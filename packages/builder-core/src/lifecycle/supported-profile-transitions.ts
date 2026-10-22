@@ -6,44 +6,17 @@ export type SupportedProfileTransitionResolutionFailureCode =
 
 export type SupportedProfileTransitionEndpoint = Readonly<{
   profile: "portfolio" | "site" | "app";
-  recipeVersion: "0.10.0" | "0.11.0" | "0.12.0" | "0.1.0" | "0.2.0" | "0.11.2" | "0.12.2" | "0.2.2" | "0.11.3" | "0.12.3" | "0.2.3" | "0.11.4" | "0.12.4" | "0.2.4";
-}>;
-
-export type SupportedHistoricalProfileTransition = Readonly<{
-  source: Readonly<{ profile: "portfolio"; recipeVersion: "0.10.0" }>;
-  target: Readonly<{ profile: "site"; recipeVersion: "0.10.0" }>;
+  recipeVersion: "0.11.5" | "0.12.5" | "0.2.5";
 }>;
 
 export type SupportedAppProfileTransition = Readonly<{
   source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.10.0" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.11.0" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.1.0" }>;
-}> | Readonly<{
-  source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.0" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.12.0" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.2.0" }>;
-}> | Readonly<{
-  source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.2" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.12.2" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.2.2" }>;
-}> | Readonly<{
-  source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.3" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.12.3" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.2.3" }>;
-}> | Readonly<{
-  source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.4" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.12.4" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.2.4" }>;
+    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.5" }>
+    | Readonly<{ profile: "site"; recipeVersion: "0.12.5" }>;
+  target: Readonly<{ profile: "app"; recipeVersion: "0.2.5" }>;
 }>;
 
-export type SupportedProfileTransition =
-  | SupportedHistoricalProfileTransition
-  | SupportedAppProfileTransition;
+export type SupportedProfileTransition = SupportedAppProfileTransition;
 
 export type SupportedProfileTransitionResolution =
   | Readonly<{ ok: true; value: SupportedProfileTransition }>
@@ -58,87 +31,21 @@ export function resolveSupportedProfileTransition(input: Readonly<{
   toProfile: string;
   toRecipeVersion: string;
 }>): SupportedProfileTransitionResolution {
-  if (input.toProfile === "app") {
-    if (input.fromProfile === "app" && input.fromRecipeVersion === input.toRecipeVersion) {
-      return { ok: false, code: "PROFILE_ALREADY_CURRENT" };
-    }
-    if (input.fromProfile !== "portfolio" && input.fromProfile !== "site") {
-      return { ok: false, code: "PROFILE_TRANSITION_SOURCE_UNSUPPORTED" };
-    }
-    if (input.toRecipeVersion === "0.2.4" &&
-        (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.4" : input.fromRecipeVersion === "0.12.4")) {
-      return { ok: true, value: {
-        source: input.fromProfile === "portfolio"
-          ? { profile: "portfolio", recipeVersion: "0.11.4" }
-          : { profile: "site", recipeVersion: "0.12.4" },
-        target: { profile: "app", recipeVersion: "0.2.4" },
-      } };
-    }
-    if (input.toRecipeVersion === "0.2.3" &&
-        (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.3" : input.fromRecipeVersion === "0.12.3")) {
-      return { ok: true, value: {
-        source: input.fromProfile === "portfolio"
-          ? { profile: "portfolio", recipeVersion: "0.11.3" }
-          : { profile: "site", recipeVersion: "0.12.3" },
-        target: { profile: "app", recipeVersion: "0.2.3" },
-      } };
-    }
-    if (input.toRecipeVersion === "0.2.2" &&
-        (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.2" : input.fromRecipeVersion === "0.12.2")) {
-      return { ok: true, value: {
-        source: input.fromProfile === "portfolio"
-          ? { profile: "portfolio", recipeVersion: "0.11.2" }
-          : { profile: "site", recipeVersion: "0.12.2" },
-        target: { profile: "app", recipeVersion: "0.2.2" },
-      } };
-    }
-    if (input.toRecipeVersion === "0.2.0" &&
-        (input.fromProfile === "portfolio" ? input.fromRecipeVersion === "0.11.0" : input.fromRecipeVersion === "0.12.0")) {
-      return { ok: true, value: {
-        source: input.fromProfile === "portfolio"
-          ? { profile: "portfolio", recipeVersion: "0.11.0" }
-          : { profile: "site", recipeVersion: "0.12.0" },
-        target: { profile: "app", recipeVersion: "0.2.0" },
-      } };
-    }
-    if (input.toRecipeVersion !== "0.1.0" ||
-        (input.fromProfile === "portfolio" ? input.fromRecipeVersion !== "0.10.0" : input.fromRecipeVersion !== "0.11.0")) {
-      return { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" };
-    }
-    return { ok: true, value: {
-      source: input.fromProfile === "portfolio"
-        ? { profile: "portfolio", recipeVersion: "0.10.0" }
-        : { profile: "site", recipeVersion: "0.11.0" },
-      target: { profile: "app", recipeVersion: "0.1.0" },
-    } };
-  }
-  if (input.toProfile !== "site") {
-    return { ok: false, code: "PROFILE_TRANSITION_UNSUPPORTED" };
-  }
-
-  if (
-    input.fromProfile === input.toProfile &&
-    input.fromRecipeVersion === input.toRecipeVersion
-  ) {
+  if (input.toProfile !== "app") return { ok: false, code: "PROFILE_TRANSITION_UNSUPPORTED" };
+  if (input.fromProfile === "app" && input.fromRecipeVersion === input.toRecipeVersion) {
     return { ok: false, code: "PROFILE_ALREADY_CURRENT" };
   }
-
-  if (input.fromProfile !== "portfolio") {
+  if (input.fromProfile !== "portfolio" && input.fromProfile !== "site") {
     return { ok: false, code: "PROFILE_TRANSITION_SOURCE_UNSUPPORTED" };
   }
-
-  if (
-    input.fromRecipeVersion !== "0.10.0" ||
-    input.toRecipeVersion !== "0.10.0"
-  ) {
+  if (input.toRecipeVersion !== "0.2.5" ||
+      input.fromRecipeVersion !== (input.fromProfile === "portfolio" ? "0.11.5" : "0.12.5")) {
     return { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" };
   }
-
-  return {
-    ok: true,
-    value: {
-      source: { profile: "portfolio", recipeVersion: "0.10.0" },
-      target: { profile: "site", recipeVersion: "0.10.0" },
-    },
-  };
+  return { ok: true, value: {
+    source: input.fromProfile === "portfolio"
+      ? { profile: "portfolio", recipeVersion: "0.11.5" }
+      : { profile: "site", recipeVersion: "0.12.5" },
+    target: { profile: "app", recipeVersion: "0.2.5" },
+  } };
 }

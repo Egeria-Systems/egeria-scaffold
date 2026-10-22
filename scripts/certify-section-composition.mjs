@@ -137,6 +137,7 @@ function configurationFor(profile, revision) {
   }
 
   const isPortfolio = profile === "portfolio";
+  const recipeVersion = isPortfolio ? "0.11.5" : "0.12.5";
   return Object.freeze({
     profile,
     projectName: isPortfolio ? "acme-portfolio" : "acme-site",
@@ -147,13 +148,13 @@ function configurationFor(profile, revision) {
       : Object.freeze([...commonCapabilities, "site-routing"]),
     capabilityIdentifier: "section-composition",
     capabilityVersion: "0.3.0",
-    expectedRecipeVersion: "0.10.0",
+    expectedRecipeVersion: recipeVersion,
     verifierIdentifier: profile,
     expectedVerificationChecks: fixedVerificationChecks,
     ...(isPortfolio ? { expectedFixtureChecks: fixtureChecks } : {}),
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.10.0",
+      recipeVersion,
       locale: "en-CA",
       evidenceRevision: revision,
     }),
@@ -198,7 +199,7 @@ function requireJourneyResult(configuration, result) {
     result.profile !== configuration.profile ||
     result.subject?.descriptorVersion !== subject.descriptorVersion ||
     result.subject?.behaviorContractDigest !== subject.behaviorContractDigest ||
-    result.recipeVersion !== "0.10.0" ||
+    result.recipeVersion !== configuration.expectedRecipeVersion ||
     result.locale !== "en-CA" ||
     result.evidenceRevision !== configuration.receipt.evidenceRevision ||
     !arraysEqual(result.checks, expectedChecksFor(configuration))
@@ -379,7 +380,9 @@ async function certifyWithAuthority(input, adapters, runJourney) {
     version: "0.3.0",
     profiles,
     subject,
-    recipeVersion: "0.10.0",
+    recipeVersions: Object.freeze(Object.fromEntries(
+      results.map(({ profile, recipeVersion }) => [profile, recipeVersion]),
+    )),
     locale: "en-CA",
     evidenceRevision: revision,
     checks: Object.freeze([

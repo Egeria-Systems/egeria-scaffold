@@ -1,7 +1,6 @@
 import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
-  applyCapabilityUpgrade as applyCapabilityUpgradeDefault,
   applyProfileTransition as applyProfileTransitionDefault,
   createApplicationEnvironmentRenderingContext,
   type ApplicationEnvironmentRenderingContext,
@@ -17,7 +16,6 @@ import {
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
   planCapabilityRemoval,
-  planCapabilityUpgrade,
   planProfileTransition as planProfileTransitionDefault,
   persistenceRemovalHumanReviewSchema,
   persistenceRemovalInputSchema,
@@ -30,11 +28,7 @@ import {
   type CapabilityRemovalPlan,
   type CapabilityRemovalExecutionResult,
   type CapabilityRemovalPlanningFailureCode,
-  type CapabilityUpgradeExecutionResult,
-  type CapabilityUpgradePlan,
-  type CapabilityUpgradePlanningFailureCode,
   type ProfileTransitionPlan,
-  type AppProfileTransitionPlan,
   type ProfileTransitionExecutionResult,
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
@@ -65,9 +59,6 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityRemoval?(input: Parameters<
     typeof applyCapabilityRemovalDefault
   >[0]): Promise<CapabilityRemovalExecutionResult>;
-  applyCapabilityUpgrade?(input: Parameters<
-    typeof applyCapabilityUpgradeDefault
-  >[0]): Promise<CapabilityUpgradeExecutionResult>;
   applyProfileTransition?(input: Parameters<
     typeof applyProfileTransitionDefault
   >[0]): Promise<ProfileTransitionExecutionResult>;
@@ -100,16 +91,10 @@ type PlanRemoveSuccess = Readonly<{
   plan: CapabilityRemovalPlan;
 }>;
 
-type PlanUpgradeSuccess = Readonly<{
-  ok: true;
-  command: "plan-upgrade";
-  plan: CapabilityUpgradePlan;
-}>;
-
 type PlanProfileTransitionSuccess = Readonly<{
   ok: true;
   command: "plan-profile-transition";
-  plan: ProfileTransitionPlan | AppProfileTransitionPlan;
+  plan: ProfileTransitionPlan;
 }>;
 
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
@@ -134,19 +119,6 @@ const removalPlannerRefusalCodes =
     "JOB_REMOVAL_SUBJECT_UNAVAILABLE",
     "PERSISTENCE_REMOVAL_INPUT_INVALID",
     "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE",
-  ]);
-
-const upgradePlannerRefusalCodes =
-  new Set<CapabilityUpgradePlanningFailureCode>([
-    "CAPABILITY_ACTION_CONFLICT",
-    "CAPABILITY_ALREADY_CURRENT",
-    "CAPABILITY_UPGRADE_EDGE_MISSING",
-    "CAPABILITY_UPGRADE_UNSUPPORTED",
-    "CAPABILITY_VERSION_AMBIGUOUS",
-    "PROJECT_DRIFT_DETECTED",
-    "PROJECT_EJECTION_UNSUPPORTED",
-    "PROJECT_INSPECTION_INVALID",
-    "PROJECT_STATE_INCOMPATIBLE",
   ]);
 
 const profileTransitionPlannerRefusalCodes =
@@ -174,14 +146,6 @@ function isRemovalPlannerRefusalCode(
 ): code is CapabilityRemovalPlanningFailureCode {
   return removalPlannerRefusalCodes.has(
     code as CapabilityRemovalPlanningFailureCode,
-  );
-}
-
-function isUpgradePlannerRefusalCode(
-  code: string,
-): code is CapabilityUpgradePlanningFailureCode {
-  return upgradePlannerRefusalCodes.has(
-    code as CapabilityUpgradePlanningFailureCode,
   );
 }
 
@@ -415,15 +379,6 @@ function writePlanRemoveRefusal(
   return 1;
 }
 
-function writePlanUpgradeRefusal(output: CliOutput, code: string): 1 {
-  writeJson(output.writeError, {
-    ok: false,
-    command: "plan-upgrade",
-    code,
-  });
-  return 1;
-}
-
 function writePlanProfileTransitionRefusal(
   output: CliOutput,
   code: string,
@@ -631,93 +586,6 @@ async function runPlanRemove(
   return 0;
 }
 
-async function runPlanUpgrade(
-  command: Extract<CliCommand, Readonly<{ kind: "plan-upgrade" }>>,
-  output: CliOutput,
-  dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
-  const root = resolve(command.directory);
-  const initialGit = await inspectForPlan(root, dependencies);
-
-  if (!initialGit.ok) {
-    return writePlanUpgradeRefusal(output, initialGit.code);
-  }
-
-  let outcome:
-    | Readonly<{
-        kind: "result";
-        result: Awaited<ReturnType<typeof planCapabilityUpgrade>>;
-      }>
-    | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
-
-  try {
-    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
-    outcome = {
-      kind: "result",
-      result: await planCapabilityUpgrade({
-        reader,
-        git: initialGit,
-        capability: command.capability,
-        toVersion: command.toVersion,
-      }),
-    };
-  } catch {
-    outcome = { kind: "failure", code: "REPOSITORY_OPEN_FAILED" };
-  }
-
-  let targetFailure: string | undefined;
-  if (outcome.kind === "result" && outcome.result.ok) {
-    const createTargets = outcome.result.value.actions.flatMap((action) =>
-      action.kind === "create-file" ? [action.path] : [],
-    );
-    const targetInspection = await inspectCreateTargetsForPlan(
-      root,
-      createTargets,
-      dependencies,
-    );
-
-    if (!targetInspection.ok) {
-      targetFailure = targetInspection.code;
-    }
-  }
-
-  const finalGit = await inspectForPlan(root, dependencies);
-
-  if (!finalGit.ok) {
-    return writePlanUpgradeRefusal(output, finalGit.code);
-  }
-
-  if (!sameGitIdentity(initialGit, finalGit)) {
-    return writePlanUpgradeRefusal(output, "GIT_WORKTREE_CHANGED");
-  }
-
-  if (targetFailure !== undefined) {
-    return writePlanUpgradeRefusal(output, targetFailure);
-  }
-
-  if (outcome.kind === "failure") {
-    return writePlanUpgradeRefusal(output, outcome.code);
-  }
-
-  if (!outcome.result.ok) {
-    const code = outcome.result.issues[0]?.code;
-    return writePlanUpgradeRefusal(
-      output,
-      code !== undefined && isUpgradePlannerRefusalCode(code)
-        ? code
-        : "REPOSITORY_OPEN_FAILED",
-    );
-  }
-
-  const success: PlanUpgradeSuccess = {
-    ok: true,
-    command: "plan-upgrade",
-    plan: outcome.result.value,
-  };
-  writeJson(output.write, success);
-  return 0;
-}
-
 async function runPlanProfileTransition(
   command: Extract<
     CliCommand,
@@ -908,52 +776,6 @@ async function runApplyRemove(
   return 0;
 }
 
-async function runApplyUpgrade(
-  command: Extract<CliCommand, Readonly<{ kind: "apply-upgrade" }>>,
-  output: CliOutput,
-  dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
-  let result: CapabilityUpgradeExecutionResult;
-  try {
-    result = await (
-      dependencies.applyCapabilityUpgrade ?? applyCapabilityUpgradeDefault
-    )({
-      root: resolve(command.directory),
-      capability: command.capability,
-      toVersion: command.toVersion,
-      approvedPlanFingerprint: command.approvedPlanFingerprint,
-      verifier: dependencies.createVerifier(),
-    });
-  } catch {
-    writeJson(output.writeError, {
-      ok: false,
-      command: "apply-upgrade",
-      code: "CAPABILITY_EXECUTION_FAILED",
-      phase: "precondition",
-      recovery: "inspect-worktree",
-    });
-    return 1;
-  }
-
-  if (!result.ok) {
-    writeJson(output.writeError, {
-      ok: false,
-      command: "apply-upgrade",
-      code: result.code,
-      phase: result.phase,
-      recovery: result.recovery,
-    });
-    return 1;
-  }
-
-  writeJson(output.write, {
-    ok: true,
-    command: "apply-upgrade",
-    result: result.value,
-  });
-  return 0;
-}
-
 async function runApplyProfileTransition(
   command: Extract<
     CliCommand,
@@ -1059,10 +881,6 @@ export function createCliRunner(
       return runPlanRemove(parsed.value, output, dependencies);
     }
 
-    if (parsed.value.kind === "plan-upgrade") {
-      return runPlanUpgrade(parsed.value, output, dependencies);
-    }
-
     if (parsed.value.kind === "plan-profile-transition") {
       return runPlanProfileTransition(parsed.value, output, dependencies);
     }
@@ -1073,10 +891,6 @@ export function createCliRunner(
 
     if (parsed.value.kind === "apply-remove") {
       return runApplyRemove(parsed.value, output, dependencies);
-    }
-
-    if (parsed.value.kind === "apply-upgrade") {
-      return runApplyUpgrade(parsed.value, output, dependencies);
     }
 
     if (parsed.value.kind === "apply-profile-transition") {

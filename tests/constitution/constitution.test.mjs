@@ -616,12 +616,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4").length, 1);
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5").length, 1);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5").if,
     "github.event_name != 'pull_request' || !github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.4").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.5").if,
     "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
@@ -706,23 +706,23 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
   const cohorts = ["Vitest five", "dependency-security", "literal-lint", "vite-security"];
   const dedicatedNames = [
-    ...cohorts.flatMap((cohort) => ["portfolio", "app-persistence-email"].map(
+    ...cohorts.flatMap((cohort) => ["portfolio", "app-persistence-email"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
       (profile) => `compiled ${cohort} jobs lifecycle on ${profile} completes production verification`,
     )),
     ...["retained", "current", "dependency-security", "literal-lint", "vite-security"].map(
       (cohort) => `compiled ${cohort} app optional lifecycle completes production verification`,
     ),
-    ...cohorts.flatMap((cohort) => ["portfolio", "site"].map(
+    ...cohorts.flatMap((cohort) => ["portfolio", "site"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
       (profile) => `compiled ${cohort} email lifecycle on ${profile} verifies and retains its foundation`,
     )),
-    ...cohorts.flatMap((cohort) => ["portfolio", "app"].map(
+    ...cohorts.flatMap((cohort) => ["portfolio", "app"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
       (profile) => `compiled ${cohort} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
     )),
   ];
-  assert.equal(new Set(dedicatedNames).size, 29);
+  assert.equal(new Set(dedicatedNames).size, 26);
   assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
     (name) => selector.test(name),
-  ).length), [2, 2, 2, 2, 5, 8, 8]);
+  ).length), [2, 2, 1, 2, 5, 7, 7]);
   for (const name of dedicatedNames) {
     assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
     assert.equal(skipSelector.test(name), true, name);
@@ -2830,7 +2830,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     enforcementMap,
-    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across eight optional subsets per retained and current edge[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+immutable app fixtures[^\n]+certification execution remains a later gate/iu,
+    /INV-APP-ARCHITECTURE[^\n]+implemented[^\n]+shared app project\/state parsing[^\n]+runtime\/test templates[^\n]+conditional whole-Worker verification[^\n]+app optional-capability addition\/removal with exact Worker receipts[^\n]+incoming app transition planning and state-last execution across eight optional subsets per current edge[^\n]+thin CLI app creation and incoming-transition exposure[^\n]+immutable app fixtures[^\n]+certification execution remains a later gate/iu,
   );
   assert.match(
     packageOwnership,
@@ -2838,7 +2838,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.4[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.5[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2858,7 +2858,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.4` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.5` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3169,7 +3169,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.4[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.5[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3740,7 +3740,9 @@ test("executable capability certification ownership is current", async () => {
     assert.equal(record.status, pending ? "pending" : "certified");
     assert.equal(
       record.taskPlan,
-      ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+      capabilityId === "standards"
+        ? "docs/superpowers/plans/2026-10-21-patched-standards-certification.md"
+        : ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
         : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
@@ -3764,7 +3766,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.4`, `site@0\.12\.4`, and `app@0\.2\.4`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.5`, `site@0\.12\.5`, and `app@0\.2\.5`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4176,7 +4178,7 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+booking-calendly@0\.1\.0[^\n]+plan-add[^\n]+apply-add[^\n]+plan-remove[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
+    /INV-CLEAN-ISOLATED-MIGRATION[^\n]+exact Calendly, multilingual, analytics, persistence, transactional-email, hosted-contact and jobs[^\n]+plan-add[^\n]+apply-add[^\n]+plan-remove[^\n]+apply-remove[^\n]+capability model[^\n]+exact plan fingerprint[^\n]+exact expected dirty paths/iu,
   );
   assert.match(
     enforcementMap,
@@ -4303,11 +4305,11 @@ test("canonical documentation accepts profile-transition execution and records t
   );
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted/iu,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+retired[^\n]+refuse without mutation/iu,
   );
   assert.match(
     enforcementMap,
-    /INV-STATE-UPDATE-ORDER[^\n]+standards(?: and site-routing)? upgrades?[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
+    /INV-STATE-UPDATE-ORDER[^\n]+incoming app transactions[^\n]+migration-before-state[^\n]+verified-final-diff/iu,
   );
   for (const candidateOwner of [sourcePlan, capabilityModel, enforcementMap]) {
     assert.match(
@@ -4413,7 +4415,7 @@ test("canonical documentation accepts profile-transition execution and records t
   }
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-PROFILE-TRANSITION[^\n]+actual and accepted[^\n]+pull request 50/iu,
+    /INV-SUPPORTED-PROFILE-TRANSITION[^\n]+two exact incoming app edges[^\n]+Historical portfolio-to-site[^\n]+inert provenance/iu,
   );
 
   for (const extractionOwner of [
@@ -4577,7 +4579,7 @@ test("canonical documentation accepts profile-transition execution and records t
 
   assert.match(
     enforcementMap,
-    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+standards@0\.3\.0[^\n]+standards@0\.4\.0[^\n]+apply-upgrade[^\n]+actual[^\n]+accepted[^\n]+separate verified-final-diff stop/iu,
+    /INV-SUPPORTED-UPGRADE-EDGE[^\n]+retired[^\n]+refuse without mutation/iu,
   );
 });
 
@@ -4968,7 +4970,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.4[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.5[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

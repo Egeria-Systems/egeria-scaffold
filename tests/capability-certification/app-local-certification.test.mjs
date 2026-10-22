@@ -26,8 +26,8 @@ registry.records["app-foundation"] = {
 };
 registry.records.standards = {
   subject: {
-    descriptorVersion: "0.5.0",
-    behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+    descriptorVersion: "0.5.1",
+    behaviorContractDigest: "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
   },
   requiredEvidence: ["existing-repository-lifecycle", "fresh-scaffold"],
   status: "pending",
@@ -61,7 +61,7 @@ const configuration = {
   createArguments: [], capabilityIdentifier: "app-foundation", capabilityVersion: "0.1.0",
   expectedCapabilities: fixtureState.installedCapabilities.map(({ identifier }) => identifier),
   expectedInstalledCapabilities: fixtureState.installedCapabilities,
-  expectedCapabilitySettings: {}, expectedRecipeVersion: "0.2.4", verifierIdentifier: "app",
+  expectedCapabilitySettings: {}, expectedRecipeVersion: "0.2.5", verifierIdentifier: "app",
   expectedVerificationChecks: fixedChecks,
   createError: code => new TestCertificationError(code),
   isCertificationError: error => error instanceof TestCertificationError,
@@ -162,10 +162,10 @@ test("fresh app runner contracts retain actual separate Worker and build evidenc
 test("fresh app runner contracts reject project selection and settings disagreement", async () => {
   for (const changeProject of [
     source => source.replace("originProfile: app", "originProfile: site"),
-    source => source.replace("recipeVersion: 0.2.4", "recipeVersion: 0.2.0"),
-    source => source.replace("recipeVersion: 0.2.4", "recipeVersion: 0.2.1"),
-    source => source.replace("recipeVersion: 0.2.4", "recipeVersion: 0.2.2"),
-    source => source.replace("recipeVersion: 0.2.4", "recipeVersion: 0.3.0"),
+    source => source.replace("recipeVersion: 0.2.5", "recipeVersion: 0.2.0"),
+    source => source.replace("recipeVersion: 0.2.5", "recipeVersion: 0.2.1"),
+    source => source.replace("recipeVersion: 0.2.5", "recipeVersion: 0.2.2"),
+    source => source.replace("recipeVersion: 0.2.5", "recipeVersion: 0.3.0"),
     source => source.replace("capabilitySettings: {}", "capabilitySettings:\n  booking-calendly:\n    destination: https://calendly.com/example/intro\n    mode: popup"),
     source => source.replace("  - site-routing\n", ""),
   ]) {
@@ -189,14 +189,14 @@ test("local runner contracts attribute default app journeys only to the retained
     "multilingual", "observability", "section-composition", "site-routing", "standards",
   ]);
   assert.deepEqual(result.subjects.find(({ capability }) => capability === "standards").subject, {
-    descriptorVersion: "0.5.0", behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+    descriptorVersion: "0.5.1", behaviorContractDigest: "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
   });
   assert.deepEqual(result.freshScaffolds.map(({ identifier }) => identifier), ["app", "app-all-optional-integrations"]);
   for (const fresh of result.freshScaffolds) {
-    assert.equal(fresh.recipeVersion, "0.2.4");
+    assert.equal(fresh.recipeVersion, "0.2.5");
     assert.deepEqual(fresh.workerIntegration, { executed: [fresh.identifier], skipped: [] });
     assert.deepEqual(fresh.appBuildEvidence, [buildEvidence(fresh.identifier)]);
-    assert.equal(fresh.installedCapabilities[0].version, "0.5.0");
+    assert.equal(fresh.installedCapabilities[0].version, "0.5.1");
   }
   assert.deepEqual(adapters.calls, ["create", "infer", "doctor", "diff", "verify", "create", "infer", "doctor", "diff", "verify"]);
   assert.doesNotMatch(JSON.stringify(result), /certified|accepted|calendly\.com|clarity123|0123456789abcdef0123456789abcdef/);
@@ -205,6 +205,10 @@ test("local runner contracts attribute default app journeys only to the retained
 test("local app certification refuses persistence and renewed shared subjects before generation", async () => {
   for (const changed of [
     currentRegistry.records,
+    { ...registry.records, standards: {
+      ...registry.records.standards,
+      subject: { descriptorVersion: "0.5.0", behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9" },
+    } },
     { ...registry.records, "application-persistence": {
       ...registry.records["app-foundation"],
       subject: { descriptorVersion: "0.1.0", behaviorContractDigest: `sha256:${"c".repeat(64)}` },

@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -15,10 +15,7 @@ const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
-  { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
-  { profiles: createLiteralLintProfileRecipes(), versions: { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.3-foundation", site: "web-recipe-app-0.2.3", app: "web-recipe-app-0.2.3" }, persistenceLock: "web-recipe-app-0.2.3-persistence" },
-  { profiles: createViteSecurityProfileRecipes(), versions: { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.4-foundation", site: "web-recipe-app-0.2.4", app: "web-recipe-app-0.2.4" }, persistenceLock: "web-recipe-app-0.2.4-persistence" },
+  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.5-foundation", site: "web-recipe-app-0.2.5", app: "web-recipe-app-0.2.5" }, persistenceLock: "web-recipe-app-0.2.5-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -31,7 +28,7 @@ async function assertCohort(repo, cohort, profile, persistent = false) {
 }
 
 async function repository(profile = "portfolio", options = {}) {
-  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createVitestFiveProfileRecipes() };
+  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createCurrentProfileRecipes() };
   const rendered = await core.renderSkeleton({ profile, projectName: "email-lifecycle", displayName: "Email lifecycle", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
@@ -74,7 +71,7 @@ async function addition(repo, selectedCapability = capability, overrides = {}) {
 }
 
 test("current profiles add email with explicit dependencies and persist state only after verification", async () => {
-  for (const cohort of cohorts) for (const profile of ["portfolio", "site", "app"]) {
+  for (const cohort of cohorts) for (const profile of Object.keys(cohort.versions)) {
     const repo = await repository(profile, { profiles: cohort.profiles });
     const { planned, result } = await addition(repo);
     assert.equal(result.ok, true, JSON.stringify(result));
@@ -102,7 +99,7 @@ test("failed verification retains the source prefix without recording successful
 });
 
 test("email removal declares separate operator review and retains foundation on all profiles", async () => {
-  for (const cohort of cohorts) for (const profile of ["portfolio", "site", "app"]) {
+  for (const cohort of cohorts) for (const profile of Object.keys(cohort.versions)) {
     const repo = await repository(profile, { transactionalEmailResend: true, profiles: cohort.profiles });
     const planned = await core.planCapabilityRemoval({ reader: repo.reader, git, capability, inspectRepositoryInventory: repo.inventory });
     assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -132,11 +129,11 @@ test("email addition refuses historical recipes and modified dependency locks be
   assert.equal(planned.ok, false);
   assert.equal(planned.issues[0].code, "PROJECT_DRIFT_DETECTED");
   assert.deepEqual(repo.writes, []);
-  const context = createGenerationRenderingContext();
-  const historical = await repository("portfolio", { context: { ...context, catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFourProfileRecipes() } });
+  const historical = await repository("portfolio");
+  const source = decoder.decode(historical.files.get(".egeria/project.yaml"));
+  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.5", "0.10.0")));
   const result = await core.planCapabilityAddition({ reader: historical.reader, git, capability });
   assert.equal(result.ok, false);
-  assert.equal(result.issues[0].code, "CAPABILITY_ADDITION_UNSUPPORTED");
   assert.deepEqual(historical.writes, []);
 });
 
@@ -176,7 +173,8 @@ test("email and persistence compose in either addition order", async () => {
 
 test("other optional additions preserve email and the retained foundation", async () => {
   for (const cohort of cohorts) for (const emailInstalled of [true, false]) {
-    const repo = await repository("portfolio", { ...(emailInstalled ? { transactionalEmailResend: true } : { context: { ...createGenerationRenderingContext(false, true), profiles: cohort.profiles } }), profiles: cohort.profiles });
+    const profile = Object.hasOwn(cohort.versions, "portfolio") ? "portfolio" : "site";
+    const repo = await repository(profile, { ...(emailInstalled ? { transactionalEmailResend: true } : { context: { ...createGenerationRenderingContext(false, true), profiles: cohort.profiles } }), profiles: cohort.profiles });
     const { result } = await addition(repo, "multilingual");
     assert.equal(result.ok, true, JSON.stringify(result));
     const project = core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value;
@@ -351,15 +349,11 @@ test("jobs-bearing repositories refuse incidental addition and removal without c
 });
 
 
-test("jobs repositories refuse profile transitions and unsupported upgrades before writes", async () => {
+test("jobs repositories refuse profile transitions before writes", async () => {
   const repo = await repository("portfolio", { backgroundJobDelivery: true });
   const before = new Map(repo.files);
   for (const toProfile of ["site", "app"]) {
     const result = await core.planProfileTransition({ reader: repo.reader, git, toProfile });
-    assert.equal(result.ok, false, JSON.stringify(result));
-  }
-  for (const selectedCapability of ["background-job-delivery", "standards"]) {
-    const result = await core.planCapabilityUpgrade({ reader: repo.reader, git, capability: selectedCapability, toVersion: "0.4.0" });
     assert.equal(result.ok, false, JSON.stringify(result));
   }
   assert.deepEqual(repo.files, before);

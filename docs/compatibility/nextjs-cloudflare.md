@@ -12,6 +12,10 @@ On 2026-08-13, Repository quality [run `31742910235`](https://github.com/Egeria-
 
 The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Its package manifest and the root manifest own the current exact executable versions; the current workflows own their action pins and deployment contract. Preparation evidence and the approved implementation plan remain separately reviewable as private local workflow artifacts ignored by Git.
 
+## Current local dependency renewal
+
+The unused-public-generation retirement candidate changes only the proof's Vitest declaration from `5.0.1` to `5.0.3` and its necessary root lock closure under [ADR-0015](../adr/0015-vitest-five-generation.md#patched-public-generation). The exact root lock SHA-256 is `06247cf74d1084578ab07cfa7e1cb58ab6c5ae5f51399a19f2146b2bef49287d`. Local frozen installation, peer checks, moderate-threshold audit (zero advisories), all 807 registry signatures, four unit tests, Next/OpenNext builds and 21 workerd integration tests pass against that candidate. OpenNext reuses the completed Next build. These local outcomes do not renew the historical browser, hosted or deployed evidence below, and supply no release or certification acceptance.
+
 ## Accepted evidence snapshot
 
 | Surface | Exact version or value |

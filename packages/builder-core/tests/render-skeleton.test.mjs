@@ -8,7 +8,6 @@ import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
-import { retainedRenderingContext } from "./retained-generation.mjs";
 import { createTemplateCatalog } from "../dist/generation/template-catalog.js";
 import {
   deriveTemplateDestination,
@@ -21,135 +20,70 @@ const tokens = {
   workerName: "acme-studio-web",
 };
 
-test("literal lint successors own their patch and preserve installed dependency cohorts", async () => {
+test("current recipes own the lint patch and select exact optional dependency families", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const { createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
   const patchPath = "patches/next-eslint-plugin-next.patch";
   const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
-  const recipes = { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" };
+  const recipes = { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" };
   for (const profile of ["portfolio", "site", "app"]) {
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
-      const request = { profile, projectName: "literal-lint-example", displayName: "Literal Lint Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
-      const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true), profiles: createLiteralLintProfileRecipes() };
+      const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
+      const request = { profile, projectName: "current-example", displayName: "Current Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
       const current = assertSuccess(await core.renderSkeleton(request, context));
       assert.equal(current.project.recipeVersion, recipes[profile]);
-      const oldContext = { ...context, profiles: createDependencySecurityProfileRecipes() };
-      const retained = assertSuccess(await core.renderSkeleton(request, oldContext));
-      const fileMap = new Map(current.files.map(({ path, content }) => [path, content]));
-      assert.deepEqual(Buffer.from(fileMap.get(patchPath)), patch);
-      assert.equal(retained.files.some(({ path }) => path === patchPath), false);
-      assert.deepEqual(current.files.filter(({ path }) => ![patchPath, "pnpm-workspace.yaml"].includes(path)), retained.files.filter(({ path }) => path !== "pnpm-workspace.yaml"));
-      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-      const oldPolicy = parseGeneratedYaml(retained.files, "pnpm-workspace.yaml");
-      const plugin = profile === "portfolio" ? "16.3.0" : "16.3.3";
-      assert.deepEqual(policy, { ...oldPolicy, overrides: { ...oldPolicy.overrides, [`@next/eslint-plugin-next@${plugin}>fast-glob`]: "-" }, patchedDependencies: { [`@next/eslint-plugin-next@${plugin}`]: patchPath } });
+      assert.deepEqual(Buffer.from(current.files.find(({ path }) => path === patchPath).content), patch);
       const ownedPatch = current.surfaces.find(({ path }) => path === patchPath);
       assert.equal(ownedPatch.ownership, "managed");
       assert.deepEqual(ownedPatch.owner, { kind: "builder-kernel" });
+      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
       const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
+      const plugin = manifest.devDependencies["eslint-config-next"];
+      assert.equal(policy.overrides["@next/eslint-plugin-next@" + plugin + ">fast-glob"], "-");
+      assert.equal(policy.patchedDependencies["@next/eslint-plugin-next@" + plugin], patchPath);
+      assert.equal(manifest.devDependencies.vitest, "5.0.3");
+      assert.equal(manifest.dependencies.next, "16.3.8");
       const foundation = manifest.dependencies.effect !== undefined;
-      const expectedLock = profile === "app" && options.applicationPersistence ? "app-0.2.3-persistence"
-        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.3"
-        : profile === "portfolio" && foundation ? "portfolio-0.11.3-foundation"
-        : `${profile}-${recipes[profile]}`;
+      const expectedLock = options.applicationPersistence ? "app-0.2.5-persistence"
+        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.5"
+        : profile === "portfolio" && foundation ? "portfolio-0.11.5-foundation"
+        : profile + "-" + recipes[profile];
       assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
-      assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), expectedLock.replace(/3(?=-|$)/u, "2"));
-      for (const [rendered, selectedContext] of [[current, context], [retained, oldContext]]) {
-        const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
-        const state = { origin: { profile, recipeVersion: rendered.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces };
-        assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(rendered.project, state)).renderingContext, selectedContext);
+      for (const vitest of ["4.1.10", "4.1.11", "5.0.0", "^5.0.3"]) {
+        assert.equal(resolveRecipeLockfileVersion(current.project, { ...manifest, devDependencies: { ...manifest.devDependencies, vitest } }), undefined);
       }
+      const lockfile = parseDocument(await readFile(new URL("../lockfiles/web-recipe-" + expectedLock + "/pnpm-lock.yaml", import.meta.url), "utf8")).toJS();
+      assert.deepEqual(lockfile.overrides, policy.overrides);
+      assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(current.project, renderingState(core, current))).renderingContext, context);
     }
-    const candidate = assertSuccess(await core.renderSkeleton({ profile, projectName: "literal-lint-candidate", displayName: "Literal Lint Candidate", packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext()));
+    const candidate = assertSuccess(await core.renderSkeleton({ profile, projectName: "internal-example", displayName: "Internal Example", packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext()));
     assert.equal(candidate.project.schemaVersion, "2.0.0");
     assert.deepEqual(Buffer.from(candidate.files.find(({ path }) => path === patchPath).content), patch);
   }
 });
 
-test("supported rendering retains independently frozen pre-retirement bytes and ownership", async () => {
+function renderingState(core, rendered) {
+  const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
+  const checks = rendered.project.selectedCapabilities.includes("application-persistence")
+    ? core.persistenceGenerationVerificationChecks
+    : rendered.project.selectedCapabilities.includes("app-foundation") ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+  return {
+    schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0",
+    origin: { profile: rendered.project.originProfile, recipeVersion: rendered.project.recipeVersion },
+    installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces, appliedMigrations: [], ejections: [],
+    compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" },
+    lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] },
+  };
+}
+
+test("frozen retired rendering controls remain inert and refuse executable selection", async () => {
   const core = await import("../dist/index.js");
   const frozen = JSON.parse(await readFile(new URL("./fixtures/retired-recipes/supported-rendering.json", import.meta.url), "utf8"));
+  assert.ok(frozen.cases.length > 0);
   for (const expected of frozen.cases) {
-    const actual = assertSuccess(await core.renderSkeleton(expected.request, expected.context));
-    assert.deepEqual(actual.project, expected.project, expected.label);
-    assert.deepEqual(actual.surfaces, expected.surfaces, expected.label);
-    assert.deepEqual(actual.files.map(({ path, content }) => ({ path, sha256: createHash("sha256").update(content).digest("hex") })), expected.files, expected.label);
-  }
-});
-
-test("dependency successors preserve retained output and require exact declaration and recipe pairs", async () => {
-  const core = await import("../dist/index.js");
-  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
-  const recipes = { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" };
-  for (const profile of ["portfolio", "site", "app"]) {
-    for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
-      const request = { profile, projectName: "successor-example", displayName: "Successor Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
-      const context = { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true), profiles: core.createDependencySecurityProfileRecipes() };
-      const current = assertSuccess(await core.renderSkeleton(request, context));
-      assert.equal(current.project.recipeVersion, recipes[profile]);
-      const retained = assertSuccess(await core.renderSkeleton(request, { ...context, profiles: core.createVitestFiveProfileRecipes() }));
-      const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
-      const oldManifest = parseGeneratedJson(retained.files, "apps/web/package.json");
-      assert.equal(oldManifest.dependencies.next, profile === "portfolio" && !options.transactionalEmailResend && !options.backgroundJobDelivery ? "16.3.0" : "16.3.3");
-      assert.deepEqual(manifest, { ...oldManifest, dependencies: { ...oldManifest.dependencies, next: "16.3.8" } });
-      assert.deepEqual(current.files.filter(file => !["apps/web/package.json", "pnpm-workspace.yaml"].includes(file.path)), retained.files.filter(file => !["apps/web/package.json", "pnpm-workspace.yaml"].includes(file.path)));
-      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-      assert.equal(policy.overrides["next@>=16.2.0 <16.3.8"], "16.3.8");
-      assert.equal(policy.overrides["sharp@>=0.35.0 <0.35.5"], "0.35.5");
-      assert.ok(resolveRecipeLockfileVersion(current.project, manifest));
-      assert.equal(resolveRecipeLockfileVersion(current.project, oldManifest), undefined);
-      assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), undefined);
-      const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(current.files.map(({ path, content }) => [path, content])), surfaces: current.surfaces }));
-      const state = { origin: { profile, recipeVersion: recipes[profile] }, installedCapabilities: core.createInstalledManifest(current.resolved), managedSurfaces };
-      assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(current.project, state)).renderingContext, context);
-    }
-  }
-});
-
-test("application environment dependency policy preserves retained graphs and corrects the Next declaration", async () => {
-  const core = await import("../dist/index.js");
-  const { createGenerationRenderingContext } = await import("../dist/catalog/verified-package-versions.js");
-  for (const profile of ["portfolio", "site", "app"]) {
-    const request = { profile, projectName: "dependency-example", displayName: "Dependency Example", packageVersions: core.verifiedCapabilityPackageVersions };
-    const current = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createVitestFiveProfileRecipes() }));
-    const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
-    const currentWorkspace = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-    const candidateWorkspace = parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml");
-    assert.equal(currentWorkspace.overrides["fast-uri@"], "3.1.6");
-    assert.equal(currentWorkspace.overrides["miniflare>undici"], "7.29.0");
-    assert.equal(currentWorkspace.overrides["jsdom>undici"], undefined);
-    const retainedOverrides = { ...currentWorkspace.overrides };
-    delete retainedOverrides["next@16.3.0"];
-    delete retainedOverrides["sharp@>=0.35.0 <0.35.4"];
-    assert.deepEqual(candidateWorkspace, {
-      ...currentWorkspace,
-      minimumReleaseAgeExclude: ["vite@8.2.4", ...currentWorkspace.minimumReleaseAgeExclude.filter(value => value !== "fast-uri@3.1.6"), "undici@7.29.1", "undici@8.10.2"],
-      overrides: {
-        ...retainedOverrides,
-        "vite@>=8.2.0 <8.2.4": "8.2.4",
-        "vite@8.2.4>rolldown": "1.2.5",
-        "vite@8.2.4>postcss": "8.5.26",
-        "fast-uri@": "3.1.8",
-        "miniflare>undici": "7.29.1",
-        "jsdom>undici": "8.10.2",
-        "next@>=16.2.0 <16.3.8": "16.3.8",
-        "sharp@>=0.35.0 <0.35.5": "0.35.5",
-        "source-map-js@>=1.0.0 <1.2.2": "1.2.2",
-        "proxy-addr@>=2.0.0 <2.0.8": "2.0.8",
-        "brace-expansion@>=1.0.0 <1.1.21": "1.1.21",
-        "brace-expansion@>=2.0.0 <2.1.7": "2.1.7",
-        "brace-expansion@>=5.0.0 <5.0.12": "5.0.12",
-        [`@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}>fast-glob`]: "-",
-      },
-      patchedDependencies: { [`@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`]: "patches/next-eslint-plugin-next.patch" },
-    });
-    const currentManifest = parseGeneratedJson(current.files, "apps/web/package.json");
-    const candidateManifest = parseGeneratedJson(candidate.files, "apps/web/package.json");
-    assert.deepEqual(candidateManifest.dependencies, { ...currentManifest.dependencies, next: "16.3.8" });
-    assert.deepEqual(candidateManifest.devDependencies, currentManifest.devDependencies);
+    assert.ok(expected.files.length > 0);
+    assert.equal((await core.renderSkeleton(expected.request, expected.context)).ok, false, expected.label);
   }
 });
 
@@ -200,12 +134,8 @@ const appFoundationPaths = [
 
 test("app generation preserves production-site bytes across all optional subsets", async () => {
   const core = await import("../dist/index.js");
-  const { createVitestFiveProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   for (const generation of [
-    { context: retainedRenderingContext, recipe: "0.1.0", standards: "0.4.0", appVitest: "4.1.11", siteVitest: "4.1.10" },
-    { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() }, recipe: "0.2.0", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
-    { context: { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: core.createDependencySecurityProfileRecipes() }, recipe: "0.2.2", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
-    { context: undefined, recipe: "0.2.4", standards: "0.5.0", appVitest: "5.0.0", siteVitest: "5.0.0" },
+    { context: undefined, recipe: "0.2.5", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -349,6 +279,7 @@ const portfolioPaths = [
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
+  "patches/next-eslint-plugin-next.patch",
   "pnpm-workspace.yaml",
 ];
 
@@ -421,6 +352,7 @@ const sitePaths = [
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
   "package.json",
+  "patches/next-eslint-plugin-next.patch",
   "pnpm-workspace.yaml",
 ];
 
@@ -630,7 +562,7 @@ function contrastRatio(foreground, background) {
 async function loadRenderSkeleton() {
   const module = await import("../dist/index.js");
   assert.equal(typeof module.renderSkeleton, "function");
-  return (request, context = retainedRenderingContext) => module.renderSkeleton(request, context);
+  return (request, context) => module.renderSkeleton(request, context);
 }
 
 async function compileGeneratedContentModule(files) {
@@ -1906,67 +1838,18 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
   }
 });
 
-test("current site rendering uses the patched framework while historical rendering stays frozen", async () => {
+test("current site rendering uses the patched framework and refuses historical controls", async () => {
   const renderSkeleton = await loadRenderSkeleton();
-  const request = {
-    profile: "site",
-    projectName: "acme-studio",
-    displayName: "Acme Studio",
-    packageVersions,
-  };
+  const request = { profile: "site", projectName: "acme-studio", displayName: "Acme Studio", packageVersions };
   const current = assertSuccess(await renderSkeleton(request));
-  const currentManifest = JSON.parse(
-    indexFiles(current.files).get("apps/web/package.json"),
-  );
-  const historicalProfiles = [
-    {
-      identifier: "portfolio",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
-      defaultCapabilities: [
-        "standards",
-        "content-files",
-        "section-composition",
-        "deployment-cloudflare",
-        "observability",
-      ],
-    },
-    {
-      identifier: "site",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.10.0",
-      defaultCapabilities: [
-        "standards",
-        "content-files",
-        "section-composition",
-        "deployment-cloudflare",
-        "observability",
-        "site-routing",
-      ],
-    },
-  ];
-  const historicalRendered = assertSuccess(
-    await renderSkeleton(request, {
-      catalogSnapshot: {
-        standards: "0.4.0",
-        siteRouting: "0.3.0",
-      },
-      profiles: historicalProfiles,
-    }),
-  );
-  const historicalManifest = JSON.parse(
-    indexFiles(historicalRendered.files).get("apps/web/package.json"),
-  );
-
-  assert.equal(current.project.recipeVersion, "0.11.0");
-  assert.equal(currentManifest.dependencies.next, "16.3.3");
-  assert.equal(currentManifest.devDependencies["eslint-config-next"], "16.3.3");
-  assert.equal(historicalRendered.project.recipeVersion, "0.10.0");
-  assert.equal(historicalManifest.dependencies.next, "16.3.0");
-  assert.equal(
-    historicalManifest.devDependencies["eslint-config-next"],
-    "16.3.0",
-  );
+  const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
+  assert.equal(current.project.recipeVersion, "0.12.5");
+  assert.equal(manifest.dependencies.next, "16.3.8");
+  assert.equal(manifest.devDependencies["eslint-config-next"], "16.3.3");
+  assert.equal((await renderSkeleton(request, {
+    catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
+    profiles: [{ identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.10.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] }],
+  })).ok, false);
 });
 
 test("production site rendering materializes route metadata and browser contracts without changing portfolio", async () => {
@@ -2063,7 +1946,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.11.5",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -2142,7 +2025,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.2",
-      next: "16.3.0",
+      next: "16.3.8",
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
@@ -2168,7 +2051,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       tailwindcss: "4.3.3",
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
-      vitest: "4.1.10",
+      vitest: "5.0.3",
       wrangler: "4.118.0",
     },
   });
@@ -2210,7 +2093,8 @@ test("generated unit and component tests use distinct named environments", async
   assert.doesNotMatch(configuration, /workers|cloudflare|miniflare|coverage/iu);
   assert.doesNotMatch(configuration, /vite-tsconfig-paths/u);
 
-  assert.match(setup, /@testing-library\/jest-dom\/vitest/u);
+  assert.match(setup, /@testing-library\/jest-dom\/matchers/u);
+  assert.match(setup, /expect\.extend\(matchers\)/u);
   assert.match(setup, /afterEach\(cleanup\)/u);
   assert.match(unitTest, /parseContentConfiguration/u);
   assert.match(unitTest, /parseYamlContent/u);
@@ -2246,48 +2130,14 @@ test("generated workspaces constrain vulnerable transitive dependency ranges", a
     "pnpm-workspace.yaml",
   );
 
-  assert.deepEqual(workspace.minimumReleaseAgeExclude, [
-    "@egeria-systems/observability@0.3.0",
-    "fast-uri@3.1.6",
-    "qs@6.16.0",
-    "js-yaml@4.3.2",
-    "sharp@0.35.4",
-    "@img/sharp-darwin-arm64@0.35.4",
-    "@img/sharp-darwin-x64@0.35.4",
-    "@img/sharp-freebsd-wasm32@0.35.4",
-    "@img/sharp-libvips-darwin-arm64@1.3.3",
-    "@img/sharp-libvips-darwin-x64@1.3.3",
-    "@img/sharp-libvips-linux-arm@1.3.3",
-    "@img/sharp-libvips-linux-arm64@1.3.3",
-    "@img/sharp-libvips-linux-ppc64@1.3.3",
-    "@img/sharp-libvips-linux-riscv64@1.3.3",
-    "@img/sharp-libvips-linux-s390x@1.3.3",
-    "@img/sharp-libvips-linux-x64@1.3.3",
-    "@img/sharp-libvips-linuxmusl-arm64@1.3.3",
-    "@img/sharp-libvips-linuxmusl-x64@1.3.3",
-    "@img/sharp-linux-arm@0.35.4",
-    "@img/sharp-linux-arm64@0.35.4",
-    "@img/sharp-linux-ppc64@0.35.4",
-    "@img/sharp-linux-riscv64@0.35.4",
-    "@img/sharp-linux-s390x@0.35.4",
-    "@img/sharp-linux-x64@0.35.4",
-    "@img/sharp-linuxmusl-arm64@0.35.4",
-    "@img/sharp-linuxmusl-x64@0.35.4",
-    "@img/sharp-wasm32@0.35.4",
-    "@img/sharp-webcontainers-wasm32@0.35.4",
-    "@img/sharp-win32-arm64@0.35.4",
-    "@img/sharp-win32-ia32@0.35.4",
-    "@img/sharp-win32-x64@0.35.4",
-  ]);
-  assert.deepEqual(workspace.overrides, {
-    "fast-uri@": "3.1.6",
-    "js-yaml@>=4.0.0 <4.3.2": "4.3.2",
-    "miniflare>undici": "7.29.0",
-    "next@16.3.0": "16.3.3",
-    "qs@": "6.16.0",
-    "sharp@>=0.35.0 <0.35.4": "0.35.4",
-    "vitest@4.1.10": "4.1.11",
-  });
+  assert.equal(workspace.minimumReleaseAge, 1440);
+  assert.equal(workspace.resolutionMode, "time-based");
+  assert.equal(workspace.overrides["vitest@4.1.10"], undefined);
+  assert.equal(workspace.overrides["next@>=16.2.0 <16.3.8"], "16.3.8");
+  assert.equal(workspace.overrides["vite@>=8.2.0 <8.2.4"], "8.2.4");
+  assert.equal(workspace.overrides["sharp@>=0.35.0 <0.35.5"], "0.35.5");
+  assert.ok(workspace.minimumReleaseAgeExclude.includes("vite@8.2.4"));
+
 });
 
 test("production observability renders bounded Next and Cloudflare composition", async () => {
@@ -2306,7 +2156,7 @@ test("production observability renders bounded Next and Cloudflare composition",
 
   assert.match(
     workspace,
-    /minimumReleaseAgeExclude:\n  - "@egeria-systems\/observability@0\.3\.0"/u,
+    /minimumReleaseAgeExclude:[\s\S]*"@egeria-systems\/observability@0\.3\.0"/u,
   );
 
   assert.deepEqual(wrangler.observability, {
@@ -3501,7 +3351,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.10.0");
+    assert.equal(rendered.project.recipeVersion, "0.11.5");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -5897,8 +5747,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 103],
-    ["site", 120],
+    ["portfolio", 104],
+    ["site", 121],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -6041,7 +5891,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 108);
+  assert.equal(selected.surfaces.length, 109);
   assert.deepEqual(
     selected.surfaces
       .filter(
@@ -6184,37 +6034,9 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 });
 
 
-test("Vitest five generation materializes each exact recipe without changing the retained generation", async () => {
-  const core = await import("../dist/index.js");
-  const { createVitestFourProfileRecipes, createVitestFiveProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-  const retained = { catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFourProfileRecipes() };
-  for (const [profile, recipeVersion, oldRecipeVersion] of [["portfolio", "0.11.0", "0.10.0"], ["site", "0.12.0", "0.11.0"], ["app", "0.2.0", "0.1.0"]]) {
-    const request = { profile, projectName: "vitest-contract", displayName: "Vitest contract", packageVersions: core.verifiedCapabilityPackageVersions };
-    const current = await core.renderSkeleton(request, { catalogSnapshot: { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: createVitestFiveProfileRecipes() });
-    const historical = await core.renderSkeleton(request, retained);
-    assert.equal(current.ok, true, JSON.stringify(current));
-    assert.equal(historical.ok, true, JSON.stringify(historical));
-    assert.equal(current.value.project.recipeVersion, recipeVersion);
-    assert.equal(historical.value.project.recipeVersion, oldRecipeVersion);
-    for (const [rendered, version, standards] of [[current.value, "5.0.0", "0.5.0"], [historical.value, profile === "app" ? "4.1.11" : "4.1.10", "0.4.0"]]) {
-      const files = new Map(rendered.files.map(({ path, content }) => [path, Buffer.from(content).toString("utf8")]));
-      const manifest = JSON.parse(files.get("apps/web/package.json"));
-      assert.equal(manifest.devDependencies.vitest, version);
-      assert.equal(manifest.dependencies.next, profile === "portfolio" ? "16.3.0" : "16.3.3");
-      assert.equal(manifest.dependencies.effect, profile === "app" ? "4.0.0-rc.112" : undefined);
-      assert.equal(core.createInstalledManifest(rendered.resolved).find(({ identifier }) => identifier === "standards").version, standards);
-      assert.equal(parseDocument(files.get("pnpm-workspace.yaml")).toJS().overrides["vitest@4.1.10"], version === "5.0.0" ? undefined : "4.1.11");
-      assert.equal(files.has("apps/web/vitest.cloudflare.config.ts"), profile === "app");
-    }
-    const currentFiles = new Map(current.value.files.map(({ path, content }) => [path, content]));
-    const changed = historical.value.files.filter(({ path, content }) => !Buffer.from(content).equals(currentFiles.get(path))).map(({ path }) => path).sort();
-    assert.deepEqual(changed, ["apps/web/package.json", "apps/web/tests/setup/component.ts", "pnpm-workspace.yaml"]);
-  }
-});
-
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
-  catalogSnapshot: { standards: "0.7.0", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" },
+  catalogSnapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" },
   profiles: [
     { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
     { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
@@ -6240,7 +6062,7 @@ test("application environment rendering preserves profile identity and materiali
       assert.ok(files.has("apps/web/src/configuration/application-environment.ts"));
       assert.ok(files.has("docs/environments.md"));
       const manifest = JSON.parse(files.get("apps/web/package.json"));
-      assert.equal(manifest.devDependencies.vitest, "5.0.0");
+      assert.equal(manifest.devDependencies.vitest, "5.0.3");
       assert.equal(manifest.dependencies.effect, profile === "app" ? "4.0.0-rc.112" : undefined);
       assert.equal(manifest.scripts["check:environment"], "node scripts/check-application-environment.mjs --local");
       assert.equal(manifest.scripts["check:environment:deployment"], "node scripts/check-application-environment.mjs --deployment");
@@ -6356,9 +6178,9 @@ test("fresh security declarations match their locked Next across supported depen
 test("security recipes remain outside environment schema controls", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.2"], ["app", "0.2.2"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.5"], ["site", "0.12.5"], ["app", "0.2.5"]]) {
     const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
-    const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createVitestFiveProfileRecipes() }));
+    const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createCurrentProfileRecipes() }));
     assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);
     const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
     assert.equal(core.applicationEnvironmentProjectConfigurationSchema.safeParse(candidate.project).success, true);
@@ -6387,48 +6209,5 @@ test("security dependency policy shares exact reviewed patches with environment 
     assert.equal(policy.resolutionMode, "time-based");
     assert.equal(current.project.schemaVersion, "1.0.0");
     assert.equal(candidate.project.schemaVersion, "2.0.0");
-  }
-});
-
-test("Vite security successors preserve installed cohorts and select exact dependency policy and locks", async () => {
-  const core = await import("../dist/index.js");
-  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  const { createLiteralLintProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
-  const recipes = { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" };
-  for (const profile of ["portfolio", "site", "app"]) {
-    for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
-      const request = { profile, projectName: "vite-security-example", displayName: "Vite Security Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options };
-      const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
-      const current = assertSuccess(await core.renderSkeleton(request, context));
-      assert.equal(current.project.recipeVersion, recipes[profile]);
-      const retainedContext = { ...context, profiles: createLiteralLintProfileRecipes() };
-      const retained = assertSuccess(await core.renderSkeleton(request, retainedContext));
-      assert.deepEqual(current.files.filter(({ path }) => path !== "pnpm-workspace.yaml"), retained.files.filter(({ path }) => path !== "pnpm-workspace.yaml"));
-      assert.deepEqual(core.createInstalledManifest(current.resolved), core.createInstalledManifest(retained.resolved));
-      const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-      const oldPolicy = parseGeneratedYaml(retained.files, "pnpm-workspace.yaml");
-      assert.deepEqual(policy, {
-        ...oldPolicy,
-        minimumReleaseAgeExclude: ["vite@8.2.4", ...oldPolicy.minimumReleaseAgeExclude],
-        overrides: { ...oldPolicy.overrides, "vite@>=8.2.0 <8.2.4": "8.2.4", "vite@8.2.4>rolldown": "1.2.5", "vite@8.2.4>postcss": "8.5.26" },
-      });
-      const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
-      const foundation = manifest.dependencies.effect !== undefined;
-      const lock = options.applicationPersistence ? "app-0.2.4-persistence"
-        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.4"
-        : profile === "portfolio" && foundation ? "portfolio-0.11.4-foundation"
-        : profile + "-" + recipes[profile];
-      assert.equal(resolveRecipeLockfileVersion(current.project, manifest), lock);
-      assert.equal(resolveRecipeLockfileVersion(retained.project, manifest), lock.replace(/4(?=-|$)/u, "3"));
-      const lockfile = parseDocument(await readFile(new URL("../lockfiles/web-recipe-" + lock + "/pnpm-lock.yaml", import.meta.url), "utf8")).toJS();
-      assert.deepEqual(lockfile.overrides, policy.overrides);
-      for (const [rendered, selectedContext] of [[current, context], [retained, retainedContext]]) {
-        const managedSurfaces = assertSuccess(core.materializeInstalledSurfaces({ files: new Map(rendered.files.map(({ path, content }) => [path, content])), surfaces: rendered.surfaces }));
-        const state = { origin: { profile, recipeVersion: rendered.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces };
-        assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(rendered.project, state)).renderingContext, selectedContext);
-      }
-      assert.equal(resolveRecipeLockfileVersion({ ...current.project, recipeVersion: profile === "app" ? "0.12.4" : "0.2.4" }, manifest), undefined);
-    }
   }
 });

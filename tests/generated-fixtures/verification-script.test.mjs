@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
   access,
@@ -415,60 +416,60 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-0.11.4",
+        relativeRoot: "fixtures/generated/portfolio-0.11.5",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.4",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.5",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-0.12.4",
+        relativeRoot: "fixtures/generated/site-0.12.5",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.12.4",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.5",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.4",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.5",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-0.2.4",
+        relativeRoot: "fixtures/generated/app-0.2.5",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.4",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.5",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-0.2.4",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.5",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.11.4",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.5",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.2.4",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.5",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.4" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.5" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.4" : contract.profile === "site" ? "0.12.4" : "0.11.4",
+      contract.profile === "app" ? "0.2.5" : contract.profile === "site" ? "0.12.5" : "0.11.5",
     );
-    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
+    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.1" : "0.5.1");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
     assert.equal(contract.expectedDeploymentCloudflareVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.4.0" : "0.3.0");
@@ -898,7 +899,7 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     const tarballLockfilePath = join(tarballRoot, "pnpm-lock.yaml");
     const tarballLockfile = await readFile(tarballLockfilePath, "utf8");
     const tarballOverride = tarballLockfile.replace(
-      "    resolution: {integrity:",
+      /    resolution: \{\s*integrity:/u,
       "    resolution: {tarball: https://example.invalid/package.tgz, integrity:",
     );
     assert.notEqual(tarballOverride, tarballLockfile);
@@ -2027,24 +2028,30 @@ test("active fixture inspection refuses retained dependency cohorts", async () =
         "FIXTURE_INVENTORY_INVALID",
       );
     }
+    if (profile === "portfolio") continue;
     const literalLintRoot = `${identifier}-${retainedRecipe.replace(/2$/u, "3")}`;
     await expectFixtureError(
       () => inspectGeneratedFixture(resolve(repositoryRoot, "fixtures/generated", literalLintRoot), identifier),
-      "FIXTURE_WORKSPACE_POLICY_INVALID",
+      "FIXTURE_INVENTORY_INVALID",
     );
   }
 });
 
 test("active fixture inspection independently refuses retained workspace policies", async () => {
+  const controls = JSON.parse(await readFile(
+    resolve(repositoryRoot, "packages/builder-core/tests/fixtures/retired-recipes/public-generations.json"), "utf8",
+  ));
   const owner = await mkdtemp(join(tmpdir(), "retained-fixture-policy-"));
   try {
     for (const { identifier } of generatedFixtureContracts) {
       const root = await copyFixture(owner, identifier, "retained-policy");
       const policyPath = join(root, "pnpm-workspace.yaml");
-      const historicalPolicy = await readFile(
-        resolve(repositoryRoot, "fixtures/generated", identifier, "pnpm-workspace.yaml"),
-      );
-      assert.notDeepEqual(await readFile(policyPath), historicalPolicy);
+      const historical = controls.retiredWorkspacePolicies.find(({ sourceFiles }) =>
+        sourceFiles.includes(`fixtures/generated/${identifier}/pnpm-workspace.yaml`));
+      assert.notEqual(historical, undefined);
+      const historicalPolicy = historical.workspaceYaml;
+      assert.equal(createHash("sha256").update(historicalPolicy).digest("hex"), historical.sha256);
+      assert.notEqual(await readFile(policyPath, "utf8"), historicalPolicy);
       await writeFile(policyPath, historicalPolicy);
       await expectFixtureError(
         () => inspectGeneratedFixture(root, identifier),

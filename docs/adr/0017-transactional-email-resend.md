@@ -6,6 +6,8 @@
 
 [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds environment-bound configuration and exact nonproduction recipient restrictions and permits only necessary unused shared-snapshot retirement at complete generation activation. Preserve independent selection, profile identity, foundation composition and the attempt, timeout, idempotency and uncertain-outcome semantics below.
 
+Current public recipe and retained-snapshot applicability follows [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) and [ADR-0015](0015-vitest-five-generation.md#patched-public-generation). Earlier version tuples below describe their original decision. The early retirement changes unused executable support only; removal, data, provider and outcome safeguards remain unchanged.
+
 ## Context
 
 Transactional email needs a provider-neutral application boundary and explicit provider semantics without introducing a business workflow. The user approved current-profile support, native HTTP transport, the sender and reliability contract, and privacy/removal behavior on 2026-09-22.

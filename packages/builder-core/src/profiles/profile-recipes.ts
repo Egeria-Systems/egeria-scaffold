@@ -1,6 +1,4 @@
-import { applicationEnvironmentRecipeVersions, type ProfileRecipe } from "../contracts/profile.js";
-
-export type SupportedProfileRecipeVersion = "0.9.0" | "0.10.0";
+import { publicRecipeVersions, applicationEnvironmentRecipeVersions, type ProfileRecipe } from "../contracts/profile.js";
 
 const sharedPortfolioCapabilities = [
   "standards",
@@ -11,8 +9,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.9.0" | "0.10.0" | "0.11.0" | "0.11.2" | "0.11.3" | "0.11.4" | "0.12.0";
-  site: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0" | "0.12.2" | "0.12.3" | "0.12.4" | "0.13.0";
+  portfolio: "0.11.5" | "0.12.0";
+  site: "0.12.5" | "0.13.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
@@ -30,98 +28,18 @@ function createRecipes(input: Readonly<{
   ];
 }
 
-function isSupportedProfileRecipeVersion(
-  value: string,
-): value is SupportedProfileRecipeVersion {
-  return value === "0.9.0" || value === "0.10.0";
-}
-
-export function createProfileRecipeSnapshot(
-  recipeVersion: SupportedProfileRecipeVersion,
-): readonly ProfileRecipe[] {
-  if (!isSupportedProfileRecipeVersion(recipeVersion)) {
-    throw new TypeError("profile-recipe-snapshot-version-unsupported");
-  }
-
-  return createRecipes({ portfolio: recipeVersion, site: recipeVersion });
-}
-
-export function createVitestFourProfileRecipes(): readonly ProfileRecipe[] {
+export function createCurrentProfileRecipes(): readonly ProfileRecipe[] {
   return [
-    ...createRecipes({
-      portfolio: "0.10.0",
-      site: "0.11.0",
-    }),
-    {
-      identifier: "app",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.1.0",
-      defaultCapabilities: ["app-foundation", "site-routing"],
-    },
+    ...createRecipes(publicRecipeVersions),
+    { identifier: "app", schemaVersion: "1.0.0", recipeVersion: publicRecipeVersions.app, defaultCapabilities: ["app-foundation", "site-routing"] },
   ];
 }
 
-export function createVitestFiveProfileRecipes(): readonly ProfileRecipe[] {
-  return [
-    ...createRecipes({ portfolio: "0.11.0", site: "0.12.0" }),
-    {
-      identifier: "app",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.2.0",
-      defaultCapabilities: ["app-foundation", "site-routing"],
-    },
-  ];
+export function isCurrentProfileRecipe(profile: string, recipeVersion: string): boolean {
+  return Object.entries(publicRecipeVersions).some(([identifier, version]) => identifier === profile && version === recipeVersion);
 }
 
-export function createDependencySecurityProfileRecipes(): readonly ProfileRecipe[] {
-  return [
-    ...createRecipes({ portfolio: "0.11.2", site: "0.12.2" }),
-    {
-      identifier: "app",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.2.2",
-      defaultCapabilities: ["app-foundation", "site-routing"],
-    },
-  ];
-}
-
-export function createLiteralLintProfileRecipes(): readonly ProfileRecipe[] {
-  return [
-    ...createRecipes({ portfolio: "0.11.3", site: "0.12.3" }),
-    {
-      identifier: "app",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.2.3",
-      defaultCapabilities: ["app-foundation", "site-routing"],
-    },
-  ];
-}
-
-export function createViteSecurityProfileRecipes(): readonly ProfileRecipe[] {
-  return [
-    ...createRecipes({ portfolio: "0.11.4", site: "0.12.4" }),
-    {
-      identifier: "app",
-      schemaVersion: "1.0.0",
-      recipeVersion: "0.2.4",
-      defaultCapabilities: ["app-foundation", "site-routing"],
-    },
-  ];
-}
-
-export function isViteSecurityProfileRecipe(profile: string, recipeVersion: string): boolean {
-  return (profile === "portfolio" && recipeVersion === "0.11.4") ||
-    (profile === "site" && recipeVersion === "0.12.4") ||
-    (profile === "app" && recipeVersion === "0.2.4");
-}
-
-export function isLiteralLintProfileRecipe(profile: string, recipeVersion: string): boolean {
-  return isViteSecurityProfileRecipe(profile, recipeVersion) || (profile === "portfolio" && recipeVersion === "0.11.3") ||
-    (profile === "site" && recipeVersion === "0.12.3") ||
-    (profile === "app" && recipeVersion === "0.2.3");
-}
-
-export const profileRecipes: readonly ProfileRecipe[] = createViteSecurityProfileRecipes();
+export const profileRecipes: readonly ProfileRecipe[] = createCurrentProfileRecipes();
 
 export function createApplicationEnvironmentProfileRecipes(): readonly ProfileRecipe[] {
   return [

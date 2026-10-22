@@ -565,13 +565,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const state = inspection.inference.state.value;
   if (capabilityValue === "application-persistence" && (
-    project.originProfile !== "app" || (project.recipeVersion !== "0.2.0" && project.recipeVersion !== "0.2.2" && project.recipeVersion !== "0.2.3" && project.recipeVersion !== "0.2.4") ||
-    snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.0"
-  )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
-  if ((capabilityValue === "transactional-email-resend" || capabilityValue === "contact-form-web3forms" || capabilityValue === "background-job-delivery") && !(
-    (project.originProfile === "portfolio" && (project.recipeVersion === "0.11.0" || (project.recipeVersion === "0.11.2" || (project.recipeVersion === "0.11.3" || project.recipeVersion === "0.11.4")))) ||
-    (project.originProfile === "site" && (project.recipeVersion === "0.12.0" || (project.recipeVersion === "0.12.2" || (project.recipeVersion === "0.12.3" || project.recipeVersion === "0.12.4")))) ||
-    (project.originProfile === "app" && (project.recipeVersion === "0.2.0" || (project.recipeVersion === "0.2.2" || (project.recipeVersion === "0.2.3" || project.recipeVersion === "0.2.4"))))
+    project.originProfile !== "app" || project.recipeVersion !== "0.2.5" ||
+    snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.1"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =
     project.selectedCapabilities.includes(capabilityValue) ||

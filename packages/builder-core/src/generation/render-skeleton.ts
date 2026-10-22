@@ -1,4 +1,3 @@
-import { isLiteralLintProfileRecipe, isViteSecurityProfileRecipe } from "../profiles/profile-recipes.js";
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
@@ -224,7 +223,6 @@ function enrichApplicationManifest(
   files: readonly GeneratedFile[],
   packageVersions: CapabilityPackageVersions,
   profile: ProfileIdentifier,
-  recipeVersion: string,
   persistence: boolean,
   foundation: boolean,
   applicationEnvironments: boolean,
@@ -266,11 +264,7 @@ function enrichApplicationManifest(
     );
   }
 
-  const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
-  const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
-    (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || recipeVersion === "0.2.4" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || recipeVersion === "0.12.4" || (applicationEnvironments && recipeVersion === "0.13.0")));
+  const productionSite = profile === "app" || profile === "site";
   const enrichedManifest = {
     ...manifest,
     scripts: {
@@ -284,7 +278,7 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      ...(dependencySecurity ? { next: "16.3.8" } : (productionSite || foundation) ? { next: "16.3.3" } : {}),
+      next: "16.3.8",
       ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
@@ -292,7 +286,6 @@ function enrichApplicationManifest(
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
       ...(persistence ? { "@cloudflare/workers-types": "5.20260730.1", "drizzle-kit": "0.31.10" } : {}),
-      ...(app && recipeVersion === "0.1.0" ? { vitest: "4.1.11" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
         : {}),
@@ -315,7 +308,7 @@ function enrichApplicationManifest(
     if (applicationEnvironments && file.path === "README.md") {
       return { path: file.path, content: encoder.encode(`${decoder.decode(file.content)}\nSee [Application environments](docs/environments.md) for build inputs, runtime targets and local recovery.\n`) };
     }
-    if ((foundation || literalLintRoots) && file.path === "pnpm-workspace.yaml") {
+    if (file.path === "pnpm-workspace.yaml") {
       let workspaceSource = decoder.decode(file.content);
       if (foundation) {
         const workspace = parseDocument(workspaceSource);
@@ -323,12 +316,12 @@ function enrichApplicationManifest(
         if (persistence) workspace.setIn(["overrides", "@esbuild-kit/core-utils>esbuild"], "0.25.4");
         workspaceSource = workspace.toString();
       }
-      if (literalLintRoots) {
+      {
         const plugin = `@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`;
         workspaceSource = workspaceSource.replace("overrides:\n", `overrides:\n  "${plugin}>fast-glob": "-"\n`);
         workspaceSource += `\npatchedDependencies:\n  "${plugin}": "patches/next-eslint-plugin-next.patch"\n`;
       }
-      if (applicationEnvironments || isViteSecurityProfileRecipe(profile, recipeVersion)) {
+      {
         workspaceSource = workspaceSource.replace("minimumReleaseAgeExclude:\n", 'minimumReleaseAgeExclude:\n  - "vite@8.2.4"\n');
         workspaceSource = workspaceSource.replace("overrides:\n", 'overrides:\n  "vite@>=8.2.0 <8.2.4": "8.2.4"\n  "vite@8.2.4>rolldown": "1.2.5"\n  "vite@8.2.4>postcss": "8.5.26"\n');
       }
@@ -368,9 +361,9 @@ function createPackageSurface(
   );
 }
 
-function createBuilderSurfaces(applicationEnvironments: boolean, literalLintRoots: boolean): readonly ManagedSurfaceDescriptor[] {
+function createBuilderSurfaces(applicationEnvironments: boolean): readonly ManagedSurfaceDescriptor[] {
   return [
-    ...(literalLintRoots ? [createFileSurface("builder-literal-lint-roots-patch", "patches/next-eslint-plugin-next.patch", "managed")] : []),
+    createFileSurface("builder-literal-lint-roots-patch", "patches/next-eslint-plugin-next.patch", "managed"),
     ...(applicationEnvironments ? [
       createFileSurface("builder-application-environment-guide", "docs/environments.md", "application-owned"),
       createFileSurface("builder-build-environment-example", "apps/web/.env.example", "application-owned"),
@@ -472,7 +465,7 @@ function createDesiredSurfaces(
 ): readonly ManagedSurfaceDescriptor[] {
   return [
     ...resolved.capabilities.flatMap(({ managedSurfaces }) => managedSurfaces),
-    ...createBuilderSurfaces(applicationEnvironments, applicationEnvironments || isLiteralLintProfileRecipe(resolved.profile, resolved.recipeVersion)),
+    ...createBuilderSurfaces(applicationEnvironments),
   ].sort((left, right) => compareText(left.identifier, right.identifier));
 }
 
@@ -483,7 +476,7 @@ export async function renderSkeleton(
   context?: SkeletonRenderingContext | ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>>> {
   const applicationEnvironments = context !== undefined && "projectSchemaVersion" in context;
-  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0";
+  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.1" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0";
   if ((applicationEnvironments || environmentDescriptor || (context !== undefined && "projectSchemaVersion" in context)) &&
       (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
@@ -603,7 +596,6 @@ export async function renderSkeleton(
     files,
     packageVersions,
     projectResult.value.originProfile,
-    resolutionResult.value.recipeVersion,
     request.applicationPersistence === true,
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
     applicationEnvironments,

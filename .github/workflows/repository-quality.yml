@@ -427,11 +427,11 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.4
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.5
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.4
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()

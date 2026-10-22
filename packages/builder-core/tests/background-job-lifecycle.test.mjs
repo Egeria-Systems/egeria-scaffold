@@ -5,7 +5,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFourProfileRecipes, createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -15,10 +15,7 @@ const root = "/generated/jobs-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/jobs-lifecycle", gitDirectory: "/generated/.git/worktrees/jobs-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-foundation", site: "web-recipe-app-0.2.0", app: "web-recipe-app-0.2.0" }, persistenceLock: "web-application-persistence" },
-  { profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.2-foundation", site: "web-recipe-app-0.2.2", app: "web-recipe-app-0.2.2" }, persistenceLock: "web-recipe-app-0.2.2-persistence" },
-  { profiles: createLiteralLintProfileRecipes(), versions: { portfolio: "0.11.3", site: "0.12.3", app: "0.2.3" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.3-foundation", site: "web-recipe-app-0.2.3", app: "web-recipe-app-0.2.3" }, persistenceLock: "web-recipe-app-0.2.3-persistence" },
-  { profiles: createViteSecurityProfileRecipes(), versions: { portfolio: "0.11.4", site: "0.12.4", app: "0.2.4" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.4-foundation", site: "web-recipe-app-0.2.4", app: "web-recipe-app-0.2.4" }, persistenceLock: "web-recipe-app-0.2.4-persistence" },
+  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.5-foundation", site: "web-recipe-app-0.2.5", app: "web-recipe-app-0.2.5" }, persistenceLock: "web-recipe-app-0.2.5-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -31,7 +28,7 @@ async function assertCohort(repo, cohort, profile, persistent = false) {
 }
 
 async function repository(profile = "portfolio", options = {}) {
-  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createVitestFiveProfileRecipes() };
+  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createCurrentProfileRecipes() };
   const rendered = await core.renderSkeleton({ profile, projectName: "jobs-lifecycle", displayName: "Jobs lifecycle", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
@@ -67,7 +64,7 @@ async function repository(profile = "portfolio", options = {}) {
 }
 
 test("jobs addition selects current jobs and deployment on all current profiles", async () => {
-  for (const cohort of cohorts) for (const profile of ["portfolio", "site", "app"]) {
+  for (const cohort of cohorts) for (const profile of Object.keys(cohort.versions)) {
     const repo = await repository(profile, { profiles: cohort.profiles });
     const planned = await core.planCapabilityAddition({ reader: repo.reader, git, capability });
     assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -109,10 +106,11 @@ async function add(repo, overrides={}) {
 }
 
 test("retired controls invalidate approved jobs plans before writes or verification", async () => {
-  for (const [profile, recipe] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"]]) {
-    const control = JSON.parse(await readFile(new URL(`./fixtures/retired-recipes/${profile}-${recipe}.json`, import.meta.url), "utf8"));
+  for (const name of ["portfolio-0.11.1", "site-0.12.1", "app-0.2.1", "portfolio-0.11.3", "portfolio-calendly-0.11.3", "portfolio-email-0.11.3"]) {
+    const control = JSON.parse(await readFile(new URL(`./fixtures/retired-recipes/${name}.json`, import.meta.url), "utf8"));
+    const profile = control.project.originProfile;
     for (const operation of ["add", "remove"]) for (const variant of Object.values(control.variants)) {
-      const repo = await repository(profile, { backgroundJobDelivery: operation === "remove", profiles: createDependencySecurityProfileRecipes() });
+      const repo = await repository(profile, { backgroundJobDelivery: operation === "remove", profiles: createCurrentProfileRecipes() });
       const planned = operation === "add"
         ? await core.planCapabilityAddition({ reader: repo.reader, git, capability })
         : await removalPlan(repo);
@@ -136,8 +134,8 @@ test("retired controls invalidate approved jobs plans before writes or verificat
 
 test("current jobs planning and application refuse declaration drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
-    const repo = await repository("portfolio", { profiles: createDependencySecurityProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.2");
+    const repo = await repository("portfolio", { profiles: createCurrentProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.5");
     const planned = mode === "after-plan" ? await core.planCapabilityAddition({ reader: repo.reader, git, capability }) : undefined;
     if (planned !== undefined) assert.equal(planned.ok, true, JSON.stringify(planned));
     if (mode === "unknown-declaration") {
@@ -165,8 +163,8 @@ test("current jobs planning and application refuse declaration drift before writ
 
 test("current jobs removal refuses declaration and lock drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
-    const repo = await repository("app", { backgroundJobDelivery: true, profiles: createDependencySecurityProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.2");
+    const repo = await repository("app", { backgroundJobDelivery: true, profiles: createCurrentProfileRecipes() });
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.5");
     const prepared = await removalPlan(repo);
     if (mode === "unknown-declaration") {
       const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -194,7 +192,7 @@ test("current jobs removal refuses declaration and lock drift before writes", as
 });
 
 test("current jobs removal and re-add retain foundation, explicit email, persistence and exact migration identities", async()=>{
-  for(const cohort of cohorts) for(const profile of ["portfolio","site","app"]) for(const retainedVersion of ["0.1.0","0.2.0"]) {
+  for(const cohort of cohorts) for(const profile of Object.keys(cohort.versions)) for(const retainedVersion of ["0.1.0","0.2.0"]) {
     const persistent=profile==="app";
     const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles}});
     const expectedNext = cohort.versions.app === "0.2.0" ? "16.3.3" : "16.3.8";

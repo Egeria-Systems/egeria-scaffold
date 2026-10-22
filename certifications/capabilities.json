@@ -320,15 +320,15 @@
     },
     "standards": {
       "subject": {
-        "descriptorVersion": "0.6.0",
-        "behaviorContractDigest": "sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd"
+        "descriptorVersion": "0.6.1",
+        "behaviorContractDigest": "sha256:36f8c505fe048250bdf064f194608e94486df232b131c3ebf689436ec8a95b9c"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-14-application-persistence-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-10-21-patched-standards-certification.md",
       "evidence": []
     },
     "transactional-email-resend": {

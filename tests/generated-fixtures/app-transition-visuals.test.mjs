@@ -44,9 +44,9 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
   assert.equal(exists, true, "the app transition visual producer is not implemented");
   const module = await import(producer);
   assert.equal(typeof module.verifyAppTransitionVisuals, "function");
-  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare" });
-  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates" });
-  for (const recipeVersion of ["0.2.2", "0.2.3", "0.2.4"]) {
+  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.5" });
+  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.5" });
+  for (const recipeVersion of ["0.2.5"]) {
     assert.deepEqual(module.parseAppTransitionVisualArguments(["--candidates", `--app-recipe-version=${recipeVersion}`]), { mode: "candidates", recipeVersion });
   }
   const digest = "a".repeat(64);
@@ -62,7 +62,7 @@ async function harness(t, overrides = {}) {
   t.after(() => rm(root, { recursive: true, force: true }));
   const images = {};
   for (const viewport of ["desktop", "mobile"]) {
-    images[viewport] = await readFile(new URL(`../../fixtures/generated/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, import.meta.url));
+    images[viewport] = await readFile(new URL(`../../docs/implementation-evidence/retired-recipe-visuals/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, import.meta.url));
   }
   const calls = [];
   const adapters = {
@@ -196,23 +196,10 @@ test("promotion refuses candidate tampering, symlink ancestors, and concurrent e
   assert.equal(await readFile(join(h.root, manifest.assets[1].templatePath), "utf8"), "concurrent owner");
 });
 
-test("default compares the committed four baselines across all eight subsets without update mode", async (t) => {
+test("current visual comparison refuses without exact successor input admission", async (t) => {
   const h = await harness(t);
-  const candidate = await h.module.verifyAppTransitionVisuals({ mode: "candidates" }, h.adapters);
-  await h.module.verifyAppTransitionVisuals({ mode: "promote", digest: candidate.manifestSha256 }, h.adapters);
-  h.calls.length = 0;
-  const result = await h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters);
-  assert.equal(result.status, "compared");
-  assert.equal(h.calls.length, 8);
-  assert.equal(h.calls.every(({ mode, baselines }) => mode === "compare" && baselines.desktop && baselines.mobile), true);
-  const execute = h.adapters.executeCase;
-  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
-    ...h.adapters,
-    executeCase: async (input) => {
-      const value = await execute(input);
-      return { ...value, images: { ...value.images, desktop: Buffer.concat([value.images.desktop, Buffer.from("stable different actual")]) } };
-    },
-  }), /VISUAL_COMPARISON_FAILED/);
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters), /VISUAL_INPUT_ADMISSION_REQUIRED/);
+  assert.equal(h.calls.length, 0);
 });
 
 test("visual reports require two executed viewport comparisons and reject skips, retries, and unrelated failures", async () => {
@@ -309,7 +296,7 @@ test("visual capture stabilizes and saves before screenshot comparison and prese
   }
 });
 
-for (const preparation of ["synthetic", "security", "literal-lint", "vite-security"])
+for (const preparation of ["synthetic", "current"])
 test(`${preparation} visual targets use exact production files, run non-update captures twice, and preserve process receipts`, async (t) => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url), "utf8");
@@ -318,7 +305,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
   const commands = [];
   let ownedProject;
   const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: preparation === "vite-security" ? "0.2.4" : preparation === "literal-lint" ? "0.2.3" : "0.2.2" }, {
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.5" }, {
     ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
@@ -345,11 +332,11 @@ test(`${preparation} visual targets use exact production files, run non-update c
   });
   if (preparation !== "synthetic") {
     assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, preparation === "vite-security" ? "0.11.4" : preparation === "literal-lint" ? "0.11.3" : "0.11.2");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.11.5");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, preparation === "vite-security" ? "0.2.4" : preparation === "literal-lint" ? "0.2.3" : "0.2.2");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, preparation === "vite-security" ? "6b119f067ef4647b1e9147899ef10e7df91b2eb2d25aeba78de85d5522f6b0c6" : preparation === "literal-lint" ? "34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6" : "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067");
-    if (["literal-lint", "vite-security"].includes(preparation)) assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
+    assert.equal(result.project.targetProject.recipeVersion, "0.2.5");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "71d1c4012f6b057e030b77be287f10bd56354ace9466862a5d0dc8eb34517b22");
+    assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
   assert.equal(commands.some(({ arguments: args }) => args.some(value => value.includes("update-snapshots"))), false);
@@ -399,4 +386,35 @@ test("visual prerequisites retain raw and threshold audit results and reject inc
     assert.equal(audit.exitCode, disposition.rawExitCode);
     assert.deepEqual(audit.disposition, disposition);
   }
+});
+
+
+test("retired portfolio visual arguments refuse", async () => {
+  const module = await import(producer);
+  for (const mode of [[], ["--candidates"]]) {
+    assert.throws(() => module.parseAppTransitionVisualArguments([...mode, "--app-recipe-version=0.2.3"]), /VISUAL_ARGUMENT_INVALID/);
+  }
+});
+
+test("retired portfolio visual verification refuses before preparation", async () => {
+  const module = await import(producer);
+  const effects = [];
+  const unexpected = () => { effects.push("preparation"); throw new Error("unexpected preparation"); };
+  await assert.rejects(module.verifyAppTransitionVisuals({ mode: "candidates", recipeVersion: "0.2.3" }, {
+    repositoryRoot: "/unused/retired-visual",
+    filesystem: new Proxy({}, { get: () => unexpected }),
+    snapshotSource: unexpected,
+    inspectEnvironment: unexpected,
+    prepareBuilder: unexpected,
+  }), /VISUAL_ARGUMENT_INVALID/);
+  assert.deepEqual(effects, []);
+});
+
+test("retired portfolio visual execution refuses before project preparation", async () => {
+  const module = await import(producer);
+  const effects = [];
+  await assert.rejects(module.executeAppTransitionVisualCase({ recipeVersion: "0.2.3" }, {
+    prepareProject: async () => { effects.push("prepare"); throw new Error("unexpected project preparation"); },
+  }), /VISUAL_RECIPE_IDENTITY_INVALID/);
+  assert.deepEqual(effects, []);
 });

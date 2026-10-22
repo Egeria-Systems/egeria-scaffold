@@ -11,7 +11,7 @@ const core = await import(pathToFileURL(builtEntry));
 test("retired structured controls cannot fall back to current generation", async () => {
   const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
-  for (const name of (await readdir(root)).filter(name => name !== "supported-rendering.json")) {
+  for (const name of (await readdir(root)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
     const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
     for (const [variant, { state }] of Object.entries(control.variants)) {
       for (const [projectInput, stateInput] of [[control.project, state], [control.project, undefined], [undefined, state]]) {
@@ -27,7 +27,7 @@ test("retired controls refuse lifecycle planning and execution before effects", 
   const controls = resolve(packageRoot, "tests/fixtures/retired-recipes");
   const root = "/generated/project";
   const git = { ok: true, identity: { root, revision: "a".repeat(40), attachedRef: "refs/heads/retired-control-test", gitDirectory: "/generated/common/.git/worktrees/retired-control-test", commonDirectory: "/generated/common/.git" } };
-  for (const name of (await readdir(controls)).filter(name => name !== "supported-rendering.json")) {
+  for (const name of (await readdir(controls)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
     const control = JSON.parse(await readFile(resolve(controls, name), "utf8"));
     for (const [variant, { state }] of Object.entries(control.variants)) {
       const files = new Map([[".egeria/project.yaml", control.projectYaml], [".egeria/state.json", JSON.stringify(state)]]);
@@ -83,7 +83,7 @@ function assertIssues(result, expectedIssues) {
 }
 
 function createCatalog() {
-  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
+  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
 }
 
 function resolveRequest(
@@ -118,7 +118,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.4",
+    recipeVersion: "0.2.5",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -136,7 +136,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.4");
+    assert.equal(resolution.recipeVersion, "0.2.5");
     assert.deepEqual(
       identifiers,
       [
@@ -321,7 +321,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.5.0");
+  assert.equal(standards.version, "0.5.1");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -1843,7 +1843,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.4",
+      recipeVersion: "0.11.5",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1855,7 +1855,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.4",
+      recipeVersion: "0.12.5",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1868,7 +1868,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.4",
+      recipeVersion: "0.2.5",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1892,7 +1892,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.4");
+  assert.equal(portfolio.recipeVersion, "0.11.5");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1928,7 +1928,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.4" : "0.12.4",
+      profile === "portfolio" ? "0.11.5" : "0.12.5",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1974,7 +1974,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.5.0",
+      version: "0.5.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -2024,9 +2024,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.11.4" },
-      { identifier: "site", recipeVersion: "0.12.4" },
-      { identifier: "app", recipeVersion: "0.2.4" },
+      { identifier: "portfolio", recipeVersion: "0.11.5" },
+      { identifier: "site", recipeVersion: "0.12.5" },
+      { identifier: "app", recipeVersion: "0.2.5" },
     ],
   );
 
@@ -2038,35 +2038,10 @@ test("current recipes add app while historical portfolio and site snapshots stay
     "upgrade-site-routing-0-3-0-to-0-4-0",
   ]);
 
-  const historicalCatalog = assertOk(
-    core.createCapabilityCatalogSnapshot(packageVersions, {
-      standards: "0.4.0",
-      siteRouting: "0.3.0",
-    }),
-  );
-  assert.equal(
-    historicalCatalog.find(({ identifier }) => identifier === "site-routing")
-      ?.version,
-    "0.3.0",
-  );
-  assert.equal(historicalCatalog.length, 9);
-  assert.equal(
-    historicalCatalog.some(({ identifier }) => identifier === "app-foundation"),
-    false,
-  );
-  for (const descriptor of historicalCatalog) {
-    assert.deepEqual(
-      descriptor.supportedProfiles,
-      descriptor.identifier === "site-routing"
-        ? ["site"]
-        : ["portfolio", "site"],
-      descriptor.identifier,
-    );
-  }
-  assert.deepEqual(core.createProfileRecipeSnapshot("0.10.0"), [
-    { ...core.profileRecipes[0], recipeVersion: "0.10.0" },
-    { ...core.profileRecipes[1], recipeVersion: "0.10.0" },
-  ]);
+  assert.equal(core.createCapabilityCatalogSnapshot(packageVersions, {
+    standards: "0.4.0", siteRouting: "0.3.0",
+  }).ok, false);
+
 });
 
 test("resolution traverses dependency identifiers lexically rather than trusting descriptor order", () => {
@@ -2283,7 +2258,15 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 });
 
 
-test("supported profile transitions admit only historical and same-cohort incoming app edges", () => {
+test("supported profile transitions admit only the current incoming app edges", () => {
+  for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
+    ["portfolio", "0.11.5", "app", "0.2.5"],
+    ["site", "0.12.5", "app", "0.2.5"],
+  ]) {
+    assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
+      ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
+    });
+  }
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
     ["portfolio", "0.10.0", "site", "0.10.0"],
     ["portfolio", "0.10.0", "app", "0.1.0"],
@@ -2292,23 +2275,16 @@ test("supported profile transitions admit only historical and same-cohort incomi
     ["site", "0.12.0", "app", "0.2.0"],
     ["portfolio", "0.11.2", "app", "0.2.2"],
     ["site", "0.12.2", "app", "0.2.2"],
-    ["portfolio", "0.11.3", "app", "0.2.3"],
     ["site", "0.12.3", "app", "0.2.3"],
-    ["portfolio", "0.11.4", "app", "0.2.4"],
-    ["site", "0.12.4", "app", "0.2.4"],
-  ]) {
-    assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
-      ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
-    });
-  }
-  for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
     ["site", "0.10.0", "app", "0.1.0"], ["portfolio", "0.9.0", "app", "0.1.0"],
     ["site", "0.12.0", "app", "0.1.0"], ["app", "0.1.0", "app", "0.1.0"],
     ["app", "0.1.0", "portfolio", "0.10.0"], ["portfolio", "0.10.0", "app", "0.2.0"],
     ["unknown", "0.10.0", "app", "0.1.0"],
     ...["portfolio", "site"].flatMap(fromProfile => {
-      const versions = fromProfile === "portfolio" ? ["0.10.0", "0.11.0", "0.11.2", "0.11.3", "0.11.4"] : ["0.11.0", "0.12.0", "0.12.2", "0.12.3", "0.12.4"];
-      return versions.flatMap((fromVersion, index) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.4"].flatMap((toVersion, targetIndex) => index === targetIndex ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
+      const pairs = fromProfile === "portfolio"
+        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.5", "0.2.5"]]
+        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.5", "0.2.5"]];
+      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.5"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
     }),
     ["portfolio", "0.11.1", "app", "0.2.1"],
     ["site", "0.12.1", "app", "0.2.1"],
@@ -2316,4 +2292,21 @@ test("supported profile transitions admit only historical and same-cohort incomi
     ["site", "0.11.1", "app", "0.2.1"],
     ["portfolio", "0.11.1", "app", "9.9.9"],
   ]) assert.equal(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}).ok, false);
+});
+
+
+test("retired portfolio recipes cannot select locks or incoming app edges", async () => {
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  for (const foundation of [false, true]) {
+    const manifest = {
+      dependencies: { next: "16.3.8", ...(foundation ? { effect: "4.0.0-rc.112" } : {}) },
+      devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.0" },
+    };
+    assert.equal(resolveRecipeLockfileVersion({ originProfile: "portfolio", recipeVersion: "0.11.3" }, manifest), undefined);
+  }
+  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.5"]) {
+    assert.deepEqual(core.resolveSupportedProfileTransition({
+      fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion,
+    }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+  }
 });

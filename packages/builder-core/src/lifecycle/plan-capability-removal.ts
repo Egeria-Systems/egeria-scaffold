@@ -1022,6 +1022,20 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(project.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: project.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
+  let desiredContext = snapshot.value.renderingContext;
+  if (desiredContext !== undefined &&
+      (capabilityValue === "background-job-delivery" || capabilityValue === "application-persistence")) {
+    const catalogSnapshot = { ...desiredContext.catalogSnapshot };
+    if (capabilityValue === "background-job-delivery") {
+      delete catalogSnapshot.backgroundJobDelivery;
+      catalogSnapshot.deploymentCloudflare = project.selectedCapabilities.includes("application-persistence") ? "0.4.0" : "0.3.0";
+    } else {
+      delete catalogSnapshot.applicationPersistence;
+      catalogSnapshot.standards = "0.5.1";
+      catalogSnapshot.deploymentCloudflare = catalogSnapshot.backgroundJobDelivery === undefined ? "0.3.0" : "0.5.0";
+    }
+    desiredContext = { ...desiredContext, catalogSnapshot };
+  }
   const [currentRender, desiredRender] = await Promise.all([
     renderSkeleton(renderRequest, snapshot.value.renderingContext),
     renderSkeleton({
@@ -1043,9 +1057,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
       ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
-    }, capabilityValue === "background-job-delivery"
-      ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false), profiles: snapshot.value.profiles }
-      : capabilityValue === "application-persistence" ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0"), profiles: snapshot.value.profiles } : snapshot.value.renderingContext),
+    }, desiredContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {

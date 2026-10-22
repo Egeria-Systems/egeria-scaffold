@@ -1,14 +1,12 @@
-import { retainedRenderingContext } from "./retained-generation.mjs";
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentCohorts = [
-  { label: "Vitest five", generation: "vitest-five", profiles: createVitestFiveProfileRecipes(), versions: { portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" } },
-  { label: "Dependency security", generation: "dependency-security", profiles: createDependencySecurityProfileRecipes(), versions: { portfolio: "0.11.2", site: "0.12.2", app: "0.2.2" } },
+  { label: "Current", generation: "current", profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" } },
 ];
 
 
@@ -91,7 +89,7 @@ async function loadTextEntries(directory) {
 }
 
 async function installedEntries(profile, options = {}) {
-  const cohort = currentCohorts.find(({ generation }) => generation === options.generation);
+  const cohort = currentCohorts.find(({ generation }) => generation === options.generation) ?? currentCohorts[0];
   const selectedVerificationChecks = profile === "app"
     ? core.appCapabilityAdditionPersistedVerificationChecks
     : persistedVerificationChecks;
@@ -106,7 +104,7 @@ async function installedEntries(profile, options = {}) {
     ...(includeBooking ? { bookingCalendly: settings } : {}),
     ...(includeMultilingual ? { multilingual: true } : {}),
     ...(includeAnalytics ? { analytics: analyticsSettings } : {}),
-  }, cohort === undefined ? retainedRenderingContext : { ...createGenerationRenderingContext(), profiles: cohort.profiles });
+  }, { ...createGenerationRenderingContext(), profiles: cohort.profiles });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -121,9 +119,7 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(packageRoot, `lockfiles/web-recipe-${cohort !== undefined
-          ? `${profile}-${cohort.versions[profile]}`
-          : (profile === "app" ? "app-0.1.0" : profile === "site" ? "0.9.0" : "0.10.0")}/pnpm-lock.yaml`),
+        resolve(packageRoot, `lockfiles/web-recipe-${profile}-${cohort.versions[profile]}/pnpm-lock.yaml`),
       ),
     ),
   );
@@ -421,9 +417,9 @@ function applyAppOperation(repository, operation, plan, overrides = {}) {
       });
 }
 
-test("retained optional lifecycle ignores changed generation recipes", async () => {
+test("installed optional lifecycle ignores changed generation defaults", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
-    for (const vitestDeclaration of profile === "app" ? ["4.1.10", "4.1.11"] : ["4.1.10"]) {
+    for (const vitestDeclaration of ["5.0.3"]) {
       for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
         const entries = await installedEntries(profile, {
           booking: operation.kind === "removal", vitestDeclaration,
@@ -441,8 +437,8 @@ test("retained optional lifecycle ignores changed generation recipes", async () 
           assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
           const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
           assert.equal(state.ok, true);
-          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.10.0", site: "0.11.0", app: "0.1.0" }[profile] });
-          assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.4.0");
+          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }[profile] });
+          assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
         } finally {
           core.profileRecipes.push(...recipes);
         }
@@ -451,22 +447,15 @@ test("retained optional lifecycle ignores changed generation recipes", async () 
   }
 });
 
-test("app optional lifecycle preserves retained and patched Vitest manifests", async () => {
-  for (const vitestDeclaration of ["4.1.10", "4.1.11"]) {
+test("app optional lifecycle refuses retired Vitest declarations without writes", async () => {
+  for (const vitestDeclaration of ["4.1.10", "4.1.11", "5.0.0"]) {
     for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
-      const entries = await installedEntries("app", {
-        booking: operation.kind === "removal", vitestDeclaration,
-      });
+      const entries = await installedEntries("app", { booking: operation.kind === "removal", vitestDeclaration });
       const repository = createRepository(entries);
+      const before = new Map(repository.files);
       const planned = await planAppOperation(repository, operation);
-      assert.equal(planned.ok, true, JSON.stringify(planned));
-      const applied = await applyAppOperation(repository, operation, planned.value);
-      assert.equal(applied.ok, true, JSON.stringify(applied));
-      assert.equal(repository.files.get("apps/web/package.json"), entries.get("apps/web/package.json"));
-      const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
-      assert.equal(state.ok, true);
-      assert.equal(state.value.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package").fingerprint,
-        core.fingerprintJsonValue(vitestDeclaration));
+      assert.equal(planned.ok, false);
+      assert.deepEqual(repository.files, before);
     }
   }
 });
@@ -549,7 +538,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         const oldState = core.parseStateJson(entries.get(".egeria/state.json"));
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true, JSON.stringify(state));
-        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.1.0" });
+        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.5" });
         for (const identifier of ["app-foundation", "site-routing"]) {
           assert.deepEqual(
             state.value.installedCapabilities.find((item) => item.identifier === identifier),
@@ -589,7 +578,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         assert.equal(repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
           desiredOptions.multilingual);
         assert.ok(repository.files.has("apps/web/content/en-CA/about.yaml"));
-        const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
+        const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
         assert.equal(catalog.ok, true);
         const inference = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
         assert.deepEqual(
@@ -954,7 +943,7 @@ async function expectedSuccessfulArtifacts(
     projectName: currentProject.value.project.name,
     displayName: currentProject.value.project.displayName,
     packageVersions: core.verifiedCapabilityPackageVersions,
-  }, retainedRenderingContext);
+  }, createGenerationRenderingContext());
   assert.equal(desired.ok, true);
   const expectedFiles = new Map(entries);
   const desiredText = new Map(
@@ -1065,7 +1054,7 @@ test("capability removal executes the approved plan once and persists migration 
       worktreeInspections,
     } = await runApply(repository);
 
-    const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
+    const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
     assert.equal(catalog.ok, true);
     const finalInference = await core.inferRepository({
       reader: repository.reader,
@@ -1143,7 +1132,7 @@ test("multilingual and Calendly removal preserve the other capability in both in
         }),
       );
       const { result } = await runApply(repository, { capability });
-      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
+      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
       const failedInference = result.ok || !catalog.ok
         ? undefined
         : await core.inferRepository({
@@ -1384,7 +1373,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     ),
   );
 
-  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, retainedRenderingContext.catalogSnapshot);
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
   assert.equal(catalog.ok, true, JSON.stringify(catalog.issues));
   const inference = await core.inferRepository({
     reader: repository.reader,
@@ -2420,7 +2409,7 @@ for (const cohort of currentCohorts) test(`${cohort.label} optional lifecycle pr
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true);
         assert.deepEqual(state.value.origin, { profile, recipeVersion: cohort.versions[profile] });
-        assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+        assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
         assert.equal(state.value.lastSuccessfulVerification.checks.includes("worker-integration"), profile === "app");
         const expected = await installedEntries(profile, { ...options, [operation.option]: operation.kind === "addition" });
         for (const [path, content] of expected) if (!path.startsWith(".egeria/")) assert.deepEqual(repository.files.get(path), content, path);

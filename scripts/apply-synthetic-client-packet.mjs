@@ -511,9 +511,7 @@ async function validateProjectIdentity(projectRoot, packet) {
   }
 
   const analytics = project.capabilitySettings?.analytics;
-  const standardsVersion = project.recipeVersion === "0.11.0"
-    ? "0.4.0"
-    : (project.recipeVersion === "0.12.0" || project.recipeVersion === "0.12.2" || project.recipeVersion === "0.12.3" || project.recipeVersion === "0.12.4") ? "0.5.0" : undefined;
+  const standardsVersion = project.recipeVersion === "0.12.5" ? "0.5.1" : undefined;
   if (
     packageManifest.name !== packet.identifier ||
     webPackageManifest.name !== `${packet.identifier}-web` ||
@@ -524,6 +522,9 @@ async function validateProjectIdentity(projectRoot, packet) {
     }) ||
     project.originProfile !== packet.profile ||
     standardsVersion === undefined ||
+    project.schemaVersion !== "1.0.0" ||
+    state.schemaVersion !== "1.0.0" ||
+    state.projectSchemaVersion !== "1.0.0" ||
     !sameJson(project.selectedCapabilities, expectedProjectCapabilities) ||
     !sameJson(Object.keys(analytics?.providers ?? {}), [
       "cloudflareWebAnalytics",

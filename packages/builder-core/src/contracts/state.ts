@@ -1,3 +1,4 @@
+import { publicRecipeVersions } from "./profile.js";
 import { z } from "zod";
 
 import {
@@ -59,18 +60,6 @@ export const installedSurfaceSchema = z
   })
   .superRefine(addMergeTargetIssue)
   .readonly();
-
-const legacyVerificationChecks = [
-  "contracts",
-  "pre-state-inference",
-  "lockfile",
-  "frozen-install",
-  "lint",
-  "typecheck",
-  "next-build",
-  "opennext-build",
-  "post-state-inference",
-] as const;
 
 const currentVerificationChecks = [
   "contracts",
@@ -298,16 +287,13 @@ function validateStateVerification(
 ): void {
     const hasFoundation = state.schemaVersion === "2.0.0"
       ? state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.3.0")
-      : (state.origin.profile === "app" &&
-      (state.origin.recipeVersion === "0.1.0" || state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || (state.origin.recipeVersion === "0.2.3" || state.origin.recipeVersion === "0.2.4")))) ||
-      (((state.origin.profile === "portfolio" && (state.origin.recipeVersion === "0.11.0" || (state.origin.recipeVersion === "0.11.2" || (state.origin.recipeVersion === "0.11.3" || state.origin.recipeVersion === "0.11.4")))) ||
-        (state.origin.profile === "site" && (state.origin.recipeVersion === "0.12.0" || (state.origin.recipeVersion === "0.12.2" || (state.origin.recipeVersion === "0.12.3" || state.origin.recipeVersion === "0.12.4"))))) &&
-        state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.2.0"));
+      : state.origin.profile === "app" ||
+        state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.2.0");
     const hasPersistence = state.installedCapabilities.some(
       ({ identifier }) => identifier === "application-persistence",
     );
-    const supportsPersistence = state.origin.profile === "app" &&
-      (state.origin.recipeVersion === "0.2.0" || (state.origin.recipeVersion === "0.2.2" || (state.origin.recipeVersion === "0.2.3" || state.origin.recipeVersion === "0.2.4")));
+    const supportsPersistence = state.schemaVersion === "1.0.0" &&
+      state.origin.profile === "app" && state.origin.recipeVersion === publicRecipeVersions.app;
     const expectedChecks = state.lastSuccessfulVerification.kind ===
       "capability-addition"
       ? hasPersistence
@@ -331,16 +317,7 @@ function validateStateVerification(
               ? persistenceVerificationChecks
               : hasFoundation
               ? appVerificationChecks
-              : state.schemaVersion === "2.0.0" || state.origin.recipeVersion === "0.7.0" ||
-                state.origin.recipeVersion === "0.8.0" ||
-                state.origin.recipeVersion === "0.9.0" ||
-                state.origin.recipeVersion === "0.10.0" ||
-                state.origin.recipeVersion === "0.11.0" ||
-                (state.origin.recipeVersion === "0.11.2" || (state.origin.recipeVersion === "0.11.3" || state.origin.recipeVersion === "0.11.4")) ||
-                state.origin.recipeVersion === "0.12.0" ||
-                (state.origin.recipeVersion === "0.12.2" || (state.origin.recipeVersion === "0.12.3" || state.origin.recipeVersion === "0.12.4"))
-              ? currentVerificationChecks
-              : legacyVerificationChecks;
+              : currentVerificationChecks;
 
     if (
       (hasPersistence && (!supportsPersistence ||
@@ -411,6 +388,14 @@ export const installedStateSchema = z
       .readonly(),
   })
   .superRefine(validateStateVerification)
+  .superRefine((state, context) => {
+    const persistence = state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence");
+    const standards = state.installedCapabilities.find(({ identifier }) => identifier === "standards");
+    if (state.origin.recipeVersion !== publicRecipeVersions[state.origin.profile] ||
+        standards?.version !== (persistence ? "0.6.1" : "0.5.1")) {
+      context.addIssue({ code: "custom", message: "public installed tuple must match recipe", path: ["installedCapabilities"] });
+    }
+  })
   .readonly()
   .meta({
     id: "urn:egeria-systems:schema:state:1.0.0",
@@ -427,7 +412,7 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
   projectSchemaVersion: z.literal("2.0.0"),
 }).superRefine(validateStateVerification).superRefine((state, context) => {
   const versions: Readonly<Record<string, string>> = {
-    standards: "0.7.0",
+    standards: "0.7.1",
     "content-files": "0.4.0",
     "section-composition": "0.3.0",
     "deployment-cloudflare": "0.7.0",

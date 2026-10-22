@@ -556,20 +556,23 @@ test("the adapter applies exactly the declared writes and emits a bounded receip
 
 test("the adapter accepts exact generation identities and refuses mixed or unsupported identities", async () => {
   const identities = [
-    { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: true },
-    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: true },
+    { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: false },
+    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.1", accepted: false },
     { recipe: "0.12.1", standards: "0.4.0", stateRecipe: "0.12.1", accepted: false },
     { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
-    { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.2", accepted: true },
+    { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.12.2", standards: "0.4.0", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
-    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.3", accepted: true },
-    { recipe: "0.12.4", standards: "0.5.0", stateRecipe: "0.12.4", accepted: true },
+    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.3", accepted: false },
+    { recipe: "0.12.5", standards: "0.5.1", stateRecipe: "0.12.5", accepted: true },
+    { recipe: "0.12.4", standards: "0.5.0", stateRecipe: "0.12.4", accepted: false },
+    { recipe: "0.12.5", standards: "0.5.0", stateRecipe: "0.12.5", accepted: false },
+    { recipe: "0.12.5", standards: "0.5.1", stateRecipe: "0.12.5", schemaVersion: "2.0.0", accepted: false },
     { recipe: "0.12.3", standards: "0.4.0", stateRecipe: "0.12.3", accepted: false },
-    { recipe: "0.12.4", standards: "0.4.0", stateRecipe: "0.12.4", accepted: false },
+    { recipe: "0.12.5", standards: "0.4.0", stateRecipe: "0.12.5", accepted: false },
     { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
-    { recipe: "0.12.4", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.5", standards: "0.5.1", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.11.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
     { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
@@ -583,6 +586,11 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
       const project = parse(await readFile(projectPath, "utf8"));
       const state = JSON.parse(await readFile(statePath, "utf8"));
       project.recipeVersion = identity.recipe;
+      if (identity.schemaVersion) {
+        project.schemaVersion = identity.schemaVersion;
+        state.schemaVersion = identity.schemaVersion;
+        state.projectSchemaVersion = identity.schemaVersion;
+      }
       state.origin.recipeVersion = identity.stateRecipe;
       state.installedCapabilities.find(({ identifier }) => identifier === "standards").version = identity.standards;
       await writeFile(projectPath, stringify(project));

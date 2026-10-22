@@ -6,6 +6,8 @@
 
 [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds common application-target mapping and narrowly permits related unused snapshot retirement at complete generation activation. The APP_DB, local SQL/runtime evidence, approved remote-target, migration/removal and data-recovery protections below remain; persistence is never implicit.
 
+Current public recipe and retained-snapshot applicability follows [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) and [ADR-0015](0015-vitest-five-generation.md#patched-public-generation). Earlier version tuples below describe their original decision. The early retirement changes unused executable support only; removal, data, provider and outcome safeguards remain unchanged. Current persistence uses `app@0.2.5`, `standards@0.6.1`, deployment `0.4.0` and Vitest `5.0.3`; independent email/jobs composition keeps its declared deployment/foundation variants.
+
 ## Context
 
 Application persistence needs shared deployment and test changes without changing the default app or invalidating materialized repositories. The user approved local-first configuration and separate persistence-specific contract versions on 2026-09-14, following the runner and export-removal review decisions.

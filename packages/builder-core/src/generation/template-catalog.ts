@@ -1,4 +1,4 @@
-import { isLiteralLintProfileRecipe } from "../profiles/profile-recipes.js";
+import { applicationEnvironmentRecipeVersions, publicRecipeVersions } from "../contracts/profile.js";
 import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
@@ -105,25 +105,6 @@ const portfolioTemplateSources: readonly TemplateSource[] = [
   {
     source:
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-    contentKind: "binary",
-  },
-];
-
-const legacySiteTemplateSources: readonly TemplateSource[] = [
-  ...textTemplateSources([
-    "site/apps/web/content/en-CA/site.yaml.template",
-    "site/apps/web/content/en-CA/about.yaml.template",
-    "site/apps/web/content/en-CA/long-form/introduction.md.template",
-    "site/apps/web/app/about/page.tsx",
-  ] as const),
-  {
-    source:
-      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-    contentKind: "binary",
-  },
-  {
-    source:
-      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
     contentKind: "binary",
   },
 ];
@@ -350,7 +331,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.4" : profile === "site" ? "0.12.4" : "0.11.4",
+  recipeVersion: string = publicRecipeVersions[profile],
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -361,32 +342,28 @@ export function createTemplateCatalog(
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
   applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0" || recipeVersion === "0.2.2" || recipeVersion === "0.2.3" || recipeVersion === "0.2.4" || (applicationEnvironments && recipeVersion === "0.3.0"));
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0" || recipeVersion === "0.12.2" || recipeVersion === "0.12.3" || recipeVersion === "0.12.4" || (applicationEnvironments && recipeVersion === "0.13.0")));
-  const literalLintRoots = applicationEnvironments || isLiteralLintProfileRecipe(profile, recipeVersion);
-  const dependencySecurity = literalLintRoots || (profile === "portfolio" && recipeVersion === "0.11.2") ||
-    (profile === "site" && recipeVersion === "0.12.2") || (profile === "app" && recipeVersion === "0.2.2");
-  const vitestFive = dependencySecurity || (profile === "portfolio" && (recipeVersion === "0.11.0")) ||
-    (profile === "site" && (recipeVersion === "0.12.0")) ||
-    (profile === "app" && (recipeVersion === "0.2.0"));
+  if (recipeVersion !== (applicationEnvironments ? applicationEnvironmentRecipeVersions : publicRecipeVersions)[profile]) {
+    return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
+  }
+  const app = profile === "app";
+  const productionSite = app || profile === "site";
   const sources = [
-    ...(literalLintRoots ? [{
+    ...([{
       source: "common/literal-lint-roots/patches/next-eslint-plugin-next.patch",
       destinationSource: "common/patches/next-eslint-plugin-next.patch",
       contentKind: "text" as const,
-    }] : []),
+    }]),
     ...(applicationEnvironments ? textTemplateSources([
       "common/apps/web/src/configuration/application-environment.ts",
       "common/apps/web/scripts/check-application-environment.mjs",
       "common/apps/web/tests/unit/application-environment.test.ts",
       "common/docs/environments.md",
     ]) : []),
-    ...commonTemplateSources.map(entry => dependencySecurity && entry.source === "common/pnpm-workspace.yaml"
+    ...commonTemplateSources.map(entry => entry.source === "common/pnpm-workspace.yaml"
       ? { ...entry, source: "common/dependency-security/pnpm-workspace.yaml", destinationSource: entry.source }
-      : vitestFive && [
+      : [
       "common/apps/web/package.json.template",
       "common/apps/web/tests/setup/component.ts",
-      "common/pnpm-workspace.yaml",
     ].includes(entry.source)
       ? { ...entry, source: entry.source.replace("common/", "common/vitest-five/"), destinationSource: entry.source }
       : entry).filter(
@@ -409,16 +386,14 @@ export function createTemplateCatalog(
     ),
     ...(profile === "portfolio"
       ? portfolioTemplateSources
-      : productionSite
-        ? productionSiteTemplateSources.filter(
+      : productionSiteTemplateSources.filter(
             ({ source }) =>
               (!includeBookingCalendly || source !== "site/apps/web/app/page.tsx") &&
               (!includeMultilingual ||
                 (source !== "site/apps/web/app/sitemap.ts" &&
                   source !==
                     "site/apps/web/tests/e2e/site-routing.spec.ts.template")),
-          )
-        : legacySiteTemplateSources),
+          )),
     ...(includeBookingCalendly
       ? bookingCalendlyTemplateSources.filter(
           ({ source }) =>

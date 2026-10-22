@@ -11,7 +11,7 @@ import { stringifyCanonicalJson } from "../dist/serialization/canonical-json.js"
 import { persistenceGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -25,10 +25,7 @@ const digest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("h
 const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 const cohorts = [
-  { profiles: createVitestFiveProfileRecipes(), recipe: "0.2.0", appLock: "web-recipe-app-0.2.0" },
-  { profiles: createDependencySecurityProfileRecipes(), recipe: "0.2.2", appLock: "web-recipe-app-0.2.2" },
-  { profiles: createLiteralLintProfileRecipes(), recipe: "0.2.3", appLock: "web-recipe-app-0.2.3" },
-  { profiles: createViteSecurityProfileRecipes(), recipe: "0.2.4", appLock: "web-recipe-app-0.2.4" },
+  { profiles: createCurrentProfileRecipes(), recipe: "0.2.5", appLock: "web-recipe-app-0.2.5" },
 ];
 
 async function repository(options = {}) {
@@ -37,7 +34,7 @@ async function repository(options = {}) {
     applicationPersistence: true, ...(options.multilingual ? { multilingual: true } : {}),
     ...(options.transactionalEmailResend ? { transactionalEmailResend: true } : {}),
     packageVersions: core.verifiedCapabilityPackageVersions,
-  }, options.context ?? { ...createGenerationRenderingContext(true, options.transactionalEmailResend === true), profiles: options.profiles ?? createVitestFiveProfileRecipes() });
+  }, options.context ?? { ...createGenerationRenderingContext(true, options.transactionalEmailResend === true), profiles: options.profiles ?? createCurrentProfileRecipes() });
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
   files.set("pnpm-lock.yaml", new Uint8Array(await readFile(createRecipeLockfileUrl(resolveRecipeLockfileVersion(rendered.value.project, JSON.parse(decoder.decode(files.get("apps/web/package.json"))))))));
@@ -179,7 +176,7 @@ test("persistence removal requires evidence review and restores the default app 
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   const finalState = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
-  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
   assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.3.0");
   assert.equal(finalState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   const finalManifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
@@ -443,7 +440,7 @@ test("other optional removal retains persistence and requires the binding verifi
     assert.equal(result.ok, bindingChecked, JSON.stringify(result));
     if (!bindingChecked) assert.equal(result.code, "CAPABILITY_VERIFICATION_FAILED");
     const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.1");
     assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), true);
     assert.equal(repo.files.has("apps/web/vitest.bindings.config.ts"), true);
   }

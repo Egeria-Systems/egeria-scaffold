@@ -36,7 +36,7 @@ const descriptorDigests = Object.freeze({
   "site-routing":
     "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac",
   standards:
-    "sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd",
+    "sha256:36f8c505fe048250bdf064f194608e94486df232b131c3ebf689436ec8a95b9c",
   "transactional-email-resend": "sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3",
 });
 const descriptorVersions = Object.freeze({
@@ -52,7 +52,7 @@ const descriptorVersions = Object.freeze({
   observability: "0.3.0",
   "section-composition": "0.3.0",
   "site-routing": "0.4.0",
-  standards: "0.6.0",
+  standards: "0.6.1",
   "transactional-email-resend": "0.1.0",
 });
 const expectedIdentifiers = Object.freeze([
@@ -196,19 +196,17 @@ test("certification subjects bind the descriptor and required evidence", () => {
     );
   }
 
-  const retainedCatalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, core.vitestFourCapabilityCatalogSnapshot));
-  assert.deepEqual(core.createCertificationSubject(retainedCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards), {
-    descriptorVersion: "0.4.0",
-    behaviorContractDigest: "sha256:640d95879a1e40e8fe26cf350453e01ead9fd031f30d53c4dd64552046449607",
-  });
+  assert.equal(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+    standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0",
+  }).ok, false);
 
   const defaultCatalog = assertSuccess(core.createCapabilityCatalogSnapshot(
-    core.verifiedCapabilityPackageVersions, core.vitestFiveCapabilityCatalogSnapshot,
+    core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" },
   ));
   assert.equal(defaultCatalog.some(({ identifier }) => identifier === "application-persistence"), false);
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards), {
-    descriptorVersion: "0.5.0",
-    behaviorContractDigest: "sha256:56a667594f2cbf43beed6e23471e4d8bf28fcbbf54d6f13530191153c84d4de9",
+    descriptorVersion: "0.5.1",
+    behaviorContractDigest: "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
   });
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare"), requiredEvidence["deployment-cloudflare"]), {
     descriptorVersion: "0.3.0",
@@ -234,7 +232,9 @@ test("current certification preserves accepted evidence and keeps other subjects
 
   for (const [identifier, record] of Object.entries(committedRegistry.records)) {
     const expected = createRecord(identifier);
-    if (acceptedLocalSubjects.has(identifier)) {
+    if (identifier === "standards") {
+      expected.taskPlan = "docs/superpowers/plans/2026-10-21-patched-standards-certification.md";
+    } else if (acceptedLocalSubjects.has(identifier)) {
       expected.status = "certified";
       expected.taskPlan = "docs/superpowers/plans/2026-09-13-app-foundation-certification.md";
       expected.evidence = expected.requiredEvidence.map((kind) => ({

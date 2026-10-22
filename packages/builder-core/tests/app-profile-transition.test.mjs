@@ -2,23 +2,18 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
-  { label: "Vitest five", generation: "vitest-five", portfolio: "0.11.0", site: "0.12.0", app: "0.2.0" },
+  { label: "Current", generation: "current", portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" },
 ];
 const currentTransitionContexts = {
-  "vitest-five": { ...createGenerationRenderingContext(), profiles: createVitestFiveProfileRecipes() },
+  "current": createGenerationRenderingContext(),
 };
 
 import { deflateSync } from "node:zlib";
 import { parseDocument, stringify } from "yaml";
 import * as core from "../dist/index.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
-const { createVitestFourProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-const retainedRenderingContext = {
-  catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" },
-  profiles: createVitestFourProfileRecipes(),
-};
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const bookingCalendly = { destination: "https://calendly.com/example/discovery", mode: "popup" };
@@ -29,17 +24,17 @@ const git = { ok: true, identity: {
     root: "/private/app-plan", revision: "a".repeat(40), attachedRef: "refs/heads/app-plan", gitDirectory: "/private/common/.git/worktrees/app-plan", commonDirectory: "/private/common/.git"
   } };
 const checks = ["contracts", "pre-state-inference", "lockfile", "frozen-install", "lint", "typecheck", "unit-tests", "component-tests", "next-build", "opennext-build", "post-state-inference"];
-async function fixture(profile, subset = 0, project = { projectName: "transition-test", displayName: "Private display sentinel" }, generation = "vitest-four") {
+async function fixture(profile, subset = 0, project = { projectName: "transition-test", displayName: "Private display sentinel" }, generation = "current") {
   const request = {
     profile, ...project, packageVersions: core.verifiedCapabilityPackageVersions, ...(subset & 1 ? { bookingCalendly } : {}), ...(subset & 2 ? { multilingual: true } : {}), ...(subset & 4 ? { analytics } : {})
   };
-  const context = generation === "vitest-four" ? retainedRenderingContext : currentTransitionContexts[generation];
+  const context = currentTransitionContexts[generation];
   const rendered = await core.renderSkeleton(request, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
   const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   assert.equal(target.ok, true);
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, new Uint8Array(content)]));
-  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation === "vitest-four" ? (profile === "portfolio" ? "0.10.0" : "0.9.0") : `${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}/pnpm-lock.yaml`, import.meta.url))));
+  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}/pnpm-lock.yaml`, import.meta.url))));
   files.set(".egeria/project.yaml", encoder.encode(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", encoder.encode(""));
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
@@ -95,13 +90,13 @@ for (const profile of ["portfolio", "site"])
       const prepared = await prepare(f);
       assert.equal(prepared.ok, true);
       const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
-      assert.equal(manifest.devDependencies.vitest, "4.1.10", "incoming transitions preserve the source declaration");
+      assert.equal(manifest.devDependencies.vitest, "5.0.3", "incoming transitions preserve the source declaration");
       const successful = await plan(f, evidence);
       assert.equal(successful.ok, true, JSON.stringify(successful));
       assert.deepEqual(await plan(f, evidence), successful);
       const value = successful.value;
       assert.equal(value.target.profile, "app");
-      assert.equal(value.target.recipeVersion, "0.1.0");
+      assert.equal(value.target.recipeVersion, "0.2.5");
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0"));
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0"));
       assert.equal(value.actions.some(({ path }) => path.startsWith(".egeria/")), false);
@@ -144,7 +139,7 @@ test("portfolio preparation preserves scalar content, navigation, Markdown and u
   assert.equal(merged.scripts.custom, "echo safe");
   assert.equal(merged.description, "custom");
   assert.equal(merged.dependencies.effect, "4.0.0-rc.112");
-  assert.equal(merged.dependencies.next, "16.3.3");
+  assert.equal(merged.dependencies.next, "16.3.8");
 });
 test("app planning preserves both supported Git revision formats and rejects invalid identities", async () => {
   for (const profile of ["portfolio", "site"]) {
@@ -176,15 +171,13 @@ test("app planning preserves both supported Git revision formats and rejects inv
     assert.equal(JSON.stringify([...f.files]), before);
   }
 });
-test("default visual admission loads promoted assets for both groups and refuses changed source content", async () => {
+test("default visual admission refuses both successor groups and changed source content", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   for (const subset of [0, 7]) {
     const f = await fixture("portfolio", subset, policy.appTransitionVisualProject);
     const result = await plan(f);
-    assert.equal(result.ok, true, JSON.stringify(result));
-    for (const path of policy.appTransitionBaselinePaths) {
-      assert.equal(result.value.actions.find(action => action.path === path)?.kind, "replace-file");
-    }
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
     const path = subset === 0 ? "apps/web/content/en-CA/site.yaml" : "apps/web/content/en-CA/localized-content.yaml";
     const content = parseDocument(decoder.decode(f.files.get(path))).toJS();
     const home = subset === 0 ? content.home : content.pages.home;
@@ -426,13 +419,12 @@ test("visual input fingerprints include rendered build configuration and manifes
   }
 });
 
-test("frozen visual inputs reject changed runtime or lockfile identities and retain excluded-content compatibility", async () => {
+test("unadmitted visual inputs refuse changed runtime and lock identities while preserving excluded-content fingerprints", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
   const cohorts = [
-    { context: retainedRenderingContext, lock: "app-0.1.0" },
-    { context: currentTransitionContexts["vitest-five"], lock: "app-0.2.0" },
+    { context: currentTransitionContexts.current, lock: "app-0.2.5" },
   ];
   const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
   for (const [cohortIndex, cohort] of cohorts.entries()) {
@@ -451,8 +443,8 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     assert.equal(prepared.ok,true);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,true);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, false);
     for (const invalidSubset of [
       [...optionalCapabilities, "unknown-capability"],
       ...(optionalCapabilities.length ? [[...optionalCapabilities, optionalCapabilities[0]]] : [["none"]]),
@@ -475,12 +467,13 @@ test("frozen visual inputs reject changed runtime or lockfile identities and ret
     currentFiles.set("apps/web/content/en-CA/long-form/introduction.md",encoder.encode("---\ntitle: Preserved\nsummary: Off home\n---\nCustomized preserved prose.\n"));
     const customized = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
     assert.equal(customized.ok,true);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
+    assert.deepEqual(customized.value.influencingFingerprints, prepared.value.influencingFingerprints);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,false);
   }
   }
 });
 
-test("current visual candidate freezes exact inputs while successor transitions remain unadmitted", async () => {
+test("historical visual candidate preserves frozen inputs while successor transitions remain unadmitted", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
@@ -495,10 +488,10 @@ test("current visual candidate freezes exact inputs while successor transitions 
     assert.deepEqual(candidate.baselines[group], baselines);
     assert.equal(Object.isFrozen(candidate.baselines[group]), true);
   }
-  const currentSubsetKeys = [];
+  const historical = JSON.parse(await readFile(new URL("../../../docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/transition-inputs.json", import.meta.url), "utf8"));
+  assert.deepEqual(candidate, historical.value);
   for (const generation of [
-    { context: { ...createGenerationRenderingContext(), profiles: createDependencySecurityProfileRecipes() }, portfolio: "0.11.2", app: "0.2.2", next: "16.3.8", lock: "app-0.2.2" },
-    { context: { ...createGenerationRenderingContext(), profiles: createLiteralLintProfileRecipes() }, portfolio: "0.11.3", app: "0.2.3", next: "16.3.8", lock: "app-0.2.3" },
+    { context: createGenerationRenderingContext(), portfolio: "0.11.5", app: "0.2.5", next: "16.3.8", lock: "app-0.2.5" },
   ]) for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -518,18 +511,13 @@ test("current visual candidate freezes exact inputs while successor transitions 
     assert.equal(manifest.dependencies.next, generation.next);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url))));
-    if (generation.app === "0.2.3") {
-      const key = [...optionalCapabilities].sort().join("+") || "none";
-      currentSubsetKeys.push(key);
-      assert.equal(candidate.targetLockfileFingerprint, targetLockfileFingerprint);
-      assert.equal(candidate.subsets[key], core.fingerprintJsonValue(prepared.value.influencingFingerprints));
-    }
     const result = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities,
       influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint });
     assert.equal(result.ok, false);
     assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
-  assert.deepEqual(Object.keys(candidate.subsets).sort(), currentSubsetKeys.sort());
+  assert.deepEqual(Object.keys(candidate.subsets).sort(), ["none", "analytics", "booking-calendly", "multilingual", "analytics+booking-calendly", "analytics+multilingual", "booking-calendly+multilingual", "analytics+booking-calendly+multilingual"].sort());
+  assert.equal(core.resolveSupportedProfileTransition({ fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion: "0.2.3" }).ok, false);
 });
 
 // Construct complete PNGs with valid chunk CRCs, changing only pixel data.
@@ -561,11 +549,11 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
       const prepared = await prepare(f);
       assert.equal(prepared.ok, true, JSON.stringify(prepared));
       const manifest = JSON.parse(decoder.decode(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content));
-      assert.equal(manifest.devDependencies.vitest, "5.0.0");
+      assert.equal(manifest.devDependencies.vitest, "5.0.3");
       const result = await plan(f, await reviewed(f));
       assert.equal(result.ok, true, JSON.stringify(result));
       assert.equal(result.value.target.recipeVersion, cohort.app);
-      assert.equal(result.value.target.capabilities.find(({ identifier }) => identifier === "standards").version, "0.5.0");
+      assert.equal(result.value.target.capabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
       assert.equal(result.value.actions.some(({ kind }) => kind.includes("delete")), false);
       assert.equal(result.value.actions.filter(({ path }) => path === "pnpm-lock.yaml").length, 1);
       assert.deepEqual(result.value.requiredApprovals, ["transform", "verified-final-diff"]);
@@ -574,37 +562,33 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
   }
 });
 
-test("literal lint transitions require exact same-cohort endpoints", async () => {
-  const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.3"], ["site", "0.12.3"]]) {
-    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.3" });
-    assert.equal(edge.ok, true);
-    assert.deepEqual(edge.value.source, { profile, recipeVersion });
-    assert.deepEqual(edge.value.target, { profile: "app", recipeVersion: "0.2.3" });
-    assert.equal(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.2" }).ok, false);
-    assert.equal(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion.replace(/3$/u, "2"), toProfile: "app", toRecipeVersion: "0.2.3" }).ok, false);
+test("retired transition endpoints refuse the historical and current targets", async () => {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.3"]]) {
+    for (const toRecipeVersion of ["0.2.2", "0.2.3", "0.2.5"]) {
+      assert.equal(core.resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion }).ok, false);
+    }
   }
 });
 
 test("Vite security incoming transitions admit only exact same-cohort endpoints", async () => {
   const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
-  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.4", "0.11.3"], ["site", "0.12.4", "0.12.3"]]) {
-    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.4" });
-    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.4" } } });
-    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.4"]]) {
+  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.5", "0.11.3"], ["site", "0.12.5", "0.12.3"]]) {
+    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.5" });
+    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.5" } } });
+    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.5"]]) {
       assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
     }
   }
 });
 
-test("Vite security visual candidate binds every subset without admitting portfolio transitions", async () => {
+test("current visual inputs bind every subset without inheriting historical admission", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
-  const { createViteSecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+  const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const validators = await loadAppTransitionContentValidators();
-  const context = { ...createGenerationRenderingContext(), profiles: createViteSecurityProfileRecipes() };
+  const context = { ...createGenerationRenderingContext(), profiles: createCurrentProfileRecipes() };
   const subsets = {};
-  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.4/pnpm-lock.yaml", import.meta.url))));
+  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.5/pnpm-lock.yaml", import.meta.url))));
   for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -627,7 +611,9 @@ test("Vite security visual candidate binds every subset without admitting portfo
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
-  assert.deepEqual(candidate, { targetLockfileFingerprint, baselines: policy.appTransitionVisualInputRecord.baselines, subsets });
+  assert.notDeepEqual(candidate.subsets, subsets);
+  assert.notEqual(candidate.targetLockfileFingerprint, targetLockfileFingerprint);
+  assert.deepEqual(candidate.baselines, policy.appTransitionVisualInputRecord.baselines);
   assert.equal(Object.isFrozen(candidate), true);
   assert.equal(Object.isFrozen(candidate.subsets), true);
 });

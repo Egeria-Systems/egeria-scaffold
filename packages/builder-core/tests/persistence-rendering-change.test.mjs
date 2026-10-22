@@ -7,12 +7,12 @@ import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } f
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const { createVitestFiveProfileRecipes, createDependencySecurityProfileRecipes, createLiteralLintProfileRecipes, createViteSecurityProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-const retainedContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createVitestFiveProfileRecipes() });
-const ordinary = (await renderSkeleton(request, retainedContext())).value;
-const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, retainedContext(true))).value;
+const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const currentContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createCurrentProfileRecipes() });
+const ordinary = (await renderSkeleton(request, currentContext())).value;
+const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, currentContext(true))).value;
 const manifest = (rendered) => JSON.parse(decoder.decode(rendered.files.find(({ path }) => path === "apps/web/package.json").content));
-const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-application-persistence" : "web-recipe-app-0.2.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.5-persistence" : "web-recipe-app-0.2.5"}/pnpm-lock.yaml`, import.meta.url), "utf8");
 async function reader(rendered, modify = (value) => value, lockSource) {
   return createInMemoryRepositoryReader({
     "package.json": decoder.decode(rendered.files.find(({ path }) => path === "package.json").content),
@@ -61,21 +61,18 @@ test("persistence refuses a changed root dependency graph before replacing its l
 });
 
 
-test("historical and security dependency replacement refuses swapped source locks", async () => {
+test("current persistence dependency replacement refuses swapped source locks", async () => {
   const cases = [
-    { profiles: createVitestFiveProfileRecipes(), ordinary: "web-recipe-app-0.2.0", persistent: "web-application-persistence" },
-    { profiles: createDependencySecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.2", persistent: "web-recipe-app-0.2.2-persistence" },
-    { profiles: createLiteralLintProfileRecipes(), ordinary: "web-recipe-app-0.2.3", persistent: "web-recipe-app-0.2.3-persistence" },
-    { profiles: createViteSecurityProfileRecipes(), ordinary: "web-recipe-app-0.2.4", persistent: "web-recipe-app-0.2.4-persistence" },
+    { profiles: createCurrentProfileRecipes(), ordinary: "web-recipe-app-0.2.5", persistent: "web-recipe-app-0.2.5-persistence" },
   ];
-  for (const [index, cohort] of cases.entries()) {
+  for (const cohort of cases) {
     const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
     const currentOrdinary = await renderSkeleton(request, context(false));
     const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
-    const expectedNext = index === 0 ? "16.3.3" : "16.3.8";
-    assert.equal(currentOrdinary.value.project.recipeVersion, ["0.2.0", "0.2.2", "0.2.3", "0.2.4"][index]);
+    const expectedNext = "16.3.8";
+    assert.equal(currentOrdinary.value.project.recipeVersion, "0.2.5");
     assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
     assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
     assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);
@@ -92,9 +89,7 @@ test("historical and security dependency replacement refuses swapped source lock
       assert.equal(manifest(actual.value.desired).dependencies.next, expectedNext);
       const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.3.6" ? "16.3.3" : "16.3.6" } }), expectedSource) });
       assert.equal(mismatched.ok, false);
-      const swapped = await Promise.all(cases.filter(other => other !== cohort).map(other =>
-        readFile(new URL(`../lockfiles/${other[sourceKind]}/pnpm-lock.yaml`, import.meta.url), "utf8")));
-      for (const source of [...swapped, expectedSource + "\n"]) {
+      for (const source of [expectedTarget, expectedSource + "\n"]) {
         const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
         assert.equal(refused.ok, false);
       }

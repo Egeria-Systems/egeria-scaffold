@@ -63,12 +63,6 @@ export type CliCommand =
       jobRemovalPath?: string;
     }>
   | Readonly<{
-      kind: "plan-upgrade";
-      directory: string;
-      capability: "site-routing" | "standards";
-      toVersion: "0.4.0";
-    }>
-  | Readonly<{
       kind: "plan-profile-transition";
       directory: string;
       toProfile: "site" | "app";
@@ -102,13 +96,6 @@ export type CliCommand =
       jobRemovalPath?: string;
       persistenceRemovalHumanReviewPath?: string;
       jobRemovalHumanReviewPath?: string;
-      approvedPlanFingerprint: string;
-    }>
-  | Readonly<{
-      kind: "apply-upgrade";
-      directory: string;
-      capability: "site-routing" | "standards";
-      toVersion: "0.4.0";
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
@@ -635,69 +622,6 @@ function parseRemove(
   }
 }
 
-function parseUpgrade(
-  kind: "plan-upgrade" | "apply-upgrade",
-  arguments_: readonly string[],
-): ValidationResult<CliCommand> {
-  try {
-    const applying = kind === "apply-upgrade";
-    const { values, tokens } = parseArgs({
-      args: [...arguments_],
-      options: {
-        directory: { type: "string" },
-        capability: { type: "string" },
-        "to-version": { type: "string" },
-        ...(applying ? approvedPlanOptionDefinitions : {}),
-      },
-      strict: true,
-      allowPositionals: false,
-      tokens: true,
-    });
-    const directory = values.directory;
-    const capability = values.capability;
-    const toVersion = values["to-version"];
-    const approvedPlanFingerprint = values["approved-plan"];
-
-    if (
-      !hasExactOptions(tokens, [
-        "directory",
-        "capability",
-        "to-version",
-        ...(applying ? ["approved-plan"] : []),
-      ]) ||
-      !validAbsoluteDirectory(directory) ||
-      (capability !== "standards" && capability !== "site-routing") ||
-      toVersion !== "0.4.0"
-    ) {
-      return invalidArguments();
-    }
-
-    if (kind === "apply-upgrade") {
-      if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
-        return invalidArguments();
-      }
-
-      return {
-        ok: true,
-        value: {
-          kind,
-          directory,
-          capability,
-          toVersion,
-          approvedPlanFingerprint,
-        },
-      };
-    }
-
-    return {
-      ok: true,
-      value: { kind, directory, capability, toVersion },
-    };
-  } catch {
-    return invalidArguments();
-  }
-}
-
 function parseProfileTransition(
   kind: "plan-profile-transition" | "apply-profile-transition",
   arguments_: readonly string[],
@@ -775,9 +699,6 @@ export function parseCliArguments(
     case "plan-remove":
     case "apply-remove":
       return parseRemove(command, commandArguments);
-    case "plan-upgrade":
-    case "apply-upgrade":
-      return parseUpgrade(command, commandArguments);
     case "plan-profile-transition":
     case "apply-profile-transition":
       return parseProfileTransition(command, commandArguments);

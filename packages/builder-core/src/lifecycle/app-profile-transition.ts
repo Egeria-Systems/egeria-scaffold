@@ -58,7 +58,7 @@ export const appTransitionVisualAnalyticsSettings = Object.freeze({
   providers: { cloudflareWebAnalytics: { siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
   operationalIntegrations: {},
 });
-// These fixed inputs and expected image identities require review together.
+// Historical visual provenance only; these retired inputs confer no current admission.
 // The producer must regenerate and obtain approval before promoting images.
 // Template/configuration/dependency changes require renewed visual evidence;
 // recomputing a canonical render cannot silently approve new inputs.
@@ -146,10 +146,8 @@ export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   }
   const key = optionalCapabilities.join("+") || "none";
   const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
-  const record = [
-    appTransitionVisualInputRecord,
-    vitestFiveAppTransitionVisualInputRecord,
-  ].find(candidate => input.targetLockfileFingerprint === candidate.targetLockfileFingerprint &&
+  const admittedRecords: readonly typeof appTransitionVisualInputRecord[] = [];
+  const record = admittedRecords.find(candidate => input.targetLockfileFingerprint === candidate.targetLockfileFingerprint &&
     Object.hasOwn(candidate.subsets, key) && Reflect.get(candidate.subsets, key) === fingerprint);
   if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   const expectedBaselines = record.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];

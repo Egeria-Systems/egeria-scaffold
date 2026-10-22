@@ -20,8 +20,8 @@ export type CapabilityPackageVersions = Readonly<{
 }>;
 
 export type CapabilityCatalogSnapshot = Readonly<{
-  standards: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
-  siteRouting?: "0.3.0" | "0.4.0";
+  standards: "0.5.1" | "0.6.1" | "0.7.1";
+  siteRouting?: "0.4.0";
   appFoundation?: "0.1.0" | "0.2.0" | "0.3.0";
   deploymentCloudflare?: "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0" | "0.7.0";
   backgroundJobDelivery?: "0.1.0" | "0.2.0";
@@ -29,27 +29,21 @@ export type CapabilityCatalogSnapshot = Readonly<{
   transactionalEmailResend?: "0.1.0";
 }>;
 
-export const vitestFourCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
-  standards: "0.4.0",
-  siteRouting: "0.4.0",
-  appFoundation: "0.1.0",
-});
-
 export const vitestFiveCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
-  standards: "0.5.0",
+  standards: "0.5.1",
   siteRouting: "0.4.0",
   appFoundation: "0.1.0",
 });
 
 export const applicationPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...vitestFiveCapabilityCatalogSnapshot,
-  standards: "0.6.0",
+  standards: "0.6.1",
   deploymentCloudflare: "0.4.0",
   applicationPersistence: "0.1.0",
 });
 
 export const applicationEnvironmentCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
-  standards: "0.7.0",
+  standards: "0.7.1",
   siteRouting: "0.4.0",
   appFoundation: "0.3.0",
   deploymentCloudflare: "0.7.0",
@@ -100,13 +94,13 @@ const currentCapabilityCatalogSnapshot: CapabilityCatalogSnapshot = {
 function isSupportedStandardsSnapshotVersion(
   value: string,
 ): value is CapabilityCatalogSnapshot["standards"] {
-  return value === "0.3.0" || value === "0.4.0" || value === "0.5.0" || value === "0.6.0" || value === "0.7.0";
+  return value === "0.5.1" || value === "0.6.1" || value === "0.7.1";
 }
 
 function isSupportedSiteRoutingSnapshotVersion(
   value: string,
 ): value is NonNullable<CapabilityCatalogSnapshot["siteRouting"]> {
-  return value === "0.3.0" || value === "0.4.0";
+  return value === "0.4.0";
 }
 
 function isSupportedAppFoundationSnapshotVersion(
@@ -273,8 +267,8 @@ function createDescriptors(
   packageVersions: CapabilityPackageVersions,
   snapshot: CapabilityCatalogSnapshot,
 ): readonly CapabilityDescriptor[] {
-  const applicationEnvironments = snapshot.standards === "0.7.0";
-  const siteRoutingVersion = snapshot.siteRouting ?? "0.3.0";
+  const applicationEnvironments = snapshot.standards === "0.7.1";
+  const siteRoutingVersion = snapshot.siteRouting ?? "0.4.0";
   const persistence = snapshot.applicationPersistence === "0.1.0";
   const jobs = snapshot.backgroundJobDelivery !== undefined;
   const jobOperations = snapshot.backgroundJobDelivery === "0.2.0";
@@ -501,7 +495,7 @@ function createDescriptors(
       "standards",
       "devDependencies",
       "vitest",
-      snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0" || applicationEnvironments ? "5.0.0" : "4.1.10",
+      "5.0.3",
     ),
     createFileEvidencePoint(
       "standards-visual-regression-specification",
@@ -531,20 +525,7 @@ function createDescriptors(
       "application-owned",
     ),
   ] as const;
-  const currentStandardsEvidenceIdentifiers = new Set([
-    "standards-playwright-visual-configuration",
-    "standards-visual-regression-specification",
-    "standards-visual-regression-test-script",
-  ]);
-  const selectedStandardsEvidencePoints =
-    snapshot.standards !== "0.3.0"
-      ? standardsEvidencePoints
-      : standardsEvidencePoints.filter(
-          ({ managedSurface }) =>
-            !currentStandardsEvidenceIdentifiers.has(
-              managedSurface.identifier,
-            ),
-        );
+  const selectedStandardsEvidencePoints = standardsEvidencePoints;
 
   const contentFilesEvidencePoints = [
     createPackageEvidencePoint(
@@ -790,8 +771,7 @@ function createDescriptors(
       "apps/web/content/en-CA/about.yaml",
       "application-owned",
     ),
-    ...(siteRoutingVersion === "0.4.0"
-      ? [
+    ...[
     createFileEvidencePoint(
       "site-routing-not-found-route",
       "site-routing",
@@ -882,8 +862,7 @@ function createDescriptors(
       "apps/web/tests/unit/routing-content.test.ts",
       "application-owned",
     ),
-        ]
-      : []),
+        ],
   ] as const;
 
   const bookingCalendlyEvidencePoints = [
@@ -1270,9 +1249,7 @@ function createDescriptors(
       adapterSemanticRequirements: [],
       managedSurfaces: [
         ...projectManagedSurfaces(selectedStandardsEvidencePoints),
-        ...(snapshot.standards !== "0.3.0"
-          ? standardsVisualBaselineSurfaces
-          : []),
+        ...standardsVisualBaselineSurfaces,
       ],
       inferenceProbes: projectInferenceProbes(
         selectedStandardsEvidencePoints,
@@ -1286,9 +1263,7 @@ function createDescriptors(
         "browser-development",
         "browser-preview",
         "deployed-configuration",
-        ...(snapshot.standards !== "0.3.0"
-          ? (["visual-regression"] as const)
-          : []),
+        "visual-regression",
         "workflow-contracts",
         ...(persistence ? ["binding-runtime-tests"] : []),
       ],
@@ -1297,17 +1272,13 @@ function createDescriptors(
         "unit-and-component-testing-claim-boundaries",
         "browser-testing-claim-boundaries",
         ...(persistence ? ["binding-runtime-testing-claim-boundaries"] : []),
-        ...(snapshot.standards !== "0.3.0"
-          ? (["visual-regression-baseline-and-claim-boundaries"] as const)
-          : []),
+        "visual-regression-baseline-and-claim-boundaries",
       ],
       removalAndRecoveryRequirements: [
         "review-package-and-configuration-removal",
         "review-generated-test-surface-removal",
         "review-generated-quality-surface-removal",
-        ...(snapshot.standards !== "0.3.0"
-          ? (["review-visual-regression-configuration-and-baselines"] as const)
-          : []),
+        "review-visual-regression-configuration-and-baselines",
       ],
     },
     {
@@ -1539,22 +1510,17 @@ function createDescriptors(
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
       dependencies:
-        siteRoutingVersion === "0.4.0"
-          ? ["content-files", "observability", "section-composition"]
-          : ["content-files", "section-composition"],
+        ["content-files", "observability", "section-composition"],
       ...sharedCapabilityMetadata,
       migrationPlanners:
-        siteRoutingVersion === "0.4.0"
-          ? ["upgrade-site-routing-0-3-0-to-0-4-0"]
-          : [],
+        ["upgrade-site-routing-0-3-0-to-0-4-0"],
       supportedProfiles: siteRoutingSupportedProfiles,
       requiredPackages: [],
       platformResources: [],
       adapterSemanticRequirements: [],
       ...projectEvidencePoints(siteRoutingEvidencePoints),
       verificationPlan:
-        siteRoutingVersion === "0.4.0"
-          ? [
+        [
               "content-contracts",
               "component-tests",
               "typecheck",
@@ -1562,24 +1528,19 @@ function createDescriptors(
               "opennext-build",
               "browser-development",
               "browser-preview",
-            ]
-          : ["typecheck", "next-build"],
+            ],
       documentationEvidenceRequirements:
-        siteRoutingVersion === "0.4.0"
-          ? [
+        [
               "browser-route-and-navigation-behavior",
               "crawl-metadata-contract",
               "nested-error-and-not-found-behavior",
               "page-and-navigation-migration-contract",
-            ]
-          : ["multi-page-routing-contract"],
+            ],
       removalAndRecoveryRequirements:
-        siteRoutingVersion === "0.4.0"
-          ? [
+        [
               "review-route-content-and-crawl-metadata-removal",
               "review-redirect-and-navigation-recovery",
-            ]
-          : ["review-route-and-content-removal"],
+            ],
     },
     {
       identifier: "booking-calendly",
@@ -1795,7 +1756,7 @@ function createDescriptors(
       documentationEvidenceRequirements: ["schema-and-migration-ownership", "environment-isolation-and-migration-authority", "backup-export-and-recovery-boundaries", "machine-and-human-removal-review"],
       removalAndRecoveryRequirements: ["review-exact-export-and-recovery-evidence", "review-required-uncertainty-dispositions", "preserve-application-owned-schema-and-migrations", "refuse-surviving-package-references", "separate-source-and-persistent-data-recovery"],
     } as const] : []),
-    ...((snapshot.standards === "0.5.0" || snapshot.standards === "0.6.0") ? [{
+    ...((snapshot.standards === "0.5.1" || snapshot.standards === "0.6.1") ? [{
       identifier: "contact-form-web3forms",
       version: "0.1.0",
       deliveryMode: "source-generated",
@@ -1990,30 +1951,30 @@ export function createCapabilityCatalogSnapshot(
     ? Reflect.get(snapshotValue, "applicationPersistence") as unknown : undefined;
   const jobsSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "backgroundJobDelivery") as unknown : undefined;
-  const applicationEnvironments = standardsSnapshot === "0.7.0" || deploymentSnapshot === "0.7.0" || appFoundationSnapshot === "0.3.0";
+  const applicationEnvironments = standardsSnapshot === "0.7.1" || deploymentSnapshot === "0.7.0" || appFoundationSnapshot === "0.3.0";
   const applicationEnvironmentTupleValid = applicationEnvironments &&
-    standardsSnapshot === "0.7.0" && siteRoutingSnapshot === "0.4.0" &&
+    standardsSnapshot === "0.7.1" && siteRoutingSnapshot === "0.4.0" &&
     appFoundationSnapshot === "0.3.0" && deploymentSnapshot === "0.7.0" &&
     snapshotValue !== null && typeof snapshotValue === "object" &&
     Object.keys(snapshotValue).length === 4 &&
     Object.keys(snapshotValue).every((key) => ["standards", "siteRouting", "appFoundation", "deploymentCloudflare"].includes(key));
   const supportedJobs = jobsSnapshot === "0.1.0" || jobsSnapshot === "0.2.0";
   const jobsTupleValid = jobsSnapshot === undefined || (supportedJobs && appFoundationSnapshot === "0.2.0" &&
-    siteRoutingSnapshot === "0.4.0" && (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0"));
+    siteRoutingSnapshot === "0.4.0" && (standardsSnapshot === "0.5.1" || standardsSnapshot === "0.6.1"));
   const persistenceTupleValid = applicationEnvironments ? true : persistenceSnapshot === undefined
-    ? standardsSnapshot !== "0.6.0" && (supportedJobs ? deploymentSnapshot === "0.5.0" : deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
-    : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.0" &&
+    ? standardsSnapshot !== "0.6.1" && (supportedJobs ? deploymentSnapshot === "0.5.0" : deploymentSnapshot === undefined || deploymentSnapshot === "0.3.0")
+    : persistenceSnapshot === "0.1.0" && standardsSnapshot === "0.6.1" &&
       (supportedJobs ? deploymentSnapshot === "0.6.0" : deploymentSnapshot === "0.4.0") && (appFoundationSnapshot === "0.1.0" || appFoundationSnapshot === "0.2.0") && siteRoutingSnapshot === "0.4.0";
   const emailSnapshot = typeof snapshotValue === "object" && snapshotValue !== null
     ? Reflect.get(snapshotValue, "transactionalEmailResend") as unknown : undefined;
   if ((emailSnapshot !== undefined || appFoundationSnapshot === "0.2.0") &&
       !(emailSnapshot === "0.1.0" && appFoundationSnapshot === "0.2.0" &&
-        (standardsSnapshot === "0.5.0" || standardsSnapshot === "0.6.0") && siteRoutingSnapshot === "0.4.0")) {
+        (standardsSnapshot === "0.5.1" || standardsSnapshot === "0.6.1") && siteRoutingSnapshot === "0.4.0")) {
     versionIssues.push({ code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID", path: ["snapshot", "transactionalEmailResend"], context: { reason: "unsupported-version" } });
   }
   const resolvedSiteRoutingSnapshot =
     siteRoutingSnapshot === undefined
-      ? "0.3.0"
+      ? "0.4.0"
       : typeof siteRoutingSnapshot === "string" &&
           isSupportedSiteRoutingSnapshotVersion(siteRoutingSnapshot)
         ? siteRoutingSnapshot
@@ -2060,7 +2021,7 @@ export function createCapabilityCatalogSnapshot(
   if (
     typeof standardsSnapshot !== "string" ||
     !isSupportedStandardsSnapshotVersion(standardsSnapshot) ||
-    (standardsSnapshot === "0.7.0" && !applicationEnvironmentTupleValid)
+    (standardsSnapshot === "0.7.1" && !applicationEnvironmentTupleValid)
   ) {
     versionIssues.push({
       code: "CAPABILITY_DESCRIPTOR_VERSION_INVALID",

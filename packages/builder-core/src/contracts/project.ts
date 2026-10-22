@@ -1,3 +1,5 @@
+import { publicRecipeVersions } from "./profile.js";
+
 import { z } from "zod";
 
 import {
@@ -239,6 +241,9 @@ export const projectConfigurationSchema = z
     ejectedAreas: ejectedAreaListSchema,
   })
   .superRefine((project, context) => {
+    if (project.recipeVersion !== publicRecipeVersions[project.originProfile]) {
+      context.addIssue({ code: "custom", message: "public recipe must match profile", path: ["recipeVersion"] });
+    }
     const contactSelected = project.selectedCapabilities.includes("contact-form-web3forms");
     const contactConfigured = project.capabilitySettings["contact-form-web3forms"] !== undefined;
     if (contactSelected !== contactConfigured) {
