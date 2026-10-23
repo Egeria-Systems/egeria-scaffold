@@ -6,7 +6,7 @@ import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentCohorts = [
-  { label: "Current", generation: "current", profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" } },
+  { label: "Current", generation: "current", profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" } },
 ];
 
 
@@ -437,7 +437,7 @@ test("installed optional lifecycle ignores changed generation defaults", async (
           assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
           const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
           assert.equal(state.ok, true);
-          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }[profile] });
+          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }[profile] });
           assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
         } finally {
           core.profileRecipes.push(...recipes);
@@ -538,7 +538,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         const oldState = core.parseStateJson(entries.get(".egeria/state.json"));
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true, JSON.stringify(state));
-        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.5" });
+        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.6" });
         for (const identifier of ["app-foundation", "site-routing"]) {
           assert.deepEqual(
             state.value.installedCapabilities.find((item) => item.identifier === identifier),

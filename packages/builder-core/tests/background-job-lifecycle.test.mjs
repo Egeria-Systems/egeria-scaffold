@@ -15,7 +15,7 @@ const root = "/generated/jobs-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/jobs-lifecycle", gitDirectory: "/generated/.git/worktrees/jobs-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.5-foundation", site: "web-recipe-app-0.2.5", app: "web-recipe-app-0.2.5" }, persistenceLock: "web-recipe-app-0.2.5-persistence" },
+  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.6-foundation", site: "web-recipe-app-0.2.6", app: "web-recipe-app-0.2.6" }, persistenceLock: "web-recipe-app-0.2.6-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -74,7 +74,7 @@ test("jobs addition selects current jobs and deployment on all current profiles"
     await assertCohort(repo, cohort, profile);
     const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
     assert.equal(state.installedCapabilities.find(({identifier}) => identifier === capability).version, "0.2.0");
-    assert.equal(state.installedCapabilities.find(({identifier}) => identifier === "deployment-cloudflare").version, "0.5.0");
+    assert.equal(state.installedCapabilities.find(({identifier}) => identifier === "deployment-cloudflare").version, "0.5.1");
     assert.equal(state.installedCapabilities.find(({identifier}) => identifier === "app-foundation").version, "0.2.0");
     assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   }
@@ -135,7 +135,7 @@ test("retired controls invalidate approved jobs plans before writes or verificat
 test("current jobs planning and application refuse declaration drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
     const repo = await repository("portfolio", { profiles: createCurrentProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.5");
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.11.6");
     const planned = mode === "after-plan" ? await core.planCapabilityAddition({ reader: repo.reader, git, capability }) : undefined;
     if (planned !== undefined) assert.equal(planned.ok, true, JSON.stringify(planned));
     if (mode === "unknown-declaration") {
@@ -164,7 +164,7 @@ test("current jobs planning and application refuse declaration drift before writ
 test("current jobs removal refuses declaration and lock drift before writes", async () => {
   for (const mode of ["unknown-declaration", "origin-mismatch", "descriptor-mismatch", "manifest-drift", "lock-drift", "after-plan"]) {
     const repo = await repository("app", { backgroundJobDelivery: true, profiles: createCurrentProfileRecipes() });
-    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.5");
+    assert.equal(core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value.recipeVersion, "0.2.6");
     const prepared = await removalPlan(repo);
     if (mode === "unknown-declaration") {
       const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -195,7 +195,7 @@ test("current jobs removal and re-add retain foundation, explicit email, persist
   for(const cohort of cohorts) for(const profile of Object.keys(cohort.versions)) for(const retainedVersion of ["0.1.0","0.2.0"]) {
     const persistent=profile==="app";
     const repo=await repository(profile,{backgroundJobDelivery:true,transactionalEmailResend:true,...(persistent?{applicationPersistence:true}:{}),context:{...createGenerationRenderingContext(persistent,true,true,retainedVersion),profiles:cohort.profiles}});
-    const expectedNext = cohort.versions.app === "0.2.0" ? "16.3.3" : "16.3.8";
+    const expectedNext = cohort.versions.app === "0.2.0" ? "16.3.3" : "16.4.1";
     await assertCohort(repo, cohort, profile, persistent);
     assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
     const prepared=await removalPlan(repo);
@@ -209,7 +209,7 @@ test("current jobs removal and re-add retain foundation, explicit email, persist
     let state=core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
     assert.equal(JSON.parse(decoder.decode(repo.files.get("apps/web/package.json"))).dependencies.next, expectedNext);
     assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
-    assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="deployment-cloudflare").version,persistent?"0.4.0":"0.3.0");
+    assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="deployment-cloudflare").version,persistent?"0.4.1":"0.3.1");
     assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="app-foundation").version,"0.2.0");
     assert.ok(state.installedCapabilities.some(({identifier})=>identifier==="transactional-email-resend"));
     if(persistent) assert.ok(repo.files.has("apps/web/src/infrastructure/persistence/schema.ts"));

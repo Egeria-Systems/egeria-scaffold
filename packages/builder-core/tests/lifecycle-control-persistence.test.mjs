@@ -31,7 +31,7 @@ const installedState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.5" },
+  origin: { profile: "portfolio", recipeVersion: "0.11.6" },
   installedCapabilities: [{ identifier: "standards", version: "0.5.1", deliveryMode: "hybrid", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" }],
   appliedMigrations: ["current-migration"],
   managedSurfaces: [],
@@ -100,7 +100,7 @@ const installedStateSource = `{
   "managedSurfaces": [],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.11.5"
+    "recipeVersion": "0.11.6"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

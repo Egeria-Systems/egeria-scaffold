@@ -76,7 +76,7 @@ function createState(overrides = {}) {
     schemaVersion: "1.0.0",
     builderVersion: "0.0.0",
     projectSchemaVersion: "1.0.0",
-    origin: { profile: "portfolio", recipeVersion: "0.11.5" },
+    origin: { profile: "portfolio", recipeVersion: "0.11.6" },
     installedCapabilities: [],
     appliedMigrations: [],
     managedSurfaces: [],
@@ -503,7 +503,7 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
 });
 
 test("standards recognizes only the exact patched Vitest declaration without accepting other versions or managed drift", async () => {
-  const root = resolve(packageRoot, "../../fixtures/generated/app-0.2.5");
+  const root = resolve(packageRoot, "../../fixtures/generated/app-0.2.6");
   const reader = { async readText(path) {
     try { return { kind: "file", content: await readFile(resolve(root, path), "utf8") }; }
     catch (error) { return error.code === "ENOENT" ? { kind: "missing" } : { kind: "error", code: "FILE_ENCODING_INVALID" }; }
@@ -666,7 +666,7 @@ test("observability inference requires source files and deployment-owned Wrangle
     version_metadata: { binding: "CF_VERSION_METADATA" },
   })}\n`;
   const state = createState({
-    origin: { profile: "portfolio", recipeVersion: "0.11.5" },
+    origin: { profile: "portfolio", recipeVersion: "0.11.6" },
     installedCapabilities: [installCapability(descriptor)],
   });
 
@@ -905,7 +905,7 @@ test("application-owned and ejected surfaces are reported without reading their 
 
 
 test("Vitest five standards refuse retained declarations and ranges even with matching installed fingerprints", async () => {
-  const reader = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated/app-0.2.5"));
+  const reader = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated/app-0.2.6"));
   const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
   const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
   const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" });

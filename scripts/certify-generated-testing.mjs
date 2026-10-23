@@ -51,13 +51,13 @@ const configuration = Object.freeze({
   expectedCapabilities,
   capabilityIdentifier: "standards",
   capabilityVersion: "0.5.1",
-  expectedRecipeVersion: "0.11.5",
+  expectedRecipeVersion: "0.11.6",
   verifierIdentifier: "portfolio",
   verificationOptions: Object.freeze({ includeVisual: true }),
   expectedVerificationChecks,
   receipt: Object.freeze({
     subject,
-    recipeVersion: "0.11.5",
+    recipeVersion: "0.11.6",
   }),
   createError: (code) => new GeneratedTestingCertificationError(code),
   isCertificationError: (error) =>

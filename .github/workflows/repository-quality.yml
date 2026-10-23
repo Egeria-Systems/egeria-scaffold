@@ -181,7 +181,7 @@ jobs:
 
       - name: Test CLI excluding dedicated lifecycle jobs
         env:
-          CLI_TEST_SKIP_PATTERN: (?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$)|(?:^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$)|(?:^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$)
+          CLI_TEST_SKIP_PATTERN: (?:^compiled current jobs lifecycle on portfolio completes production verification$)|(?:^compiled current jobs lifecycle on app-persistence-email completes production verification$)|(?:^compiled current app optional lifecycle completes production verification$)|(?:^compiled current email lifecycle on portfolio verifies and retains its foundation$)|(?:^compiled current email lifecycle on site verifies and retains its foundation$)|(?:^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$)|(?:^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$)
         run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
 
       - name: Test public packages
@@ -203,21 +203,17 @@ jobs:
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
 
   cli-jobs:
-    name: CLI jobs (${{ matrix.cohort }})
+    name: CLI jobs (${{ matrix.fixture }})
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
-          - cohort: vitest-five
-            test-pattern: ^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
-          - cohort: dependency-security
-            test-pattern: ^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
-          - cohort: literal-lint
-            test-pattern: ^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
-          - cohort: vite-security
-            test-pattern: ^compiled vite-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$
+          - fixture: portfolio
+            test-pattern: ^compiled current jobs lifecycle on portfolio completes production verification$
+          - fixture: app-persistence-email
+            test-pattern: ^compiled current jobs lifecycle on app-persistence-email completes production verification$
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -253,11 +249,15 @@ jobs:
       matrix:
         include:
           - group: app-optionals
-            test-pattern: ^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$
-          - group: email
-            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$
-          - group: hosted-contact
-            test-pattern: ^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$
+            test-pattern: ^compiled current app optional lifecycle completes production verification$
+          - group: email-portfolio
+            test-pattern: ^compiled current email lifecycle on portfolio verifies and retains its foundation$
+          - group: email-site
+            test-pattern: ^compiled current email lifecycle on site verifies and retains its foundation$
+          - group: hosted-contact-portfolio
+            test-pattern: ^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$
+          - group: hosted-contact-app
+            test-pattern: ^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -427,11 +427,11 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.5
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.6
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()

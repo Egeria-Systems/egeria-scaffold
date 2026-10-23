@@ -136,10 +136,10 @@ test("jobs catalog rejects mixed and unknown tuples for both real versions", () 
     const snapshot = createGenerationRenderingContext(false, true, true, version).catalogSnapshot;
     assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, snapshot).ok, true);
     for (const changed of [
-      { backgroundJobDelivery: "0.3.0" }, { deploymentCloudflare: "0.3.0" },
-      { deploymentCloudflare: "0.6.0" }, { appFoundation: "0.1.0" },
+      { backgroundJobDelivery: "0.3.0" }, { deploymentCloudflare: "0.3.1" },
+      { deploymentCloudflare: "0.6.1" }, { appFoundation: "0.1.0" },
       { standards: "0.4.0" }, { siteRouting: "0.3.0" },
-      { applicationPersistence: "0.1.0" },
+      { applicationPersistence: "0.1.1" },
     ]) assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, { ...snapshot, ...changed }).ok, false, JSON.stringify(changed));
   }
 });

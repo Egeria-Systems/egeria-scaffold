@@ -616,12 +616,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5").length, 1);
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6").length, 1);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.5").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6").if,
     "github.event_name != 'pull_request' || !github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.5").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.6").if,
     "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
@@ -647,15 +647,13 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs';
   const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
   const cliJobs = workflow.jobs["cli-jobs"];
-  assert.equal(cliJobs.name, "CLI jobs (${{ matrix.cohort }})");
+  assert.equal(cliJobs.name, "CLI jobs (${{ matrix.fixture }})");
   assert.deepEqual(cliJobs.strategy, {
     "fail-fast": false,
     matrix: {
       include: [
-        { cohort: "vitest-five", "test-pattern": "^compiled Vitest five jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
-        { cohort: "dependency-security", "test-pattern": "^compiled dependency-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
-        { cohort: "literal-lint", "test-pattern": "^compiled literal-lint jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
-        { cohort: "vite-security", "test-pattern": "^compiled vite-security jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$" },
+        { fixture: "portfolio", "test-pattern": "^compiled current jobs lifecycle on portfolio completes production verification$" },
+        { fixture: "app-persistence-email", "test-pattern": "^compiled current jobs lifecycle on app-persistence-email completes production verification$" },
       ],
     },
   });
@@ -679,9 +677,11 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "fail-fast": false,
     matrix: {
       include: [
-        { group: "app-optionals", "test-pattern": "^compiled (?:retained|current|dependency-security|literal-lint|vite-security) app optional lifecycle completes production verification$" },
-        { group: "email", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) email lifecycle on (?:portfolio|site) verifies and retains its foundation$" },
-        { group: "hosted-contact", "test-pattern": "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) Web3Forms lifecycle on (?:portfolio|app) preserves composition and re-adds safely$" },
+        { group: "app-optionals", "test-pattern": "^compiled current app optional lifecycle completes production verification$" },
+        { group: "email-portfolio", "test-pattern": "^compiled current email lifecycle on portfolio verifies and retains its foundation$" },
+        { group: "email-site", "test-pattern": "^compiled current email lifecycle on site verifies and retains its foundation$" },
+        { group: "hosted-contact-portfolio", "test-pattern": "^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$" },
+        { group: "hosted-contact-app", "test-pattern": "^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$" },
       ],
     },
   });
@@ -696,39 +696,41 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
     ({ run }) => run === nonJobsCommand,
   );
-  const jobsUnion = "^compiled (?:Vitest five|dependency-security|literal-lint|vite-security) jobs lifecycle on (?:portfolio|app-persistence-email) completes production verification$";
-  const skipPattern = [jobsUnion, ...lifecycle.strategy.matrix.include.map(
-    (group) => group["test-pattern"],
-  )].map((pattern) => `(?:${pattern})`).join("|");
+  const skipPattern = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
+    .map((group) => `(?:${group["test-pattern"]})`).join("|");
   assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: skipPattern });
   const selectors = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
     .map((group) => new RegExp(group["test-pattern"], "u"));
   const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
-  const cohorts = ["Vitest five", "dependency-security", "literal-lint", "vite-security"];
   const dedicatedNames = [
-    ...cohorts.flatMap((cohort) => ["portfolio", "app-persistence-email"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
-      (profile) => `compiled ${cohort} jobs lifecycle on ${profile} completes production verification`,
-    )),
-    ...["retained", "current", "dependency-security", "literal-lint", "vite-security"].map(
-      (cohort) => `compiled ${cohort} app optional lifecycle completes production verification`,
+    ...["portfolio", "app-persistence-email"].map(
+      (profile) => `compiled current jobs lifecycle on ${profile} completes production verification`,
     ),
-    ...cohorts.flatMap((cohort) => ["portfolio", "site"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
-      (profile) => `compiled ${cohort} email lifecycle on ${profile} verifies and retains its foundation`,
-    )),
-    ...cohorts.flatMap((cohort) => ["portfolio", "app"].filter(profile => cohort !== "literal-lint" || profile !== "portfolio").map(
-      (profile) => `compiled ${cohort} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
-    )),
+    "compiled current app optional lifecycle completes production verification",
+    ...["portfolio", "site"].map(
+      (profile) => `compiled current email lifecycle on ${profile} verifies and retains its foundation`,
+    ),
+    ...["portfolio", "app"].map(
+      (profile) => `compiled current Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
+    ),
   ];
-  assert.equal(new Set(dedicatedNames).size, 26);
+  assert.equal(new Set(dedicatedNames).size, 7);
   assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
     (name) => selector.test(name),
-  ).length), [2, 2, 1, 2, 5, 7, 7]);
+  ).length), [1, 1, 1, 1, 1, 1, 1]);
   for (const name of dedicatedNames) {
     assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
     assert.equal(skipSelector.test(name), true, name);
   }
   const remainderNames = [
     "parses a project configuration",
+    "compiled current app transition from site completes production verification",
+    // Routing sentinel; the current transition loop emits only the site case.
+    "compiled current app transition from portfolio completes production verification",
+    "compiled app transition from site with all optionals preserves content through production verification",
+    "compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery",
+    "application environment compiled CLI refuses inputs before dependencies and preserves existing content",
+    "retired upgrade commands refuse before repository or verifier access",
     ...dedicatedNames.map((name) => `${name} with extra coverage`),
     ...dedicatedNames.map((name) => name.replace(/^compiled [\s\S]+? (jobs|app optional|email|Web3Forms) lifecycle/u, "compiled future $1 lifecycle")),
     ...dedicatedNames.filter((name) => name.includes(" on ")).map(
@@ -1467,7 +1469,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.3.5>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.3.8\": 16.3.8\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.3.5\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
+    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@node-minify/core@9.0.2>glob\": \"10.5.0\"\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.4.1>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.4.1\": 16.4.1\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.4.1\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
   );
 });
 
@@ -2838,7 +2840,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.5[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.6[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2858,7 +2860,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.5` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.6` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3169,7 +3171,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.5[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.6[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3742,10 +3744,10 @@ test("executable capability certification ownership is current", async () => {
       record.taskPlan,
       capabilityId === "standards"
         ? "docs/superpowers/plans/2026-10-21-patched-standards-certification.md"
-        : ["background-job-delivery", "deployment-cloudflare"].includes(capabilityId) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
+        : capabilityId === "deployment-cloudflare" ? "docs/superpowers/plans/2026-10-22-deployment-adapter-certification-renewal.md" : capabilityId === "background-job-delivery" ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
         ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
-        : ["application-persistence", "standards", "deployment-cloudflare"].includes(capabilityId)
-        ? "docs/superpowers/plans/2026-09-14-application-persistence-certification.md"
+        : capabilityId === "application-persistence"
+        ? "docs/superpowers/plans/2026-10-22-persistence-worker-types-certification-renewal.md"
         : pending || capabilityId === "observability"
           ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
           : "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
@@ -3766,7 +3768,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.5`, `site@0\.12\.5`, and `app@0\.2\.5`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.6`, `site@0\.12\.6`, and `app@0\.2\.6`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4970,7 +4972,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.5[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.6[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

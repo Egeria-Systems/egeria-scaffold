@@ -6,7 +6,15 @@
 
 [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds common application-target mapping and narrowly permits related unused snapshot retirement at complete generation activation. The APP_DB, local SQL/runtime evidence, approved remote-target, migration/removal and data-recovery protections below remain; persistence is never implicit.
 
-Current public recipe and retained-snapshot applicability follows [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) and [ADR-0015](0015-vitest-five-generation.md#patched-public-generation). Earlier version tuples below describe their original decision. The early retirement changes unused executable support only; removal, data, provider and outcome safeguards remain unchanged. Current persistence uses `app@0.2.5`, `standards@0.6.1`, deployment `0.4.0` and Vitest `5.0.3`; independent email/jobs composition keeps its declared deployment/foundation variants.
+Current public recipe and retained-snapshot applicability follows [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) and [ADR-0015](0015-vitest-five-generation.md#patched-public-generation). Earlier version tuples below describe their original decision. The early retirement changes unused executable support only; removal, data, provider and outcome safeguards remain unchanged. Current persistence uses `app@0.2.6`, `standards@0.6.1`, deployment `0.4.1` and Vitest `5.0.3`; independent email/jobs composition keeps its declared deployment/foundation variants.
+
+## Workers-types patch successor
+
+On 2026-10-22, the approved adapter renewal requires `@cloudflare/workers-types@5.20261006.1` for Wrangler `4.148.0`. Current generation and supported installed operations select exact `application-persistence@0.1.1`. Its only descriptor changes are the version, exact Workers-types inference pin and the current `add-application-persistence-0-1-1` / `remove-application-persistence-0-1-1` operation identifiers.
+
+Under [ADR-0020's unused-generation exception](0020-application-environments.md#early-retirement-of-unused-public-generations), this narrowly supersedes executable retention of persistence `0.1.0`. Preserve its original descriptor, registry record, historical decisions and frozen controls; old or mixed installed tuples refuse before effects. No client upgrade, database migration, new lifecycle operation or schema-2 persistence support is introduced. Jobs-bearing addition and non-jobs removal retain their existing unsupported-operation restrictions.
+
+The successor certification subject is `0.1.1 / sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869`, pending with empty evidence and a renewed private task plan. Every other descriptor subject remains unchanged. Independent persistence/email selection, both jobs variants, source/data/provider separation and all evidence and human-review safeguards remain.
 
 ## Context
 

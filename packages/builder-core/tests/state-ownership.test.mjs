@@ -17,7 +17,7 @@ const validProject = {
     defaultLocale: "en-CA",
   },
   originProfile: "portfolio",
-  recipeVersion: "0.11.5",
+  recipeVersion: "0.11.6",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
   capabilitySettings: {},
@@ -38,7 +38,7 @@ const validState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.5" },
+  origin: { profile: "portfolio", recipeVersion: "0.11.6" },
   installedCapabilities: [
     {
       identifier: "standards",
@@ -145,7 +145,7 @@ project:
   displayName: No
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.5
+recipeVersion: 0.11.6
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -168,7 +168,7 @@ project:
   defaultLocale: en-CA
   displayName: Sample Portfolio
   name: sample-portfolio
-recipeVersion: 0.11.5
+recipeVersion: 0.11.6
 schemaVersion: 1.0.0
 selectedCapabilities:
   - standards
@@ -199,7 +199,7 @@ project:
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.5
+recipeVersion: 0.11.6
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -217,7 +217,7 @@ project:
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.5
+recipeVersion: 0.11.6
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -275,7 +275,7 @@ test("profile-transition receipts require the exact conservative persisted check
 
   const transitionState = {
     ...validState,
-    origin: { profile: "site", recipeVersion: "0.12.5" },
+    origin: { profile: "site", recipeVersion: "0.12.6" },
     lastSuccessfulVerification: {
       kind: "profile-transition",
       checks: expectedChecks,

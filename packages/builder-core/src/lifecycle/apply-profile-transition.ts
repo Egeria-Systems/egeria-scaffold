@@ -115,11 +115,11 @@ export type ProfileTransitionExecutionResult =
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
           toProfile: "app";
-          toRecipeVersion: "0.2.5";
+          toRecipeVersion: "0.2.6";
         }>;
         migration:
-          | "transition-portfolio-0-11-5-to-app-0-2-5"
-          | "transition-site-0-12-5-to-app-0-2-5";
+          | "transition-portfolio-0-11-6-to-app-0-2-6"
+          | "transition-site-0-12-6-to-app-0-2-6";
         changedPaths: readonly string[];
         verificationChecks: typeof appProfileTransitionVerificationChecks;
       }>;
@@ -659,8 +659,8 @@ export async function applyProfileTransition(input: Readonly<{
   }
   const plan = appPreparation.plan;
   const migrationIdentifier = plan.source.profile === "portfolio"
-    ? "transition-portfolio-0-11-5-to-app-0-2-5"
-    : "transition-site-0-12-5-to-app-0-2-5";
+    ? "transition-portfolio-0-11-6-to-app-0-2-6"
+    : "transition-site-0-12-6-to-app-0-2-6";
   const persistedChecks = appProfileTransitionPersistedVerificationChecks;
   const desiredCapabilities = plan.target.capabilities.map(
     ({ identifier }) => identifier,

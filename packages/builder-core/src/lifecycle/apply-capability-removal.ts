@@ -90,12 +90,12 @@ type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "
 
 function removalMigrationIdentifier(
   capability: RemovableCapability,
-  version: "0.1.0" | "0.2.0",
+  version: "0.1.0" | "0.1.1" | "0.2.0",
 ):
   | "remove-analytics-0-1-0"
   | "remove-booking-calendly-0-1-0"
   | "remove-multilingual-0-1-0"
-  | "remove-application-persistence-0-1-0"
+  | "remove-application-persistence-0-1-1"
   | "remove-transactional-email-resend-0-1-0"
   | "remove-contact-form-web3forms-0-1-0"
   | "remove-background-job-delivery-0-1-0"
@@ -108,7 +108,7 @@ function removalMigrationIdentifier(
     case "transactional-email-resend":
       return "remove-transactional-email-resend-0-1-0";
     case "application-persistence":
-      return "remove-application-persistence-0-1-0";
+      return "remove-application-persistence-0-1-1";
     case "analytics":
       return "remove-analytics-0-1-0";
     case "booking-calendly":
@@ -164,7 +164,7 @@ export type CapabilityRemovalExecutionResult =
         baseRevision: string;
         capability: Readonly<{
           identifier: RemovableCapability;
-          version: "0.1.0" | "0.2.0";
+          version: "0.1.0" | "0.1.1" | "0.2.0";
         }>;
         migration: ReturnType<typeof removalMigrationIdentifier>;
         changedPaths: readonly string[];

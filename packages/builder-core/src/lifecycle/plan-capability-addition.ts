@@ -48,7 +48,7 @@ export type CapabilityAdditionPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-    version: "0.1.0" | "0.2.0";
+    version: "0.1.0" | "0.1.1" | "0.2.0";
   }>;
   settings:
     | Readonly<{
@@ -565,7 +565,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const state = inspection.inference.state.value;
   if (capabilityValue === "application-persistence" && (
-    project.originProfile !== "app" || project.recipeVersion !== "0.2.5" ||
+    project.originProfile !== "app" || project.recipeVersion !== "0.2.6" ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.1"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =
@@ -632,7 +632,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== (capabilityValue === "background-job-delivery" ? "0.2.0" : "0.1.0")) {
+  if (descriptor?.version !== (capabilityValue === "background-job-delivery" ? "0.2.0" : capabilityValue === "application-persistence" ? "0.1.1" : "0.1.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 

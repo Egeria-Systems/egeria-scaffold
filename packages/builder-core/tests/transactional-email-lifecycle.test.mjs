@@ -15,7 +15,7 @@ const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.5-foundation", site: "web-recipe-app-0.2.5", app: "web-recipe-app-0.2.5" }, persistenceLock: "web-recipe-app-0.2.5-persistence" },
+  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.6-foundation", site: "web-recipe-app-0.2.6", app: "web-recipe-app-0.2.6" }, persistenceLock: "web-recipe-app-0.2.6-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -131,7 +131,7 @@ test("email addition refuses historical recipes and modified dependency locks be
   assert.deepEqual(repo.writes, []);
   const historical = await repository("portfolio");
   const source = decoder.decode(historical.files.get(".egeria/project.yaml"));
-  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.5", "0.10.0")));
+  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.6", "0.10.0")));
   const result = await core.planCapabilityAddition({ reader: historical.reader, git, capability });
   assert.equal(result.ok, false);
   assert.deepEqual(historical.writes, []);

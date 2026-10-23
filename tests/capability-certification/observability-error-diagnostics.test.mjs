@@ -246,7 +246,7 @@ function commandOutput(command, version = "0.3.0") {
           kind: "valid",
           value: {
             installedCapabilities: installedCapabilities.map(capability => capability.identifier === "observability" ? { ...capability, version } : { ...capability }),
-            origin: { profile: "app", recipeVersion: "0.2.5" },
+            origin: { profile: "app", recipeVersion: "0.2.6" },
           },
         },
         capabilities: installedCapabilities.map(({ identifier }) => ({ identifier, category: "confirmed" })),
@@ -270,7 +270,7 @@ function commandOutput(command, version = "0.3.0") {
   throw new Error("unexpected command");
 }
 
-async function createRunnerAdapters({ recipeVersion = "0.2.5" } = {}) {
+async function createRunnerAdapters({ recipeVersion = "0.2.6" } = {}) {
   let projectRoot;
   const commands = [];
   const adapters = {
@@ -285,7 +285,7 @@ async function createRunnerAdapters({ recipeVersion = "0.2.5" } = {}) {
         await mkdir(join(projectRoot, ".egeria"), { recursive: true });
         await writeFile(
           join(projectRoot, ".egeria/project.yaml"),
-          appProjectSource.replace("recipeVersion: 0.2.5", `recipeVersion: ${recipeVersion}`),
+          appProjectSource.replace("recipeVersion: 0.2.6", `recipeVersion: ${recipeVersion}`),
           "utf8",
         );
       }
@@ -635,7 +635,7 @@ test("the current app runner retains complete identity and actual Worker and Eff
     version: "0.3.0",
     profile: "app",
     subject: exactSubject,
-    recipeVersion: "0.2.5",
+    recipeVersion: "0.2.6",
     evidenceRevision: exactRevision,
     cleanup: "identity-checked",
     installedCapabilities,
@@ -746,13 +746,13 @@ test("deployment candidate validation requires the complete current app identity
   const accepted = validateObservabilityDeploymentCandidate(candidate);
   assert.equal(accepted.ok, true);
   assert.equal(accepted.profile, "app");
-  assert.equal(accepted.recipeVersion, "0.2.5");
+  assert.equal(accepted.recipeVersion, "0.2.6");
   assert.deepEqual(accepted.subject, exactSubject);
   assert.equal(accepted.revision, exactRevision);
   for (const mutate of [
     value => { value.projectSource = value.projectSource.replace("originProfile: app", "originProfile: portfolio"); },
-    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.5", "recipeVersion: 0.1.0"); },
-    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.5", "recipeVersion: 0.2.2"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.6", "recipeVersion: 0.1.0"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.6", "recipeVersion: 0.2.2"); },
     value => { value.projectSource += "unexpected: true\n"; },
     value => { value.infer.result.state.value.installedCapabilities.pop(); },
     value => { value.infer.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },

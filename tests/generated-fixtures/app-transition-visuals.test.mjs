@@ -44,9 +44,9 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
   assert.equal(exists, true, "the app transition visual producer is not implemented");
   const module = await import(producer);
   assert.equal(typeof module.verifyAppTransitionVisuals, "function");
-  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.5" });
-  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.5" });
-  for (const recipeVersion of ["0.2.5"]) {
+  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.6" });
+  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.6" });
+  for (const recipeVersion of ["0.2.6"]) {
     assert.deepEqual(module.parseAppTransitionVisualArguments(["--candidates", `--app-recipe-version=${recipeVersion}`]), { mode: "candidates", recipeVersion });
   }
   const digest = "a".repeat(64);
@@ -305,7 +305,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
   const commands = [];
   let ownedProject;
   const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.5" }, {
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.6" }, {
     ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
@@ -332,10 +332,10 @@ test(`${preparation} visual targets use exact production files, run non-update c
   });
   if (preparation !== "synthetic") {
     assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, "0.11.5");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.11.6");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, "0.2.5");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "71d1c4012f6b057e030b77be287f10bd56354ace9466862a5d0dc8eb34517b22");
+    assert.equal(result.project.targetProject.recipeVersion, "0.2.6");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);

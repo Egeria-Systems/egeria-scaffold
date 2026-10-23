@@ -431,7 +431,7 @@ function verificationIsExact(
 
   const checks = value.checks;
   const app = rendered.resolved.capabilities.some(({ identifier }) => identifier === "app-foundation");
-  const persistence = rendered.resolved.capabilities.some(({ identifier, version }) => identifier === "application-persistence" && version === "0.1.0");
+  const persistence = rendered.resolved.capabilities.some(({ identifier, version }) => identifier === "application-persistence" && version === "0.1.1");
   const expectedChecks = persistence ? persistenceGenerationVerificationChecks : app ? appGenerationVerificationChecks : verificationChecks;
 
   return (

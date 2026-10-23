@@ -27,7 +27,7 @@ test("email selection adds the server foundation to each current profile without
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.dependencies.resend, undefined);
-    assert.equal(manifest.dependencies.next, "16.3.8");
+    assert.equal(manifest.dependencies.next, "16.4.1");
     assert.ok(manifest.scripts["test:integration:cloudflare"]);
     assert.ok(resolveRecipeLockfileVersion(project, manifest));
   }
@@ -46,13 +46,13 @@ test("email leaves default and unrelated descriptor contracts unchanged", async 
     assert.equal(rendered.ok, true);
     assert.equal(rendered.value.project.selectedCapabilities.includes("transactional-email-resend"), false);
     const manifest = JSON.parse(new TextDecoder().decode(rendered.value.files.find(({ path }) => path === "apps/web/package.json").content));
-    assert.equal(manifest.dependencies.next, "16.3.8");
+    assert.equal(manifest.dependencies.next, "16.4.1");
     assert.equal(rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation")?.version, profile === "app" ? "0.1.0" : undefined);
   }
 });
 
 test("installed email and retained foundation require an exact current profile and shared tuple", async () => {
-  const fixtureState = JSON.parse(await readFile(new URL("../../../fixtures/generated/app-0.2.5/.egeria/state.json", import.meta.url), "utf8"));
+  const fixtureState = JSON.parse(await readFile(new URL("../../../fixtures/generated/app-0.2.6/.egeria/state.json", import.meta.url), "utf8"));
   for (const profile of ["portfolio", "site", "app"]) {
     for (const hasEmail of [false, true]) {
       const rendered = await renderSkeleton(request(profile, hasEmail ? { transactionalEmailResend: true } : {}), createGenerationRenderingContext(false, true));

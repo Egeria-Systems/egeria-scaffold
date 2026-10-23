@@ -25,7 +25,7 @@ const digest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("h
 const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), recipe: "0.2.5", appLock: "web-recipe-app-0.2.5" },
+  { profiles: createCurrentProfileRecipes(), recipe: "0.2.6", appLock: "web-recipe-app-0.2.6" },
 ];
 
 async function repository(options = {}) {
@@ -84,7 +84,7 @@ function removalEvidence(repository) {
   const databases = [{ environment: "local", databaseId: "local-application-database" }];
   const schemaPath = "apps/web/src/infrastructure/persistence/schema.ts";
   const subject = {
-    descriptorVersion: "0.1.0",
+    descriptorVersion: "0.1.1",
     descriptorFingerprint: fingerprint(repository.rendered.resolved.capabilities.find(({ identifier }) => identifier === "application-persistence")),
     schemaFingerprint: fingerprint([{ path: schemaPath, fingerprint: digest(repository.files.get(schemaPath)) }]),
     migrationsFingerprint: fingerprint([...repository.files.keys()].filter((path) => path.startsWith("apps/web/migrations/")).sort().map((path) => ({ path, fingerprint: digest(repository.files.get(path)) }))),
@@ -137,7 +137,7 @@ test("removing persistence preserves independently installed email and its found
   assert.equal(readded.ok, true, JSON.stringify(readded));
   const readdedState = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
   assert.deepEqual(readdedState.origin, { profile: "app", recipeVersion: cohort.recipe });
-  assert.deepEqual(readdedState.appliedMigrations, ["remove-application-persistence-0-1-0", "add-application-persistence-0-1-0"]);
+  assert.deepEqual(readdedState.appliedMigrations, ["remove-application-persistence-0-1-1", "add-application-persistence-0-1-1"]);
   assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   }
 
@@ -164,7 +164,7 @@ test("persistence removal requires evidence review and restores the default app 
   const planned = await plan(repo, evidence);
   assert.equal(planned.ok, true, JSON.stringify(planned));
   assert.deepEqual(planned.value.persistenceRemovalSubject, {
-    descriptorVersion: "0.1.0",
+    descriptorVersion: "0.1.1",
     descriptorFingerprint: evidence.evidence.subject.descriptorFingerprint,
     schemaFingerprint: evidence.evidence.subject.schemaFingerprint,
     migrationsFingerprint: evidence.evidence.subject.migrationsFingerprint,
@@ -177,7 +177,7 @@ test("persistence removal requires evidence review and restores the default app 
   assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   const finalState = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
   assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
-  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.3.0");
+  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.3.1");
   assert.equal(finalState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   const finalManifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
   assert.equal(finalManifest.scripts.custom, "node scripts/custom.mjs");
@@ -194,7 +194,7 @@ test("persistence removal requires evidence review and restores the default app 
   assert.equal(readded.ok, true, JSON.stringify(readded));
   const readdedState = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
   assert.deepEqual(readdedState.origin, { profile: "app", recipeVersion: cohort.recipe });
-  assert.deepEqual(readdedState.appliedMigrations, ["remove-application-persistence-0-1-0", "add-application-persistence-0-1-0"]);
+  assert.deepEqual(readdedState.appliedMigrations, ["remove-application-persistence-0-1-1", "add-application-persistence-0-1-1"]);
   assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   }
 
@@ -301,6 +301,7 @@ test("changed export bytes after approval refuse before the first write", async 
 test("persistence evidence subjects and required recovery cannot be self-certified by the supplied envelope", async () => {
   for (const mutate of [
     (input) => { delete input.evidence; },
+    (input) => { input.evidence.subject.descriptorVersion = "0.1.0"; },
     (input) => { input.evidence.subject.schemaFingerprint = `sha256:${"0".repeat(64)}`; },
     (input) => { input.evidence.databases[0].databaseId = "other-database"; },
     (input) => { input.evidence.databases[0].recovery.restoration = "failed"; },
@@ -477,4 +478,31 @@ test("changed user migration bytes invalidate an approved evidence subject befor
   assert.equal(result.ok, false);
   assert.equal(result.code, "CAPABILITY_PLAN_APPROVAL_INVALID");
   assert.deepEqual(repo.writes, []);
+});
+
+test("retired installed persistence refuses removal and addition before verification or writes", async () => {
+  for (const reverse of [false, true]) {
+    const repo = await repository();
+    const evidence = removalEvidence(repo);
+    const planned = await plan(repo, evidence);
+    assert.equal(planned.ok, true, JSON.stringify(planned));
+    const state = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
+    state.installedCapabilities = state.installedCapabilities.map(capability =>
+      capability.identifier === "application-persistence" ? { ...capability, version: "0.1.0" } : capability);
+    if (reverse) state.installedCapabilities.reverse();
+    repo.files.set(".egeria/state.json", encoder.encode(stringifyCanonicalJson(state)));
+    let verifications = 0;
+    const verifier = { verifyInIsolatedCopy: async () => { verifications++; throw new Error("Retired state reached verification"); } };
+    const removed = await apply(repo, planned.value, evidence, { verifier });
+    assert.equal(removed.ok, false);
+    const added = await core.applyCapabilityAddition({
+      root, capability: "multilingual", approvedPlanFingerprint: planned.value.planFingerprint,
+      reader: repo.reader, writer: repo.writer, inspectWorktree: async () => git,
+      inspectCreateTargets: async () => ({ ok: true }),
+      inspectExpectedChanges: async () => ({ ok: true }), verifier,
+    });
+    assert.equal(added.ok, false);
+    assert.deepEqual(repo.writes, []);
+    assert.equal(verifications, 0);
+  }
 });

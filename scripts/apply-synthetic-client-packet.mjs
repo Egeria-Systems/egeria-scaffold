@@ -93,7 +93,7 @@ const expectedInstalledCapabilities = [
   { identifier: "standards", version: "0.4.0" },
   { identifier: "content-files", version: "0.4.0" },
   { identifier: "section-composition", version: "0.3.0" },
-  { identifier: "deployment-cloudflare", version: "0.3.0" },
+  { identifier: "deployment-cloudflare", version: "0.3.1" },
   { identifier: "observability", version: "0.3.0" },
   { identifier: "site-routing", version: "0.4.0" },
   { identifier: "analytics", version: "0.1.0" },
@@ -511,7 +511,7 @@ async function validateProjectIdentity(projectRoot, packet) {
   }
 
   const analytics = project.capabilitySettings?.analytics;
-  const standardsVersion = project.recipeVersion === "0.12.5" ? "0.5.1" : undefined;
+  const standardsVersion = project.recipeVersion === "0.12.6" ? "0.5.1" : undefined;
   if (
     packageManifest.name !== packet.identifier ||
     webPackageManifest.name !== `${packet.identifier}-web` ||

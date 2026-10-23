@@ -19,7 +19,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 const currentTransitionCohorts = [
-  { label: "Current", generation: "current", portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" },
+  { label: "Current", generation: "current", portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" },
 ];
 const currentTransitionContexts = { current: createGenerationRenderingContext() };
 
@@ -620,8 +620,8 @@ test("installed incoming app transitions ignore changed generation defaults", as
       assert.equal(manifest.devDependencies.vitest, "5.0.3");
       const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
       assert.equal(state.ok, true);
-      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.5" });
-      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.5/pnpm-lock.yaml"))));
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.6" });
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml"))));
     } finally {
       core.profileRecipes.push(...recipes);
     }
@@ -649,7 +649,7 @@ for (const profile of ["site"]) {
       assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
       assert.equal(execution.result.value.status, "verified-final-diff-approval-required");
       assert.equal(execution.result.value.migration,
-        profile === "portfolio" ? "transition-portfolio-0-11-5-to-app-0-2-5" : "transition-site-0-12-5-to-app-0-2-5");
+        profile === "portfolio" ? "transition-portfolio-0-11-6-to-app-0-2-6" : "transition-site-0-12-6-to-app-0-2-6");
       assert.deepEqual(execution.result.value.verificationChecks, core.appProfileTransitionVerificationChecks);
       assert.deepEqual(repository.writes.map(batch => batch.map(({ path }) => path)), [
         plan.actions.map(({ path }) => path),
@@ -664,13 +664,13 @@ for (const profile of ["site"]) {
       const previousProject = core.parseProjectYaml(decode(source.get(".egeria/project.yaml")));
       assert.equal(project.ok, true);
       assert.equal(project.value.originProfile, "app");
-      assert.equal(project.value.recipeVersion, "0.2.5");
+      assert.equal(project.value.recipeVersion, "0.2.6");
       assert.deepEqual(project.value.capabilitySettings, previousProject.value.capabilitySettings);
       const manifest = JSON.parse(decode(repository.files.get("apps/web/package.json")));
       assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
-      assert.equal(manifest.dependencies.next, "16.3.8");
+      assert.equal(manifest.dependencies.next, "16.4.1");
       assert.equal(manifest.scripts["test:integration:cloudflare"], "vitest run --config vitest.cloudflare.config.ts");
-      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.5/pnpm-lock.yaml"))));
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml"))));
       if (profile === "portfolio") {
         for (const locale of subset & 2 ? ["en-CA", "fr-CA"] : ["en-CA"]) {
           const path = `apps/web/content/${locale}/${subset & 2 ? "localized-content" : "site"}.yaml`;
@@ -686,7 +686,7 @@ for (const profile of ["site"]) {
       assert.equal(state.ok, true, JSON.stringify(state));
       assert.equal(migrations.ok, true);
       assert.equal(migrations.value.length, 1);
-      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.5" });
+      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.6" });
       assert.deepEqual(state.value.appliedMigrations, [execution.result.value.migration]);
       assert.deepEqual(state.value.ejections, []);
       assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
@@ -726,7 +726,7 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
       assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
       assert.deepEqual(state.value.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).devDependencies.vitest, "5.0.3");
-      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next, "16.3.8");
+      assert.equal(JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next, "16.4.1");
       assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, `lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`))));
       for (const { path, kind } of plan.dispositions) if (kind === "preserve-file") assert.deepEqual(repository.files.get(path), source.get(path), path);
       assertExactChangedPaths(repository.files, snapshotFiles(source), execution.result.value.changedPaths);
@@ -736,7 +736,7 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
 
 
 test("successor portfolio execution refuses unadmitted visual inputs before writes or verification", async () => {
-  const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.11.5"));
+  const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.11.6"));
   const repository = createRepository(source);
   const result = await core.applyProfileTransition({
     root: git.identity.root,
@@ -848,7 +848,7 @@ test("app transition retains the full persisted prefix on post-state disagreemen
     assert.deepEqual(snapshotFiles(repository.files), snapshotFiles(expected));
     const migration = core.parseMigrationLog(decode(repository.files.get(".egeria/migrations.jsonl")));
     assert.equal(migration.ok, true);
-    assert.ok(migration.value.some(({ identifier }) => identifier === "transition-site-0-12-5-to-app-0-2-5"));
+    assert.ok(migration.value.some(({ identifier }) => identifier === "transition-site-0-12-6-to-app-0-2-6"));
   }
 });
 
@@ -884,6 +884,6 @@ test("filesystem-backed app transition rejects an ancestor swap during an exact-
     assert.deepEqual(await readdir(outside), []);
     const migration = core.parseMigrationLog(await readFile(join(movedControlDirectory, "migrations.jsonl"), "utf8"));
     assert.equal(migration.ok, true);
-    assert.equal(migration.value.some(({ identifier }) => identifier === "transition-site-0-12-5-to-app-0-2-5"), false);
+    assert.equal(migration.value.some(({ identifier }) => identifier === "transition-site-0-12-6-to-app-0-2-6"), false);
   });
 });

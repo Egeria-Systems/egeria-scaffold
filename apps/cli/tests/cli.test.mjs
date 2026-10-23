@@ -21,7 +21,7 @@ import { createGenerationRenderingContext } from "../../../packages/builder-core
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 const lifecycleCohorts = [
-  { label: "current", generation: "current", portfolio: "0.11.5", site: "0.12.5", app: "0.2.5", portfolioFoundation: "portfolio-0.11.5-foundation" },
+  { label: "current", generation: "current", portfolio: "0.11.6", site: "0.12.6", app: "0.2.6", portfolioFoundation: "portfolio-0.11.6-foundation" },
 ];
 
 
@@ -874,9 +874,9 @@ test("application persistence creation reaches installed state through the gener
     const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
     const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.1.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.1.1");
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.6.1");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.4.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.4.1");
   } finally {
     await rm(owner, { recursive: true, force: false });
   }
@@ -981,7 +981,7 @@ test("compiled application persistence addition planning and approval refusals p
     const planResult = await executeBuilt(["plan-add", ...arguments_]);
     assert.equal(planResult.exitCode, 0, planResult.stderr);
     const plan = JSON.parse(planResult.stdout).result;
-    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.0" });
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.1" });
     const refused = await executeBuilt(["apply-add", ...arguments_, "--approved-plan", `sha256:${"a".repeat(64)}`]);
     assert.equal(refused.exitCode, 1, refused.stdout);
     assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_PLAN_APPROVAL_INVALID");
@@ -1001,7 +1001,7 @@ test("compiled application persistence removal reviews evidence and refuses unre
     assert.equal(planResult.exitCode, 0, planResult.stderr);
     assert.equal(planResult.stderr, "");
     const plan = JSON.parse(planResult.stdout).plan;
-    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.0" });
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.1" });
     assert.equal(plan.persistenceRemovalReport.recommendation, "obtain-more-evidence");
     assert.doesNotMatch(planResult.stdout, /private-removal|production-application|staging-application/u);
     await writeFile(humanReviewPath, JSON.stringify({
@@ -1059,7 +1059,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.2.5");
+      assert.equal(project.recipeVersion, "0.2.6");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -4112,7 +4112,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(await listTree(join(primary, ".git")), gitBefore);
         const plan = JSON.parse(first.stdout).plan;
         assert.deepEqual([plan.source.profile, plan.source.recipeVersion], [profile, lifecycleCohorts[0][profile]]);
-        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.5"]);
+        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.6"]);
         assert.deepEqual(plan.requiredApprovals, ["transform", "verified-final-diff"]);
         const preserved = new Map(await Promise.all(plan.dispositions
           .filter(({ kind }) => kind === "preserve-file")
@@ -4123,8 +4123,8 @@ for (const profile of ["site"]) {
         assert.equal(execution.stdout.endsWith("\n"), true);
         assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
         const migration = profile === "portfolio"
-          ? "transition-portfolio-0-11-5-to-app-0-2-5"
-          : "transition-site-0-12-5-to-app-0-2-5";
+          ? "transition-portfolio-0-11-6-to-app-0-2-6"
+          : "transition-site-0-12-6-to-app-0-2-6";
         const changedPaths = [...new Set([
           ...plan.actions.map(({ path }) => path),
           ".egeria/project.yaml", ".egeria/migrations.jsonl", ".egeria/state.json",
@@ -4136,7 +4136,7 @@ for (const profile of ["site"]) {
             transition: {
               fromProfile: profile,
               fromRecipeVersion: lifecycleCohorts[0][profile],
-              toProfile: "app", toRecipeVersion: "0.2.5",
+              toProfile: "app", toRecipeVersion: "0.2.6",
             },
             migration, changedPaths,
             verificationChecks: core.appProfileTransitionVerificationChecks,
@@ -4150,7 +4150,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(project.capabilitySettings, sourceProject.capabilitySettings);
         assert.equal(project.selectedCapabilities.includes("multilingual"), allOptionals);
         const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
-        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.5" });
+        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.6" });
         assert.deepEqual(state.appliedMigrations, [migration]);
         assert.deepEqual(state.lastSuccessfulVerification, {
           kind: "profile-transition", checks: core.appProfileTransitionPersistedVerificationChecks,
@@ -5362,7 +5362,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["site"]) {
 }
 
 for (const generation of [
-  { name: "current", generation: "current", recipe: "0.2.5", vitest: "5.0.3", catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "current", generation: "current", recipe: "0.2.6", vitest: "5.0.3", catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
 ]) {
   test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {

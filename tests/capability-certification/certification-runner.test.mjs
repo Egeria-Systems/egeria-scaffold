@@ -457,7 +457,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       version: "0.3.0",
     },
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.5"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verifyFixture: async ({ environment }) => {
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
       assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
@@ -480,7 +480,7 @@ test("section composition certification binds both supported fresh-scaffold prof
     },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.5"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
     verifierIdentifier: "site",
   });
 
@@ -502,7 +502,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       behaviorContractDigest:
         "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
     },
-    recipeVersions: { portfolio: "0.11.5", site: "0.12.5" },
+    recipeVersions: { portfolio: "0.11.6", site: "0.12.6" },
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -702,7 +702,7 @@ test("section composition certification fails closed on authority and journey dr
         version: "0.3.0",
       },
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.5"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
       verifyFixture: async () => ({
         ok: true,
         checks: sectionCompositionFixtureChecks,
@@ -723,7 +723,7 @@ test("section composition certification fails closed on authority and journey dr
       },
       profile: "site",
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.5"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
       verifierIdentifier: "site",
       ...siteOverrides,
     });
@@ -1459,7 +1459,7 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
   const scaffold = createSuccessfulScaffoldAdapters({
     inferredCapability: { identifier: "standards", version: "0.5.1" },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.5"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verificationChecks: visualChecks,
   });
 
@@ -1476,7 +1476,7 @@ test("generated testing certification binds a fresh portfolio to the exact stand
         behaviorContractDigest:
           "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
       },
-      recipeVersion: "0.11.5",
+      recipeVersion: "0.11.6",
       checks: [
         "compiled-cli-create",
         "state-inference",
@@ -1533,7 +1533,7 @@ test("generated testing certification rejects missing, extra, or reordered visua
     const scaffold = createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "standards", version: "0.5.1" },
       postCreate: (projectRoot) =>
-        writeRecipeVersion(projectRoot, "0.11.5"),
+        writeRecipeVersion(projectRoot, "0.11.6"),
       verificationChecks: checks,
     });
     await assert.rejects(
@@ -1554,7 +1554,7 @@ test("generated testing certification rejects stale state, recipe, diagnostics, 
       version: "0.5.1",
     }),
     postCreate: (projectRoot) =>
-      writeRecipeVersion(projectRoot, "0.11.5"),
+      writeRecipeVersion(projectRoot, "0.11.6"),
     verificationChecks: visualChecks,
   });
   const cases = [
@@ -1662,7 +1662,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       indexReads += 1;
       return "H selected-evidence.test.mjs\0";
     },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.5"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verifyFixture: async ({ projectRoot, environment }) => {
       assert.equal(projectRoot, scaffold.state.projectRoot);
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
@@ -1688,7 +1688,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       behaviorContractDigest:
         "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
     },
-    recipeVersion: "0.11.5",
+    recipeVersion: "0.11.6",
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -1958,7 +1958,7 @@ test("content files certification fails closed on invalid authority and evidence
     createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "content-files", version: "0.4.0" },
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.5"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
       verifyFixture: async () => ({ ok: true, checks: contentFixtureChecks }),
       ...overrides,
     });
@@ -2590,8 +2590,8 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
   };
   try {
     for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
-      ["0.2.5", false, undefined],
-      ["0.2.5", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.2.6", false, undefined],
+      ["0.2.6", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
       ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
     ]) {
       commands.length = 0;
@@ -2676,7 +2676,7 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                       origin: { profile: "app", recipeVersion },
                       installedCapabilities: [
                         { identifier: "standards", version: "0.5.1" },
-                        { identifier: "deployment-cloudflare", version: "0.3.0" },
+                        { identifier: "deployment-cloudflare", version: "0.3.1" },
                         { identifier: "content-files", version: "0.4.0" },
                         { identifier: "section-composition", version: "0.3.0" },
                         { identifier: "observability", version: "0.3.0" },

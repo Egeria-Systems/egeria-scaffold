@@ -43,7 +43,7 @@ export function createGenerationRenderingContext(
   const base = applicationPersistence ? applicationPersistenceCatalogSnapshot : vitestFiveCapabilityCatalogSnapshot;
   return {
     catalogSnapshot: { ...((emailFoundation || backgroundJobs) ? { ...base, appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" } as const : base),
-      ...(backgroundJobs ? { backgroundJobDelivery: backgroundJobVersion, deploymentCloudflare: applicationPersistence ? "0.6.0" : "0.5.0" } as const : {}),
+      ...(backgroundJobs ? { backgroundJobDelivery: backgroundJobVersion, deploymentCloudflare: applicationPersistence ? "0.6.1" : "0.5.1" } as const : {}),
     },
     profiles: createCurrentProfileRecipes(),
   };
@@ -73,11 +73,11 @@ function selectInstalledRenderingContext(
   const foundation = state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation");
   const email = state.installedCapabilities.find(({ identifier }) => identifier === "transactional-email-resend");
   const jobs = state.installedCapabilities.find(({ identifier }) => identifier === "background-job-delivery");
-  if (jobs !== undefined || deployment?.version === "0.5.0" || deployment?.version === "0.6.0") {
+  if (jobs !== undefined || deployment?.version === "0.5.1" || deployment?.version === "0.6.1") {
     const routing = state.installedCapabilities.find(({ identifier }) => identifier === "site-routing");
     const sharedTuple = persistence === undefined
-      ? standards?.version === "0.5.1" && deployment?.version === "0.5.0"
-      : project.originProfile === "app" && persistence.version === "0.1.0" && standards?.version === "0.6.1" && deployment?.version === "0.6.0";
+      ? standards?.version === "0.5.1" && deployment?.version === "0.5.1"
+      : project.originProfile === "app" && persistence.version === "0.1.1" && standards?.version === "0.6.1" && deployment?.version === "0.6.1";
     return sharedTuple && (jobs?.version === "0.1.0" || jobs?.version === "0.2.0") && foundation?.version === "0.2.0" &&
       (email === undefined || email.version === "0.1.0") &&
       (project.originProfile === "portfolio" ? routing === undefined : routing?.version === "0.4.0")
@@ -86,16 +86,16 @@ function selectInstalledRenderingContext(
   if (foundation?.version === "0.2.0" || email !== undefined) {
     const routing = state.installedCapabilities.find(({ identifier }) => identifier === "site-routing");
     const sharedTuple = persistence === undefined
-      ? standards?.version === "0.5.1" && deployment?.version === "0.3.0"
-      : project.originProfile === "app" && persistence.version === "0.1.0" &&
-        standards?.version === "0.6.1" && deployment?.version === "0.4.0";
+      ? standards?.version === "0.5.1" && deployment?.version === "0.3.1"
+      : project.originProfile === "app" && persistence.version === "0.1.1" &&
+        standards?.version === "0.6.1" && deployment?.version === "0.4.1";
     return sharedTuple && foundation?.version === "0.2.0" &&
       (email === undefined || email.version === "0.1.0") &&
       (project.originProfile === "portfolio" ? routing === undefined : routing?.version === "0.4.0")
       ? { ...createGenerationRenderingContext(persistence !== undefined, true), profiles } : undefined;
   }
-  if (standards?.version === "0.6.1" || deployment?.version === "0.4.0" || persistence !== undefined) {
-    return standards?.version === "0.6.1" && deployment?.version === "0.4.0" && persistence?.version === "0.1.0" &&
+  if (standards?.version === "0.6.1" || deployment?.version === "0.4.1" || persistence !== undefined) {
+    return standards?.version === "0.6.1" && deployment?.version === "0.4.1" && persistence?.version === "0.1.1" &&
       project.originProfile === "app" &&
       state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0") &&
       state.installedCapabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0")

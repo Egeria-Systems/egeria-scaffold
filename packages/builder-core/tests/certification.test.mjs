@@ -8,7 +8,7 @@ import { requiredEvidence } from "./certification-contracts.mjs";
 const coordinatedPlanPath =
   "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md";
 const persistencePlanPath =
-  "docs/superpowers/plans/2026-09-14-application-persistence-certification.md";
+  "docs/superpowers/plans/2026-10-22-persistence-worker-types-certification-renewal.md";
 const evidencePath =
   "docs/implementation-evidence/example-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
@@ -19,14 +19,14 @@ const descriptorDigests = Object.freeze({
   "app-foundation":
     "sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a",
   "application-persistence":
-    "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
+    "sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869",
   "booking-calendly":
     "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
   "contact-form-web3forms": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9",
   "content-files":
     "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
   "deployment-cloudflare":
-    "sha256:55c727c3636b4405e489d6e65d5b435228f50b1ef6ede51293d44556137576fd",
+    "sha256:c3ce5750bf4fd47d4c32320625210df6af601e81584b07c78e6f40fbbd44d5b3",
   multilingual:
     "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
   observability:
@@ -43,11 +43,11 @@ const descriptorVersions = Object.freeze({
   "background-job-delivery": "0.2.0",
   analytics: "0.1.0",
   "app-foundation": "0.2.0",
-  "application-persistence": "0.1.0",
+  "application-persistence": "0.1.1",
   "booking-calendly": "0.1.0",
   "contact-form-web3forms": "0.1.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.6.0",
+  "deployment-cloudflare": "0.6.1",
   multilingual: "0.1.0",
   observability: "0.3.0",
   "section-composition": "0.3.0",
@@ -96,7 +96,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: ["background-job-delivery", "deployment-cloudflare"].includes(identifier) ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
+    taskPlan: identifier === "deployment-cloudflare" ? "docs/superpowers/plans/2026-10-22-deployment-adapter-certification-renewal.md" : identifier === "background-job-delivery" ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
       ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
       : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
       ? persistencePlanPath
@@ -209,8 +209,8 @@ test("certification subjects bind the descriptor and required evidence", () => {
     behaviorContractDigest: "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
   });
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare"), requiredEvidence["deployment-cloudflare"]), {
-    descriptorVersion: "0.3.0",
-    behaviorContractDigest: "sha256:fb2464553830b052428773286689dc91984d662bf999b267aefbcb66e045ed6e",
+    descriptorVersion: "0.3.1",
+    behaviorContractDigest: "sha256:4ae7bb0360716408426ba0271eeff824f99781378bae1be6cab5bb8d69da9352",
   });
 
   const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
@@ -325,6 +325,8 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   const artifacts = {
     [coordinatedPlanPath]: "# approved plan",
     [registry.records.standards.taskPlan]: "# approved standards migration plan",
+    [registry.records["deployment-cloudflare"].taskPlan]: "# synthetic deployment renewal plan",
+    [registry.records["application-persistence"].taskPlan]: "# synthetic persistence renewal plan",
     [registry.records["transactional-email-resend"].taskPlan]: "# separate email certification plan",
     [registry.records["contact-form-web3forms"].taskPlan]: "# separate hosted contact certification plan",
     [registry.records["background-job-delivery"].taskPlan]: "# separate background job certification plan",
@@ -489,4 +491,68 @@ test("hosted contact cannot borrow email evidence or omit provider and cleanup o
   const candidates = cloneRegistry();candidates.records["contact-form-web3forms"]=changed;
   assert.equal(core.validateCertificationAdmission({catalog,registry:candidates}).ok,false);
   assert.equal(core.validateCertificationClosure({catalog,registry:committedRegistry}).ok,false);
+});
+
+test("renewed deployment admission requires a new plan and its private artifact", () => {
+  const acceptedRegistry = structuredClone(committedRegistry);
+  acceptedRegistry.records["deployment-cloudflare"] = {
+    ...acceptedRegistry.records["deployment-cloudflare"],
+    subject: {
+      descriptorVersion: "0.6.0",
+      behaviorContractDigest: "sha256:55c727c3636b4405e489d6e65d5b435228f50b1ef6ede51293d44556137576fd",
+    },
+    taskPlan: "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md",
+  };
+  assert.deepEqual(core.validateCertificationAdmission({ catalog, registry: committedRegistry, acceptedRegistry }), {
+    ok: true,
+    value: undefined,
+  });
+  const stalePlan = structuredClone(committedRegistry);
+  stalePlan.records["deployment-cloudflare"].taskPlan = acceptedRegistry.records["deployment-cloudflare"].taskPlan;
+  const refused = core.validateCertificationAdmission({ catalog, registry: stalePlan, acceptedRegistry });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.issues.some(({ code }) => code === "CERTIFICATION_TASK_PLAN_RENEWAL_REQUIRED"), true);
+
+  const record = committedRegistry.records["deployment-cloudflare"];
+  const selected = { schemaVersion: "1.0.0", records: { "deployment-cloudflare": record } };
+  assert.deepEqual(core.validateCertificationArtifacts({
+    registry: selected,
+    artifacts: { [record.taskPlan]: "# Pending deployment certification renewal" },
+    validRevisions: [],
+  }), { ok: true, value: undefined });
+  const missing = core.validateCertificationArtifacts({ registry: selected, artifacts: {}, validRevisions: [] });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.issues[0].code, "CERTIFICATION_TASK_PLAN_MISSING");
+});
+
+test("renewed persistence admission requires a new plan and its private artifact", () => {
+  const acceptedRegistry = structuredClone(committedRegistry);
+  acceptedRegistry.records["application-persistence"] = {
+    ...acceptedRegistry.records["application-persistence"],
+    subject: {
+      descriptorVersion: "0.1.0",
+      behaviorContractDigest: "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95",
+    },
+    taskPlan: "docs/superpowers/plans/2026-09-14-application-persistence-certification.md",
+  };
+  assert.deepEqual(core.validateCertificationAdmission({ catalog, registry: committedRegistry, acceptedRegistry }), {
+    ok: true,
+    value: undefined,
+  });
+  const stalePlan = structuredClone(committedRegistry);
+  stalePlan.records["application-persistence"].taskPlan = acceptedRegistry.records["application-persistence"].taskPlan;
+  const refused = core.validateCertificationAdmission({ catalog, registry: stalePlan, acceptedRegistry });
+  assert.equal(refused.ok, false);
+  assert.equal(refused.issues.some(({ code }) => code === "CERTIFICATION_TASK_PLAN_RENEWAL_REQUIRED"), true);
+
+  const record = committedRegistry.records["application-persistence"];
+  const selected = { schemaVersion: "1.0.0", records: { "application-persistence": record } };
+  assert.deepEqual(core.validateCertificationArtifacts({
+    registry: selected,
+    artifacts: { [record.taskPlan]: "# Pending persistence certification renewal" },
+    validRevisions: [],
+  }), { ok: true, value: undefined });
+  const missing = core.validateCertificationArtifacts({ registry: selected, artifacts: {}, validRevisions: [] });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.issues[0].code, "CERTIFICATION_TASK_PLAN_MISSING");
 });

@@ -278,14 +278,14 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      next: "16.3.8",
+      next: "16.4.1",
       ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
     devDependencies: {
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
-      ...(persistence ? { "@cloudflare/workers-types": "5.20260730.1", "drizzle-kit": "0.31.10" } : {}),
+      ...(persistence ? { "@cloudflare/workers-types": "5.20261006.1", "drizzle-kit": "0.31.10" } : {}),
       ...(productionSite
         ? { "eslint-config-next": "16.3.3" }
         : {}),
@@ -476,7 +476,7 @@ export async function renderSkeleton(
   context?: SkeletonRenderingContext | ApplicationEnvironmentRenderingContext,
 ): Promise<ValidationResult<RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>>> {
   const applicationEnvironments = context !== undefined && "projectSchemaVersion" in context;
-  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.1" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.0";
+  const environmentDescriptor = context?.catalogSnapshot.standards === "0.7.1" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.deploymentCloudflare === "0.7.1";
   if ((applicationEnvironments || environmentDescriptor || (context !== undefined && "projectSchemaVersion" in context)) &&
       (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");

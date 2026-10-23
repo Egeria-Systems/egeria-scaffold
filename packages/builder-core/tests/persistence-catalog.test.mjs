@@ -11,7 +11,7 @@ import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { createVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const defaultSnapshot = { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" };
-const persistenceSnapshot = { ...defaultSnapshot, standards: "0.6.1", deploymentCloudflare: "0.4.0", applicationPersistence: "0.1.0" };
+const persistenceSnapshot = { ...defaultSnapshot, standards: "0.6.1", deploymentCloudflare: "0.4.1", applicationPersistence: "0.1.1" };
 const catalog = (snapshot) => createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, snapshot);
 
 test("explicit application persistence resolves the complete optional tuple with exact existing foundation", () => {
@@ -20,9 +20,9 @@ test("explicit application persistence resolves the complete optional tuple with
   const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: ["application-persistence"] }, result.value, profileRecipes);
   assert.equal(resolved.ok, true, JSON.stringify(resolved));
   const versions = Object.fromEntries(resolved.value.capabilities.map(({ identifier, version }) => [identifier, version]));
-  assert.equal(versions["application-persistence"], "0.1.0");
+  assert.equal(versions["application-persistence"], "0.1.1");
   assert.equal(versions.standards, "0.6.1");
-  assert.equal(versions["deployment-cloudflare"], "0.4.0");
+  assert.equal(versions["deployment-cloudflare"], "0.4.1");
   assert.equal(versions["app-foundation"], "0.1.0");
   assert.equal(versions["site-routing"], "0.4.0");
   const persistence = result.value.find(({ identifier }) => identifier === "application-persistence");
@@ -38,21 +38,30 @@ test("default generation retains exact default shared subjects while persistence
   assert.equal(result.ok, true, JSON.stringify(result));
   const versions = Object.fromEntries(result.value.resolved.capabilities.map(({ identifier, version }) => [identifier, version]));
   assert.equal(versions.standards, "0.5.1");
-  assert.equal(versions["deployment-cloudflare"], "0.3.0");
+  assert.equal(versions["deployment-cloudflare"], "0.3.1");
   assert.equal(versions["application-persistence"], undefined);
   assert.equal(result.value.files.some(({ path }) => path.includes("persistence") || path.endsWith("vitest.bindings.config.ts")), false);
 });
 
 test("installed persistence selection requires the exact shared versions and current app recipe", async () => {
-  const fixture = new URL("../../../fixtures/generated/app-persistence-0.2.5/.egeria/", import.meta.url);
+  const fixture = new URL("../../../fixtures/generated/app-persistence-0.2.6/.egeria/", import.meta.url);
   const project = parseProjectYaml(await readFile(new URL("project.yaml", fixture), "utf8")).value;
   const state = JSON.parse(await readFile(new URL("state.json", fixture), "utf8"));
   const selected = createVerifiedProjectSnapshot(project, state);
   assert.equal(selected.ok, true);
   assert.deepEqual(selected.value.renderingContext.catalogSnapshot, persistenceSnapshot);
+
+  const reordered = { ...state, installedCapabilities: [...state.installedCapabilities].reverse() };
+  assert.equal(createVerifiedProjectSnapshot(project, reordered).ok, true);
+  for (const candidate of [state, reordered]) {
+    const retired = { ...candidate, installedCapabilities: candidate.installedCapabilities.map(capability =>
+      capability.identifier === "application-persistence" ? { ...capability, version: "0.1.0" } : capability) };
+    assert.equal(createVerifiedProjectSnapshot(project, retired).ok, false);
+  }
+
   for (const changed of [
     { ...state, installedCapabilities: state.installedCapabilities.slice(0, 2) },
-    { ...state, installedCapabilities: state.installedCapabilities.map((capability) => capability.identifier === "deployment-cloudflare" ? { ...capability, version: "0.3.0" } : capability) },
+    { ...state, installedCapabilities: state.installedCapabilities.map((capability) => capability.identifier === "deployment-cloudflare" ? { ...capability, version: "0.3.1" } : capability) },
     { ...state, origin: { profile: "app", recipeVersion: "0.1.0" } },
   ]) assert.equal(createVerifiedProjectSnapshot(project, changed).ok, false);
 });
@@ -72,11 +81,11 @@ test("persistence leaves every unaffected descriptor byte contract unchanged", (
 test("mixed shared contract tuples refuse before resolution", () => {
   for (const snapshot of [
     { ...persistenceSnapshot, standards: "0.5.1" },
-    { ...persistenceSnapshot, deploymentCloudflare: "0.3.0" },
+    { ...persistenceSnapshot, deploymentCloudflare: "0.3.1" },
     { ...persistenceSnapshot, appFoundation: undefined },
     { ...persistenceSnapshot, applicationPersistence: undefined },
-    { ...defaultSnapshot, applicationPersistence: "0.1.0" },
-    { ...defaultSnapshot, deploymentCloudflare: "0.4.0" },
+    { ...defaultSnapshot, applicationPersistence: "0.1.1" },
+    { ...defaultSnapshot, deploymentCloudflare: "0.4.1" },
     { ...persistenceSnapshot, applicationPersistence: "0.2.0" },
   ]) assert.equal(catalog(snapshot).ok, false, JSON.stringify(snapshot));
 });
@@ -89,4 +98,38 @@ test("persistence is unavailable to portfolio and site and historical app views"
   }
   const historical = catalog({ ...defaultSnapshot, standards: "0.4.0" });
   assert.equal(historical.ok, false);
+});
+
+test("retired persistence descriptors cannot select a current standalone, email or jobs tuple", () => {
+  for (const extras of [
+    {},
+    { appFoundation: "0.2.0", transactionalEmailResend: "0.1.0" },
+    ...["0.1.0", "0.2.0"].map(backgroundJobDelivery => ({
+      appFoundation: "0.2.0", transactionalEmailResend: "0.1.0",
+      deploymentCloudflare: "0.6.1", backgroundJobDelivery,
+    })),
+  ]) {
+    const current = catalog({ ...persistenceSnapshot, ...extras });
+    assert.equal(current.ok, true, JSON.stringify(current));
+    const resolved = resolveCapabilities({
+      profile: "app",
+      requestedCapabilities: ["application-persistence",
+        ...(extras.transactionalEmailResend ? ["transactional-email-resend"] : []),
+        ...(extras.backgroundJobDelivery ? ["background-job-delivery"] : [])],
+    }, current.value, profileRecipes);
+    assert.equal(resolved.ok, true, JSON.stringify(resolved));
+    const descriptor = resolved.value.capabilities.find(({ identifier }) => identifier === "application-persistence");
+    assert.equal(descriptor.version, "0.1.1");
+    assert.equal(descriptor.inferenceProbes.find(({ packageName }) => packageName === "@cloudflare/workers-types").version, "5.20261006.1");
+    assert.deepEqual(descriptor.migrationPlanners, ["add-application-persistence-0-1-1", "remove-application-persistence-0-1-1"]);
+    const retired = catalog({ ...persistenceSnapshot, ...extras, applicationPersistence: "0.1.0" });
+    assert.equal(retired.ok, false, JSON.stringify(retired));
+  }
+});
+
+test("the frozen persistence predecessor remains evidence, not an executable catalog", async () => {
+  const frozen = JSON.parse(await readFile(new URL("./fixtures/retired-capabilities/application-persistence-0.1.0.json", import.meta.url), "utf8"));
+  assert.equal(frozen.descriptor.version, "0.1.0");
+  assert.equal(frozen.descriptor.inferenceProbes.find(({ packageName }) => packageName === "@cloudflare/workers-types").version, "5.20260730.1");
+  assert.equal(catalog({ ...persistenceSnapshot, applicationPersistence: frozen.descriptor.version }).ok, false);
 });

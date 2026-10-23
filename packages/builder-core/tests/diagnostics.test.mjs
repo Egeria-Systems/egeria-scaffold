@@ -96,7 +96,7 @@ function profile(defaultCapabilities = ["sample"]) {
   return {
     identifier: "portfolio",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.11.5",
+    recipeVersion: "0.11.6",
     defaultCapabilities,
   };
 }
@@ -111,7 +111,7 @@ function project(selectedCapabilities = ["sample"], overrides = {}) {
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.5",
+    recipeVersion: "0.11.6",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: ["standards", ...selectedCapabilities],
     capabilitySettings: {},
@@ -125,7 +125,7 @@ function state(installedCapabilities, managedSurfaces = [], overrides = {}) {
     schemaVersion: "1.0.0",
     builderVersion: "0.0.0",
     projectSchemaVersion: "1.0.0",
-    origin: { profile: "portfolio", recipeVersion: "0.11.5" },
+    origin: { profile: "portfolio", recipeVersion: "0.11.6" },
     installedCapabilities: installedCapabilities.some(({ identifier }) => identifier === "standards")
       ? installedCapabilities : [installCapability(requiredStandards), ...installedCapabilities],
     appliedMigrations: [],

@@ -26,7 +26,7 @@ test("current recipes own the lint patch and select exact optional dependency fa
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
   const patchPath = "patches/next-eslint-plugin-next.patch";
   const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
-  const recipes = { portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" };
+  const recipes = { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" };
   for (const profile of ["portfolio", "site", "app"]) {
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
@@ -43,13 +43,16 @@ test("current recipes own the lint patch and select exact optional dependency fa
       assert.equal(policy.overrides["@next/eslint-plugin-next@" + plugin + ">fast-glob"], "-");
       assert.equal(policy.patchedDependencies["@next/eslint-plugin-next@" + plugin], patchPath);
       assert.equal(manifest.devDependencies.vitest, "5.0.3");
-      assert.equal(manifest.dependencies.next, "16.3.8");
+      assert.equal(manifest.dependencies.next, "16.4.1");
       const foundation = manifest.dependencies.effect !== undefined;
-      const expectedLock = options.applicationPersistence ? "app-0.2.5-persistence"
-        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.5"
-        : profile === "portfolio" && foundation ? "portfolio-0.11.5-foundation"
+      const expectedLock = options.applicationPersistence ? "app-0.2.6-persistence"
+        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.6"
+        : profile === "portfolio" && foundation ? "portfolio-0.11.6-foundation"
         : profile + "-" + recipes[profile];
       assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
+      for (const next of ["16.3.8", "16.4.0", "^16.4.1"]) {
+        assert.equal(resolveRecipeLockfileVersion(current.project, { ...manifest, dependencies: { ...manifest.dependencies, next } }), undefined);
+      }
       for (const vitest of ["4.1.10", "4.1.11", "5.0.0", "^5.0.3"]) {
         assert.equal(resolveRecipeLockfileVersion(current.project, { ...manifest, devDependencies: { ...manifest.devDependencies, vitest } }), undefined);
       }
@@ -135,7 +138,7 @@ const appFoundationPaths = [
 test("app generation preserves production-site bytes across all optional subsets", async () => {
   const core = await import("../dist/index.js");
   for (const generation of [
-    { context: undefined, recipe: "0.2.5", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
+    { context: undefined, recipe: "0.2.6", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -1843,8 +1846,8 @@ test("current site rendering uses the patched framework and refuses historical c
   const request = { profile: "site", projectName: "acme-studio", displayName: "Acme Studio", packageVersions };
   const current = assertSuccess(await renderSkeleton(request));
   const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
-  assert.equal(current.project.recipeVersion, "0.12.5");
-  assert.equal(manifest.dependencies.next, "16.3.8");
+  assert.equal(current.project.recipeVersion, "0.12.6");
+  assert.equal(manifest.dependencies.next, "16.4.1");
   assert.equal(manifest.devDependencies["eslint-config-next"], "16.3.3");
   assert.equal((await renderSkeleton(request, {
     catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
@@ -1946,7 +1949,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.5",
+    recipeVersion: "0.11.6",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -2024,8 +2027,8 @@ test("rendered manifests and desired project match the approved resolved recipe"
     },
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
-      "@opennextjs/cloudflare": "1.20.2",
-      next: "16.3.8",
+      "@opennextjs/cloudflare": "1.20.12",
+      next: "16.4.1",
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
@@ -2052,7 +2055,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       typescript: "6.0.3",
       "typescript-eslint": "8.66.0",
       vitest: "5.0.3",
-      wrangler: "4.118.0",
+      wrangler: "4.148.0",
     },
   });
 });
@@ -2133,7 +2136,7 @@ test("generated workspaces constrain vulnerable transitive dependency ranges", a
   assert.equal(workspace.minimumReleaseAge, 1440);
   assert.equal(workspace.resolutionMode, "time-based");
   assert.equal(workspace.overrides["vitest@4.1.10"], undefined);
-  assert.equal(workspace.overrides["next@>=16.2.0 <16.3.8"], "16.3.8");
+  assert.equal(workspace.overrides["next@>=16.2.0 <16.4.1"], "16.4.1");
   assert.equal(workspace.overrides["vite@>=8.2.0 <8.2.4"], "8.2.4");
   assert.equal(workspace.overrides["sharp@>=0.35.0 <0.35.5"], "0.35.5");
   assert.ok(workspace.minimumReleaseAgeExclude.includes("vite@8.2.4"));
@@ -3351,7 +3354,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.11.5");
+    assert.equal(rendered.project.recipeVersion, "0.11.6");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -6036,7 +6039,7 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
-  catalogSnapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.0" },
+  catalogSnapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.1" },
   profiles: [
     { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
     { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
@@ -6163,10 +6166,10 @@ test("fresh security declarations match their locked Next across supported depen
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "declared-next", displayName: "Declared Next", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
       const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
-      assert.equal(manifest.dependencies.next, "16.3.8");
+      assert.equal(manifest.dependencies.next, "16.4.1");
       const lock = resolveRecipeLockfileVersion(rendered.project, manifest);
       assert.ok(lock);
-      for (const version of ["16.3.1", "16.3.4", "^16.3.8", "99.0.0"]) {
+      for (const version of ["16.3.1", "16.3.4", "^16.4.1", "99.0.0"]) {
         assert.equal(resolveRecipeLockfileVersion(rendered.project, { ...manifest, dependencies: { ...manifest.dependencies, next: version } }), undefined);
       }
     }
@@ -6178,7 +6181,7 @@ test("fresh security declarations match their locked Next across supported depen
 test("security recipes remain outside environment schema controls", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.5"], ["site", "0.12.5"], ["app", "0.2.5"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.6"], ["site", "0.12.6"], ["app", "0.2.6"]]) {
     const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
     const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createCurrentProfileRecipes() }));
     assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);
@@ -6198,12 +6201,13 @@ test("security dependency policy shares exact reviewed patches with environment 
     const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
     assert.equal(policy.overrides["fast-uri@"], "3.1.8");
     assert.equal(policy.overrides["next@16.3.0"], undefined);
-    assert.equal(policy.overrides["next@>=16.2.0 <16.3.8"], "16.3.8");
+    assert.equal(policy.overrides["next@>=16.2.0 <16.4.1"], "16.4.1");
     assert.equal(policy.overrides["brace-expansion@>=1.0.0 <1.1.21"], "1.1.21");
     assert.equal(policy.overrides["brace-expansion@>=2.0.0 <2.1.7"], "2.1.7");
     assert.equal(policy.overrides["brace-expansion@>=5.0.0 <5.0.12"], "5.0.12");
     assert.equal(policy.overrides["miniflare>undici"], "7.29.1");
     assert.equal(policy.overrides["jsdom>undici"], "8.10.2");
+    assert.equal(policy.overrides["@node-minify/core@9.0.2>glob"], "10.5.0");
     assert.deepEqual(policy, parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml"));
     assert.equal(policy.minimumReleaseAge, 1440);
     assert.equal(policy.resolutionMode, "time-based");

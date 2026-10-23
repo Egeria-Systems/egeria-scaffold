@@ -1,6 +1,6 @@
 # Program Roadmap
 
-**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.5`, `site@0.12.5` and `app@0.2.5`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
+**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.6`, `site@0.12.6` and `app@0.2.6`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
 
 This is the concise execution sequence. It does not supersede the [full approved source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) or an accepted ADR.
 
@@ -170,7 +170,7 @@ P3C began after P3B closed and did not reopen or weaken P3 or P3B. P3C strengthe
 
 ## P4 — App foundation
 
-The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.5`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
+The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.6`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
 
 The generated app pins `effect@4.0.0-rc.112` directly and confines it to application, infrastructure, composition, and delivery server modules. Request context stays explicit; an application-owned build-information service receives Cloudflare or in-memory Layers; delivery runs one lazy program once and interprets defect before interruption, interruption before recognized typed failure, and unrecognized or mixed residual failure as unexpected. Pure interruption uses the native abort, `deployment-cloudflare` alone owns `enable_request_signal`, cancellation claims exclude already-started provider work, and the initial application has no retry.
 
@@ -230,7 +230,7 @@ This bounded exception allows the pair to proceed through ordinary implementatio
 | --- | --- | --- | --- | --- |
 | `analytics` | `0.1.0` | `sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba` | pending | Settings, consent, build activation and provider isolation |
 | `app-foundation` | `0.2.0` | `sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a` | pending | Compiled/runtime target and current-profile composition; assess installed default 0.1.0 separately |
-| `application-persistence` | `0.1.0` | `sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95` | pending | Target mapping, bindings, preflight and workflow evidence |
+| `application-persistence` | `0.1.1` | `sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869` | pending | Target mapping, bindings, preflight and workflow evidence |
 | `background-job-delivery` | `0.1.0` | `sha256:97c9aa94d8c489ec6eaca1a61258546aa511105c5f3a565509da01e752f0883b` | pending | Target/Worker/deployment inputs; lifecycle remains unsupported and pending |
 | `booking-calendly` | `0.1.0` | `sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca` | pending | Target input, local absence and mode/composition evidence |
 | `contact-form-web3forms` | `0.1.0` | `sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9` | certified | Target input and unavailable/deployment behavior; preserve old receipt |

@@ -325,7 +325,7 @@ function requireAppBuild(measurement, context) {
     measurement.schemaVersion !== "1.0.0" ||
     measurement.headSha !== context.source.revision ||
     measurement.profile !== "app" ||
-    measurement.recipeVersion !== "0.2.5"
+    measurement.recipeVersion !== "0.2.6"
   ) reject();
   try {
     requireAppRuntimeEvidence(measurement, "app-analytics");

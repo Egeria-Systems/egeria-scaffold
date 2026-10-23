@@ -4,7 +4,7 @@ import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
-  { label: "Current", generation: "current", portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" },
+  { label: "Current", generation: "current", portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" },
 ];
 const currentTransitionContexts = {
   "current": createGenerationRenderingContext(),
@@ -96,7 +96,7 @@ for (const profile of ["portfolio", "site"])
       assert.deepEqual(await plan(f, evidence), successful);
       const value = successful.value;
       assert.equal(value.target.profile, "app");
-      assert.equal(value.target.recipeVersion, "0.2.5");
+      assert.equal(value.target.recipeVersion, "0.2.6");
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0"));
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0"));
       assert.equal(value.actions.some(({ path }) => path.startsWith(".egeria/")), false);
@@ -139,7 +139,7 @@ test("portfolio preparation preserves scalar content, navigation, Markdown and u
   assert.equal(merged.scripts.custom, "echo safe");
   assert.equal(merged.description, "custom");
   assert.equal(merged.dependencies.effect, "4.0.0-rc.112");
-  assert.equal(merged.dependencies.next, "16.3.8");
+  assert.equal(merged.dependencies.next, "16.4.1");
 });
 test("app planning preserves both supported Git revision formats and rejects invalid identities", async () => {
   for (const profile of ["portfolio", "site"]) {
@@ -424,7 +424,7 @@ test("unadmitted visual inputs refuse changed runtime and lock identities while 
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
   const cohorts = [
-    { context: currentTransitionContexts.current, lock: "app-0.2.5" },
+    { context: currentTransitionContexts.current, lock: "app-0.2.6" },
   ];
   const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
   for (const [cohortIndex, cohort] of cohorts.entries()) {
@@ -491,7 +491,7 @@ test("historical visual candidate preserves frozen inputs while successor transi
   const historical = JSON.parse(await readFile(new URL("../../../docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/transition-inputs.json", import.meta.url), "utf8"));
   assert.deepEqual(candidate, historical.value);
   for (const generation of [
-    { context: createGenerationRenderingContext(), portfolio: "0.11.5", app: "0.2.5", next: "16.3.8", lock: "app-0.2.5" },
+    { context: createGenerationRenderingContext(), portfolio: "0.11.6", app: "0.2.6", next: "16.4.1", lock: "app-0.2.6" },
   ]) for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -564,7 +564,7 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
 
 test("retired transition endpoints refuse the historical and current targets", async () => {
   for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.3"]]) {
-    for (const toRecipeVersion of ["0.2.2", "0.2.3", "0.2.5"]) {
+    for (const toRecipeVersion of ["0.2.2", "0.2.3", "0.2.6"]) {
       assert.equal(core.resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion }).ok, false);
     }
   }
@@ -572,10 +572,10 @@ test("retired transition endpoints refuse the historical and current targets", a
 
 test("Vite security incoming transitions admit only exact same-cohort endpoints", async () => {
   const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
-  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.5", "0.11.3"], ["site", "0.12.5", "0.12.3"]]) {
-    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.5" });
-    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.5" } } });
-    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.5"]]) {
+  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.6", "0.11.3"], ["site", "0.12.6", "0.12.3"]]) {
+    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.6" });
+    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.6" } } });
+    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.6"]]) {
       assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
     }
   }
@@ -588,7 +588,7 @@ test("current visual inputs bind every subset without inheriting historical admi
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createCurrentProfileRecipes() };
   const subsets = {};
-  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.5/pnpm-lock.yaml", import.meta.url))));
+  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml", import.meta.url))));
   for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,

@@ -57,9 +57,9 @@ export function parseAppTransitionVisualArguments(arguments_) {
   const recipeArguments = values.filter(value => value.startsWith("--app-recipe-version="));
   if (recipeArguments.length > 1) fail("VISUAL_ARGUMENT_INVALID");
   const recipeVersion = recipeArguments[0]?.slice("--app-recipe-version=".length);
-  if (recipeVersion !== undefined && !["0.2.5"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
+  if (recipeVersion !== undefined && !["0.2.6"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
   const modes = values.filter(value => !recipeArguments.includes(value));
-  const recipe = { recipeVersion: recipeVersion ?? "0.2.5" };
+  const recipe = { recipeVersion: recipeVersion ?? "0.2.6" };
   if (modes.length === 0) return { mode: "compare", ...recipe };
   if (modes.length === 1 && modes[0] === "--candidates") return { mode: "candidates", ...recipe };
   if (modes.length === 1 && recipeVersion === undefined) {
@@ -218,7 +218,7 @@ async function promote(options, adapters) {
 }
 
 export async function verifyAppTransitionVisuals(options, injected = {}) {
-  if (options.recipeVersion !== undefined && (!["0.2.5"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
+  if (options.recipeVersion !== undefined && (!["0.2.6"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
   if (!["candidates", "compare", "promote"].includes(options.mode) || (options.mode === "promote" && !/^[a-f0-9]{64}$/.test(options.digest))) fail("VISUAL_ARGUMENT_INVALID");
   // No successor visual input has received exact-manifest human admission.
   if (options.mode === "compare") fail("VISUAL_INPUT_ADMISSION_REQUIRED");
@@ -284,8 +284,8 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
   }
 }
 
-async function prepareProject(root, subset, recipeVersion = "0.2.5") {
-  if (!["0.2.5"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
+async function prepareProject(root, subset, recipeVersion = "0.2.6") {
+  if (!["0.2.6"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const core = await import(pathToFileURL(join(root, "packages/builder-core/dist/index.js")));
   const policy = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-profile-transition.js")));
   const validation = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-transition-content-validation.js")));
@@ -303,7 +303,7 @@ async function prepareProject(root, subset, recipeVersion = "0.2.5") {
   const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
   const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
-  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.5" ||
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.6" ||
       target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== recipeVersion) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
@@ -464,7 +464,7 @@ async function retainBrowserArtifacts(fs, project, destination) {
 }
 
 export async function executeAppTransitionVisualCase(input, injected = {}) {
-  if (input.recipeVersion !== undefined && !["0.2.5"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
+  if (input.recipeVersion !== undefined && !["0.2.6"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const fs = injected.filesystem ?? filesystem;
   const command = injected.runCommand ?? runCommand;
   if (injected.runCommand && typeof injected.runAudit !== "function") fail("VISUAL_AUDIT_ADAPTER_INVALID");

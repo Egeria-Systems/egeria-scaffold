@@ -86,7 +86,7 @@ function additionMigrationIdentifier(
   | "add-analytics-0-1-0"
   | "add-booking-calendly-0-1-0"
   | "add-multilingual-0-1-0"
-  | "add-application-persistence-0-1-0"
+  | "add-application-persistence-0-1-1"
   | "add-transactional-email-resend-0-1-0"
   | "add-contact-form-web3forms-0-1-0"
   | "add-background-job-delivery-0-2-0" {
@@ -104,7 +104,7 @@ function additionMigrationIdentifier(
     case "transactional-email-resend":
       return "add-transactional-email-resend-0-1-0";
     case "application-persistence":
-      return "add-application-persistence-0-1-0";
+      return "add-application-persistence-0-1-1";
   }
 }
 
@@ -145,7 +145,7 @@ export type CapabilityAdditionExecutionResult =
         baseRevision: string;
         capability: Readonly<{
           identifier: AddableCapability;
-          version: "0.1.0" | "0.2.0";
+          version: "0.1.0" | "0.1.1" | "0.2.0";
         }>;
         migration: ReturnType<typeof additionMigrationIdentifier>;
         changedPaths: readonly string[];

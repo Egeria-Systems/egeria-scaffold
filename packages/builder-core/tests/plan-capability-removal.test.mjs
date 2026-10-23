@@ -88,7 +88,7 @@ async function loadTextEntries(root) {
 }
 
 async function baseFixtureEntries(profile) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.5", site: "0.12.5", app: "0.2.5" }[profile]}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }[profile]}`));
 }
 
 async function installedEntries(profile, options = {}) {

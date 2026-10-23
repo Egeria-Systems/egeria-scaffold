@@ -111,7 +111,7 @@ export type CapabilityRemovalPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: RemovableCapability;
-    version: "0.1.0" | "0.2.0";
+    version: "0.1.0" | "0.1.1" | "0.2.0";
   }>;
   jobRemovalReport?: JobRemovalMachineReport;
   jobRemovalSubject?: Omit<JobRemovalSubject, "resources">;
@@ -966,7 +966,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor === undefined || (capabilityValue === "background-job-delivery" ? !["0.1.0", "0.2.0"].includes(descriptor.version) : descriptor.version !== "0.1.0")) {
+  if (descriptor === undefined || (capabilityValue === "background-job-delivery" ? !["0.1.0", "0.2.0"].includes(descriptor.version) : descriptor.version !== (capabilityValue === "application-persistence" ? "0.1.1" : "0.1.0"))) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -1028,11 +1028,11 @@ export async function planCapabilityRemoval(input: Readonly<{
     const catalogSnapshot = { ...desiredContext.catalogSnapshot };
     if (capabilityValue === "background-job-delivery") {
       delete catalogSnapshot.backgroundJobDelivery;
-      catalogSnapshot.deploymentCloudflare = project.selectedCapabilities.includes("application-persistence") ? "0.4.0" : "0.3.0";
+      catalogSnapshot.deploymentCloudflare = project.selectedCapabilities.includes("application-persistence") ? "0.4.1" : "0.3.1";
     } else {
       delete catalogSnapshot.applicationPersistence;
       catalogSnapshot.standards = "0.5.1";
-      catalogSnapshot.deploymentCloudflare = catalogSnapshot.backgroundJobDelivery === undefined ? "0.3.0" : "0.5.0";
+      catalogSnapshot.deploymentCloudflare = catalogSnapshot.backgroundJobDelivery === undefined ? "0.3.1" : "0.5.1";
     }
     desiredContext = { ...desiredContext, catalogSnapshot };
   }
@@ -1194,7 +1194,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     profile: project.originProfile,
     capability: {
       identifier: capabilityValue,
-      version: descriptor.version as "0.1.0" | "0.2.0",
+      version: descriptor.version as "0.1.0" | "0.1.1" | "0.2.0",
     },
     ...(jobReview?.ok === true ? {jobRemovalReport: jobReview.value.report, jobRemovalSubject: jobReview.value.subject} : {}),
     ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),

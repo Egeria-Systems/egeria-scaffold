@@ -391,8 +391,14 @@ export const installedStateSchema = z
   .superRefine((state, context) => {
     const persistence = state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence");
     const standards = state.installedCapabilities.find(({ identifier }) => identifier === "standards");
+    const deployment = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
+    const backgroundJobs = state.installedCapabilities.some(({ identifier }) => identifier === "background-job-delivery");
+    const expectedDeploymentVersion = backgroundJobs
+      ? persistence ? "0.6.1" : "0.5.1"
+      : persistence ? "0.4.1" : "0.3.1";
     if (state.origin.recipeVersion !== publicRecipeVersions[state.origin.profile] ||
-        standards?.version !== (persistence ? "0.6.1" : "0.5.1")) {
+        standards?.version !== (persistence ? "0.6.1" : "0.5.1") ||
+        (deployment !== undefined && deployment.version !== expectedDeploymentVersion)) {
       context.addIssue({ code: "custom", message: "public installed tuple must match recipe", path: ["installedCapabilities"] });
     }
   })
@@ -415,7 +421,7 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
     standards: "0.7.1",
     "content-files": "0.4.0",
     "section-composition": "0.3.0",
-    "deployment-cloudflare": "0.7.0",
+    "deployment-cloudflare": "0.7.1",
     observability: "0.3.0",
     ...(state.origin.profile !== "portfolio" ? { "site-routing": "0.4.0" } : {}),
     ...(state.origin.profile === "app" ? { "app-foundation": "0.3.0" } : {}),

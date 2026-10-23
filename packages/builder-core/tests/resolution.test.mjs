@@ -118,7 +118,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.5",
+    recipeVersion: "0.2.6",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -136,7 +136,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.5");
+    assert.equal(resolution.recipeVersion, "0.2.6");
     assert.deepEqual(
       identifiers,
       [
@@ -763,7 +763,7 @@ test("the current catalog preserves existing capability contracts while widening
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.0",
+      version: "0.3.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -845,14 +845,14 @@ test("the current catalog preserves existing capability contracts while widening
           path: "apps/web/package.json",
           section: "dependencies",
           packageName: "@opennextjs/cloudflare",
-          version: "1.20.2",
+          version: "1.20.12",
         },
         {
           kind: "package",
           path: "apps/web/package.json",
           section: "devDependencies",
           packageName: "wrangler",
-          version: "4.118.0",
+          version: "4.148.0",
         },
         { kind: "file", path: ".github/workflows/deploy.yml" },
         { kind: "file", path: "apps/web/next.config.ts" },
@@ -1843,7 +1843,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.5",
+      recipeVersion: "0.11.6",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1855,7 +1855,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.5",
+      recipeVersion: "0.12.6",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1868,7 +1868,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.5",
+      recipeVersion: "0.2.6",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1892,7 +1892,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.5");
+  assert.equal(portfolio.recipeVersion, "0.11.6");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1928,7 +1928,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.5" : "0.12.5",
+      profile === "portfolio" ? "0.11.6" : "0.12.6",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1995,7 +1995,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.0",
+      version: "0.3.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -2024,9 +2024,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.11.5" },
-      { identifier: "site", recipeVersion: "0.12.5" },
-      { identifier: "app", recipeVersion: "0.2.5" },
+      { identifier: "portfolio", recipeVersion: "0.11.6" },
+      { identifier: "site", recipeVersion: "0.12.6" },
+      { identifier: "app", recipeVersion: "0.2.6" },
     ],
   );
 
@@ -2260,8 +2260,8 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 
 test("supported profile transitions admit only the current incoming app edges", () => {
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
-    ["portfolio", "0.11.5", "app", "0.2.5"],
-    ["site", "0.12.5", "app", "0.2.5"],
+    ["portfolio", "0.11.6", "app", "0.2.6"],
+    ["site", "0.12.6", "app", "0.2.6"],
   ]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
       ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
@@ -2282,9 +2282,9 @@ test("supported profile transitions admit only the current incoming app edges", 
     ["unknown", "0.10.0", "app", "0.1.0"],
     ...["portfolio", "site"].flatMap(fromProfile => {
       const pairs = fromProfile === "portfolio"
-        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.5", "0.2.5"]]
-        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.5", "0.2.5"]];
-      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.5"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
+        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.6", "0.2.6"]]
+        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.6", "0.2.6"]];
+      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.6"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
     }),
     ["portfolio", "0.11.1", "app", "0.2.1"],
     ["site", "0.12.1", "app", "0.2.1"],
@@ -2299,14 +2299,74 @@ test("retired portfolio recipes cannot select locks or incoming app edges", asyn
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
   for (const foundation of [false, true]) {
     const manifest = {
-      dependencies: { next: "16.3.8", ...(foundation ? { effect: "4.0.0-rc.112" } : {}) },
+      dependencies: { next: "16.4.1", ...(foundation ? { effect: "4.0.0-rc.112" } : {}) },
       devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.0" },
     };
     assert.equal(resolveRecipeLockfileVersion({ originProfile: "portfolio", recipeVersion: "0.11.3" }, manifest), undefined);
   }
-  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.5"]) {
+  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.6"]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({
       fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion,
     }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+  }
+});
+
+const deploymentSnapshotCases = [
+  {
+    name: "ordinary",
+    version: "0.3.1",
+    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" },
+  },
+  {
+    name: "persistence",
+    version: "0.4.1",
+    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.1.0", applicationPersistence: "0.1.1" },
+  },
+  {
+    name: "jobs",
+    version: "0.5.1",
+    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0" },
+  },
+  {
+    name: "jobs with persistence",
+    version: "0.6.1",
+    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0", applicationPersistence: "0.1.1" },
+  },
+  {
+    name: "explicit internal environments",
+    version: "0.7.1",
+    snapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0" },
+  },
+];
+
+test("current deployment snapshots select exact supported adapter packages", async (t) => {
+  for (const { name, version, snapshot } of deploymentSnapshotCases) {
+    await t.test(name, () => {
+      const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+        ...snapshot,
+        deploymentCloudflare: version,
+      });
+      assert.equal(result.ok, true, JSON.stringify(result.issues));
+      const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
+      assert.equal(deployment.version, version);
+      const packages = Object.fromEntries(deployment.inferenceProbes
+        .filter(({ kind }) => kind === "package")
+        .map(({ packageName, version }) => [packageName, version]));
+      assert.equal(packages["@opennextjs/cloudflare"], "1.20.12");
+      assert.equal(packages.wrangler, "4.148.0");
+    });
+  }
+});
+
+test("retired deployment tuples are refused by snapshot selection", async (t) => {
+  for (const { name, version, snapshot } of deploymentSnapshotCases) {
+    await t.test(name, () => {
+      const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+        ...snapshot,
+        deploymentCloudflare: version.replace(/\.1$/, ".0"),
+      });
+      assert.equal(result.ok, false);
+      assert.equal(result.issues.some(({ code }) => code === "CAPABILITY_DESCRIPTOR_VERSION_INVALID"), true);
+    });
   }
 });

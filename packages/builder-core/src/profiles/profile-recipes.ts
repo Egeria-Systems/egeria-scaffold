@@ -9,8 +9,8 @@ const sharedPortfolioCapabilities = [
 ] as const;
 
 function createRecipes(input: Readonly<{
-  portfolio: "0.11.5" | "0.12.0";
-  site: "0.12.5" | "0.13.0";
+  portfolio: "0.11.6" | "0.12.0";
+  site: "0.12.6" | "0.13.0";
 }>): readonly ProfileRecipe[] {
   return [
     {
