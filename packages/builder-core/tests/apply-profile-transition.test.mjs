@@ -628,7 +628,7 @@ test("installed incoming app transitions ignore changed generation defaults", as
   }
 });
 
-for (const profile of ["site"]) {
+for (const profile of ["portfolio", "site"]) {
   for (let subset = 0; subset < 8; subset += 1) {
     test(`app transition executes ${profile} optional subset ${subset} with state-last persistence`, async () => {
       const source = await appTransitionSource(profile, subset);
@@ -754,9 +754,9 @@ test("successor portfolio execution refuses unadmitted visual inputs before writ
   assert.deepEqual(repository.files, source);
 });
 
-test("Vite security and retained portfolio inputs and mixed controls refuse before any write", async () => {
+test("unapproved current portfolio and mixed controls refuse before any write", async () => {
   const cases = [
-    { generation: "current", profile: "portfolio", code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED" },
+    { generation: "current", profile: "portfolio", code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID" },
     { generation: "current", profile: "portfolio", stateRecipe: "0.11.3", code: "PROJECT_STATE_INCOMPATIBLE" },
     { generation: "current", profile: "site", stateRecipe: "0.12.3", code: "PROJECT_STATE_INCOMPATIBLE" },
     { generation: "current", profile: "portfolio", stateRecipe: "9.9.9", code: "PROJECT_STATE_INCOMPATIBLE" },
@@ -805,9 +805,14 @@ test("retired portfolio controls invalidate approved transitions before effects"
   }
 });
 
-test("all portfolio optional subsets refuse execution without current visual admission", async () => {
+test("portfolio optional subsets refuse unproved first-viewport changes before effects", async () => {
   for (let subset = 0; subset < 8; subset += 1) {
-    const repository = createRepository(await appTransitionSource("portfolio", subset));
+    const source = await appTransitionSource("portfolio", subset);
+    const path = `apps/web/content/en-CA/${subset & 2 ? "localized-content" : "site"}.yaml`;
+    const document = parseDocument(decode(source.get(path)));
+    document.setIn([...(subset & 2 ? ["pages", "home"] : ["home"]), "sections", 0, "content", "heading"], "Changed first viewport");
+    source.set(path, bytes(document.toString()));
+    const repository = createRepository(source);
     const before = snapshotFiles(repository.files);
     const execution = await invokeApply(repository, { toProfile: "app" });
     assertFailure(execution.result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });

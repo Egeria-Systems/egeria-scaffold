@@ -99,7 +99,9 @@ Remove obsolete capability-upgrade modules and the `plan-upgrade`/`apply-upgrade
 
 Preserve independently used capability variants, including both jobs versions and current foundation, deployment, persistence and email combinations. This exception grants no client migration, provider action, security waiver, schema-2 public activation, certification acceptance or publication. All other complete-activation supersessions below retain their original timing.
 
-Visual candidate preparation selects app `0.2.6` and refuses retired inputs. Historical visual admission records are inert provenance; the current admission set is empty. Default comparison and portfolio-to-app planning/execution require separate exact successor admission and fail closed until it exists. Matching historical pixels do not transfer approval. Site-to-app retains its no-visual-change behavior.
+Visual candidate preparation selects app `0.2.6` and refuses retired inputs. Historical visual admission records remain inert provenance; their retirement left the current admission set empty. Default comparison and portfolio-to-app planning/execution require separate exact successor admission and fail closed for unproved inputs. Matching historical pixels do not transfer approval. Site-to-app retains its no-visual-change behavior.
+
+The separately approved successor source registers one finite current record for the separately accepted original four images and manifest, plus no-write reuse of the already-canonical PNGs. This narrowly extends the retirement-time empty-set state without restoring historical admission. The [app transition visual boundary](../architecture/capability-model.md#app-transition-visual-evidence) owns the shared source-loaded policy, exact raw-source freshness and two-file bridge, leaf self-anchor, current lock/baseline checks and claim limits. The human approved the concrete reviewed source candidate and no-write asset reuse separately from local implementation and deterministic tests. Promotion and ordinary visual execution retain their separate gates.
 
 ### Supersessions at complete activation
 

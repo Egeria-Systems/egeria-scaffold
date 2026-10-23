@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { stringify } from "yaml";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { GeneratedFile, RenderedSkeleton } from "../generation/render-skeleton.js";
@@ -139,38 +140,44 @@ export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   targetLockfileFingerprint: `sha256:${string}`;
   baselines?: readonly GeneratedFile[];
 }>): AppTransitionResult<Readonly<{ fingerprint: `sha256:${string}` }>> {
-  const optionalCapabilities = [...input.optionalCapabilities].sort(compareText);
-  if (new Set(optionalCapabilities).size !== optionalCapabilities.length ||
-      optionalCapabilities.some(identifier => !["analytics", "booking-calendly", "multilingual"].includes(identifier))) {
-    return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-  }
-  const key = optionalCapabilities.join("+") || "none";
-  const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
-  const admittedRecords: readonly typeof appTransitionVisualInputRecord[] = [];
-  const record = admittedRecords.find(candidate => input.targetLockfileFingerprint === candidate.targetLockfileFingerprint &&
-    Object.hasOwn(candidate.subsets, key) && Reflect.get(candidate.subsets, key) === fingerprint);
-  if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-  const expectedBaselines = record.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];
-  if (input.baselines !== undefined) {
-    const baselines = input.baselines;
-    if (baselines.length !== appTransitionBaselinePaths.length ||
-        appTransitionBaselinePaths.some((path, index) => {
-          const matching = baselines.filter(file => file.path === path);
-          const baseline = matching[0];
-          return matching.length !== 1 || baseline === undefined || fingerprintFileContent(baseline.content) !== expectedBaselines[index];
-        })) {
-      return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-    }
-  }
-  return {ok:true,value:{fingerprint:fingerprintJsonValue({optionalCapabilities,influencingFingerprint:fingerprint,targetLockfileFingerprint:input.targetLockfileFingerprint,expectedBaselines})}};
+  const influencingFingerprint = fingerprintJsonValue(input.influencingFingerprints);
+  const identity = visualAdmission.verifyAppTransitionVisualInputIdentity({
+    optionalCapabilities: input.optionalCapabilities,
+    influencingFingerprint,
+    targetLockfileFingerprint: input.targetLockfileFingerprint,
+    ...(input.baselines === undefined ? {} : { baselineFingerprints: input.baselines.map(file => ({
+      path: file.path, fingerprint: fingerprintFileContent(file.content),
+    })) }),
+  });
+  if (identity === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+  return { ok: true, value: { fingerprint: fingerprintJsonValue({
+    optionalCapabilities: identity.optionalCapabilities,
+    influencingFingerprint,
+    targetLockfileFingerprint: input.targetLockfileFingerprint,
+    expectedBaselines: identity.expectedBaselines,
+  }) } };
 }
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const maximumContentBytes = 1024 * 1024;
-export const appTransitionBaselinePaths = [
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-] as const;
+type VisualAdmission = Readonly<{
+  baselinePaths: readonly [string, string];
+  verifyAppTransitionVisualInputIdentity: (input: Readonly<{
+    optionalCapabilities: readonly string[];
+    influencingFingerprint: `sha256:${string}`;
+    targetLockfileFingerprint: `sha256:${string}`;
+    baselineFingerprints?: readonly AppTransitionPathFingerprint[];
+  }>) => Readonly<{ optionalCapabilities: readonly string[]; expectedBaselines: readonly string[] }> | undefined;
+}>;
+const visualAdmissionModule: unknown = createRequire(new URL("../../package.json", import.meta.url))("./src/lifecycle/app-transition-visual-admission.cjs");
+if (visualAdmissionModule === null || typeof visualAdmissionModule !== "object" ||
+    !("baselinePaths" in visualAdmissionModule) || !Array.isArray(visualAdmissionModule.baselinePaths) ||
+    visualAdmissionModule.baselinePaths.length !== 2 || visualAdmissionModule.baselinePaths.some(path => typeof path !== "string") ||
+    !("verifyAppTransitionVisualInputIdentity" in visualAdmissionModule) || typeof visualAdmissionModule.verifyAppTransitionVisualInputIdentity !== "function") {
+  throw new Error("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+}
+const visualAdmission = visualAdmissionModule as VisualAdmission;
+export const appTransitionBaselinePaths = visualAdmission.baselinePaths;
 export function appTransitionFailure(code: AppTransitionFailureCode): AppTransitionResult<never> {
   return { ok: false, issues: [{
         code, path: [], context: { reason: "precondition-refused" }

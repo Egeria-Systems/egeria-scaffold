@@ -171,16 +171,15 @@ test("app planning preserves both supported Git revision formats and rejects inv
     assert.equal(JSON.stringify([...f.files]), before);
   }
 });
-test("default visual admission refuses both successor groups and changed source content", async () => {
+test("default visual admission accepts all exact subsets and refuses changed first-viewport content", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
-  for (const subset of [0, 7]) {
+  for (let subset = 0; subset < 8; subset++) {
     const f = await fixture("portfolio", subset, policy.appTransitionVisualProject);
     const result = await plan(f);
-    assert.equal(result.ok, false, JSON.stringify(result));
-    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-    const path = subset === 0 ? "apps/web/content/en-CA/site.yaml" : "apps/web/content/en-CA/localized-content.yaml";
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const path = subset & 2 ? "apps/web/content/en-CA/localized-content.yaml" : "apps/web/content/en-CA/site.yaml";
     const content = parseDocument(decoder.decode(f.files.get(path))).toJS();
-    const home = subset === 0 ? content.home : content.pages.home;
+    const home = subset & 2 ? content.pages.home : content.home;
     home.sections[0].content.heading = "Changed first viewport";
     f.files.set(path, encoder.encode(stringify(content)));
     const refused = await plan(f);
@@ -419,7 +418,7 @@ test("visual input fingerprints include rendered build configuration and manifes
   }
 });
 
-test("unadmitted visual inputs refuse changed runtime and lock identities while preserving excluded-content fingerprints", async () => {
+test("exact visual inputs refuse changed runtime and lock identities while preserving excluded-content fingerprints", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
@@ -443,8 +442,8 @@ test("unadmitted visual inputs refuse changed runtime and lock identities while 
     assert.equal(prepared.ok,true);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,false);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
     for (const invalidSubset of [
       [...optionalCapabilities, "unknown-capability"],
       ...(optionalCapabilities.length ? [[...optionalCapabilities, optionalCapabilities[0]]] : [["none"]]),
@@ -468,12 +467,12 @@ test("unadmitted visual inputs refuse changed runtime and lock identities while 
     const customized = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
     assert.equal(customized.ok,true);
     assert.deepEqual(customized.value.influencingFingerprints, prepared.value.influencingFingerprints);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
   }
   }
 });
 
-test("historical visual candidate preserves frozen inputs while successor transitions remain unadmitted", async () => {
+test("historical visual candidates remain inert after exact successor admission", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
@@ -511,10 +510,10 @@ test("historical visual candidate preserves frozen inputs while successor transi
     assert.equal(manifest.dependencies.next, generation.next);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url))));
-    const result = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities,
-      influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint });
-    assert.equal(result.ok, false);
-    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: candidate.targetLockfileFingerprint }).ok, false);
+    assert.notEqual(core.fingerprintJsonValue(prepared.value.influencingFingerprints), candidate.subsets[[...optionalCapabilities].sort().join("+") || "none"]);
   }
   assert.deepEqual(Object.keys(candidate.subsets).sort(), ["none", "analytics", "booking-calendly", "multilingual", "analytics+booking-calendly", "analytics+multilingual", "booking-calendly+multilingual", "analytics+booking-calendly+multilingual"].sort());
   assert.equal(core.resolveSupportedProfileTransition({ fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion: "0.2.3" }).ok, false);
@@ -581,7 +580,7 @@ test("Vite security incoming transitions admit only exact same-cohort endpoints"
   }
 });
 
-test("current visual inputs bind every subset without inheriting historical admission", async () => {
+test("current visual inputs bind every independently frozen subset without inheriting historical admission", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
@@ -605,11 +604,26 @@ test("current visual inputs bind every subset without inheriting historical admi
     assert.equal(prepared.ok, true, JSON.stringify(prepared));
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(prepared.value.influencingFingerprints);
-    const refused = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint });
-    assert.equal(refused.ok, false);
-    assert.equal(refused.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true);
+    const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({
+      path, content: await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${subset & 2 ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url)),
+    })));
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
+  assert.deepEqual(subsets, {
+  "none": "sha256:9803734000314547efb125930cef327b425c8e83bd50e9677acba88a6844163e",
+  "analytics": "sha256:2ea3c5b3e6aa44eab20264b2ae91b33ae69d4802bedb15025193560773936492",
+  "booking-calendly": "sha256:1f44a15d15aef9ac2575216f6a9a19efa41067d1d469c78ae32a4c6a60f4b5bd",
+  "analytics+booking-calendly": "sha256:f750891726da506b3e8b08086e1fe6635b949a341448188d82c5a360685fe540",
+  "multilingual": "sha256:ffce593ed90ebb73a97ef9fefed60b4f1def270f3293dc273354977d9792c9e3",
+  "analytics+multilingual": "sha256:03fc6c83b4036312ee87ce307557e7628d61699902b7c4d61e50fa69d55614c5",
+  "booking-calendly+multilingual": "sha256:2fab3e46b40067235eafa5e4367fa6dcf542567c39ae40b12ed8fc2b68911520",
+  "analytics+booking-calendly+multilingual": "sha256:a98b3d78da20eb5af693c2a19f2cf67fdc150e0e1d11bd9374e25a1a6839ddcf"
+});
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
   assert.notDeepEqual(candidate.subsets, subsets);
   assert.notEqual(candidate.targetLockfileFingerprint, targetLockfileFingerprint);
