@@ -2065,7 +2065,7 @@ async function inspectFailedOpenNextCommand(failCommand) {
 
 test("live verification maps the prepared OpenNext transform failure without persisting child output", async () => {
   const stdout = "\u001b[32mSkipping\u001b[0m Next.js build\nGenerating bundle PRIVATE_STDOUT\n";
-  const stderr = "Building Next.js app\nOpenNext build complete.\nAuthorization: Bearer PRIVATE_TOKEN\nCookie: PRIVATE_COOKIE\n/Users/PRIVATE_PERSON/server.js\n";
+  const stderr = "Building Next.js app\nOpenNext build complete.\nAuthorization: Bearer PRIVATE_TOKEN\nCookie: PRIVATE_COOKIE\n/private/PRIVATE_SOURCE/server.js\n";
   const started = performance.now();
   const failure = await inspectFailedOpenNextCommand(input => execFileAsync(process.execPath, ["-e", [
     `process.stdout.write(${JSON.stringify(stdout)});`,
