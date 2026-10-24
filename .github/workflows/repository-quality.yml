@@ -357,6 +357,108 @@ jobs:
           cache: false
           install: false
 
+      - name: Record native Git prerequisite outcomes
+        id: git_prerequisite
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          import * as filesystem from "node:fs";
+          import path from "node:path";
+          import { spawnSync } from "node:child_process";
+          
+          const maximumBytes = 1024 * 1024;
+          const recordingErrors = [];
+          const closedError = error => error ? {
+            code: typeof error.code === "string" ? error.code : null,
+            errno: typeof error.errno === "number" ? error.errno : null,
+            syscall: typeof error.syscall === "string" ? error.syscall : null,
+          } : null;
+          
+          try {
+            const runnerTemporaryDirectory = filesystem.realpathSync(process.env.RUNNER_TEMP);
+            const artifactDirectory = filesystem.mkdtempSync(path.join(runnerTemporaryDirectory, "git-prerequisite-"));
+            filesystem.chmodSync(artifactDirectory, 0o700);
+            filesystem.appendFileSync(process.env.GITHUB_OUTPUT, `directory=${artifactDirectory}\n`);
+            const save = (name, bytes) => {
+              try {
+                filesystem.writeFileSync(path.join(artifactDirectory, name), bytes, { flag: "wx", mode: 0o600 });
+                return true;
+              } catch (error) {
+                recordingErrors.push({ file: name, error: closedError(error) });
+                return false;
+              }
+            };
+            const json = value => `${JSON.stringify(value, null, 2)}\n`;
+            const checkoutRoot = filesystem.realpathSync(process.cwd());
+            const workspaceRoot = filesystem.realpathSync(process.env.GITHUB_WORKSPACE);
+            if (checkoutRoot !== workspaceRoot) throw Object.assign(new Error(), { code: "CHECKOUT_WORKSPACE_MISMATCH" });
+            const ownership = name => {
+              try {
+                const information = filesystem.lstatSync(name);
+                return { uid: information.uid, gid: information.gid,
+                  type: information.isSymbolicLink() ? "symlink" : information.isDirectory() ? "directory" : information.isFile() ? "file" : "other" };
+              } catch (error) {
+                return { error: closedError(error) };
+              }
+            };
+            const inheritedCount = Number(process.env.GIT_CONFIG_COUNT ?? "0");
+            const boundedCount = Number.isInteger(inheritedCount) && inheritedCount >= 0 && inheritedCount <= 32;
+            const exactRootEntries = [];
+            for (let index = 0; index < (boundedCount ? inheritedCount : 0); index += 1) {
+              if (process.env[`GIT_CONFIG_KEY_${index}`] === "safe.directory" &&
+                  process.env[`GIT_CONFIG_VALUE_${index}`] === checkoutRoot) {
+                exactRootEntries.push({ origin: `environment:GIT_CONFIG_VALUE_${index}`, value: checkoutRoot });
+              }
+            }
+            save("context.json", json({ cwd: process.cwd(), checkoutRoot, workspaceRoot,
+              effectiveUid: process.geteuid(), effectiveGid: process.getegid(),
+              checkoutOwnership: ownership(checkoutRoot), gitOwnership: ownership(path.join(checkoutRoot, ".git")),
+              home: process.env.HOME ?? null,
+              runtime: { node: process.version, platform: process.platform, architecture: process.arch },
+              safeDirectoryObservation: { exactRootEntries, inheritedEntryInspectionComplete: boundedCount,
+                fileConfigurationRead: false, completeConfigurationInventory: false },
+            }));
+          
+            const environment = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+            const listingArguments = ["ls-files", "--cached", "--others", "--exclude-standard", "-z"];
+            const outcomes = [];
+            for (const [name, arguments_] of [["inherited", listingArguments],
+              ["exact-root", ["-c", `safe.directory=${checkoutRoot}`, ...listingArguments]]]) {
+              const started = Date.now();
+              const result = spawnSync("git", arguments_, { cwd: checkoutRoot, env: environment,
+                encoding: null, shell: false, timeout: 30000, killSignal: "SIGKILL", maxBuffer: maximumBytes });
+              const stdout = result.stdout ?? Buffer.alloc(0);
+              const stderr = result.stderr ?? Buffer.alloc(0);
+              const stdoutPrefix = stdout.subarray(0, maximumBytes);
+              const stderrPrefix = stderr.subarray(0, maximumBytes - stdoutPrefix.length);
+              const stdoutSaved = save(`${name}.stdout`, stdoutPrefix);
+              const stderrSaved = save(`${name}.stderr`, stderrPrefix);
+              const outcome = { name, executable: "git", arguments: arguments_, cwd: checkoutRoot,
+                optionalLocks: "0", nativeExit: result.status, signal: result.signal,
+                processError: closedError(result.error), elapsedMilliseconds: Date.now() - started,
+                stdout: { capturedBytes: stdout.length, savedBytes: stdoutSaved ? stdoutPrefix.length : null, saved: stdoutSaved },
+                stderr: { capturedBytes: stderr.length, savedBytes: stderrSaved ? stderrPrefix.length : null, saved: stderrSaved },
+                captureComplete: stdoutSaved && stderrSaved && !result.error && !result.signal &&
+                  stdout.length + stderr.length <= maximumBytes,
+              };
+              const processMetadataSaved = save(`${name}.process.json`, json(outcome));
+              outcomes.push({ ...outcome, processMetadataSaved });
+            }
+            const summarySaved = save("summary.json", json({ observationsOnly: true,
+              timeoutMillisecondsPerChild: 30000, maximumBytesPerChild: maximumBytes, outcomes, recordingErrors }));
+            const incomplete = !summarySaved || recordingErrors.length > 0 ||
+              outcomes.some(outcome => !outcome.captureComplete || !outcome.processMetadataSaved || outcome.nativeExit !== 0);
+            console.log(JSON.stringify({ diagnosticRecording: incomplete ? "native-failure-or-incomplete" : "recorded",
+              outcomes: outcomes.map(({ name, nativeExit, signal, captureComplete }) => ({ name, nativeExit, signal, captureComplete })),
+              recordingErrorCount: recordingErrors.length }));
+            if (incomplete) process.exitCode = 1;
+          } catch (error) {
+            console.error(JSON.stringify({ diagnosticRecording: "failed", error: closedError(error) }));
+            process.exitCode = 1;
+          }
+          NODE
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
@@ -365,6 +467,25 @@ jobs:
 
       - name: Test generated fixture contracts and determinism
         run: pnpm run test:generated-fixtures
+
+      - name: Retain native Git prerequisite evidence
+        if: always() && steps.git_prerequisite.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-fixtures-git-prerequisite
+          path: |
+            ${{ steps.git_prerequisite.outputs.directory }}/context.json
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.stdout
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.stderr
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.process.json
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.stdout
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.stderr
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.process.json
+            ${{ steps.git_prerequisite.outputs.directory }}/summary.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7
 
   generated-jobs:
     needs: [scope]
