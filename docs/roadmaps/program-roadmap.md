@@ -1,5 +1,7 @@
 # Program Roadmap
 
+**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.6`, `site@0.12.6` and `app@0.2.6`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
+
 This is the concise execution sequence. It does not supersede the [full approved source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) or an accepted ADR.
 
 ## Contact and portability work deferred
@@ -168,7 +170,7 @@ P3C began after P3B closed and did not reopen or weaken P3 or P3B. P3C strengthe
 
 ## P4 — App foundation
 
-The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.0`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
+The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.6`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
 
 The generated app pins `effect@4.0.0-rc.112` directly and confines it to application, infrastructure, composition, and delivery server modules. Request context stays explicit; an application-owned build-information service receives Cloudflare or in-memory Layers; delivery runs one lazy program once and interprets defect before interruption, interruption before recognized typed failure, and unrecognized or mixed residual failure as unexpected. Pure interruption uses the native abort, `deployment-cloudflare` alone owns `enable_request_signal`, cancellation claims exclude already-started provider work, and the initial application has no retry.
 
@@ -187,6 +189,8 @@ Read-only planning and fingerprint-gated execution retain the original app edges
 **Accepted fixture predecessor:** Pull request 118 merged at `f4d4833e33893719c36f5848f22e1749fc659488`, with tree `8d8126529c72f0df7ea096bcc554bb1bf8557262` identical to its final reviewed candidate. Post-merge Repository quality run `34731575539` passed builder-and-packages, scope, generated-projects, and app-transition-visuals; dependency review and compatibility proof were inapplicable under their existing rules. This exact accepted predecessor is the Vitest migration baseline.
 
 **Accepted migration:** Pull request 119 merged the Vitest 5 increment at `e18cac6c7e0d47c072050bba8468ddf2d48003b9`, selecting standards `0.5.0`, portfolio `0.11.0`, site `0.12.0`, and app `0.2.0` under ADR-0015. It preserves retained descriptors, output, locks, diagnostics, and supported operations; adds equivalent same-generation incoming app edges; and regenerates the seven current fixture roots. At migration acceptance the new standards subject remained pending and received no historical certification evidence; its separately accepted current outcome is recorded below.
+
+**Patched public successor:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) owns the early retirement of unused public generations. [ADR-0015](../adr/0015-vitest-five-generation.md#patched-public-generation) owns Vitest 5.0.3, five public and three internal lock families, and eleven successor fixtures. Changed root/proof dependencies are verified independently. Current portfolio visual inputs require their own exact-manifest approval. Full relevant verification and distinct independent reviews remain required; no certification or schema-2 activation is implied.
 
 **Accepted implementation closeout:** Increment 9 merged through pull request 120 at `4da1ad1e48c12567d4e477c4ecbc3b9d4e097922`, preserving the reviewed three-file documentation patch. Post-merge Repository quality run `34770558947` completed successfully for that exact revision: scope, builder-and-packages, generated-projects, and app-transition-visuals succeeded. Dependency review was inapplicable to the push event, and compatibility proof was excluded by the existing path classifier; neither skip is passing evidence. This closes the implementation sequence, not capability certification or P4.
 
@@ -226,7 +230,7 @@ This bounded exception allows the pair to proceed through ordinary implementatio
 | --- | --- | --- | --- | --- |
 | `analytics` | `0.1.0` | `sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba` | pending | Settings, consent, build activation and provider isolation |
 | `app-foundation` | `0.2.0` | `sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a` | pending | Compiled/runtime target and current-profile composition; assess installed default 0.1.0 separately |
-| `application-persistence` | `0.1.0` | `sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95` | pending | Target mapping, bindings, preflight and workflow evidence |
+| `application-persistence` | `0.1.1` | `sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869` | pending | Target mapping, bindings, preflight and workflow evidence |
 | `background-job-delivery` | `0.1.0` | `sha256:97c9aa94d8c489ec6eaca1a61258546aa511105c5f3a565509da01e752f0883b` | pending | Target/Worker/deployment inputs; lifecycle remains unsupported and pending |
 | `booking-calendly` | `0.1.0` | `sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca` | pending | Target input, local absence and mode/composition evidence |
 | `contact-form-web3forms` | `0.1.0` | `sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9` | certified | Target input and unavailable/deployment behavior; preserve old receipt |
@@ -246,7 +250,7 @@ Changed source, locks, workflow or runner inputs can require renewal even withou
 | Card | Coherent implementation and documentation owner |
 | --- | --- |
 | 1. Accept architecture, entry and future-service requirements | This documentary admission, ADR, canonical references and all future card/certification amendments; no runtime or registry change |
-| 2. Establish common configuration and internal generation | Freeze actual helper interfaces and version/schema ledger; target/settings, selection-only inputs, refusal and foundation checks; shared environment guide, examples and README |
+| 2. Establish common configuration and internal generation | [Common internal candidate](../architecture/capability-model.md#common-configuration-internal-candidate) implements the finite version/schema ledger, shared target helper, selection-only parsing, state-last generation/inference/doctor, foundation guard and shared guide/examples. Candidate verification and independent acceptance remain separate; public activation and provider consumers remain later checkpoints. |
 | 3. Complete hosted contact configuration | Public target, local unavailability, provider-compatible hCaptcha, browser bounds and contact guide/example |
 | 4. Complete booking configuration | One target for all modes, local absence and isolated test calendar guide/example |
 | 5. Complete analytics, consent and analytics-related guidance | All providers, exact build flag, consent context, Search Console/Looker and provider-specific guide/examples |
@@ -258,7 +262,7 @@ Changed source, locks, workflow or runner inputs can require renewal even withou
 
 Every card requires its exact plan, evidence-gap or meaningful RED/GREEN checks, bounded review, verified-diff checkpoint and separately granted publication window. The [capability boundary](../architecture/capability-model.md#application-environments) owns current public and stateful composed acceptance; their consumers ship examples and tests in the owning cards above. Documentation is not deferred to the final card. No current business contact-notification endpoint, queue-to-email workflow, replay tool or future provider is introduced for an example.
 
-During internal assembly public defaults remain byte-identical to the last complete generation. The final checkpoint activates only a coherent generation and retires related unused support under ADR-0020; it does not erase historical evidence or create migration paths for nonexistent clients. “Complete and releasable” additionally requires all required release certification and acceptance outcomes. Source activation does not authorize package publication, live certification, deployment or P4 closure. Stop at each scoped approval gate and before any separately gated operation.
+During internal assembly public defaults remain byte-identical to the last complete generation. Apart from ADR-0020's explicitly approved early retirements, the final checkpoint activates only a coherent generation and retires related unused support; it does not erase historical evidence or create migration paths for nonexistent clients. “Complete and releasable” additionally requires all required release certification and acceptance outcomes. Source activation does not authorize package publication, live certification, deployment or P4 closure. Stop at each scoped approval gate and before any separately gated operation.
 
 The [future environment acceptance clauses](2026-09-16-remaining-program-delivery-plan.md#application-environment-acceptance), all 28 delivery cards and every certification row own later service, guide, composed-flow and recovery obligations. Existing detailed private persistence/email/jobs handoffs remain exact historical-subject inputs and must be rebound before later certification; they cannot carry contradictory old environment assumptions into active work. The remaining decisions preserve D1–D12, all dependencies, policy gates and phase statuses.
 

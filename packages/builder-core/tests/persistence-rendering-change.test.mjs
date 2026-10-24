@@ -3,14 +3,16 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { prepareCapabilityDependencyChange } from "../dist/lifecycle/prepare-capability-dependency-change.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
-import { verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
+import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const ordinary = (await renderSkeleton(request)).value;
-const persistent = (await renderSkeleton({ ...request, applicationPersistence: true })).value;
+const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const currentContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createCurrentProfileRecipes() });
+const ordinary = (await renderSkeleton(request, currentContext())).value;
+const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, currentContext(true))).value;
 const manifest = (rendered) => JSON.parse(decoder.decode(rendered.files.find(({ path }) => path === "apps/web/package.json").content));
-const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-application-persistence" : "web-recipe-app-0.2.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.6-persistence" : "web-recipe-app-0.2.6"}/pnpm-lock.yaml`, import.meta.url), "utf8");
 async function reader(rendered, modify = (value) => value, lockSource) {
   return createInMemoryRepositoryReader({
     "package.json": decoder.decode(rendered.files.find(({ path }) => path === "package.json").content),
@@ -56,4 +58,41 @@ test("persistence refuses a changed root dependency graph before replacing its l
     readText: async (path) => path === "package.json" ? { kind: "file", content: JSON.stringify({ ...root, devDependencies: { custom: "1.0.0" } }) } : base.readText(path),
   } });
   assert.equal(result.ok, false);
+});
+
+
+test("current persistence dependency replacement refuses swapped source locks", async () => {
+  const cases = [
+    { profiles: createCurrentProfileRecipes(), ordinary: "web-recipe-app-0.2.6", persistent: "web-recipe-app-0.2.6-persistence" },
+  ];
+  for (const cohort of cases) {
+    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
+    const currentOrdinary = await renderSkeleton(request, context(false));
+    const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
+    assert.equal(currentOrdinary.ok, true);
+    assert.equal(currentPersistent.ok, true);
+    const expectedNext = "16.4.1";
+    assert.equal(currentOrdinary.value.project.recipeVersion, "0.2.6");
+    assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
+    assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
+    assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);
+    for (const [sourceKind, targetKind, current, desired] of [
+      ["ordinary", "persistent", currentOrdinary.value, currentPersistent.value],
+      ["persistent", "ordinary", currentPersistent.value, currentOrdinary.value],
+    ]) {
+      const expectedSource = await readFile(new URL(`../lockfiles/${cohort[sourceKind]}/pnpm-lock.yaml`, import.meta.url), "utf8");
+      const expectedTarget = await readFile(new URL(`../lockfiles/${cohort[targetKind]}/pnpm-lock.yaml`, import.meta.url), "utf8");
+      const actual = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, expectedSource) });
+      assert.equal(actual.ok, true, JSON.stringify(actual));
+      assert.equal(decoder.decode(actual.value.desired.files.find(file => file.path === "pnpm-lock.yaml").content), expectedTarget);
+      assert.equal(actual.value.desired.project.recipeVersion, current.project.recipeVersion);
+      assert.equal(manifest(actual.value.desired).dependencies.next, expectedNext);
+      const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.3.6" ? "16.3.3" : "16.3.6" } }), expectedSource) });
+      assert.equal(mismatched.ok, false);
+      for (const source of [expectedTarget, expectedSource + "\n"]) {
+        const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
+        assert.equal(refused.ok, false);
+      }
+    }
+  }
 });

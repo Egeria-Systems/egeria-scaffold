@@ -32,8 +32,8 @@
     },
     "application-persistence": {
       "subject": {
-        "descriptorVersion": "0.1.0",
-        "behaviorContractDigest": "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95"
+        "descriptorVersion": "0.1.1",
+        "behaviorContractDigest": "sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -43,7 +43,7 @@
         "provider-confirmed"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-14-application-persistence-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-10-22-persistence-worker-types-certification-renewal.md",
       "evidence": []
     },
     "background-job-delivery": {
@@ -170,8 +170,8 @@
     },
     "deployment-cloudflare": {
       "subject": {
-        "descriptorVersion": "0.6.0",
-        "behaviorContractDigest": "sha256:55c727c3636b4405e489d6e65d5b435228f50b1ef6ede51293d44556137576fd"
+        "descriptorVersion": "0.6.1",
+        "behaviorContractDigest": "sha256:c3ce5750bf4fd47d4c32320625210df6af601e81584b07c78e6f40fbbd44d5b3"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -179,7 +179,7 @@
         "fresh-scaffold"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-10-22-deployment-adapter-certification-renewal.md",
       "evidence": []
     },
     "multilingual": {
@@ -320,15 +320,15 @@
     },
     "standards": {
       "subject": {
-        "descriptorVersion": "0.6.0",
-        "behaviorContractDigest": "sha256:631efaeae569c27f225e9df3eeaacd28537f66a30f1533da70185e017508a4fd"
+        "descriptorVersion": "0.6.1",
+        "behaviorContractDigest": "sha256:36f8c505fe048250bdf064f194608e94486df232b131c3ebf689436ec8a95b9c"
       },
       "requiredEvidence": [
         "existing-repository-lifecycle",
         "fresh-scaffold"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-09-14-application-persistence-certification.md",
+      "taskPlan": "docs/superpowers/plans/2026-10-21-patched-standards-certification.md",
       "evidence": []
     },
     "transactional-email-resend": {

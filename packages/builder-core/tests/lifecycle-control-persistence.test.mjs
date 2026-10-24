@@ -31,8 +31,8 @@ const installedState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.1.0" },
-  installedCapabilities: [],
+  origin: { profile: "portfolio", recipeVersion: "0.11.6" },
+  installedCapabilities: [{ identifier: "standards", version: "0.5.1", deliveryMode: "hybrid", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" }],
   appliedMigrations: ["current-migration"],
   managedSurfaces: [],
   ejections: [],
@@ -50,6 +50,8 @@ const installedState = {
       "frozen-install",
       "lint",
       "typecheck",
+      "unit-tests",
+      "component-tests",
       "next-build",
       "opennext-build",
       "post-state-inference",
@@ -68,7 +70,17 @@ const installedStateSource = `{
     "pnpm": "11.20.0"
   },
   "ejections": [],
-  "installedCapabilities": [],
+  "installedCapabilities": [
+    {
+      "deliveryMode": "hybrid",
+      "identifier": "standards",
+      "removalPolicy": "reviewed",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "version": "0.5.1"
+    }
+  ],
   "lastSuccessfulVerification": {
     "checks": [
       "contracts",
@@ -77,6 +89,8 @@ const installedStateSource = `{
       "frozen-install",
       "lint",
       "typecheck",
+      "unit-tests",
+      "component-tests",
       "next-build",
       "opennext-build",
       "post-state-inference"
@@ -86,7 +100,7 @@ const installedStateSource = `{
   "managedSurfaces": [],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.1.0"
+    "recipeVersion": "0.11.6"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

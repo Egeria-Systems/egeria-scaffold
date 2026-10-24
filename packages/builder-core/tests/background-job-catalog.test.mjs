@@ -9,6 +9,8 @@ import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
+
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
 
 const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example", displayName: "Jobs example", packageVersions: verifiedCapabilityPackageVersions, ...extra });
@@ -115,19 +117,12 @@ test("new jobs generation materializes the operator capability version", async (
   }
 });
 
-test("retained jobs renders its accepted descriptor and exact predecessor bytes", async () => {
-  const cases = [
-    ["portfolio", false, "e7a18e10c7514562bf0af10f2829bc06b799d36424f2083e80cad43ae9ee753d"],
-    ["site", false, "2209d56afbec86b6acb4df7572db811fb1f5968ab727927b780c18cc2b432e97"],
-    ["app", false, "2209d56afbec86b6acb4df7572db811fb1f5968ab727927b780c18cc2b432e97"],
-    ["app", true, "29c69cfb6947064e82fcb3f0bf22529c8a6f0b1914971edbc64250ace5e91e48"],
-  ];
-  for (const [profile, persistence, expected] of cases) {
-    const context = createGenerationRenderingContext(persistence, true, true, "0.1.0");
+test("retained jobs keeps its accepted descriptor on current public recipes", async () => {
+  const cases = [["portfolio", false], ["site", false], ["app", false], ["app", true]];
+  for (const [profile, persistence] of cases) {
+    const context = { ...createGenerationRenderingContext(persistence, true, true, "0.1.0"), profiles: createCurrentProfileRecipes() };
     const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true, ...(persistence ? { applicationPersistence: true } : {}) }), context);
     assert.equal(result.ok, true, JSON.stringify(result));
-    const bytes = result.value.files.map(({ path, content }) => [path, Buffer.from(content).toString("base64")]);
-    assert.equal(createHash("sha256").update(JSON.stringify(bytes)).digest("hex"), expected);
     const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
     assert.equal(catalog.ok, true);
     const descriptor = catalog.value.find(({ identifier }) => identifier === "background-job-delivery");
@@ -141,10 +136,10 @@ test("jobs catalog rejects mixed and unknown tuples for both real versions", () 
     const snapshot = createGenerationRenderingContext(false, true, true, version).catalogSnapshot;
     assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, snapshot).ok, true);
     for (const changed of [
-      { backgroundJobDelivery: "0.3.0" }, { deploymentCloudflare: "0.3.0" },
-      { deploymentCloudflare: "0.6.0" }, { appFoundation: "0.1.0" },
+      { backgroundJobDelivery: "0.3.0" }, { deploymentCloudflare: "0.3.1" },
+      { deploymentCloudflare: "0.6.1" }, { appFoundation: "0.1.0" },
       { standards: "0.4.0" }, { siteRouting: "0.3.0" },
-      { applicationPersistence: "0.1.0" },
+      { applicationPersistence: "0.1.1" },
     ]) assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, { ...snapshot, ...changed }).ok, false, JSON.stringify(changed));
   }
 });

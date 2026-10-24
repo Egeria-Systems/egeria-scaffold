@@ -23,10 +23,7 @@ import test from "node:test";
 import { certifyBookingCalendlyForTesting } from "../../scripts/certify-booking-calendly.mjs";
 import { certifyContentFilesForTesting } from "../../scripts/certify-content-files.mjs";
 import { certifyGeneratedTestingForTesting } from "../../scripts/certify-generated-testing.mjs";
-import { certifyProfileTransitionLifecycleForTesting } from "../../scripts/certify-profile-transition-lifecycle.mjs";
 import { certifySectionCompositionForTesting } from "../../scripts/certify-section-composition.mjs";
-import { certifySiteRoutingForTesting } from "../../scripts/certify-site-routing.mjs";
-import { certifyStandardsLifecycleForTesting } from "../../scripts/certify-standards-lifecycle.mjs";
 import { runCertificationCli } from "../../scripts/lib/certification-cli.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -77,61 +74,10 @@ const generatedTestingCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-generated-testing.mjs",
 );
-const standardsLifecycleCertificationScript = resolve(
-  repositoryRoot,
-  "scripts/certify-standards-lifecycle.mjs",
-);
-const profileTransitionLifecycleCertificationScript = resolve(
-  repositoryRoot,
-  "scripts/certify-profile-transition-lifecycle.mjs",
-);
 const sectionCompositionCertificationScript = resolve(
   repositoryRoot,
   "scripts/certify-section-composition.mjs",
 );
-const siteRoutingCertificationScript = resolve(
-  repositoryRoot,
-  "scripts/certify-site-routing.mjs",
-);
-const compiledUpgradeCertificationTests = [
-  "the compiled plan-upgrade command plans both profiles without changing any byte",
-  "the compiled apply-upgrade command completes the exact portfolio and site transactions",
-  "the compiled standards upgrade verification failure retains transformed source and old controls",
-  "the compiled plan-upgrade command refuses unsafe or unsupported repository states without writes",
-  "the compiled apply-upgrade command refuses the finite unsafe matrix without mutation",
-];
-const builderUpgradeCertificationTests = [
-  "standards capability upgrade refuses unsupported capability and target inputs without mutation",
-  "standards capability upgrade transforms, verifies, persists state last, and stops for final-diff approval",
-  "standards capability upgrade refuses malformed, wrong, and stale plan authority without mutation",
-  "standards capability upgrade propagates named planner refusals without mutation",
-  "standards capability upgrade refuses duplicate migration history before writing",
-  "standards capability upgrade refuses unsafe Git and changed pre-write identity",
-  "standards capability upgrade refuses an ignored create target before mutation",
-  "standards capability upgrade contains reader, create-target, and preflight exceptions before writes",
-  "standards capability upgrade distinguishes uncommitted and partial transform failures",
-  "standards capability upgrade retains transformed source and old controls on verification or re-inference failure",
-  "standards capability upgrade maps clock and migration persistence failures to the retained source prefix",
-  "standards capability upgrade retains the migration prefix when its reread fails",
-  "standards capability upgrade retains an uncertain committed migration append",
-  "standards capability upgrade retains migration and old state on state construction failure",
-  "standards capability upgrade retains migration and old state when state persistence fails",
-  "standards capability upgrade retains an uncertain committed state replacement",
-  "standards capability upgrade retains the full persisted prefix on post-state disagreement",
-  "standards capability upgrade retains the full prefix on post-state state and inference disagreement",
-  "standards capability upgrade reports final Git and exact-byte failures after persistence",
-];
-const compiledSiteRoutingLifecycleTests = [
-  "the compiled plan-upgrade command plans the exact production site edge without writes",
-  "the compiled site-routing upgrade converges on the exact current site",
-  "the compiled site-routing upgrade verification failure retains transformed source and old state and migration controls",
-  "the compiled site-routing planner refuses already-current and managed-drift repositories without writes",
-];
-const builderSiteRoutingLifecycleTests = [
-  "site-routing upgrade replaces the exact production recipe and persists state last",
-  "site-routing upgrade retains transformed source and old state and migration controls when verification fails",
-  "site-routing upgrade rejects changed final bytes after state persistence",
-];
 const compiledMultilingualLifecycleTests = [
   "the compiled CLI preserves multilingual through both capability install orders and re-addition",
 ];
@@ -163,44 +109,6 @@ const multilingualCommonCapabilities = [
   "deployment-cloudflare",
   "observability",
 ];
-const compiledProfileTransitionCertificationTests = [
-  "the compiled profile-transition planner is repeatable and leaves portfolio controls and Git unchanged",
-  "the compiled profile-transition planner refuses an already-site project without mutation",
-  "the compiled profile-transition command emits its command-specific malformed-argument refusal",
-  "the compiled profile-transition planner refuses the finite unsafe matrix without mutation",
-  "the compiled apply-profile-transition command completes default and Calendly portfolio transactions",
-  "the compiled profile transition verification failure retains transformed source and old controls",
-  "the compiled apply-profile-transition command refuses representative unsafe inputs without mutation",
-];
-const builderProfileTransitionCertificationTests = [
-  "portfolio-to-site profile transition refuses unsupported target inputs without mutation",
-  "portfolio-to-site profile transition transforms, verifies, persists state last, and stops for final-diff approval",
-  "portfolio-to-site profile transition preserves the optional Calendly capability and settings",
-  "portfolio-to-site profile transition refuses malformed, wrong, and stale plan authority without mutation",
-  "portfolio-to-site profile transition propagates named planner refusals without mutation",
-  "portfolio-to-site profile transition refuses duplicate migration history before writing",
-  "portfolio-to-site profile transition refuses unsafe Git and changed pre-write identity",
-  "portfolio-to-site profile transition refuses an ignored create target before mutation",
-  "portfolio-to-site profile transition contains reader, create-target, and preflight exceptions before writes",
-  "portfolio-to-site profile transition distinguishes uncommitted and partial transform failures",
-  "portfolio-to-site profile transition contains thrown writer exceptions at every persistence boundary",
-  "portfolio-to-site profile transition retains transformed source and old controls on verification or re-inference failure",
-  "portfolio-to-site profile transition contains a thrown verifier exception with the transformed prefix",
-  "portfolio-to-site profile transition maps clock and migration persistence failures to the retained source prefix",
-  "portfolio-to-site profile transition contains a thrown clock exception with the transformed prefix",
-  "portfolio-to-site profile transition retains the migration prefix when its reread fails",
-  "portfolio-to-site profile transition retains an uncertain committed migration append",
-  "portfolio-to-site profile transition retains migration and old state when state persistence fails",
-  "portfolio-to-site profile transition retains migration and old state on state construction failure",
-  "portfolio-to-site profile transition retains an uncertain committed state replacement",
-  "portfolio-to-site profile transition retains the complete persisted prefix when state reread fails",
-  "portfolio-to-site profile transition retains the full persisted prefix on post-state disagreement",
-  "portfolio-to-site profile transition retains the full prefix on post-state state and inference disagreement",
-  "portfolio-to-site profile transition reports final Git and exact-byte failures after persistence",
-  "filesystem-backed portfolio-to-site transition verifies binary baselines without an injected byte reader",
-  "filesystem-backed portfolio-to-site transition rejects changed final binary bytes without an injected byte reader",
-  "filesystem-backed portfolio-to-site transition rejects an ancestor swap during an exact-byte read",
-];
 
 function successfulTap(testNames) {
   return [
@@ -216,590 +124,6 @@ function successfulTap(testNames) {
     "",
   ].join("\n");
 }
-
-test("standards lifecycle certification accepts real filtered TAP with passing nested subtests", async (context) => {
-  const revision = "a".repeat(40);
-  const fixtureRoot = await mkdtemp(
-    join(tmpdir(), "egeria-standards-filtered-tap-"),
-  );
-  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
-  const fixturePath = join(fixtureRoot, "filtered-evidence.test.mjs");
-  const fixtureTests = compiledUpgradeCertificationTests.map((name, index) =>
-    index === 0
-      ? `test(${JSON.stringify(name)}, async (context) => { await context.test("nested reporter evidence", () => {}); });`
-      : `test(${JSON.stringify(name)}, () => {});`,
-  );
-  await writeFile(
-    fixturePath,
-    [
-      'import test from "node:test";',
-      ...fixtureTests,
-      'test("unselected reporter evidence", () => {});',
-      "",
-    ].join("\n"),
-  );
-
-  let realTap;
-  const result = await certifyStandardsLifecycleForTesting(
-    { revision },
-    {
-      readCurrentRevision: async () => revision,
-      readRepositoryStatus: async () => "",
-      async runCommand(input) {
-        if (input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs") {
-          const execution = await execFileAsync(
-            input.executable,
-            [...input.arguments.slice(0, -1), fixturePath],
-            {
-              cwd: input.cwd,
-              env: input.environment,
-            },
-          );
-          realTap = execution.stdout;
-          return execution;
-        }
-        if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
-        return { stdout: successfulTap(builderUpgradeCertificationTests) };
-      },
-    },
-  );
-
-  assert.match(realTap, /^    # Subtest: nested reporter evidence$/mu);
-  assert.equal(result.ok, true);
-});
-
-test("standards lifecycle certification binds the exact revision to causal compiled evidence", async () => {
-  const revision = "a".repeat(40);
-  const commands = [];
-  let revisionReads = 0;
-  let statusReads = 0;
-
-  const result = await certifyStandardsLifecycleForTesting(
-    { revision },
-    {
-      async readCurrentRevision() {
-        revisionReads += 1;
-        return revision;
-      },
-      async readRepositoryStatus() {
-        statusReads += 1;
-        return "";
-      },
-      async runCommand(input) {
-        commands.push(input);
-        if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
-        return {
-          stdout: successfulTap(
-            input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-              ? compiledUpgradeCertificationTests
-              : builderUpgradeCertificationTests,
-          ),
-        };
-      },
-    },
-  );
-
-  assert.equal(revisionReads, 2);
-  assert.equal(statusReads, 2);
-  assert.deepEqual(
-    commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
-      executable,
-      arguments: arguments_,
-      cwd,
-      secrets: [
-        environment.CLOUDFLARE_API_TOKEN,
-        environment.CLOUDFLARE_ACCOUNT_ID,
-        environment.NPM_TOKEN,
-      ],
-    })),
-    [
-      {
-        executable: process.execPath,
-        arguments: [
-          "--test",
-          "--test-reporter=tap",
-          "--test-name-pattern",
-          "^the compiled (?:plan-upgrade command plans both profiles without changing any byte|apply-upgrade command completes the exact portfolio and site transactions|standards upgrade verification failure retains transformed source and old controls|plan-upgrade command refuses unsafe or unsupported repository states without writes|apply-upgrade command refuses the finite unsafe matrix without mutation)$",
-          "apps/cli/tests/cli.test.mjs",
-        ],
-        cwd: repositoryRoot,
-        secrets: [undefined, undefined, undefined],
-      },
-      {
-        executable: process.execPath,
-        arguments: ["scripts/certify-generated-testing.mjs"],
-        cwd: repositoryRoot,
-        secrets: [undefined, undefined, undefined],
-      },
-      {
-        executable: process.execPath,
-        arguments: [
-          "--test",
-          "--test-reporter=tap",
-          "--test-name-pattern",
-          "^standards capability upgrade ",
-          "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
-        ],
-        cwd: repositoryRoot,
-        secrets: [undefined, undefined, undefined],
-      },
-    ],
-  );
-  assert.deepEqual(result, {
-    ok: true,
-    capability: "standards",
-    version: "0.4.0",
-    evidenceRevision: revision,
-    profiles: ["portfolio", "site"],
-    checks: [
-      "compiled-plan-upgrade",
-      "compiled-apply-upgrade",
-      "already-current-refusal",
-      "missing-edge-refusal",
-      "verification-failure-prefix",
-      "migration-before-state",
-      "state-persistence-failure-prefix",
-      "exact-final-state",
-      "fresh-scaffold",
-    ],
-  });
-});
-
-test("standards lifecycle certification fails closed on revision drift and command failure", async () => {
-  const revision = "a".repeat(40);
-  await assert.rejects(
-    certifyStandardsLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => "b".repeat(40),
-        readRepositoryStatus: async () => "",
-        runCommand: async () => assert.fail("drift must stop before execution"),
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_REVISION_MISMATCH",
-  );
-
-  let reads = 0;
-  await assert.rejects(
-    certifyStandardsLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => {
-          reads += 1;
-          return revision;
-        },
-        readRepositoryStatus: async () => "",
-        runCommand: async () => {
-          throw new Error("private output");
-        },
-      },
-    ),
-    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
-  );
-  assert.equal(reads, 1);
-});
-
-test("standards lifecycle certification rejects dirty inputs before and after evidence", async () => {
-  const revision = "a".repeat(40);
-  await assert.rejects(
-    certifyStandardsLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => " M packages/builder-core/src/index.ts\n",
-        runCommand: async () => assert.fail("dirty inputs must stop before execution"),
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
-  );
-
-  let statusReads = 0;
-  let commandRuns = 0;
-  await assert.rejects(
-    certifyStandardsLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => {
-          statusReads += 1;
-          return statusReads === 1 ? "" : "?? unexpected-source.ts\0";
-        },
-        runCommand: async (input) => {
-          commandRuns += 1;
-          if (input.arguments[0] !== "--test") return { stdout: "{}\n" };
-          return {
-            stdout: successfulTap(
-              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-                ? compiledUpgradeCertificationTests
-                : builderUpgradeCertificationTests,
-            ),
-          };
-        },
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
-  );
-  assert.equal(commandRuns, 3);
-  assert.equal(statusReads, 2);
-});
-
-test("standards lifecycle certification rejects a successful zero-match test process", async () => {
-  const revision = "a".repeat(40);
-  await assert.rejects(
-    certifyStandardsLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => "",
-        runCommand: async () => ({
-          stdout: [
-            "TAP version 13",
-            "1..0",
-            "# tests 0",
-            "# pass 0",
-            "# fail 0",
-            "",
-          ].join("\n"),
-        }),
-      },
-    ),
-    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
-  );
-});
-
-test("the standards lifecycle certification command requires one exact revision without echoing rejected values", async () => {
-  const execution = await execFileAsync(process.execPath, [
-    standardsLifecycleCertificationScript,
-    "--revision",
-    "private-value",
-  ]).catch((error) => error);
-
-  assert.equal(execution.code, 2);
-  assert.equal(execution.stdout, "");
-  assert.deepEqual(JSON.parse(execution.stderr), {
-    ok: false,
-    code: "CERTIFICATION_ARGUMENT_INVALID",
-  });
-  assert.doesNotMatch(execution.stderr, /private-value/u);
-});
-
-test("profile transition lifecycle certification accepts real TAP with nested and unselected skipped tests", async (context) => {
-  const revision = "a".repeat(40);
-  const fixtureRoot = await mkdtemp(
-    join(tmpdir(), "egeria-profile-transition-filtered-tap-"),
-  );
-  context.after(() => rm(fixtureRoot, { recursive: true, force: true }));
-  const fixturePath = join(fixtureRoot, "filtered-evidence.test.mjs");
-  const fixtureTests = compiledProfileTransitionCertificationTests.map(
-    (name, index) =>
-      index === 0
-        ? `test(${JSON.stringify(name)}, async (context) => { await context.test("nested reporter evidence", () => {}); });`
-        : `test(${JSON.stringify(name)}, () => {});`,
-  );
-  await writeFile(
-    fixturePath,
-    [
-      'import test from "node:test";',
-      ...fixtureTests,
-      'test("unselected reporter evidence", { skip: true }, () => {});',
-      "",
-    ].join("\n"),
-  );
-
-  let realTap;
-  const result = await certifyProfileTransitionLifecycleForTesting(
-    { revision },
-    {
-      readCurrentRevision: async () => revision,
-      readRepositoryStatus: async () => "",
-      readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-      async runCommand(input) {
-        if (input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs") {
-          const fixtureArguments = input.arguments.slice(0, -1);
-          fixtureArguments.splice(
-            fixtureArguments.indexOf("--test-name-pattern"),
-            2,
-          );
-          const execution = await execFileAsync(
-            input.executable,
-            [...fixtureArguments, fixturePath],
-            { cwd: input.cwd, env: input.environment },
-          );
-          realTap = execution.stdout;
-          return execution;
-        }
-        return { stdout: successfulTap(builderProfileTransitionCertificationTests) };
-      },
-    },
-  );
-
-  assert.match(realTap, /^    # Subtest: nested reporter evidence$/mu);
-  assert.match(realTap, /unselected reporter evidence.*# SKIP/mu);
-  assert.equal(result.ok, true);
-});
-
-test("profile transition lifecycle certification binds the exact revision to causal evidence", async () => {
-  const revision = "a".repeat(40);
-  const commands = [];
-  let revisionReads = 0;
-  let statusReads = 0;
-  let indexReads = 0;
-
-  const result = await certifyProfileTransitionLifecycleForTesting(
-    { revision },
-    {
-      async readCurrentRevision() {
-        revisionReads += 1;
-        return revision;
-      },
-      async readRepositoryStatus() {
-        statusReads += 1;
-        return "";
-      },
-      async readRepositoryIndexEntries() {
-        indexReads += 1;
-        return "H selected-evidence.test.mjs\0";
-      },
-      async runCommand(input) {
-        commands.push(input);
-        return {
-          stdout: successfulTap(
-            input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-              ? compiledProfileTransitionCertificationTests
-              : builderProfileTransitionCertificationTests,
-          ),
-        };
-      },
-    },
-  );
-
-  assert.equal(revisionReads, 2);
-  assert.equal(statusReads, 2);
-  assert.equal(indexReads, 2);
-  assert.deepEqual(
-    commands.map(({ executable, arguments: arguments_, cwd, environment }) => ({
-      executable,
-      arguments: arguments_,
-      cwd,
-      secrets: [
-        environment.CLOUDFLARE_API_TOKEN,
-        environment.CLOUDFLARE_ACCOUNT_ID,
-        environment.NPM_TOKEN,
-      ],
-    })),
-    [
-      {
-        executable: process.execPath,
-        arguments: [
-          "--test",
-          "--test-reporter=tap",
-          "--test-name-pattern",
-          "^the compiled (?:profile-transition planner is repeatable and leaves portfolio controls and Git unchanged|profile-transition planner refuses an already-site project without mutation|profile-transition command emits its command-specific malformed-argument refusal|profile-transition planner refuses the finite unsafe matrix without mutation|apply-profile-transition command completes default and Calendly portfolio transactions|profile transition verification failure retains transformed source and old controls|apply-profile-transition command refuses representative unsafe inputs without mutation)$",
-          "apps/cli/tests/cli.test.mjs",
-        ],
-        cwd: repositoryRoot,
-        secrets: [undefined, undefined, undefined],
-      },
-      {
-        executable: process.execPath,
-        arguments: [
-          "--test",
-          "--test-reporter=tap",
-          "--test-name-pattern",
-          "^(?:portfolio-to-site profile transition |filesystem-backed portfolio-to-site transition )",
-          "packages/builder-core/tests/apply-profile-transition.test.mjs",
-        ],
-        cwd: repositoryRoot,
-        secrets: [undefined, undefined, undefined],
-      },
-    ],
-  );
-  assert.deepEqual(result, {
-    ok: true,
-    subject: "profile-transition-lifecycle",
-    evidenceRevision: revision,
-    transition: {
-      fromProfile: "portfolio",
-      fromRecipeVersion: "0.10.0",
-      toProfile: "site",
-      toRecipeVersion: "0.10.0",
-    },
-    migration: "transition-portfolio-0-10-0-to-site-0-10-0",
-    checks: [
-      "compiled-plan-repeatability",
-      "compiled-apply-default",
-      "compiled-apply-calendly",
-      "already-current-refusal",
-      "unsafe-and-malformed-refusal",
-      "verification-failure-prefix",
-      "transformation-failure-prefix",
-      "verification-and-reinference-prefix",
-      "migration-persistence-prefix",
-      "state-persistence-prefix",
-      "post-state-prefix",
-      "final-diff-and-byte-inspection",
-      "exact-resultant-state",
-    ],
-  });
-});
-
-test("profile transition lifecycle certification fails closed on revision, status, and command drift", async () => {
-  const revision = "a".repeat(40);
-  await assert.rejects(
-    certifyProfileTransitionLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => "b".repeat(40),
-        readRepositoryStatus: async () => "",
-        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-        runCommand: async () => assert.fail("drift must stop before execution"),
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_REVISION_MISMATCH",
-  );
-
-  await assert.rejects(
-    certifyProfileTransitionLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => " M private-source.ts\0",
-        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-        runCommand: async () => assert.fail("dirty input must not execute"),
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
-  );
-
-  await assert.rejects(
-    certifyProfileTransitionLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => "",
-        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-        runCommand: async () => {
-          throw new Error("private output");
-        },
-      },
-    ),
-    (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
-  );
-
-  let statusReads = 0;
-  let commandRuns = 0;
-  await assert.rejects(
-    certifyProfileTransitionLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-        readRepositoryStatus: async () => {
-          statusReads += 1;
-          return statusReads === 1 ? "" : "?? unexpected-source.ts\0";
-        },
-        runCommand: async (input) => {
-          commandRuns += 1;
-          return {
-            stdout: successfulTap(
-              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-                ? compiledProfileTransitionCertificationTests
-                : builderProfileTransitionCertificationTests,
-            ),
-          };
-        },
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_WORKTREE_DIRTY",
-  );
-  assert.equal(commandRuns, 2);
-  assert.equal(statusReads, 2);
-
-  let indexReads = 0;
-  let indexCommandRuns = 0;
-  await assert.rejects(
-    certifyProfileTransitionLifecycleForTesting(
-      { revision },
-      {
-        readCurrentRevision: async () => revision,
-        readRepositoryStatus: async () => "",
-        readRepositoryIndexEntries: async () => {
-          indexReads += 1;
-          return indexReads === 1
-            ? "H selected-evidence.test.mjs\0"
-            : "S selected-evidence.test.mjs\0";
-        },
-        runCommand: async (input) => {
-          indexCommandRuns += 1;
-          return {
-            stdout: successfulTap(
-              input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-                ? compiledProfileTransitionCertificationTests
-                : builderProfileTransitionCertificationTests,
-            ),
-          };
-        },
-      },
-    ),
-    (error) => error?.code === "EVIDENCE_WORKTREE_INDEX_FLAGS",
-  );
-  assert.equal(indexCommandRuns, 2);
-  assert.equal(indexReads, 2);
-});
-
-test("profile transition lifecycle certification rejects zero-match, selected-skip, and malformed TAP", async () => {
-  const revision = "a".repeat(40);
-  const invalidOutputs = [
-    ["TAP version 13", "1..0", "# tests 0", "# pass 0", "# fail 0", ""].join("\n"),
-    [
-      "TAP version 13",
-      ...compiledProfileTransitionCertificationTests.flatMap((name, index) => [
-        `# Subtest: ${name}`,
-        index === 0
-          ? `ok ${index + 1} - ${name} # SKIP selected evidence`
-          : `ok ${index + 1} - ${name}`,
-      ]),
-      `1..${compiledProfileTransitionCertificationTests.length}`,
-      `# tests ${compiledProfileTransitionCertificationTests.length}`,
-      `# pass ${compiledProfileTransitionCertificationTests.length - 1}`,
-      "# fail 0",
-      "# skipped 1",
-      "",
-    ].join("\n"),
-    "not TAP\n",
-  ];
-
-  for (const stdout of invalidOutputs) {
-    await assert.rejects(
-      certifyProfileTransitionLifecycleForTesting(
-        { revision },
-        {
-          readCurrentRevision: async () => revision,
-          readRepositoryStatus: async () => "",
-          readRepositoryIndexEntries: async () => "H selected-evidence.test.mjs\0",
-          runCommand: async () => ({ stdout }),
-        },
-      ),
-      (error) => error?.code === "LIFECYCLE_EVIDENCE_FAILED",
-    );
-  }
-});
-
-test("the profile transition lifecycle certification command requires one exact revision without echoing rejected values", async () => {
-  const execution = await execFileAsync(process.execPath, [
-    profileTransitionLifecycleCertificationScript,
-    "--revision",
-    "private-value",
-  ]).catch((error) => error);
-
-  assert.equal(execution.code, 2);
-  assert.equal(execution.stdout, "");
-  assert.deepEqual(JSON.parse(execution.stderr), {
-    ok: false,
-    code: "CERTIFICATION_ARGUMENT_INVALID",
-  });
-  assert.doesNotMatch(execution.stderr, /private-value/u);
-});
 
 const fixedChecks = Object.freeze([
   "pnpm-version",
@@ -833,13 +157,6 @@ const sectionCompositionFixtureChecks = Object.freeze([
   "section-composition-fixture-component-contract",
   "section-composition-fixture-browser-install",
   "section-composition-fixture-browser-development",
-]);
-const siteRoutingFixtureChecks = Object.freeze([
-  "site-routing-fixture-overlay",
-  "site-routing-fixture-frozen-install",
-  "site-routing-fixture-component-contract",
-  "site-routing-fixture-browser-install",
-  "site-routing-fixture-browser-development",
 ]);
 
 function createCertificationCliRuntime(arguments_ = []) {
@@ -1140,7 +457,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       version: "0.3.0",
     },
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verifyFixture: async ({ environment }) => {
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
       assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
@@ -1163,7 +480,7 @@ test("section composition certification binds both supported fresh-scaffold prof
     },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
     verifierIdentifier: "site",
   });
 
@@ -1185,7 +502,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       behaviorContractDigest:
         "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
     },
-    recipeVersion: "0.10.0",
+    recipeVersions: { portfolio: "0.11.6", site: "0.12.6" },
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -1385,7 +702,7 @@ test("section composition certification fails closed on authority and journey dr
         version: "0.3.0",
       },
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
       verifyFixture: async () => ({
         ok: true,
         checks: sectionCompositionFixtureChecks,
@@ -1406,7 +723,7 @@ test("section composition certification fails closed on authority and journey dr
       },
       profile: "site",
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
       verifierIdentifier: "site",
       ...siteOverrides,
     });
@@ -1563,6 +880,10 @@ async function copyCertificationRuntime(cleanRoot) {
     "scripts/check-capability-certification.mjs",
   );
   await copyFile(checkScript, cleanCheckScript);
+  await copyFile(
+    join(repositoryRoot, "packages/builder-core/package.json"),
+    join(cleanRoot, "packages/builder-core/package.json"),
+  );
   await cp(builderCoreDistPath, join(cleanRoot, "packages/builder-core/dist"), {
     recursive: true,
   });
@@ -2137,8 +1458,8 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   const previousToken = process.env.NPM_TOKEN;
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
   const scaffold = createSuccessfulScaffoldAdapters({
-    inferredCapability: { identifier: "standards", version: "0.4.0" },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    inferredCapability: { identifier: "standards", version: "0.5.1" },
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verificationChecks: visualChecks,
   });
 
@@ -2148,14 +1469,14 @@ test("generated testing certification binds a fresh portfolio to the exact stand
     assert.deepEqual(result, {
       ok: true,
       capability: "standards",
-      version: "0.4.0",
+      version: "0.5.1",
       profile: "portfolio",
       subject: {
-        descriptorVersion: "0.4.0",
+        descriptorVersion: "0.5.1",
         behaviorContractDigest:
-          "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
+          "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
       },
-      recipeVersion: "0.10.0",
+      recipeVersion: "0.11.6",
       checks: [
         "compiled-cli-create",
         "state-inference",
@@ -2210,9 +1531,9 @@ test("generated testing certification rejects missing, extra, or reordered visua
 
   for (const checks of invalidChecks) {
     const scaffold = createSuccessfulScaffoldAdapters({
-      inferredCapability: { identifier: "standards", version: "0.4.0" },
+      inferredCapability: { identifier: "standards", version: "0.5.1" },
       postCreate: (projectRoot) =>
-        writeRecipeVersion(projectRoot, "0.10.0"),
+        writeRecipeVersion(projectRoot, "0.11.6"),
       verificationChecks: checks,
     });
     await assert.rejects(
@@ -2230,10 +1551,10 @@ test("generated testing certification rejects stale state, recipe, diagnostics, 
   const validInput = Object.freeze({
     inferredCapability: Object.freeze({
       identifier: "standards",
-      version: "0.4.0",
+      version: "0.5.1",
     }),
     postCreate: (projectRoot) =>
-      writeRecipeVersion(projectRoot, "0.10.0"),
+      writeRecipeVersion(projectRoot, "0.11.6"),
     verificationChecks: visualChecks,
   });
   const cases = [
@@ -2341,7 +1662,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       indexReads += 1;
       return "H selected-evidence.test.mjs\0";
     },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
     verifyFixture: async ({ projectRoot, environment }) => {
       assert.equal(projectRoot, scaffold.state.projectRoot);
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
@@ -2367,7 +1688,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       behaviorContractDigest:
         "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
     },
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.11.6",
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -2637,7 +1958,7 @@ test("content files certification fails closed on invalid authority and evidence
     createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "content-files", version: "0.4.0" },
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
       verifyFixture: async () => ({ ok: true, checks: contentFixtureChecks }),
       ...overrides,
     });
@@ -2736,533 +2057,6 @@ test("the content files certification command requires one exact revision withou
     const execution = await execFileAsync(
       process.execPath,
       [contentFilesCertificationScript, ...arguments_],
-      {
-        cwd: repositoryRoot,
-        encoding: "utf8",
-        env: { PATH: process.env.PATH },
-      },
-    ).catch((error) => error);
-
-    assert.equal(execution.code, expectedExitCode);
-    assert.equal(execution.stdout, "");
-    assert.deepEqual(JSON.parse(execution.stderr), {
-      ok: false,
-      code: expectedCode,
-    });
-    assert.doesNotMatch(execution.stderr, /private-value/u);
-  }
-});
-
-test("site routing certification binds a clean exact revision to causal fresh-scaffold and lifecycle evidence", async () => {
-  const revision = "a".repeat(40);
-  let revisionReads = 0;
-  let statusReads = 0;
-  let indexReads = 0;
-  const scaffold = createSuccessfulScaffoldAdapters({
-    expectedCapabilities: Object.freeze([
-      "standards",
-      "content-files",
-      "section-composition",
-      "deployment-cloudflare",
-      "observability",
-      "site-routing",
-    ]),
-    inferredCapability: { identifier: "site-routing", version: "0.4.0" },
-    profile: "site",
-    readCurrentRevision: async () => {
-      revisionReads += 1;
-      return revision;
-    },
-    readRepositoryStatus: async () => {
-      statusReads += 1;
-      return "";
-    },
-    readRepositoryIndexEntries: async () => {
-      indexReads += 1;
-      return "H selected-evidence.test.mjs\0";
-    },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
-    runLifecycleCommand: async (input) => ({
-      stdout: successfulTap(
-        input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-          ? compiledSiteRoutingLifecycleTests
-          : builderSiteRoutingLifecycleTests,
-      ),
-    }),
-    verificationChecks: visualChecks,
-    verifierIdentifier: "site",
-    verifyFixture: async ({ projectRoot, environment }) => {
-      assert.equal(projectRoot, scaffold.state.projectRoot);
-      assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
-      assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
-      assert.equal(environment.NPM_TOKEN, undefined);
-      assert.equal(environment.NODE_OPTIONS, undefined);
-      return { ok: true, checks: siteRoutingFixtureChecks };
-    },
-  });
-
-  const result = await certifySiteRoutingForTesting(
-    { revision },
-    scaffold.adapters,
-  );
-
-  assert.deepEqual(result, {
-    ok: true,
-    capability: "site-routing",
-    version: "0.4.0",
-    profile: "site",
-    subject: {
-      descriptorVersion: "0.4.0",
-      behaviorContractDigest:
-        "sha256:17e62c4468bc05480828d23471b63afc29e19eb6a9bff07eee1f99d30cd7b3e3",
-    },
-    recipeVersion: "0.11.0",
-    locale: "en-CA",
-    evidenceRevision: revision,
-    outcomes: ["existing-repository-lifecycle", "fresh-scaffold"],
-    checks: [
-      "compiled-cli-create",
-      "state-inference",
-      "healthy-diagnostics",
-      "exact-diff",
-      ...fixedChecks,
-      "visual-regression",
-      ...siteRoutingFixtureChecks,
-      "compiled-plan-site-routing-upgrade",
-      "compiled-apply-site-routing-upgrade",
-      "already-current-and-drift-refusal",
-      "verification-failure-prefix",
-      "migration-before-state",
-      "exact-final-state",
-      "final-byte-reread",
-      "repository-sources-unchanged",
-    ],
-  });
-  assert.deepEqual(
-    scaffold.state.commands.map(({ arguments: arguments_ }) =>
-      arguments_.slice(1),
-    ),
-    [
-      [
-        "create",
-        "--profile",
-        "site",
-        "--name",
-        "acme-site",
-        "--display-name",
-        "Acme Site",
-        "--directory",
-        scaffold.state.projectRoot,
-      ],
-      ["infer", "--directory", scaffold.state.projectRoot],
-      ["doctor", "--directory", scaffold.state.projectRoot],
-      ["diff", "--directory", scaffold.state.projectRoot],
-    ],
-  );
-  assert.equal(scaffold.state.verifiedRoot, scaffold.state.projectRoot);
-  assert.equal(scaffold.state.fixtureInput.projectRoot, scaffold.state.projectRoot);
-  assert.deepEqual(scaffold.state.verificationOptions, { includeVisual: true });
-  assert.deepEqual(
-    scaffold.state.lifecycleCommands.map(({ arguments: arguments_ }) =>
-      arguments_,
-    ),
-    [
-      [
-        "--test",
-        "--test-reporter=tap",
-        "--test-name-pattern",
-        "^the compiled (?:plan-upgrade command plans the exact production site edge without writes|site-routing upgrade converges on the exact current site|site-routing upgrade verification failure retains transformed source and old state and migration controls|site-routing planner refuses already-current and managed-drift repositories without writes)$",
-        "apps/cli/tests/cli.test.mjs",
-      ],
-      [
-        "--test",
-        "--test-reporter=tap",
-        "--test-name-pattern",
-        "^site-routing upgrade (?:replaces the exact production recipe and persists state last|retains transformed source and old state and migration controls when verification fails|rejects changed final bytes after state persistence)$",
-        "packages/builder-core/tests/apply-capability-upgrade.test.mjs",
-      ],
-    ],
-  );
-  assert.equal(revisionReads, 2);
-  assert.equal(statusReads, 2);
-  assert.equal(indexReads, 2);
-  assert.equal(await pathExists(scaffold.state.ownedPath), false);
-});
-
-test("site routing fixture verification applies the exact isolated overlay and command sequence", async () => {
-  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-verifier-"));
-  const projectRoot = join(ownedRoot, "generated-project");
-  const supportRoot = join(ownedRoot, "site-routing-fixture-support");
-  const commands = [];
-
-  try {
-    const { verifySiteRoutingFixtureForTesting } = await import(
-      "../../scripts/certify-site-routing.mjs"
-    );
-    const result = await verifySiteRoutingFixtureForTesting({
-      projectRoot,
-      environment: { PATH: "/verified/bin" },
-      runCommand: async (command) => {
-        commands.push(command);
-      },
-    });
-
-    assert.deepEqual(result, { ok: true, checks: siteRoutingFixtureChecks });
-    for (const [source, destination] of [
-      [
-        "site-routing-certification.test.tsx",
-        "apps/web/tests/component/site-routing-certification.test.tsx",
-      ],
-      [
-        "site-routing-vitest.config.ts",
-        "apps/web/tests/component/site-routing-vitest.config.ts",
-      ],
-      [
-        "site-routing-certification.spec.ts",
-        "apps/web/tests/e2e/site-routing-certification.spec.ts",
-      ],
-    ]) {
-      assert.equal(
-        await readFile(join(projectRoot, destination), "utf8"),
-        await readFile(
-          join(
-            repositoryRoot,
-            "tests/capability-certification/fixtures/site-routing",
-            source,
-          ),
-          "utf8",
-        ),
-      );
-    }
-    assert.equal(await readFile(join(supportRoot, ".npmrc"), "utf8"), "");
-    assert.deepEqual(
-      commands.map(({ executable, arguments: arguments_, cwd, timeout }) => ({
-        executable,
-        arguments: arguments_,
-        cwd,
-        timeout,
-      })),
-      [
-        {
-          executable: "pnpm",
-          arguments: [
-            "install",
-            "--frozen-lockfile",
-            "--store-dir",
-            join(supportRoot, "store"),
-          ],
-          cwd: projectRoot,
-          timeout: 15 * 60 * 1000,
-        },
-        {
-          executable: "pnpm",
-          arguments: [
-            "--dir",
-            "apps/web",
-            "exec",
-            "vitest",
-            "run",
-            "--config",
-            "tests/component/site-routing-vitest.config.ts",
-            "tests/component/site-routing-certification.test.tsx",
-          ],
-          cwd: projectRoot,
-          timeout: 15 * 60 * 1000,
-        },
-        {
-          executable: "pnpm",
-          arguments: ["--dir", "apps/web", "run", "browser:install"],
-          cwd: projectRoot,
-          timeout: 15 * 60 * 1000,
-        },
-        {
-          executable: "pnpm",
-          arguments: [
-            "--dir",
-            "apps/web",
-            "exec",
-            "playwright",
-            "test",
-            "--config",
-            "playwright.dev.config.ts",
-            "tests/e2e/site-routing-certification.spec.ts",
-          ],
-          cwd: projectRoot,
-          timeout: 15 * 60 * 1000,
-        },
-      ],
-    );
-    for (const command of commands) {
-      assert.equal(command.environment.PATH, "/verified/bin");
-      assert.equal(command.environment.HOME, join(supportRoot, "home"));
-      assert.equal(command.environment.USERPROFILE, join(supportRoot, "home"));
-      assert.equal(
-        command.environment.PLAYWRIGHT_BROWSERS_PATH,
-        join(supportRoot, "playwright-browsers"),
-      );
-      assert.equal(
-        command.environment.NPM_CONFIG_USERCONFIG,
-        join(supportRoot, ".npmrc"),
-      );
-      assert.equal(
-        command.environment.NPM_CONFIG_REGISTRY,
-        "https://registry.npmjs.org/",
-      );
-      assert.equal(command.environment.TMPDIR, join(supportRoot, "temporary"));
-      assert.equal(command.environment.TMP, join(supportRoot, "temporary"));
-      assert.equal(command.environment.TEMP, join(supportRoot, "temporary"));
-      assert.equal(command.environment.XDG_CACHE_HOME, join(supportRoot, "cache"));
-    }
-  } finally {
-    await rm(ownedRoot, { recursive: true, force: true });
-  }
-});
-
-test("site routing fixture verification reports component command failures", async () => {
-  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-component-failure-"));
-  const projectRoot = join(ownedRoot, "generated-project");
-  let commandRuns = 0;
-
-  try {
-    const { verifySiteRoutingFixtureForTesting } = await import(
-      "../../scripts/certify-site-routing.mjs"
-    );
-    await assert.rejects(
-      verifySiteRoutingFixtureForTesting({
-        projectRoot,
-        environment: { PATH: "/verified/bin" },
-        runCommand: async () => {
-          commandRuns += 1;
-          if (commandRuns === 2) {
-            throw new Error("private component failure");
-          }
-        },
-      }),
-      (error) =>
-        error?.name === "SiteRoutingCertificationError" &&
-        error.code === "CERTIFICATION_FIXTURE_COMPONENT_FAILED",
-    );
-    assert.equal(commandRuns, 2);
-  } finally {
-    await rm(ownedRoot, { recursive: true, force: true });
-  }
-});
-
-test("site routing fixture verification contains preparation failures", async () => {
-  const ownedRoot = await mkdtemp(join(tmpdir(), "site-routing-fixture-failure-"));
-  const projectRoot = join(ownedRoot, "generated-project");
-  let commandRuns = 0;
-
-  try {
-    await writeFile(join(ownedRoot, "site-routing-fixture-support"), "blocked");
-    const { verifySiteRoutingFixtureForTesting } = await import(
-      "../../scripts/certify-site-routing.mjs"
-    );
-    await assert.rejects(
-      verifySiteRoutingFixtureForTesting({
-        projectRoot,
-        environment: { PATH: "/verified/bin" },
-        runCommand: async () => {
-          commandRuns += 1;
-        },
-      }),
-      (error) =>
-        error?.name === "SiteRoutingCertificationError" &&
-        error.code === "CERTIFICATION_FIXTURE_OVERLAY_FAILED",
-    );
-    assert.equal(commandRuns, 0);
-  } finally {
-    await rm(ownedRoot, { recursive: true, force: true });
-  }
-});
-
-test("site routing certification fails closed on invalid authority and evidence drift", async (context) => {
-  const revision = "a".repeat(40);
-  const createScaffold = (overrides = {}) =>
-    createSuccessfulScaffoldAdapters({
-      expectedCapabilities: Object.freeze([
-        "standards",
-        "content-files",
-        "section-composition",
-        "deployment-cloudflare",
-        "observability",
-        "site-routing",
-      ]),
-      inferredCapability: { identifier: "site-routing", version: "0.4.0" },
-      profile: "site",
-      readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
-      runLifecycleCommand: async (input) => ({
-        stdout: successfulTap(
-          input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-            ? compiledSiteRoutingLifecycleTests
-            : builderSiteRoutingLifecycleTests,
-        ),
-      }),
-      verificationChecks: visualChecks,
-      verifierIdentifier: "site",
-      verifyFixture: async () => ({ ok: true, checks: siteRoutingFixtureChecks }),
-      ...overrides,
-    });
-
-  await context.test("rejects a non-exact revision before using adapters", async () => {
-    await assert.rejects(
-      certifySiteRoutingForTesting({ revision: "a".repeat(39) }, {}),
-      (error) =>
-        error?.name === "SiteRoutingCertificationError" &&
-        error.code === "CERTIFICATION_REVISION_INVALID",
-    );
-  });
-
-  for (const [name, overrides, expectedCode] of [
-    [
-      "rejects a dirty worktree before scaffolding",
-      { readRepositoryStatus: async () => "?? private-source.ts\0" },
-      "CERTIFICATION_WORKTREE_DIRTY",
-    ],
-    [
-      "rejects non-ordinary index flags before scaffolding",
-      { readRepositoryIndexEntries: async () => "S selected-evidence.test.mjs\0" },
-      "CERTIFICATION_INDEX_FLAGS",
-    ],
-  ]) {
-    await context.test(name, async () => {
-      const scaffold = createScaffold(overrides);
-      await assert.rejects(
-        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
-        (error) => error?.code === expectedCode,
-      );
-      assert.equal(scaffold.state.commands.length, 0);
-    });
-  }
-
-  for (const [name, override, expectedCode] of [
-    [
-      "rejects revision drift after contained evidence",
-      (() => {
-        let reads = 0;
-        return {
-          readCurrentRevision: async () =>
-            (reads += 1) === 1 ? revision : "b".repeat(40),
-        };
-      })(),
-      "CERTIFICATION_REVISION_MISMATCH",
-    ],
-    [
-      "rejects worktree drift after contained evidence",
-      (() => {
-        let reads = 0;
-        return {
-          readRepositoryStatus: async () =>
-            (reads += 1) === 1 ? "" : " M private-source.ts\0",
-        };
-      })(),
-      "CERTIFICATION_WORKTREE_DIRTY",
-    ],
-    [
-      "rejects index-flag drift after contained evidence",
-      (() => {
-        let reads = 0;
-        return {
-          readRepositoryIndexEntries: async () =>
-            `${(reads += 1) === 1 ? "H" : "S"} selected-evidence.test.mjs\0`,
-        };
-      })(),
-      "CERTIFICATION_INDEX_FLAGS",
-    ],
-  ]) {
-    await context.test(name, async () => {
-      const scaffold = createScaffold(override);
-      await assert.rejects(
-        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
-        (error) => error?.code === expectedCode,
-      );
-      assert.equal(await pathExists(scaffold.state.ownedPath), false);
-    });
-  }
-
-  await context.test("rejects invalid fixed-verifier evidence", async () => {
-    const scaffold = createScaffold({ verificationChecks: fixedChecks.slice(1) });
-    await assert.rejects(
-      certifySiteRoutingForTesting({ revision }, scaffold.adapters),
-      (error) => error?.code === "GENERATED_PROJECT_VERIFICATION_INVALID",
-    );
-    assert.equal(await pathExists(scaffold.state.ownedPath), false);
-  });
-
-  await context.test("contains causal fixture failure", async () => {
-    const scaffold = createScaffold({
-      verifyFixture: async () => {
-        throw new Error("private fixture failure");
-      },
-    });
-    await assert.rejects(
-      certifySiteRoutingForTesting({ revision }, scaffold.adapters),
-      (error) => error?.code === "CERTIFICATION_FIXTURE_VERIFICATION_FAILED",
-    );
-    assert.equal(await pathExists(scaffold.state.ownedPath), false);
-  });
-
-  for (const [name, runLifecycleCommand] of [
-    [
-      "rejects successful zero-match lifecycle evidence",
-      async () => ({
-        stdout:
-          "TAP version 13\n1..0\n# tests 0\n# pass 0\n# fail 0\n",
-      }),
-    ],
-    [
-      "rejects selected skipped lifecycle evidence",
-      async (input) => {
-        const selected =
-          input.arguments.at(-1) === "apps/cli/tests/cli.test.mjs"
-            ? compiledSiteRoutingLifecycleTests
-            : builderSiteRoutingLifecycleTests;
-        return {
-          stdout: [
-            "TAP version 13",
-            `# Subtest: ${selected[0]}`,
-            `ok 1 - ${selected[0]} # SKIP private refusal`,
-            "1..1",
-            "# tests 1",
-            "# pass 0",
-            "# fail 0",
-            "",
-          ].join("\n"),
-        };
-      },
-    ],
-    [
-      "contains a lifecycle command failure",
-      async () => {
-        throw new Error("private lifecycle failure");
-      },
-    ],
-  ]) {
-    await context.test(name, async () => {
-      const scaffold = createScaffold({ runLifecycleCommand });
-      await assert.rejects(
-        certifySiteRoutingForTesting({ revision }, scaffold.adapters),
-        (error) => error?.code === "CERTIFICATION_LIFECYCLE_EVIDENCE_FAILED",
-      );
-      assert.equal(await pathExists(scaffold.state.ownedPath), false);
-    });
-  }
-});
-
-test("the site routing certification command requires one exact revision without echoing rejected values", async () => {
-  for (const [arguments_, expectedCode, expectedExitCode] of [
-    [["--revision", "private-value"], "CERTIFICATION_REVISION_INVALID", 1],
-    [
-      ["--", "--revision", "private-value"],
-      "CERTIFICATION_REVISION_INVALID",
-      1,
-    ],
-    [["--unknown", "private-value"], "CERTIFICATION_ARGUMENT_INVALID", 2],
-  ]) {
-    const execution = await execFileAsync(
-      process.execPath,
-      [siteRoutingCertificationScript, ...arguments_],
       {
         cwd: repositoryRoot,
         encoding: "utf8",
@@ -3795,8 +2589,13 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
     }],
   };
   try {
-    for (const invalidRuntime of [false, true]) {
+    for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
+      ["0.2.6", false, undefined],
+      ["0.2.6", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
+    ]) {
       commands.length = 0;
+      verifiedRoot = undefined;
       const execution = certifyBookingCalendlyForTesting(
         { calendlyUrl: "https://calendly.com/example/intro" },
         {
@@ -3874,10 +2673,10 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                   state: {
                     kind: "valid",
                     value: {
-                      origin: { profile: "app", recipeVersion: "0.2.0" },
+                      origin: { profile: "app", recipeVersion },
                       installedCapabilities: [
-                        { identifier: "standards", version: "0.5.0" },
-                        { identifier: "deployment-cloudflare", version: "0.3.0" },
+                        { identifier: "standards", version: "0.5.1" },
+                        { identifier: "deployment-cloudflare", version: "0.3.1" },
                         { identifier: "content-files", version: "0.4.0" },
                         { identifier: "section-composition", version: "0.3.0" },
                         { identifier: "observability", version: "0.3.0" },
@@ -3926,8 +2725,9 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
         },
       );
 
-      if (invalidRuntime) {
-        await assert.rejects(execution, error => error?.code === "CERTIFICATION_RUNTIME_EVIDENCE_INVALID");
+      if (expectedErrorCode) {
+        await assert.rejects(execution, error => error?.code === expectedErrorCode);
+        if (expectedErrorCode === "CAPABILITY_ADDITION_INFERENCE_INVALID") assert.equal(verifiedRoot, undefined);
         assert.equal(await pathExists(ownedPath), false);
         continue;
       }

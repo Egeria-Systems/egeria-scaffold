@@ -80,7 +80,7 @@ async function loadTextEntries(directory) {
 }
 
 async function fixtureEntries(profile = "portfolio") {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${profile.startsWith("portfolio") ? "0.11.6" : profile.startsWith("site") ? "0.12.6" : "0.2.6"}`));
 }
 
 function createRepository(entries, failBatch, afterWrite) {
@@ -1118,11 +1118,13 @@ test("application persistence addition preserves custom scripts and installs the
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   const state = JSON.parse(repository.files.get(".egeria/state.json"));
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.0");
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.4.0");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.1");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.4.1");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.equal(JSON.parse(repository.files.get("apps/web/package.json")).scripts.custom, "node custom.mjs");
-  assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-application-persistence/pnpm-lock.yaml"), "utf8"));
+  assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.6-persistence/pnpm-lock.yaml"), "utf8"));
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.1.1");
+  assert.equal(result.value.migration, "add-application-persistence-0-1-1");
   assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
 });
 
@@ -1178,7 +1180,7 @@ test("optional addition to a persistent app retains the binding verification lan
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   const state = JSON.parse(repository.files.get(".egeria/state.json"));
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.0");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.1");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
 });

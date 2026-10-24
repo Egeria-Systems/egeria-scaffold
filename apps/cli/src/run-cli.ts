@@ -1,8 +1,9 @@
 import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
-  applyCapabilityUpgrade as applyCapabilityUpgradeDefault,
   applyProfileTransition as applyProfileTransitionDefault,
+  createApplicationEnvironmentRenderingContext,
+  type ApplicationEnvironmentRenderingContext,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
   readVerifiedProjectSnapshot,
@@ -15,7 +16,6 @@ import {
   inspectGitWorktree as inspectGitWorktreeDefault,
   planCapabilityAddition,
   planCapabilityRemoval,
-  planCapabilityUpgrade,
   planProfileTransition as planProfileTransitionDefault,
   persistenceRemovalHumanReviewSchema,
   persistenceRemovalInputSchema,
@@ -28,11 +28,7 @@ import {
   type CapabilityRemovalPlan,
   type CapabilityRemovalExecutionResult,
   type CapabilityRemovalPlanningFailureCode,
-  type CapabilityUpgradeExecutionResult,
-  type CapabilityUpgradePlan,
-  type CapabilityUpgradePlanningFailureCode,
   type ProfileTransitionPlan,
-  type AppProfileTransitionPlan,
   type ProfileTransitionExecutionResult,
   type ProfileTransitionPlanningFailureCode,
   type GeneratedProjectVerifier,
@@ -48,7 +44,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { parseCliArguments, type CliCommand } from "./arguments.js";
+import { parseCliArguments, type ApplicationEnvironmentCliCommand, type CliCommand } from "./arguments.js";
 
 export type CliOutput = Readonly<{
   write(value: string): void;
@@ -63,9 +59,6 @@ type CliRunnerDependencies = Readonly<{
   applyCapabilityRemoval?(input: Parameters<
     typeof applyCapabilityRemovalDefault
   >[0]): Promise<CapabilityRemovalExecutionResult>;
-  applyCapabilityUpgrade?(input: Parameters<
-    typeof applyCapabilityUpgradeDefault
-  >[0]): Promise<CapabilityUpgradeExecutionResult>;
   applyProfileTransition?(input: Parameters<
     typeof applyProfileTransitionDefault
   >[0]): Promise<ProfileTransitionExecutionResult>;
@@ -98,16 +91,10 @@ type PlanRemoveSuccess = Readonly<{
   plan: CapabilityRemovalPlan;
 }>;
 
-type PlanUpgradeSuccess = Readonly<{
-  ok: true;
-  command: "plan-upgrade";
-  plan: CapabilityUpgradePlan;
-}>;
-
 type PlanProfileTransitionSuccess = Readonly<{
   ok: true;
   command: "plan-profile-transition";
-  plan: ProfileTransitionPlan | AppProfileTransitionPlan;
+  plan: ProfileTransitionPlan;
 }>;
 
 const plannerRefusalCodes = new Set<PlanningFailureCode>([
@@ -132,19 +119,6 @@ const removalPlannerRefusalCodes =
     "JOB_REMOVAL_SUBJECT_UNAVAILABLE",
     "PERSISTENCE_REMOVAL_INPUT_INVALID",
     "PERSISTENCE_REMOVAL_SUBJECT_UNAVAILABLE",
-  ]);
-
-const upgradePlannerRefusalCodes =
-  new Set<CapabilityUpgradePlanningFailureCode>([
-    "CAPABILITY_ACTION_CONFLICT",
-    "CAPABILITY_ALREADY_CURRENT",
-    "CAPABILITY_UPGRADE_EDGE_MISSING",
-    "CAPABILITY_UPGRADE_UNSUPPORTED",
-    "CAPABILITY_VERSION_AMBIGUOUS",
-    "PROJECT_DRIFT_DETECTED",
-    "PROJECT_EJECTION_UNSUPPORTED",
-    "PROJECT_INSPECTION_INVALID",
-    "PROJECT_STATE_INCOMPATIBLE",
   ]);
 
 const profileTransitionPlannerRefusalCodes =
@@ -172,14 +146,6 @@ function isRemovalPlannerRefusalCode(
 ): code is CapabilityRemovalPlanningFailureCode {
   return removalPlannerRefusalCodes.has(
     code as CapabilityRemovalPlanningFailureCode,
-  );
-}
-
-function isUpgradePlannerRefusalCode(
-  code: string,
-): code is CapabilityUpgradePlanningFailureCode {
-  return upgradePlannerRefusalCodes.has(
-    code as CapabilityUpgradePlanningFailureCode,
   );
 }
 
@@ -286,31 +252,29 @@ function createCliRepositoryReader(root: string): RepositoryReader {
   };
 }
 
+function createRequest<C extends Extract<CliCommand | ApplicationEnvironmentCliCommand, { kind: "create" }>>(command: C): Omit<C, "kind" | "directory"> {
+  const request = { ...command };
+  Reflect.deleteProperty(request, "kind");
+  Reflect.deleteProperty(request, "directory");
+  return request;
+}
+
 async function runCreate(
-  command: Extract<CliCommand, Readonly<{ kind: "create" }>>,
+  input: Readonly<{ command: Extract<CliCommand, { kind: "create" }>; renderingContext?: never }> |
+    Readonly<{ command: Extract<ApplicationEnvironmentCliCommand, { kind: "create" }>; renderingContext: ApplicationEnvironmentRenderingContext }>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
-  const result = await generateProject({
-    request: {
-      profile: command.profile,
-      projectName: command.projectName,
-      displayName: command.displayName,
-      ...(command.bookingCalendly === undefined
-        ? {}
-        : { bookingCalendly: command.bookingCalendly }),
-      ...(command.analytics === undefined
-        ? {}
-        : { analytics: command.analytics }),
-      ...(command.multilingual === true ? { multilingual: true } : {}),
-      ...(command.applicationPersistence === true ? { applicationPersistence: true } : {}),
-      ...(command.transactionalEmailResend === true ? { transactionalEmailResend: true } : {}),
-      ...(command.backgroundJobDelivery === true ? { backgroundJobDelivery: true } : {}),
-      ...(command.contactFormWeb3Forms === undefined ? {} : { contactFormWeb3Forms: command.contactFormWeb3Forms }),
-    },
-    destination: resolve(command.directory),
-    verifier: dependencies.createVerifier(),
-  });
+  const command = input.command;
+  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.bookingCalendly !== undefined || command.contactFormWeb3Forms !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
+    writeJson(output.writeError, { ok: false, command: "create", issues: [{ code: "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", path: ["request"], context: { reason: "incomplete-capability" } }] });
+    return 1;
+  }
+  const destination = resolve(command.directory);
+  const verifier = dependencies.createVerifier();
+  const result = input.renderingContext === undefined
+    ? await generateProject({ request: createRequest(input.command), destination, verifier })
+    : await generateProject({ request: createRequest(input.command), destination, verifier, renderingContext: input.renderingContext });
 
   if (!result.ok) {
     writeJson(output.writeError, {
@@ -337,17 +301,23 @@ async function runReadOnly(
   command: Extract<CliCommand, Readonly<{ kind: "infer" | "doctor" | "diff" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  projectSchemaVersion?: "2.0.0",
 ): Promise<0 | 1> {
   try {
     const reader = (dependencies.createReader ??
       createCliRepositoryReader)(resolve(command.directory));
-    const snapshot = await readVerifiedProjectSnapshot(reader);
+    const snapshot = projectSchemaVersion === "2.0.0"
+      ? await readVerifiedProjectSnapshot(reader, createApplicationEnvironmentRenderingContext())
+      : await readVerifiedProjectSnapshot(reader);
     if (!snapshot.ok) {
-      writeJson(output.writeError, { ok: false, code: "VERIFIED_CATALOG_INVALID" });
+      writeJson(output.writeError, { ok: false, code: projectSchemaVersion === "2.0.0" ? "PROJECT_INSPECTION_INVALID" : "VERIFIED_CATALOG_INVALID" });
       return 1;
     }
     if (command.kind === "infer") {
-      const result = await inferRepository({ reader: snapshot.value.reader, catalog: snapshot.value.catalog });
+      const request = { reader: snapshot.value.reader, catalog: snapshot.value.catalog };
+      const result = projectSchemaVersion === "2.0.0"
+        ? await inferRepository({ ...request, projectSchemaVersion: "2.0.0" })
+        : await inferRepository(request);
       writeJson(output.write, { ok: true, command: "infer", result });
       return 0;
     }
@@ -357,6 +327,7 @@ async function runReadOnly(
         reader: snapshot.value.reader,
         catalog: snapshot.value.catalog,
         profiles: snapshot.value.profiles,
+        ...(projectSchemaVersion === "2.0.0" ? { projectSchemaVersion } : {}),
       });
       writeJson(output.write, { ok: true, command: "doctor", result });
       return result.healthy ? 0 : 1;
@@ -404,15 +375,6 @@ function writePlanRemoveRefusal(
     conflicts.length > 0
       ? { conflicts }
       : {}),
-  });
-  return 1;
-}
-
-function writePlanUpgradeRefusal(output: CliOutput, code: string): 1 {
-  writeJson(output.writeError, {
-    ok: false,
-    command: "plan-upgrade",
-    code,
   });
   return 1;
 }
@@ -624,93 +586,6 @@ async function runPlanRemove(
   return 0;
 }
 
-async function runPlanUpgrade(
-  command: Extract<CliCommand, Readonly<{ kind: "plan-upgrade" }>>,
-  output: CliOutput,
-  dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
-  const root = resolve(command.directory);
-  const initialGit = await inspectForPlan(root, dependencies);
-
-  if (!initialGit.ok) {
-    return writePlanUpgradeRefusal(output, initialGit.code);
-  }
-
-  let outcome:
-    | Readonly<{
-        kind: "result";
-        result: Awaited<ReturnType<typeof planCapabilityUpgrade>>;
-      }>
-    | Readonly<{ kind: "failure"; code: "REPOSITORY_OPEN_FAILED" }>;
-
-  try {
-    const reader = (dependencies.createReader ?? createCliRepositoryReader)(root);
-    outcome = {
-      kind: "result",
-      result: await planCapabilityUpgrade({
-        reader,
-        git: initialGit,
-        capability: command.capability,
-        toVersion: command.toVersion,
-      }),
-    };
-  } catch {
-    outcome = { kind: "failure", code: "REPOSITORY_OPEN_FAILED" };
-  }
-
-  let targetFailure: string | undefined;
-  if (outcome.kind === "result" && outcome.result.ok) {
-    const createTargets = outcome.result.value.actions.flatMap((action) =>
-      action.kind === "create-file" ? [action.path] : [],
-    );
-    const targetInspection = await inspectCreateTargetsForPlan(
-      root,
-      createTargets,
-      dependencies,
-    );
-
-    if (!targetInspection.ok) {
-      targetFailure = targetInspection.code;
-    }
-  }
-
-  const finalGit = await inspectForPlan(root, dependencies);
-
-  if (!finalGit.ok) {
-    return writePlanUpgradeRefusal(output, finalGit.code);
-  }
-
-  if (!sameGitIdentity(initialGit, finalGit)) {
-    return writePlanUpgradeRefusal(output, "GIT_WORKTREE_CHANGED");
-  }
-
-  if (targetFailure !== undefined) {
-    return writePlanUpgradeRefusal(output, targetFailure);
-  }
-
-  if (outcome.kind === "failure") {
-    return writePlanUpgradeRefusal(output, outcome.code);
-  }
-
-  if (!outcome.result.ok) {
-    const code = outcome.result.issues[0]?.code;
-    return writePlanUpgradeRefusal(
-      output,
-      code !== undefined && isUpgradePlannerRefusalCode(code)
-        ? code
-        : "REPOSITORY_OPEN_FAILED",
-    );
-  }
-
-  const success: PlanUpgradeSuccess = {
-    ok: true,
-    command: "plan-upgrade",
-    plan: outcome.result.value,
-  };
-  writeJson(output.write, success);
-  return 0;
-}
-
 async function runPlanProfileTransition(
   command: Extract<
     CliCommand,
@@ -901,52 +776,6 @@ async function runApplyRemove(
   return 0;
 }
 
-async function runApplyUpgrade(
-  command: Extract<CliCommand, Readonly<{ kind: "apply-upgrade" }>>,
-  output: CliOutput,
-  dependencies: CliRunnerDependencies,
-): Promise<0 | 1> {
-  let result: CapabilityUpgradeExecutionResult;
-  try {
-    result = await (
-      dependencies.applyCapabilityUpgrade ?? applyCapabilityUpgradeDefault
-    )({
-      root: resolve(command.directory),
-      capability: command.capability,
-      toVersion: command.toVersion,
-      approvedPlanFingerprint: command.approvedPlanFingerprint,
-      verifier: dependencies.createVerifier(),
-    });
-  } catch {
-    writeJson(output.writeError, {
-      ok: false,
-      command: "apply-upgrade",
-      code: "CAPABILITY_EXECUTION_FAILED",
-      phase: "precondition",
-      recovery: "inspect-worktree",
-    });
-    return 1;
-  }
-
-  if (!result.ok) {
-    writeJson(output.writeError, {
-      ok: false,
-      command: "apply-upgrade",
-      code: result.code,
-      phase: result.phase,
-      recovery: result.recovery,
-    });
-    return 1;
-  }
-
-  writeJson(output.write, {
-    ok: true,
-    command: "apply-upgrade",
-    result: result.value,
-  });
-  return 0;
-}
-
 async function runApplyProfileTransition(
   command: Extract<
     CliCommand,
@@ -997,8 +826,20 @@ async function runApplyProfileTransition(
 
 export function createCliRunner(
   dependencies: CliRunnerDependencies,
+  projectSchemaVersion?: "2.0.0",
 ): CliRunner {
   return async (arguments_, output) => {
+    if (projectSchemaVersion === "2.0.0") {
+      const parsed = parseCliArguments(arguments_, "2.0.0");
+      if (!parsed.ok) return writeInvalidArguments(output);
+      if (parsed.value.kind !== "create") return runReadOnly(parsed.value, output, dependencies, "2.0.0");
+      try {
+        return await runCreate({ command: parsed.value, renderingContext: createApplicationEnvironmentRenderingContext() }, output, dependencies);
+      } catch {
+        writeJson(output.writeError, { ok: false, code: "PROJECT_GENERATION_FAILED" });
+        return 1;
+      }
+    }
     const parsed = parseCliArguments(arguments_);
 
     if (!parsed.ok) {
@@ -1022,7 +863,7 @@ export function createCliRunner(
 
     if (parsed.value.kind === "create") {
       try {
-        return await runCreate(parsed.value, output, dependencies);
+        return await runCreate({ command: parsed.value }, output, dependencies);
       } catch {
         writeJson(output.writeError, {
           ok: false,
@@ -1040,10 +881,6 @@ export function createCliRunner(
       return runPlanRemove(parsed.value, output, dependencies);
     }
 
-    if (parsed.value.kind === "plan-upgrade") {
-      return runPlanUpgrade(parsed.value, output, dependencies);
-    }
-
     if (parsed.value.kind === "plan-profile-transition") {
       return runPlanProfileTransition(parsed.value, output, dependencies);
     }
@@ -1054,10 +891,6 @@ export function createCliRunner(
 
     if (parsed.value.kind === "apply-remove") {
       return runApplyRemove(parsed.value, output, dependencies);
-    }
-
-    if (parsed.value.kind === "apply-upgrade") {
-      return runApplyUpgrade(parsed.value, output, dependencies);
     }
 
     if (parsed.value.kind === "apply-profile-transition") {

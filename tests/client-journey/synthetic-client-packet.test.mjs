@@ -20,6 +20,8 @@ import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+
 import { applySyntheticClientPacket } from "../../scripts/apply-synthetic-client-packet.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -34,7 +36,7 @@ const packetRoot = resolve(
 );
 const generatedFixtureRoot = resolve(
   repositoryRoot,
-  "fixtures/generated/site-multilingual-analytics",
+  generatedFixtureContracts.find(({ identifier }) => identifier === "site-multilingual-analytics").relativeRoot,
 );
 const adapterPath = resolve(
   repositoryRoot,
@@ -269,7 +271,8 @@ async function runInjectedRollback(projectRoot, statusMode) {
   await writeFile(
     wrapperPath,
     `#!/bin/sh
-if [ "$1" = "status" ]; then
+if [ "$1" = "status" ] ||
+   { [ "$1" = "--no-optional-locks" ] && [ "$2" = "status" ]; }; then
   count="$(cat "$ROLLBACK_STATUS_COUNTER" 2>/dev/null || printf '0')"
   count="$((count + 1))"
   printf '%s\n' "$count" > "$ROLLBACK_STATUS_COUNTER"
@@ -553,8 +556,23 @@ test("the adapter applies exactly the declared writes and emits a bounded receip
 
 test("the adapter accepts exact generation identities and refuses mixed or unsupported identities", async () => {
   const identities = [
-    { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: true },
-    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: true },
+    { recipe: "0.11.0", standards: "0.4.0", stateRecipe: "0.11.0", accepted: false },
+    { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
+    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.1", accepted: false },
+    { recipe: "0.12.1", standards: "0.4.0", stateRecipe: "0.12.1", accepted: false },
+    { recipe: "0.12.1", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
+    { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.2", standards: "0.4.0", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
+    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.3", accepted: false },
+    { recipe: "0.12.6", standards: "0.5.1", stateRecipe: "0.12.6", accepted: true },
+    { recipe: "0.12.4", standards: "0.5.0", stateRecipe: "0.12.4", accepted: false },
+    { recipe: "0.12.6", standards: "0.5.0", stateRecipe: "0.12.6", accepted: false },
+    { recipe: "0.12.6", standards: "0.5.1", stateRecipe: "0.12.6", schemaVersion: "2.0.0", accepted: false },
+    { recipe: "0.12.3", standards: "0.4.0", stateRecipe: "0.12.3", accepted: false },
+    { recipe: "0.12.6", standards: "0.4.0", stateRecipe: "0.12.6", accepted: false },
+    { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.6", standards: "0.5.1", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.11.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
     { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
@@ -568,6 +586,11 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
       const project = parse(await readFile(projectPath, "utf8"));
       const state = JSON.parse(await readFile(statePath, "utf8"));
       project.recipeVersion = identity.recipe;
+      if (identity.schemaVersion) {
+        project.schemaVersion = identity.schemaVersion;
+        state.schemaVersion = identity.schemaVersion;
+        state.projectSchemaVersion = identity.schemaVersion;
+      }
       state.origin.recipeVersion = identity.stateRecipe;
       state.installedCapabilities.find(({ identifier }) => identifier === "standards").version = identity.standards;
       await writeFile(projectPath, stringify(project));

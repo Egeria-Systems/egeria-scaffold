@@ -30,9 +30,9 @@ const expectedVerificationChecks = Object.freeze([
   "visual-regression",
 ]);
 const subject = Object.freeze({
-  descriptorVersion: "0.4.0",
+  descriptorVersion: "0.5.1",
   behaviorContractDigest:
-    "sha256:81bb7d1c0ee095b6411c29350fa418c8676ffa90594b848a9cc19806e08c29d4",
+    "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
 });
 
 export class GeneratedTestingCertificationError extends Error {
@@ -50,14 +50,14 @@ const configuration = Object.freeze({
   createArguments: Object.freeze([]),
   expectedCapabilities,
   capabilityIdentifier: "standards",
-  capabilityVersion: "0.4.0",
-  expectedRecipeVersion: "0.10.0",
+  capabilityVersion: "0.5.1",
+  expectedRecipeVersion: "0.11.6",
   verifierIdentifier: "portfolio",
   verificationOptions: Object.freeze({ includeVisual: true }),
   expectedVerificationChecks,
   receipt: Object.freeze({
     subject,
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.11.6",
   }),
   createError: (code) => new GeneratedTestingCertificationError(code),
   isCertificationError: (error) =>

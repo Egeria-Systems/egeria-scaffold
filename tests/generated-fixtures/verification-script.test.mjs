@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import {
   access,
@@ -21,11 +22,13 @@ import test from "node:test";
 
 import {
   captureVisualFailureArtifactsForTesting,
+  GeneratedFixtureVerificationError,
+  formatGeneratedFixtureFailure,
   generatedFixtureContracts,
   inspectGeneratedFixture,
   parseVerificationArguments,
   verifyGeneratedProjectForTesting,
-  verifyGeneratedSkeletonsForTesting,
+  verifyGeneratedSkeletonsForTesting as verifySkeletons,
 } from "../../scripts/verify-generated-skeletons.mjs";
 
 const repositoryRoot = resolve(
@@ -33,6 +36,86 @@ const repositoryRoot = resolve(
   "../..",
 );
 const execFileAsync = promisify(execFile);
+const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+
+function verifyGeneratedSkeletonsForTesting(adapters, options) {
+  return verifySkeletons({ ...adapters, runAudit: adapters?.runAudit ?? (async input => {
+    await adapters.runCommand(input);
+    return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
+  }) }, options);
+}
+
+test("the admitted skeleton audit exception never reaches strict single-project certification verification", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-audit-boundary-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  let admittedAudits = 0;
+  const adapters = {
+    createOwner: () => createKnownOwner(parent),
+    runCommand: successfulCommand,
+    runAudit: async () => {
+      admittedAudits++;
+      return { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1, advisory: "GHSA-vfj7-8cjw-p6xm" };
+    },
+  };
+  const result = await verifyGeneratedSkeletonsForTesting(adapters);
+  assert.equal(admittedAudits, generatedFixtureContracts.length);
+  assert.equal(result.auditDispositions.length, generatedFixtureContracts.length);
+  assert.equal(result.auditDispositions.every(receipt => receipt.rawExitCode === 1), true);
+  assert.equal(result.auditDispositions.every(receipt => receipt.thresholdExitCode === 1), true);
+  assert.equal(result.status, "completed-with-security-exception");
+  const commands = [];
+  await expectFixtureError(() => verifyGeneratedProjectForTesting(resolve(repositoryRoot, fixtureRoot("portfolio")), "portfolio", {
+    ...adapters,
+    runAudit: async () => assert.fail("certification must not use the exception route"),
+    runCommand: async input => {
+      commands.push(input.arguments);
+      if (input.arguments[0] === "audit") throw Object.assign(new Error("raw audit failure"), { code: 1 });
+      return successfulCommand(input);
+    },
+  }), "DEPENDENCY_AUDIT_FAILED");
+  assert.equal(commands.some(args => args.includes("lint")), false);
+  assert.equal(commands.some(args => args.includes("signatures")), false);
+});
+
+test("skeleton verification accepts below-threshold findings while preserving raw audit failures", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-audit-threshold-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const commands = [];
+  const result = await verifyGeneratedSkeletonsForTesting({
+    createOwner: () => createKnownOwner(parent),
+    runCommand: successfulCommand,
+    runAudit: async input => {
+      commands.push(input.arguments);
+      return { status: "passed", rawExitCode: 1, thresholdExitCode: 0 };
+    },
+  });
+  assert.equal(result.auditDispositions.length, generatedFixtureContracts.length);
+  assert.equal(result.auditDispositions.every(receipt => receipt.status === "passed" && receipt.rawExitCode === 1 && receipt.thresholdExitCode === 0), true);
+  assert.equal(result.status, "completed");
+  assert.equal(commands.every(arguments_ => JSON.stringify(arguments_) === JSON.stringify(["audit", "--audit-level", "info", "--json"])), true);
+});
+
+for (const disposition of [
+  { status: "passed", rawExitCode: 0 },
+  { status: "passed", rawExitCode: 0, thresholdExitCode: 1 },
+  { status: "passed", rawExitCode: 1, thresholdExitCode: 1 },
+  { status: "passed", rawExitCode: 2, thresholdExitCode: 0 },
+  { status: "accepted-with-security-exception", rawExitCode: 1 },
+  { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 0 },
+  { status: "accepted-with-security-exception", rawExitCode: 0, thresholdExitCode: 1 },
+  { status: "refused", rawExitCode: 1, thresholdExitCode: 1 },
+])
+test(`skeleton verification rejects incoherent audit disposition ${JSON.stringify(disposition)}`, async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-audit-invalid-threshold-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const commands = [];
+  await expectFixtureError(() => verifyGeneratedSkeletonsForTesting({
+    createOwner: () => createKnownOwner(parent),
+    runCommand: async input => { commands.push(input.arguments); return successfulCommand(input); },
+    runAudit: async () => disposition,
+  }), "DEPENDENCY_AUDIT_FAILED");
+  assert.equal(commands.some(arguments_ => arguments_.includes("signatures") || arguments_.includes("lint")), false);
+});
 const repositoryGitArguments = Object.freeze([
   "-c",
   `safe.directory=${repositoryRoot}`,
@@ -124,7 +207,7 @@ test("persistence fixture binding verification executes separately and a failed 
       const commands = [];
       let ownedPath;
       const run = () => verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+        resolve(repositoryRoot, fixtureRoot("app-persistence")), "app-persistence",
         {
           async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
           async runCommand(input) {
@@ -157,7 +240,7 @@ test("persistence fixture must typecheck before application binding types are ge
   const commands = [];
   try {
     await expectFixtureError(() => verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/app-persistence"), "app-persistence",
+      resolve(repositoryRoot, fixtureRoot("app-persistence")), "app-persistence",
       {
         async createOwner() { return createKnownOwner(ownerParent); },
         async runCommand(input) {
@@ -199,7 +282,7 @@ test("app build evidence refuses client Effect markers and the wrong installed p
     for (const variant of [{ client: 'export const leaked = "~effect/Effect";' }, { effectVersion: "4.0.0-rc.113" }]) {
       const commands = [];
       await expectFixtureError(() => verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated/app"), "app",
+        resolve(repositoryRoot, fixtureRoot("app")), "app",
         {
           createOwner: () => createKnownOwner(owner),
           async runCommand(input) {
@@ -243,7 +326,7 @@ test("app Worker integration executes after OpenNext and records non-app absence
     for (const identifier of ["portfolio", "app", "app-all-optional-integrations"]) {
       const commands = [];
       const result = await verifyGeneratedProjectForTesting(
-        resolve(repositoryRoot, "fixtures/generated", identifier), identifier,
+        resolve(repositoryRoot, fixtureRoot(identifier)), identifier,
         {
           createOwner: () => createKnownOwner(ownerParent),
           async runCommand(input) {
@@ -307,7 +390,7 @@ test("a failing present Worker script refuses success and still cleans its tempo
   const commands = [];
   try {
     await expectFixtureError(() => verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/app"), "app",
+      resolve(repositoryRoot, fixtureRoot("app")), "app",
       {
         async createOwner() { const owner = await createKnownOwner(ownerParent); ownedPath = owner.path; return owner; },
         async runCommand(input) {
@@ -335,63 +418,63 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio",
+        relativeRoot: "fixtures/generated/portfolio-0.11.6",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.6",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site",
+        relativeRoot: "fixtures/generated/site-0.12.6",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.6",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.6",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app",
+        relativeRoot: "fixtures/generated/app-0.2.6",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.6",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.6",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.6",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.6",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.6" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.0" : contract.profile === "site" ? "0.12.0" : "0.11.0",
+      contract.profile === "app" ? "0.2.6" : contract.profile === "site" ? "0.12.6" : "0.11.6",
     );
-    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.0" : "0.5.0");
+    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.1" : "0.5.1");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.4.0" : "0.3.0");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.4.1" : "0.3.1");
     assert.equal(
       contract.expectedSiteRoutingVersion,
       contract.profile === "portfolio" ? null : "0.4.0",
@@ -415,18 +498,18 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(
       contract.expectedSurfaces,
       contract.identifier === "portfolio-calendly"
-        ? 111
+        ? 112
         : contract.identifier === "portfolio"
-          ? 106
+          ? 107
           : contract.identifier === "site"
-            ? 123
+            ? 124
             : contract.identifier === "site-multilingual"
-              ? 139
-              : contract.identifier === "app" ? 142
-                : contract.identifier === "app-all-optional-integrations" ? 178
-                  : contract.identifier === "app-persistence" ? 161
-                    : contract.identifier === "portfolio-email" ? 134
-                      : contract.identifier === "app-persistence-email" ? 170 : contract.identifier === "site-contact-form" ? 137 : 154,
+              ? 140
+              : contract.identifier === "app" ? 143
+                : contract.identifier === "app-all-optional-integrations" ? 179
+                  : contract.identifier === "app-persistence" ? 162
+                    : contract.identifier === "portfolio-email" ? 135
+                      : contract.identifier === "app-persistence-email" ? 171 : contract.identifier === "site-contact-form" ? 138 : 155,
     );
     assert.equal(
       contract.visualRegression,
@@ -466,13 +549,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const analyticsSite = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site-multilingual-analytics",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 57);
-  assert.equal(site.expectedFiles.length, 74);
-  assert.equal(multilingualSite.expectedFiles.length, 90);
-  assert.equal(analyticsSite.expectedFiles.length, 105);
+  assert.equal(basePortfolio.expectedFiles.length, 58);
+  assert.equal(site.expectedFiles.length, 75);
+  assert.equal(multilingualSite.expectedFiles.length, 91);
+  assert.equal(analyticsSite.expectedFiles.length, 106);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    57 - 1 + 6,
+    58 - 1 + 6,
     "six booking sources replace one common home destination and add five distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
@@ -631,28 +714,28 @@ test("generated fixture text and visual baseline attributes are explicit", async
   );
 
   assert.deepEqual(textAttributes.trimEnd().split("\n"), [
-    "fixtures/generated/portfolio/package.json: text: set",
-    "fixtures/generated/portfolio/package.json: eol: lf",
-    "fixtures/generated/portfolio-calendly/package.json: text: set",
-    "fixtures/generated/portfolio-calendly/package.json: eol: lf",
-    "fixtures/generated/site/package.json: text: set",
-    "fixtures/generated/site/package.json: eol: lf",
-    "fixtures/generated/site-multilingual/package.json: text: set",
-    "fixtures/generated/site-multilingual/package.json: eol: lf",
-    "fixtures/generated/site-multilingual-analytics/package.json: text: set",
-    "fixtures/generated/site-multilingual-analytics/package.json: eol: lf",
-    "fixtures/generated/app/package.json: text: set",
-    "fixtures/generated/app/package.json: eol: lf",
-    "fixtures/generated/app-all-optional-integrations/package.json: text: set",
-    "fixtures/generated/app-all-optional-integrations/package.json: eol: lf",
-    "fixtures/generated/app-persistence/package.json: text: set",
-    "fixtures/generated/app-persistence/package.json: eol: lf",
-    "fixtures/generated/portfolio-email/package.json: text: set",
-    "fixtures/generated/portfolio-email/package.json: eol: lf",
-    "fixtures/generated/app-persistence-email/package.json: text: set",
-    "fixtures/generated/app-persistence-email/package.json: eol: lf",
-    "fixtures/generated/site-contact-form/package.json: text: set",
-    "fixtures/generated/site-contact-form/package.json: eol: lf",
+    `${fixtureRoot("portfolio")}/package.json: text: set`,
+    `${fixtureRoot("portfolio")}/package.json: eol: lf`,
+    `${fixtureRoot("portfolio-calendly")}/package.json: text: set`,
+    `${fixtureRoot("portfolio-calendly")}/package.json: eol: lf`,
+    `${fixtureRoot("site")}/package.json: text: set`,
+    `${fixtureRoot("site")}/package.json: eol: lf`,
+    `${fixtureRoot("site-multilingual")}/package.json: text: set`,
+    `${fixtureRoot("site-multilingual")}/package.json: eol: lf`,
+    `${fixtureRoot("site-multilingual-analytics")}/package.json: text: set`,
+    `${fixtureRoot("site-multilingual-analytics")}/package.json: eol: lf`,
+    `${fixtureRoot("app")}/package.json: text: set`,
+    `${fixtureRoot("app")}/package.json: eol: lf`,
+    `${fixtureRoot("app-all-optional-integrations")}/package.json: text: set`,
+    `${fixtureRoot("app-all-optional-integrations")}/package.json: eol: lf`,
+    `${fixtureRoot("app-persistence")}/package.json: text: set`,
+    `${fixtureRoot("app-persistence")}/package.json: eol: lf`,
+    `${fixtureRoot("portfolio-email")}/package.json: text: set`,
+    `${fixtureRoot("portfolio-email")}/package.json: eol: lf`,
+    `${fixtureRoot("app-persistence-email")}/package.json: text: set`,
+    `${fixtureRoot("app-persistence-email")}/package.json: eol: lf`,
+    `${fixtureRoot("site-contact-form")}/package.json: text: set`,
+    `${fixtureRoot("site-contact-form")}/package.json: eol: lf`,
   ]);
 
   const baselineDirectory =
@@ -758,17 +841,31 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     );
     const workspacePath = join(workspaceOverrideRoot, "pnpm-workspace.yaml");
     const workspace = await readFile(workspacePath, "utf8");
-    await writeFile(
-      workspacePath,
-      workspace.replace(
-        '  "miniflare>undici": 7.29.0',
-        '  "miniflare>undici": 7.29.0\n  next: 16.3.1',
-      ),
+    const unapprovedWorkspace = workspace.replace(
+      '  "miniflare>undici": 7.29.1',
+      '  "miniflare>undici": 7.29.1\n  next: 16.3.1',
     );
+    assert.notEqual(unapprovedWorkspace, workspace);
+    await writeFile(workspacePath, unapprovedWorkspace);
     await expectFixtureError(
       () => inspectGeneratedFixture(workspaceOverrideRoot, "portfolio"),
       "FIXTURE_WORKSPACE_POLICY_INVALID",
     );
+
+
+    for (const [name, replacement] of [
+      ["missing-glob-override", ""],
+      ["stale-glob-override", '  "@node-minify/core@9.0.2>glob": "10.3.3"\n'],
+    ]) {
+      const root = await copyFixture(owner, "portfolio", name);
+      const policyPath = join(root, "pnpm-workspace.yaml");
+      const policy = await readFile(policyPath, "utf8");
+      const changed = policy.replace('  "@node-minify/core@9.0.2>glob": "10.5.0"\n', replacement);
+      assert.notEqual(changed, policy);
+      await writeFile(policyPath, changed);
+      await expectFixtureError(() => inspectGeneratedFixture(root, "portfolio"), "FIXTURE_WORKSPACE_POLICY_INVALID");
+      assert.equal(await readFile(policyPath, "utf8"), changed);
+    }
 
     const lockfileOverrideRoot = await copyFixture(
       owner,
@@ -777,13 +874,12 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     );
     const lockfilePath = join(lockfileOverrideRoot, "pnpm-lock.yaml");
     const lockfile = await readFile(lockfilePath, "utf8");
-    await writeFile(
-      lockfilePath,
-      lockfile.replace(
-        "  miniflare>undici: 7.29.0",
-        "  miniflare>undici: 7.29.1",
-      ),
+    const unapprovedLockfile = lockfile.replace(
+      "  miniflare>undici: 7.29.1",
+      "  miniflare>undici: 7.29.0",
     );
+    assert.notEqual(unapprovedLockfile, lockfile);
+    await writeFile(lockfilePath, unapprovedLockfile);
     await expectFixtureError(
       () => inspectGeneratedFixture(lockfileOverrideRoot, "portfolio"),
       "FIXTURE_LOCKFILE_INVALID",
@@ -819,13 +915,12 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     const tarballRoot = await copyFixture(owner, "portfolio", "tarball");
     const tarballLockfilePath = join(tarballRoot, "pnpm-lock.yaml");
     const tarballLockfile = await readFile(tarballLockfilePath, "utf8");
-    await writeFile(
-      tarballLockfilePath,
-      tarballLockfile.replace(
-        "    resolution: {integrity:",
-        "    resolution:\n      tarball: https://example.invalid/package.tgz\n      integrity:",
-      ),
+    const tarballOverride = tarballLockfile.replace(
+      /    resolution: \{\s*integrity:/u,
+      "    resolution: {tarball: https://example.invalid/package.tgz, integrity:",
     );
+    assert.notEqual(tarballOverride, tarballLockfile);
+    await writeFile(tarballLockfilePath, tarballOverride);
     await expectFixtureError(
       () => inspectGeneratedFixture(tarballRoot, "portfolio"),
       "FIXTURE_LOCKFILE_INVALID",
@@ -1117,7 +1212,7 @@ test("single-project visual opt-in reports only checks that actually run", async
 
   try {
     const result = await verifyGeneratedProjectForTesting(
-      resolve(repositoryRoot, "fixtures/generated/site-multilingual"),
+      resolve(repositoryRoot, fixtureRoot("site-multilingual")),
       "site-multilingual",
       {
         async createOwner() {
@@ -1586,7 +1681,7 @@ test("single-root verification accepts an explicit generated project identity", 
   const ownerParent = await mkdtemp(
     join(tmpdir(), "egeria-single-root-identity-"),
   );
-  const canonicalRoot = resolve(repositoryRoot, "fixtures/generated/portfolio");
+  const canonicalRoot = resolve(repositoryRoot, fixtureRoot("portfolio"));
   const canonicalBefore = await inspectGeneratedFixture(
     canonicalRoot,
     "portfolio",
@@ -1725,7 +1820,10 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
       },
     });
 
-    const { appBuildEvidence, ...verification } = result;
+    const { appBuildEvidence, auditDispositions, status, ...verification } = result;
+    assert.equal(status, "completed");
+    assert.deepEqual(auditDispositions.map(({ fixture }) => fixture), result.fixtures);
+    assert.equal(auditDispositions.every(audit => audit.status === "passed" && audit.rawExitCode === 0), true);
     assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"]);
     for (const build of appBuildEvidence) {
       assert.equal(build.effect.version, "4.0.0-rc.112");
@@ -1828,7 +1926,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ),
   );
   for (const [fixtureIndex, arguments_] of fixtureCommands.entries()) {
-    const expected = generatedFixtureContracts[fixtureIndex].expectedApplicationPersistenceVersion === "0.1.0"
+    const expected = generatedFixtureContracts[fixtureIndex].expectedApplicationPersistenceVersion === "0.1.1"
       ? [...perFixture.slice(0, 6), ["run", "typecheck"], ...perFixture.slice(6)]
       : perFixture;
     assert.deepEqual(
@@ -1846,7 +1944,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["--version"],
     ["install", "--frozen-lockfile", "--store-dir", "<owned-path>"],
     ["peers", "check"],
-    ["audit", "--audit-level", "moderate"],
+    ["audit", "--audit-level", "info", "--json"],
     ["audit", "signatures"],
     ["run", "lint"],
     ["--dir", "apps/web", "run", "cf-typegen"],
@@ -1892,7 +1990,7 @@ test("live verification reports a stable failure and still removes its owner", a
             return identity;
           },
           async runCommand(input) {
-            if (input.arguments.join(" ") === "audit --audit-level moderate") {
+            if (input.arguments.join(" ") === "audit --audit-level info --json") {
               throw new Error("PRIVATE_VALUE");
             }
             return successfulCommand(input);
@@ -1906,14 +2004,34 @@ test("live verification reports a stable failure and still removes its owner", a
   }
 });
 
-test("live verification maps the prepared OpenNext transform failure", async () => {
+test("OpenNext failure envelope preserves existing codes and artifact-export fields", async () => {
+  const previewFailure = Object.assign(new GeneratedFixtureVerificationError("BROWSER_PREVIEW_FAILED"), {
+    artifactExportCode: "VISUAL_ARTIFACT_EXPORT_FAILED",
+    previewDiagnostics: { private: "PRIVATE_PREVIEW" },
+    commandDiagnostics: { private: "PRIVATE_UNRELATED" },
+  });
+  for (const [error, expected] of [
+    [previewFailure, { ok: false, code: "BROWSER_PREVIEW_FAILED", artifactExportCode: "VISUAL_ARTIFACT_EXPORT_FAILED" }],
+    [new GeneratedFixtureVerificationError("OPENNEXT_BUILD_FAILED"), { ok: false, code: "OPENNEXT_BUILD_FAILED" }],
+    [Object.assign(new Error("PRIVATE_MESSAGE"), { code: "OPENNEXT_BUILD_FAILED", commandDiagnostics: { private: "PRIVATE_UNKNOWN" } }), { ok: false, code: "VERIFICATION_FAILED" }],
+    [Object.assign(new Error("PRIVATE_MESSAGE"), { artifactExportCode: "VISUAL_ARTIFACT_EXPORT_FAILED" }), { ok: false, code: "VERIFICATION_FAILED", artifactExportCode: "VISUAL_ARTIFACT_EXPORT_FAILED" }],
+    [null, { ok: false, code: "VERIFICATION_FAILED" }],
+  ]) {
+    const serialized = JSON.stringify(formatGeneratedFixtureFailure(error));
+    assert.deepEqual(JSON.parse(serialized), expected);
+    assert.doesNotMatch(serialized, /PRIVATE_|previewDiagnostics|commandDiagnostics|message|stack|cause/u);
+  }
+});
+
+async function inspectFailedOpenNextCommand(failCommand) {
   const ownerParent = await mkdtemp(join(tmpdir(), "egeria-fixture-opennext-"));
   let ownedPath;
+  let failure;
 
   try {
-    await expectFixtureError(
+    await assert.rejects(
       () =>
-        verifyGeneratedSkeletonsForTesting({
+        verifyGeneratedProjectForTesting(resolve(repositoryRoot, fixtureRoot("portfolio")), "portfolio", {
           async createOwner() {
             const identity = await createKnownOwner(ownerParent);
             ownedPath = identity.path;
@@ -1924,15 +2042,222 @@ test("live verification maps the prepared OpenNext transform failure", async () 
               input.arguments.join(" ") ===
               "--dir apps/web exec opennextjs-cloudflare build --skipNextBuild"
             ) {
-              throw new Error("PRIVATE_VALUE");
+              assert.equal(input.timeout, 900000);
+              return failCommand(input);
             }
             return successfulCommand(input);
           },
         }),
-      "OPENNEXT_BUILD_FAILED",
+      error => {
+        assert.equal(error.name, "GeneratedFixtureVerificationError");
+        assert.equal(error.code, "OPENNEXT_BUILD_FAILED");
+        failure = error;
+        return true;
+      },
     );
     assert.equal(await pathExists(ownedPath), false);
+    assert.notEqual(failure.commandDiagnostics, undefined, "failed OpenNext commands must retain safe diagnostics");
+    return failure;
   } finally {
     await rm(ownerParent, { recursive: true, force: true });
+  }
+}
+
+test("live verification maps the prepared OpenNext transform failure without persisting child output", async () => {
+  const stdout = "\u001b[32mSkipping\u001b[0m Next.js build\nGenerating bundle PRIVATE_STDOUT\n";
+  const stderr = "Building Next.js app\nOpenNext build complete.\nAuthorization: Bearer PRIVATE_TOKEN\nCookie: PRIVATE_COOKIE\n/private/PRIVATE_SOURCE/server.js\n";
+  const started = performance.now();
+  const failure = await inspectFailedOpenNextCommand(input => execFileAsync(process.execPath, ["-e", [
+    `process.stdout.write(${JSON.stringify(stdout)});`,
+    `process.stderr.write(${JSON.stringify(stderr)});`,
+    "process.exitCode = 7;",
+  ].join("\n")], { cwd: input.cwd, env: input.environment, encoding: "utf8", timeout: 5000, maxBuffer: 1048576, shell: false, windowsHide: true }));
+  const diagnostics = failure.commandDiagnostics;
+  assert.deepEqual(diagnostics.process, { exitCode: 7, signal: null, killed: false, outputLimitExceeded: false });
+  assert.deepEqual(diagnostics.stdout, { status: "inspected", bytes: Buffer.byteLength(stdout), indicators: ["skipped-next-build", "generating-bundle"] });
+  assert.deepEqual(diagnostics.stderr, { status: "inspected", bytes: Buffer.byteLength(stderr), indicators: ["building-next-app", "opennext-complete"] });
+  assert.equal(diagnostics.timing.timeoutMilliseconds, 900000);
+  assert.ok(Number.isFinite(diagnostics.timing.elapsedMilliseconds));
+  assert.ok(diagnostics.timing.elapsedMilliseconds >= 0);
+  assert.ok(diagnostics.timing.elapsedMilliseconds <= performance.now() - started);
+  assert.equal(Object.hasOwn(failure, "cause"), false);
+  const envelope = formatGeneratedFixtureFailure(failure);
+  assert.deepEqual(envelope, { ok: false, code: "OPENNEXT_BUILD_FAILED", commandDiagnostics: diagnostics });
+  const serialized = JSON.stringify(envelope);
+  assert.doesNotMatch(serialized, /PRIVATE_|Authorization|Cookie|Bearer|\/Users\/|stdout\.write|stack|cause|argv|environment|cwd/u);
+});
+
+test("OpenNext diagnostics keep output limits and killed signals distinct from proven timeouts", async () => {
+  const failure = await inspectFailedOpenNextCommand(() => {
+    throw Object.assign(new Error("PRIVATE_VALUE"), {
+      code: "ERR_CHILD_PROCESS_STDIO_MAXBUFFER", signal: "SIGTERM", killed: true,
+      stdout: Buffer.from("Generating bundle PRIVATE_BUFFER"), stderr: "",
+    });
+  });
+  assert.deepEqual(failure.commandDiagnostics.process, { exitCode: null, signal: "SIGTERM", killed: true, outputLimitExceeded: true });
+  assert.deepEqual(failure.commandDiagnostics.stdout, { status: "inspected", bytes: 32, indicators: ["generating-bundle"] });
+  assert.deepEqual(failure.commandDiagnostics.stderr, { status: "inspected", bytes: 0, indicators: [] });
+  assert.doesNotMatch(JSON.stringify(failure.commandDiagnostics), /PRIVATE_|timedOut|timed-out/u);
+});
+
+test("OpenNext diagnostics normalize unknown process fields without coercion", async t => {
+  for (const [label, cause, expected] of [
+    ["missing", new Error("PRIVATE_VALUE"), { exitCode: null, signal: null, killed: null, outputLimitExceeded: false }],
+    ["unknown", { code: "ENOENT", signal: "PRIVATE_SIGNAL", killed: "true" }, { exitCode: null, signal: null, killed: null, outputLimitExceeded: false }],
+    ["negative", { code: -1, signal: null, killed: false }, { exitCode: null, signal: null, killed: false, outputLimitExceeded: false }],
+    ["too large", { code: 256, signal: "SIGTERM", killed: true }, { exitCode: null, signal: "SIGTERM", killed: true, outputLimitExceeded: false }],
+    ["fractional", { code: 1.5 }, { exitCode: null, signal: null, killed: null, outputLimitExceeded: false }],
+    ["upper boundary", { code: 255 }, { exitCode: 255, signal: null, killed: null, outputLimitExceeded: false }],
+    ["primitive", null, { exitCode: null, signal: null, killed: null, outputLimitExceeded: false }],
+  ]) {
+    await t.test(label, async () => {
+      const failure = await inspectFailedOpenNextCommand(() => { throw cause; });
+      assert.deepEqual(failure.commandDiagnostics.process, expected);
+      assert.deepEqual(failure.commandDiagnostics.stdout, { status: "absent" });
+      assert.deepEqual(failure.commandDiagnostics.stderr, { status: "absent" });
+    });
+  }
+});
+
+test("OpenNext diagnostics enforce stream byte bounds and refuse unsupported types", async t => {
+  const bounded = "界".repeat(349525) + "x";
+  for (const [label, value, expected] of [
+    ["byte boundary", bounded, { status: "inspected", bytes: 1048576, indicators: [] }],
+    ["oversized text", bounded + "x", { status: "refused" }],
+    ["oversized buffer", Buffer.alloc(1048577), { status: "refused" }],
+    ["typed array", new Uint8Array([1]), { status: "refused" }],
+    ["object", { toString() { assert.fail("unsupported output must not be coerced"); } }, { status: "refused" }],
+    ["absent", null, { status: "absent" }],
+  ]) {
+    await t.test(label, async () => {
+      const failure = await inspectFailedOpenNextCommand(() => { throw { stdout: value, stderr: value }; });
+      assert.deepEqual(failure.commandDiagnostics.stdout, expected);
+      assert.deepEqual(failure.commandDiagnostics.stderr, expected);
+    });
+  }
+});
+
+test("OpenNext diagnostic getters cannot replace the stable failure or expose their values", async t => {
+  for (const field of ["code", "signal", "killed", "stdout", "stderr"]) {
+    await t.test(field, async () => {
+      let reads = 0;
+      const cause = Object.defineProperty(new Error("PRIVATE_VALUE"), field, { get() { reads++; throw new Error("PRIVATE_GETTER"); } });
+      const failure = await inspectFailedOpenNextCommand(() => { throw cause; });
+      assert.equal(reads, 0);
+      assert.deepEqual(failure.commandDiagnostics, { status: "refused" });
+      const serialized = JSON.stringify(formatGeneratedFixtureFailure(failure));
+      assert.deepEqual(JSON.parse(serialized), { ok: false, code: "OPENNEXT_BUILD_FAILED", commandDiagnostics: { status: "refused" } });
+      assert.doesNotMatch(serialized, /PRIVATE_|Authorization|Cookie|Bearer/u);
+    });
+  }
+});
+
+test("OpenNext diagnostics refuse hostile property inspection while preserving cleanup", async () => {
+  const failure = await inspectFailedOpenNextCommand(() => {
+    throw new Proxy({}, { getOwnPropertyDescriptor() { throw new Error("PRIVATE_TRAP"); } });
+  });
+  assert.deepEqual(failure.commandDiagnostics, { status: "refused" });
+  assert.deepEqual(formatGeneratedFixtureFailure(failure), { ok: false, code: "OPENNEXT_BUILD_FAILED", commandDiagnostics: { status: "refused" } });
+});
+
+test("OpenNext success preserves the verification result and owner cleanup", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-opennext-success-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  let ownerPath;
+  let builds = 0;
+  const result = await verifyGeneratedProjectForTesting(resolve(repositoryRoot, fixtureRoot("portfolio")), "portfolio", {
+    async createOwner() {
+      const owner = await createKnownOwner(parent);
+      ownerPath = owner.path;
+      return owner;
+    },
+    async runCommand(input) {
+      if (input.arguments.includes("opennextjs-cloudflare")) {
+        builds++;
+        assert.equal(input.timeout, 900000);
+        return execFileAsync(process.execPath, ["-e", "process.stdout.write('OpenNext build complete.');"], { cwd: input.cwd, env: input.environment });
+      }
+      return successfulCommand(input);
+    },
+  });
+  assert.equal(builds, 1);
+  assert.equal(result.ok, true);
+  assert.ok(result.checks.includes("opennext-build"));
+  assert.equal(Object.hasOwn(result, "commandDiagnostics"), false);
+  assert.equal(await pathExists(ownerPath), false);
+});
+
+
+test("active fixture inspection refuses the preserved predecessor Next declaration", async t => {
+  const owner = await mkdtemp(join(tmpdir(), "retained-fixture-next-"));
+  try {
+    for (const contract of generatedFixtureContracts) {
+      await t.test(contract.identifier, async () => {
+        const predecessorVersion = contract.profile === "portfolio" ? "0.11.5" : contract.profile === "site" ? "0.12.5" : "0.2.5";
+        const control = JSON.parse(await readFile(
+          resolve(repositoryRoot, "packages/builder-core/tests/fixtures/retired-recipes", `${contract.identifier}-${predecessorVersion}.json`), "utf8",
+        ));
+        assert.equal(control.sourceCommit, "73e3cfdc4166a0d008a6c84b47b4a3a2084af71f");
+        assert.equal(control.variants.published.next, "16.3.8");
+        const root = await copyFixture(owner, contract.identifier, "retained-next");
+        const manifestPath = join(root, "apps/web/package.json");
+        const currentManifest = await readFile(manifestPath, "utf8");
+        const predecessorManifest = currentManifest.replace(
+          /("next":\s*")[^"]+(")/u,
+          (_match, prefix, suffix) => `${prefix}${control.variants.published.next}${suffix}`,
+        );
+        assert.deepEqual(JSON.parse(predecessorManifest), {
+          ...JSON.parse(currentManifest),
+          dependencies: { ...JSON.parse(currentManifest).dependencies, next: "16.3.8" },
+        });
+        await writeFile(manifestPath, predecessorManifest);
+        const before = await Promise.all(contract.expectedFiles.map(async file => [file, await readFile(join(root, file))]));
+        await expectFixtureError(() => inspectGeneratedFixture(root, contract.identifier), "FIXTURE_MANIFEST_INVALID");
+        assert.deepEqual(
+          await Promise.all(contract.expectedFiles.map(async file => [file, await readFile(join(root, file))])),
+          before,
+        );
+      });
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("active fixture inspection refuses an absent owned path", async () => {
+  const owner = await mkdtemp(join(tmpdir(), "missing-fixture-root-"));
+  try {
+    const root = join(owner, "absent");
+    await expectFixtureError(() => inspectGeneratedFixture(root, "portfolio"), "FIXTURE_PATH_INVALID");
+    assert.equal(await pathExists(root), false);
+    assert.deepEqual(await readdir(owner), []);
+  } finally {
+    await rm(owner, { recursive: true, force: true });
+  }
+});
+
+test("active fixture inspection independently refuses retained workspace policies", async () => {
+  const controls = JSON.parse(await readFile(
+    resolve(repositoryRoot, "packages/builder-core/tests/fixtures/retired-recipes/public-generations.json"), "utf8",
+  ));
+  const owner = await mkdtemp(join(tmpdir(), "retained-fixture-policy-"));
+  try {
+    for (const { identifier } of generatedFixtureContracts) {
+      const root = await copyFixture(owner, identifier, "retained-policy");
+      const policyPath = join(root, "pnpm-workspace.yaml");
+      const historical = controls.retiredWorkspacePolicies.find(({ sourceFiles }) =>
+        sourceFiles.includes(`fixtures/generated/${identifier}/pnpm-workspace.yaml`));
+      assert.notEqual(historical, undefined);
+      const historicalPolicy = historical.workspaceYaml;
+      assert.equal(createHash("sha256").update(historicalPolicy).digest("hex"), historical.sha256);
+      assert.notEqual(await readFile(policyPath, "utf8"), historicalPolicy);
+      await writeFile(policyPath, historicalPolicy);
+      await expectFixtureError(
+        () => inspectGeneratedFixture(root, identifier),
+        "FIXTURE_WORKSPACE_POLICY_INVALID",
+      );
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
   }
 });
