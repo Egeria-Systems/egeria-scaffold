@@ -298,6 +298,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "inference/infer-repository.ts",
       "lifecycle/app-profile-transition.ts",
       "lifecycle/app-transition-content-validation.ts",
+      "lifecycle/app-transition-visual-admission.cjs",
       "lifecycle/apply-capability-addition.ts",
       "lifecycle/apply-capability-removal.ts",
       "lifecycle/apply-profile-transition.ts",
