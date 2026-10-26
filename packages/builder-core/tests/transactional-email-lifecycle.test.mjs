@@ -15,7 +15,7 @@ const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.6-foundation", site: "web-recipe-app-0.2.6", app: "web-recipe-app-0.2.6" }, persistenceLock: "web-recipe-app-0.2.6-persistence" },
+  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.7-foundation", site: "web-recipe-app-0.2.7", app: "web-recipe-app-0.2.7" }, persistenceLock: "web-recipe-app-0.2.7-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -39,7 +39,7 @@ async function repository(profile = "portfolio", options = {}) {
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces));
   const checks = options.applicationPersistence ? core.persistenceGenerationVerificationChecks : rendered.value.project.selectedCapabilities.includes("app-foundation") ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
-  const state = { schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0", origin: { profile, recipeVersion: rendered.value.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [], compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" }, lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] } };
+  const state = { schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0", origin: { profile, recipeVersion: rendered.value.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [], compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" }, lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] } };
   files.set(".egeria/state.json", encoder.encode(core.serializeStateJson(state)));
   const writes = [];
   const reader = {
@@ -131,7 +131,7 @@ test("email addition refuses historical recipes and modified dependency locks be
   assert.deepEqual(repo.writes, []);
   const historical = await repository("portfolio");
   const source = decoder.decode(historical.files.get(".egeria/project.yaml"));
-  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.6", "0.10.0")));
+  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.7", "0.10.0")));
   const result = await core.planCapabilityAddition({ reader: historical.reader, git, capability });
   assert.equal(result.ok, false);
   assert.deepEqual(historical.writes, []);

@@ -196,7 +196,7 @@ async function successfulCommand(input) {
       await writeSyntheticAppBuild(input.cwd);
     }
   }
-  if (input.arguments[0] === "--version") return "11.20.0\n";
+  if (input.arguments[0] === "--version") return "11.28.1\n";
   return "";
 }
 
@@ -418,58 +418,58 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-0.11.6",
+        relativeRoot: "fixtures/generated/portfolio-0.11.7",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.6",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.7",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-0.12.6",
+        relativeRoot: "fixtures/generated/site-0.12.7",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.12.6",
+        relativeRoot: "fixtures/generated/site-multilingual-0.12.7",
       },
       {
         identifier: "site-multilingual-analytics",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.6",
+        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.7",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-0.2.6",
+        relativeRoot: "fixtures/generated/app-0.2.7",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.6",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.7",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-0.2.6",
+        relativeRoot: "fixtures/generated/app-persistence-0.2.7",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.11.6",
+        relativeRoot: "fixtures/generated/portfolio-email-0.11.7",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.2.6",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.2.7",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.6" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.7" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.6" : contract.profile === "site" ? "0.12.6" : "0.11.6",
+      contract.profile === "app" ? "0.2.7" : contract.profile === "site" ? "0.12.7" : "0.11.7",
     );
     assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.1" : "0.5.1");
     assert.equal(contract.expectedObservabilityVersion, "0.3.0");
@@ -842,8 +842,8 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     const workspacePath = join(workspaceOverrideRoot, "pnpm-workspace.yaml");
     const workspace = await readFile(workspacePath, "utf8");
     const unapprovedWorkspace = workspace.replace(
-      '  "miniflare>undici": 7.29.1',
-      '  "miniflare>undici": 7.29.1\n  next: 16.3.1',
+      '  "miniflare>undici": 7.30.1',
+      '  "miniflare>undici": 7.30.1\n  next: 16.3.1',
     );
     assert.notEqual(unapprovedWorkspace, workspace);
     await writeFile(workspacePath, unapprovedWorkspace);
@@ -875,7 +875,7 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
     const lockfilePath = join(lockfileOverrideRoot, "pnpm-lock.yaml");
     const lockfile = await readFile(lockfilePath, "utf8");
     const unapprovedLockfile = lockfile.replace(
-      "  miniflare>undici: 7.29.1",
+      "  miniflare>undici: 7.30.1",
       "  miniflare>undici: 7.29.0",
     );
     assert.notEqual(unapprovedLockfile, lockfile);

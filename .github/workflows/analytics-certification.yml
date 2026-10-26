@@ -61,7 +61,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -319,7 +319,7 @@ jobs:
             const doctor = read("doctor");
             const difference = read("diff");
             const state = infer.result?.state?.value;
-            if (state?.origin?.profile !== "app" || state?.origin?.recipeVersion !== "0.2.6") process.exit(1);
+            if (state?.origin?.profile !== "app" || state?.origin?.recipeVersion !== "0.2.7") process.exit(1);
             const installedCapabilities = state.installedCapabilities ?? [];
             if (!installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0")) process.exit(1);
             if (infer.result?.state?.kind !== "valid" || !installedCapabilities.some(({ identifier, version }) => identifier === "analytics" && version === "0.1.0") || !installedCapabilities.some(({ identifier, version }) => identifier === "multilingual" && version === "0.1.0")) process.exit(1);

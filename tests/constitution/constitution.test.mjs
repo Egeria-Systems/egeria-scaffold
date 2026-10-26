@@ -353,10 +353,10 @@ test("the root workspace remains private and pins the compatibility-proof toolch
     "eslint",
     "npm",
   ]);
-  assert.equal(manifest.packageManager, "pnpm@11.20.0");
+  assert.equal(manifest.packageManager, "pnpm@11.28.1");
   assert.deepEqual(manifest.engines, {
     node: "22.23.2",
-    pnpm: "11.20.0",
+    pnpm: "11.28.1",
   });
   assert.deepEqual(manifest.volta, { node: "22.23.2" });
   assert.equal(nvmVersion, `${manifest.volta.node}\n`);
@@ -616,12 +616,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6").length, 1);
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").length, 1);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").if,
     "github.event_name != 'pull_request' || !github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.6").if,
+    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7").if,
     "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
@@ -776,15 +776,63 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     }
     const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
     assert.deepEqual(checkout.with, { "persist-credentials": false }, identifier);
-    assert.deepEqual(job.steps.filter(({ run }) => run).map(({ run }) => run), [
+    const runSteps = job.steps.filter(({ run }) => run);
+    if (identifier === "generated-fixtures") {
+      const diagnosticStep = runSteps[0];
+      assert.ok(diagnosticStep);
+      assert.equal(job.steps.filter(({ id }) => id === "git_prerequisite").length, 1);
+      const { run: diagnosticCommand, ...diagnosticSettings } = diagnosticStep;
+      assert.deepEqual(diagnosticSettings, {
+        name: "Record native Git prerequisite outcomes",
+        id: "git_prerequisite",
+        "continue-on-error": true,
+        "timeout-minutes": 2,
+      });
+      assert.equal(typeof diagnosticCommand, "string");
+      const diagnosticCommandLines = diagnosticCommand.trimEnd().split("\n");
+      assert.equal(diagnosticCommandLines[0], "node --input-type=module <<'NODE'");
+      assert.equal(diagnosticCommandLines.at(-1), "NODE");
+      assert.equal(diagnosticCommandLines.filter(line => line === "NODE").length, 1);
+      const setupIndex = job.steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@"));
+      assert.ok(setupIndex >= 0 && setupIndex < job.steps.indexOf(diagnosticStep));
+    }
+    const verificationSteps = identifier === "generated-fixtures" ? runSteps.slice(1) : runSteps;
+    assert.deepEqual(verificationSteps.map(({ run }) => run), [
       "pnpm install --frozen-lockfile", ...commands,
     ], identifier);
-    for (const step of job.steps.filter(({ run }) => run)) {
+    for (const step of verificationSteps) {
       assert.equal(Object.hasOwn(step, "if"), false, identifier);
       assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
     }
-    if (identifier !== "generated-projects") {
-      assert.equal(job.steps.some(({ uses }) => uses?.startsWith("actions/upload-artifact@")), false);
+    const artifactUploads = job.steps.filter(({ uses }) => uses?.startsWith("actions/upload-artifact@"));
+    if (identifier === "generated-fixtures") {
+      assert.equal(artifactUploads.length, 1);
+      assert.deepEqual(artifactUploads[0], {
+        name: "Retain native Git prerequisite evidence",
+        if: "always() && steps.git_prerequisite.outputs.directory != ''",
+        "continue-on-error": true,
+        uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
+        with: {
+          name: "generated-fixtures-git-prerequisite",
+          path: [
+            "${{ steps.git_prerequisite.outputs.directory }}/context.json",
+            "${{ steps.git_prerequisite.outputs.directory }}/inherited.stdout",
+            "${{ steps.git_prerequisite.outputs.directory }}/inherited.stderr",
+            "${{ steps.git_prerequisite.outputs.directory }}/inherited.process.json",
+            "${{ steps.git_prerequisite.outputs.directory }}/exact-root.stdout",
+            "${{ steps.git_prerequisite.outputs.directory }}/exact-root.stderr",
+            "${{ steps.git_prerequisite.outputs.directory }}/exact-root.process.json",
+            "${{ steps.git_prerequisite.outputs.directory }}/summary.json",
+            "",
+          ].join("\n"),
+          "if-no-files-found": "error",
+          "include-hidden-files": false,
+          "retention-days": 7,
+        },
+      });
+      assert.ok(job.steps.indexOf(artifactUploads[0]) > job.steps.indexOf(verificationSteps.at(-1)));
+    } else if (identifier === "generated-jobs") {
+      assert.equal(artifactUploads.length, 0);
     }
     const command = commands.at(-1);
     const owners = Object.entries(workflow.jobs).flatMap(([owner, candidate]) =>
@@ -903,7 +951,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       identifier,
     );
     assert.deepEqual(setup?.with, {
-      version: "11.20.0",
+      version: "11.28.1",
       runtime: "node@22.23.2",
       cache: false,
       install: false,
@@ -1125,7 +1173,11 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
           );
         },
       });
-      for (const [property, value] of [["if", "false"], ["continue-on-error", true]]) {
+      const forbiddenProperties = [
+        ["if", "false"],
+        ["continue-on-error", identifier === "generated-fixtures" && step.id === "git_prerequisite" ? false : true],
+      ];
+      for (const [property, value] of forbiddenProperties) {
         negativeCases.push({
           name: `${identifier} ${property} on ${step.name}`,
           mutateWorkflow(candidate) {
@@ -1176,20 +1228,72 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       name: `${identifier} wrong command owner`,
       mutateWorkflow(candidate) {
         const steps = candidate.jobs[identifier].steps;
-        candidate.jobs["generated-projects"].steps.push(steps.pop());
+        const commandIndex = steps.findIndex(({ run }) => run === `pnpm run test:${identifier}`);
+        assert.notEqual(commandIndex, -1);
+        candidate.jobs["generated-projects"].steps.push(...steps.splice(commandIndex, 1));
       },
     });
   }
-  for (const artifactName of ["generated-dependency-audits", "generated-visual-failure-artifacts"]) {
-    const findArtifact = (candidate) => candidate.jobs["generated-projects"].steps.find(
+  negativeCases.push(
+    {
+      name: "duplicate native Git diagnostic command",
+      mutateWorkflow(candidate) {
+        const steps = candidate.jobs["generated-fixtures"].steps;
+        steps.push(structuredClone(steps.find(({ id }) => id === "git_prerequisite")));
+      },
+    },
+    {
+      name: "native Git diagnostic replaced by a shell command",
+      mutateWorkflow(candidate) {
+        candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run = "echo diagnostic";
+      },
+    },
+    {
+      name: "shell command after the native Git diagnostic",
+      mutateWorkflow(candidate) {
+        candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run += "echo unexpected\n";
+      },
+    },
+    {
+      name: "native Git diagnostic before pinned setup",
+      mutateWorkflow(candidate) {
+        const steps = candidate.jobs["generated-fixtures"].steps;
+        const diagnosticIndex = steps.findIndex(({ id }) => id === "git_prerequisite");
+        const setupIndex = steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@"));
+        [steps[diagnosticIndex], steps[setupIndex]] = [steps[setupIndex], steps[diagnosticIndex]];
+      },
+    },
+    {
+      name: "native Git diagnostic exception on another verification job",
+      mutateWorkflow(candidate) {
+        candidate.jobs["generated-jobs"].steps.push(structuredClone(
+          candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite"),
+        ));
+      },
+    },
+    {
+      name: "duplicate native Git diagnostic uploader",
+      mutateWorkflow(candidate) {
+        const steps = candidate.jobs["generated-fixtures"].steps;
+        steps.push(structuredClone(steps.find(({ with: settings }) => settings?.name === "generated-fixtures-git-prerequisite")));
+      },
+    },
+  );
+  for (const [identifier, artifactName] of [
+    ["generated-projects", "generated-dependency-audits"],
+    ["generated-projects", "generated-visual-failure-artifacts"],
+    ["generated-fixtures", "generated-fixtures-git-prerequisite"],
+  ]) {
+    const findArtifact = (candidate) => candidate.jobs[identifier].steps.find(
       ({ with: settings }) => settings?.name === artifactName,
     );
     negativeCases.push({
       name: `${artifactName} moved to another runner`,
       mutateWorkflow(candidate) {
         const artifact = findArtifact(candidate);
-        candidate.jobs["generated-fixtures"].steps.push(artifact);
-        candidate.jobs["generated-projects"].steps = candidate.jobs["generated-projects"].steps.filter(
+        const destination = identifier === "generated-fixtures" ? "generated-jobs" : "generated-fixtures";
+        candidate.jobs[destination].steps.push(artifact);
+        candidate.jobs[identifier].steps = candidate.jobs[identifier].steps.filter(
           (step) => step !== artifact,
         );
       },
@@ -1469,7 +1573,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@node-minify/core@9.0.2>glob\": \"10.5.0\"\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.4.1>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.4.1\": 16.4.1\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.1\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.4.1\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
+    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@node-minify/core@9.0.2>glob\": \"10.5.0\"\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.4.1>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.4.1\": 16.4.1\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.30.1\n  \"qs@\": 6.16.1\n  \"body-parser@\": 2.4.0\n  \"undici@\": 6.29.1\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.4.1\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
   );
 });
 
@@ -1970,7 +2074,7 @@ test("the compatibility deployment workflow is manual, bounded, and secret-minim
     true,
   );
   assert.doesNotMatch(workflow, /pnpm\/action-setup|actions\/setup-node/);
-  assert.match(workflow, /^          version: 11\.20\.0$/m);
+  assert.match(workflow, /^          version: 11\.28\.1$/m);
   assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
   assert.match(workflow, /^          cache: false$/m);
   assert.match(workflow, /^          install: false$/m);
@@ -2125,7 +2229,7 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
     true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
-    version: "11.20.0",
+    version: "11.28.1",
     runtime: "node@22.23.2",
     cache: false,
     install: false,
@@ -2464,7 +2568,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     true,
   );
   assert.deepEqual(stepsByName["Set up pnpm and Node.js"].with, {
-    version: "11.20.0",
+    version: "11.28.1",
     runtime: "node@22.23.2",
     cache: false,
     install: false,
@@ -2840,7 +2944,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.6[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app@0\.2\.7[^\n]+require separate certification/iu,
   );
   assert.match(
     programRoadmap,
@@ -2860,7 +2964,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.6` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.2\.7` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3171,7 +3275,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.6[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.7[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
   );
 });
 
@@ -3768,7 +3872,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.6`, `site@0\.12\.6`, and `app@0\.2\.6`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /generation-executable recipes are `portfolio@0\.11\.7`, `site@0\.12\.7`, and `app@0\.2\.7`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4972,7 +5076,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     packageOwnership,
-    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.6[^\n]+require separate certification/iu,
+    /fourteen admission capability descriptors[^\n]+three generation recipes[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.7[^\n]+require separate certification/iu,
   );
   assert.match(
     builderCoreReadme,

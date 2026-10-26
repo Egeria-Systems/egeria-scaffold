@@ -96,7 +96,7 @@ function profile(defaultCapabilities = ["sample"]) {
   return {
     identifier: "portfolio",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.11.6",
+    recipeVersion: "0.11.7",
     defaultCapabilities,
   };
 }
@@ -111,7 +111,7 @@ function project(selectedCapabilities = ["sample"], overrides = {}) {
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.6",
+    recipeVersion: "0.11.7",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: ["standards", ...selectedCapabilities],
     capabilitySettings: {},
@@ -125,7 +125,7 @@ function state(installedCapabilities, managedSurfaces = [], overrides = {}) {
     schemaVersion: "1.0.0",
     builderVersion: "0.0.0",
     projectSchemaVersion: "1.0.0",
-    origin: { profile: "portfolio", recipeVersion: "0.11.6" },
+    origin: { profile: "portfolio", recipeVersion: "0.11.7" },
     installedCapabilities: installedCapabilities.some(({ identifier }) => identifier === "standards")
       ? installedCapabilities : [installCapability(requiredStandards), ...installedCapabilities],
     appliedMigrations: [],
@@ -133,7 +133,7 @@ function state(installedCapabilities, managedSurfaces = [], overrides = {}) {
     ejections: [],
     compatibility: {
       node: "22.23.2",
-      pnpm: "11.20.0",
+      pnpm: "11.28.1",
       platformAdapter: "cloudflare-workers",
     },
     lastSuccessfulVerification: {

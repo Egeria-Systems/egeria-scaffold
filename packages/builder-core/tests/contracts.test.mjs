@@ -12,13 +12,17 @@ const builtEntry = resolve(packageRoot, "dist/index.js");
 const contracts = await import(pathToFileURL(builtEntry));
 const snapshots = await import(pathToFileURL(resolve(packageRoot, "dist/catalog/verified-package-versions.js")));
 
-test("retired recipe controls refuse raw project and state admission", async () => {
+test("retired recipe controls refuse raw project and state admission", async t => {
   const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
   for (const name of (await readdir(root)).filter(name => name !== "supported-rendering.json" && name !== "public-generations.json")) {
     const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
-    assert.equal(contracts.parseProjectYaml(control.projectYaml).ok, false, name);
+    await t.test(name + " project", () => {
+      assert.equal(contracts.parseProjectYaml(control.projectYaml).ok, false);
+    });
     for (const [variant, value] of Object.entries(control.variants)) {
-      assert.equal(contracts.parseStateJson(JSON.stringify(value.state)).ok, false, `${name}: ${variant}`);
+      await t.test(name + " state " + variant, () => {
+        assert.equal(contracts.parseStateJson(JSON.stringify(value.state)).ok, false);
+      });
     }
   }
 });
@@ -99,7 +103,7 @@ const validCapability = {
 const validProfile = {
   identifier: "portfolio",
   schemaVersion: "1.0.0",
-  recipeVersion: "0.11.6",
+  recipeVersion: "0.11.7",
   defaultCapabilities: ["standards"],
 };
 
@@ -112,7 +116,7 @@ const validProject = {
     defaultLocale: "en-CA",
   },
   originProfile: "portfolio",
-  recipeVersion: "0.11.6",
+  recipeVersion: "0.11.7",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
   capabilitySettings: {},
@@ -238,13 +242,13 @@ const profileTransitionVerificationChecks = [
   "post-state-inference",
 ];
 
-const readableRecipeVersions = ["0.11.6", "0.12.6", "0.2.6", "0.12.0", "0.13.0", "0.3.0"];
+const readableRecipeVersions = ["0.11.7", "0.12.7", "0.2.7", "0.12.0", "0.13.0", "0.3.0"];
 
 const validState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.6" },
+  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
   installedCapabilities: [
     {
       identifier: "standards",
@@ -259,7 +263,7 @@ const validState = {
   ejections: [],
   compatibility: {
     node: "22.23.2",
-    pnpm: "11.20.0",
+    pnpm: "11.28.1",
     platformAdapter: "cloudflare-workers",
   },
   lastSuccessfulVerification: {
@@ -569,7 +573,7 @@ test("app profile shares recipe, project, and state identifiers", () => {
   const appRecipe = {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.6",
+    recipeVersion: "0.2.7",
     defaultCapabilities: ["app-foundation", "site-routing"],
   };
 
@@ -585,12 +589,12 @@ test("app profile shares recipe, project, and state identifiers", () => {
   assertAccepts(contracts.projectConfigurationSchema, {
     ...validProject,
     originProfile: "app",
-    recipeVersion: "0.2.6",
+    recipeVersion: "0.2.7",
     selectedCapabilities: ["app-foundation", "site-routing"],
   });
   assertAccepts(contracts.installedStateSchema, {
     ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.6" },
+    origin: { profile: "app", recipeVersion: "0.2.7" },
     lastSuccessfulVerification: {
       kind: "generation",
       checks: [
@@ -618,7 +622,7 @@ test("app generation verification requires the exact Worker receipt and refuses 
   assert.deepEqual(contracts.appGenerationVerificationChecks, appChecks);
   const appState = {
     ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.6" },
+    origin: { profile: "app", recipeVersion: "0.2.7" },
   };
   const generationChecks = [
     "contracts",
@@ -647,7 +651,7 @@ test("app generation verification requires the exact Worker receipt and refuses 
     assertAccepts(contracts.installedStateSchema, ordinary);
     assertRejects(contracts.installedStateSchema, { ...ordinary, lastSuccessfulVerification: { kind: "generation", checks: generationChecks } });
   }
-  for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.6")) {
+  for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.7")) {
     assertRejects(contracts.installedStateSchema, { ...appState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind: "generation", checks: generationChecks } });
   }
 });
@@ -671,7 +675,7 @@ test("app generation verification supplies only supported persisted and full lif
   const appFullChecks = [...appPersistedChecks, "migration-record", "post-state-inference"];
   const appState = {
     ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.6" },
+    origin: { profile: "app", recipeVersion: "0.2.7" },
   };
   for (const [kind, persistedExport, fullExport, ordinaryPersisted, ordinaryFull] of [
     ["capability-addition", "appCapabilityAdditionPersistedVerificationChecks", "appCapabilityAdditionVerificationChecks", persistedVerificationChecks, capabilityAdditionVerificationChecks],
@@ -1438,7 +1442,7 @@ test("the schema generator checks artifacts without rewriting them", async () =>
 
 
 test("Vitest five app receipts require Worker integration for generation and each supported lifecycle", () => {
-  for (const recipeVersion of ["0.2.6"]) {
+  for (const recipeVersion of ["0.2.7"]) {
     for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
       assertAccepts(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks } });
       assertRejects(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
@@ -1554,7 +1558,7 @@ test("application environment catalog admits only the complete common tuple with
 
 
 test("current public state recipes retain exact verification vectors", () => {
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.6"], ["site", "0.12.6"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.7"], ["site", "0.12.7"]]) {
     const state = { ...validState, origin: { profile, recipeVersion } };
     assertAccepts(contracts.installedStateSchema, state);
     assertRejects(contracts.installedStateSchema, { ...state, lastSuccessfulVerification: { kind: "generation", checks: legacyVerificationChecks } });
@@ -1582,7 +1586,7 @@ test("unused public generations refuse raw and structured controls", async () =>
 
 test("public successors select patched standards independently of internal environments", () => {
   assert.deepEqual(contracts.profileRecipes.map(({ identifier, recipeVersion }) => [identifier, recipeVersion]), [
-    ["portfolio", "0.11.6"], ["site", "0.12.6"], ["app", "0.2.6"],
+    ["portfolio", "0.11.7"], ["site", "0.12.7"], ["app", "0.2.7"],
   ]);
   const publicContext = snapshots.createGenerationRenderingContext();
   assert.equal(publicContext.catalogSnapshot.standards, "0.5.1");

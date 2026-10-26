@@ -328,7 +328,7 @@ export type AppProfileTransitionPlan = Readonly<{
   }>;
   target: Readonly<{
     profile: "app";
-    recipeVersion: "0.2.6";
+    recipeVersion: "0.2.7";
     capabilities: readonly ProfileTransitionCapabilitySubject[];
   }>;
   actions: readonly AppTransitionDisposition[];
@@ -441,7 +441,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   }
   const renderingContext = snapshot.value.renderingContext;
   const targetRecipeVersion = snapshot.value.profiles.find(({ identifier }) => identifier === "app")?.recipeVersion;
-  if (targetRecipeVersion !== "0.2.6") {
+  if (targetRecipeVersion !== "0.2.7") {
     return planningFailure("PROFILE_TRANSITION_EDGE_MISSING");
   }
   const edge = resolveSupportedProfileTransition({

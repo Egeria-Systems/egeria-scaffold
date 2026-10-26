@@ -118,7 +118,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.6",
+    recipeVersion: "0.2.7",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -136,7 +136,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.6");
+    assert.equal(resolution.recipeVersion, "0.2.7");
     assert.deepEqual(
       identifiers,
       [
@@ -1843,7 +1843,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.6",
+      recipeVersion: "0.11.7",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1855,7 +1855,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.6",
+      recipeVersion: "0.12.7",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1868,7 +1868,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.6",
+      recipeVersion: "0.2.7",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1892,7 +1892,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.6");
+  assert.equal(portfolio.recipeVersion, "0.11.7");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1928,7 +1928,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.6" : "0.12.6",
+      profile === "portfolio" ? "0.11.7" : "0.12.7",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -2024,9 +2024,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.11.6" },
-      { identifier: "site", recipeVersion: "0.12.6" },
-      { identifier: "app", recipeVersion: "0.2.6" },
+      { identifier: "portfolio", recipeVersion: "0.11.7" },
+      { identifier: "site", recipeVersion: "0.12.7" },
+      { identifier: "app", recipeVersion: "0.2.7" },
     ],
   );
 
@@ -2260,8 +2260,8 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 
 test("supported profile transitions admit only the current incoming app edges", () => {
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
-    ["portfolio", "0.11.6", "app", "0.2.6"],
-    ["site", "0.12.6", "app", "0.2.6"],
+    ["portfolio", "0.11.7", "app", "0.2.7"],
+    ["site", "0.12.7", "app", "0.2.7"],
   ]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
       ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
@@ -2282,9 +2282,9 @@ test("supported profile transitions admit only the current incoming app edges", 
     ["unknown", "0.10.0", "app", "0.1.0"],
     ...["portfolio", "site"].flatMap(fromProfile => {
       const pairs = fromProfile === "portfolio"
-        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.6", "0.2.6"]]
-        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.6", "0.2.6"]];
-      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.6"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
+        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.7", "0.2.7"]]
+        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.7", "0.2.7"]];
+      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.7"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
     }),
     ["portfolio", "0.11.1", "app", "0.2.1"],
     ["site", "0.12.1", "app", "0.2.1"],
@@ -2304,7 +2304,7 @@ test("retired portfolio recipes cannot select locks or incoming app edges", asyn
     };
     assert.equal(resolveRecipeLockfileVersion({ originProfile: "portfolio", recipeVersion: "0.11.3" }, manifest), undefined);
   }
-  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.6"]) {
+  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.7"]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({
       fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion,
     }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });

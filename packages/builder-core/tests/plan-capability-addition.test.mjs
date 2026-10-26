@@ -128,7 +128,7 @@ function createSnapshotReader(entries, overrides = new Map()) {
 }
 
 async function fixtureEntries(name) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}-${name.startsWith("portfolio") ? "0.11.6" : name.startsWith("site") ? "0.12.6" : "0.2.6"}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}-${name.startsWith("portfolio") ? "0.11.7" : name.startsWith("site") ? "0.12.7" : "0.2.7"}`));
 }
 
 function assertFailure(result, code) {

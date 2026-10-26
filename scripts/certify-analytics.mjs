@@ -331,7 +331,7 @@ export async function verifyAnalyticsPortfolioForTesting({
     ["--version"],
     "PNPM_VERSION_INVALID",
   );
-  if (typeof version !== "string" || version.trim() !== "11.20.0") {
+  if (typeof version !== "string" || version.trim() !== "11.28.1") {
     throw createError("PNPM_VERSION_INVALID");
   }
 

@@ -3,10 +3,10 @@ import { z } from "zod";
 import { stableIdentifierSchema } from "./identifiers.js";
 
 export const profileIdentifierSchema = z.enum(["portfolio", "site", "app"]);
-export const publicRecipeVersions = Object.freeze({ portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" } as const);
+export const publicRecipeVersions = Object.freeze({ portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" } as const);
 
 export const profileRecipeVersionSchema = z.enum([
-  "0.11.6", "0.12.6", "0.2.6", "0.12.0", "0.13.0", "0.3.0",
+  "0.11.7", "0.12.7", "0.2.7", "0.12.0", "0.13.0", "0.3.0",
 ]);
 
 export const profileRecipeSchema = z

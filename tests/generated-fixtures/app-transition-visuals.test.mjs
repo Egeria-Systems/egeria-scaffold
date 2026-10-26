@@ -11,6 +11,8 @@ import { runInNewContext } from "node:vm";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { createSyntheticAppTransitionAdmission } from "../helpers/synthetic-app-transition-admission.mjs";
+
 const producer = new URL("../../scripts/verify-app-transition-visuals.mjs", import.meta.url);
 
 for (const auditPath of ["scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"])
@@ -45,9 +47,9 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
   assert.equal(exists, true, "the app transition visual producer is not implemented");
   const module = await import(producer);
   assert.equal(typeof module.verifyAppTransitionVisuals, "function");
-  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.6" });
-  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.6" });
-  for (const recipeVersion of ["0.2.6"]) {
+  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.7" });
+  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.7" });
+  for (const recipeVersion of ["0.2.7"]) {
     assert.deepEqual(module.parseAppTransitionVisualArguments(["--candidates", `--app-recipe-version=${recipeVersion}`]), { mode: "candidates", recipeVersion });
   }
   const digest = "a".repeat(64);
@@ -203,17 +205,15 @@ test("current visual comparison refuses without exact successor input admission"
   assert.equal(h.calls.length, 0);
 });
 
-test("default source admission reaches the environment boundary before preparation", async () => {
+test("unchanged current source refuses comparison before environment or preparation", async () => {
   const module = await import(producer);
-  let preparations = 0;
-  let cases = 0;
+  const effects = [];
   await assert.rejects(module.verifyAppTransitionVisuals({ mode: "compare" }, {
-    inspectEnvironment: async () => { throw new Error("ADMITTED_SOURCE_ENVIRONMENT_BOUNDARY"); },
-    prepareBuilder: async () => { preparations += 1; },
-    executeCase: async () => { cases += 1; },
-  }), /^Error: ADMITTED_SOURCE_ENVIRONMENT_BOUNDARY$/);
-  assert.equal(preparations, 0);
-  assert.equal(cases, 0);
+    inspectEnvironment: async () => { effects.push("environment"); throw new Error("UNEXPECTED_ENVIRONMENT"); },
+    prepareBuilder: async () => { effects.push("preparation"); },
+    executeCase: async () => { effects.push("case"); },
+  }), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
+  assert.deepEqual(effects, []);
 });
 
 test("shared visual membership refuses malformed optional subsets", () => {
@@ -331,7 +331,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
   const commands = [];
   let ownedProject;
   const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.6" }, {
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.7" }, {
     ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
@@ -358,10 +358,10 @@ test(`${preparation} visual targets use exact production files, run non-update c
   });
   if (preparation !== "synthetic") {
     assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, "0.11.6");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.11.7");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, "0.2.6");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750");
+    assert.equal(result.project.targetProject.recipeVersion, "0.2.7");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
@@ -450,41 +450,32 @@ const sourceRoot = fileURLToPath(new URL("../", producer));
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 
 async function admittedHarness(t) {
-  const h = await harness(t);
-  const require = createRequire(new URL("../../packages/builder-core/package.json", import.meta.url));
-  const policy = require("./src/lifecycle/app-transition-visual-admission.cjs");
-  const admissionObservations = {
-    policySha256: sha256(await readFile(join(sourceRoot, admissionLeaf))),
-    sourceFiles: policy.record.originalSourceFiles.map(file => ({ path: file.path, sha256: policy.record.bridgeSourceFiles[file.path] ?? file.sha256 })),
-    targetLockfileFingerprint: policy.record.targetLockfileFingerprint,
-    baselines: [],
+  const fixture = await createSyntheticAppTransitionAdmission(t);
+  const calls = [];
+  const admissionObservations = structuredClone(fixture.admissionObservations);
+  const adapters = {
+    repositoryRoot: fixture.root,
+    filesystem,
+    admissionObservations,
+    inspectEnvironment: async () => fixture.module.appTransitionVisualToolchain,
+    prepareBuilder: async () => {},
+    snapshotSource: async () => ({ revision: "a".repeat(40), files: [{ path: "source.ts", sha256: "b".repeat(64) }] }),
+    prepareProject: async (_root, subset) => {
+      const prepared = fixture.preparedProjects.get([...subset].sort().join("+") || "none");
+      assert.ok(prepared, "the synthetic fixture must contain this exact optional subset");
+      return structuredClone(prepared);
+    },
+    executeCase: async input => {
+      calls.push(input);
+      return {
+        images: fixture.images[input.subset.includes("multilingual") ? "multilingual" : "monolingual"],
+        project: { files: input.preparedProject.files.map(file => ({ path: file.path, sha256: sha256(file.content) })) },
+        influencingFingerprints: input.preparedProject.influencingFingerprints,
+        checks: ["synthetic-capture-adapter-only"],
+      };
+    },
   };
-  const images = {};
-  const paths = [];
-  for (const group of ["monolingual", "multilingual"]) {
-    images[group] = {};
-    for (const viewport of ["desktop", "mobile"]) {
-      const path = `packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${group === "multilingual" ? "multilingual-" : ""}home-${viewport}-chromium-linux.png`;
-      const bytes = await readFile(join(sourceRoot, path));
-      await mkdir(dirname(join(h.root, path)), { recursive: true });
-      await writeFile(join(h.root, path), bytes);
-      paths.push(path);
-      images[group][viewport] = bytes;
-      admissionObservations.baselines.push({ identifier: `${group}-${viewport}`, fingerprint: `sha256:${sha256(bytes)}` });
-    }
-  }
-  h.adapters.admissionObservations = admissionObservations;
-  h.adapters.prepareProject = (_root, subset) => h.module.prepareProject(sourceRoot, subset, "0.2.6");
-  h.adapters.executeCase = async input => {
-    h.calls.push(input);
-    return {
-      images: images[input.subset.includes("multilingual") ? "multilingual" : "monolingual"],
-      project: { files: input.preparedProject.files.map(file => ({ path: file.path, sha256: sha256(file.content) })) },
-      influencingFingerprints: input.preparedProject.influencingFingerprints,
-      checks: ["synthetic-capture-adapter-only"],
-    };
-  };
-  return { ...h, admissionObservations, paths };
+  return { ...fixture, calls, adapters, admissionObservations, paths: fixture.pngPaths };
 }
 
 function refuseWrites(effects) {
@@ -497,8 +488,28 @@ function refuseWrites(effects) {
   };
 }
 
-test("entry admission refuses incomplete, foreign and stale observations before preparation or writes", async t => {
+async function assertSyntheticEntry(h) {
+  const effects = [];
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
+    ...h.adapters, filesystem: refuseWrites(effects),
+    inspectEnvironment: async () => { effects.push("environment"); throw new Error("SYNTHETIC_ENTRY_REACHED_ENVIRONMENT"); },
+    prepareBuilder: async () => { effects.push("build"); },
+  }), /^Error: SYNTHETIC_ENTRY_REACHED_ENVIRONMENT$/);
+  assert.deepEqual(effects, ["environment"]);
+  assert.deepEqual(h.calls, []);
+}
+
+async function assertSyntheticComparison(h) {
+  await assertSyntheticEntry(h);
+  const result = await h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters);
+  assert.equal(result.status, "compared");
+  assert.equal(h.calls.length, 8);
+  return result;
+}
+
+test("synthetic entry admission refuses incomplete, foreign and stale observations before preparation or writes", async t => {
   const h = await admittedHarness(t);
+  await assertSyntheticEntry(h);
   const malformed = [true, {},
     { ...h.admissionObservations, sourceFiles: h.admissionObservations.sourceFiles.slice(1) },
     { ...h.admissionObservations, sourceFiles: [...h.admissionObservations.sourceFiles, { path: "packages/builder-core/src/unreviewed.ts", sha256: "a".repeat(64) }] },
@@ -512,68 +523,91 @@ test("entry admission refuses incomplete, foreign and stale observations before 
   }
   for (const admissionObservations of malformed) {
     const effects = [];
+    let suppliedObservationReads = 0;
+    const observationFields = [];
+    const trackedObservation = admissionObservations !== null && typeof admissionObservations === "object"
+      ? new Proxy(admissionObservations, { get(target, key, receiver) { observationFields.push(key); return Reflect.get(target, key, receiver); } })
+      : admissionObservations;
     await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
-      ...h.adapters, admissionObservations, filesystem: refuseWrites(effects),
+      ...h.adapters, filesystem: refuseWrites(effects),
+      get admissionObservations() { suppliedObservationReads += 1; return trackedObservation; },
       inspectEnvironment: async () => { effects.push("environment"); throw new Error("UNEXPECTED_ENVIRONMENT"); },
       prepareBuilder: async () => { effects.push("build"); },
     }), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
+    assert.ok(suppliedObservationReads > 0, "the producer must consume the supplied observation");
+    if (typeof admissionObservations === "object") assert.ok(observationFields.includes("policySha256"), "the eligible policy must reach observation validation");
     assert.deepEqual(effects, []);
     assert.deepEqual(h.calls, []);
   }
 });
 
-test("default admission reads reject changed or unsafe source, lock, PNG and policy before effects", async () => {
-  const module = await import(producer);
+test("synthetic default reads reject changed or unsafe source, lock, PNG and policy before effects", async t => {
+  const h = await copiedVisualPolicyFixture(t);
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters), /^Error: CACHED_POLICY_REACHED_ENVIRONMENT$/);
+  assert.deepEqual(h.effects, ["environment"]);
+  h.effects.length = 0;
   const paths = [admissionLeaf, "scripts/verify-app-transition-visuals.mjs", "packages/builder-core/src/lifecycle/app-profile-transition.ts",
     "packages/builder-core/templates/common/apps/web/app/globals.css", "packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts",
-    "packages/builder-core/lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml",
+    "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml",
     "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png"];
   for (const path of paths) for (const kind of ["changed", "missing", "symlink"]) {
     const effects = [];
+    let faultReached = false;
     const fs = { ...refuseWrites(effects),
       lstat: async absolute => {
         const stats = await filesystem.lstat(absolute);
-        if (absolute === join(sourceRoot, path) && kind === "symlink") return { ...stats, isFile: () => stats.isFile(), isDirectory: () => stats.isDirectory(), isSymbolicLink: () => true };
+        if (absolute === join(h.root, path) && kind === "symlink") {
+          faultReached = true;
+          return { ...stats, isFile: () => stats.isFile(), isDirectory: () => stats.isDirectory(), isSymbolicLink: () => true };
+        }
         return stats;
       },
       open: async (absolute, flags, mode) => {
         if (flags === "wx") { effects.push("open-write"); throw new Error("UNEXPECTED_WRITE"); }
-        if (absolute === join(sourceRoot, path) && kind === "missing") throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        if (absolute === join(h.root, path) && kind === "missing") {
+          faultReached = true;
+          throw Object.assign(new Error("missing"), { code: "ENOENT" });
+        }
         const handle = await filesystem.open(absolute, flags, mode);
         return { stat: () => handle.stat(), close: () => handle.close(), readFile: async () => {
           const bytes = await handle.readFile();
-          if (absolute === join(sourceRoot, path) && kind === "changed") bytes[0] ^= 1;
+          if (absolute === join(h.root, path) && kind === "changed") { faultReached = true; bytes[0] ^= 1; }
           return bytes;
         } };
       },
     };
-    await assert.rejects(module.verifyAppTransitionVisuals({ mode: "compare" }, {
-      filesystem: fs,
+    await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
+      ...h.adapters, filesystem: fs,
       inspectEnvironment: async () => { effects.push("environment"); throw new Error("UNEXPECTED_ENVIRONMENT"); },
       prepareBuilder: async () => { effects.push("build"); },
       executeCase: async () => { effects.push("case"); },
     }), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/, `${path}: ${kind}`);
+    assert.equal(faultReached, true, `${path}: ${kind} must reach the intended physical read`);
     assert.deepEqual(effects, []);
   }
 });
 
-test("source entry ignores compiled output before the environment boundary", async () => {
-  const module = await import(producer);
-  await assert.rejects(module.verifyAppTransitionVisuals({ mode: "compare" }, {
-    filesystem: { ...filesystem, open: async (path, ...arguments_) => {
+test("synthetic source entry ignores compiled output before the environment boundary", async t => {
+  const h = await copiedVisualPolicyFixture(t);
+  await filesystem.rename(join(h.root, "packages/builder-core/dist"), join(h.root, "packages/builder-core/unavailable-compiled-inputs"));
+  assert.equal(await access(join(h.root, "packages/builder-core/dist")).then(() => true, () => false), false);
+  const reads = [];
+  await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
+    ...h.adapters,
+    filesystem: { ...h.adapters.filesystem, open: async (path, ...arguments_) => {
+      reads.push(path);
       assert.equal(path.includes("/dist/"), false, "entry must not consult stale compiled output");
-      return filesystem.open(path, ...arguments_);
+      return h.adapters.filesystem.open(path, ...arguments_);
     } },
-    inspectEnvironment: async () => { throw new Error("ADMITTED_SOURCE_ENVIRONMENT_BOUNDARY"); },
-  }), /^Error: ADMITTED_SOURCE_ENVIRONMENT_BOUNDARY$/);
+  }), /^Error: CACHED_POLICY_REACHED_ENVIRONMENT$/);
+  assert.ok(reads.includes(join(h.root, admissionLeaf)), "the eligible fixture must reach physical source observations");
+  assert.deepEqual(h.effects, ["environment"]);
 });
 
-test("admitted comparison executes all subsets with canonical baselines and leaves source PNGs unchanged", async t => {
+test("synthetic comparison executes all subsets with canonical baseline bytes and leaves source PNGs unchanged", async t => {
   const h = await admittedHarness(t);
   const before = await Promise.all(h.paths.map(path => readFile(join(h.root, path))));
-  const result = await h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters);
-  assert.equal(result.status, "compared");
-  assert.equal(h.calls.length, 8);
+  const result = await assertSyntheticComparison(h);
   assert.equal(h.calls.every(call => call.mode === "compare" && Object.keys(call.baselines).length === 2), true);
   const manifest = JSON.parse(await readFile(join(h.root, result.manifestPath), "utf8"));
   assert.equal(manifest.cases.length, 8);
@@ -581,16 +615,22 @@ test("admitted comparison executes all subsets with canonical baselines and leav
   assert.deepEqual(await Promise.all(h.paths.map(path => readFile(join(h.root, path)))), before);
 });
 
-test("changed preparation inputs refuse before artifact or case writes", async t => {
+test("synthetic comparison reaches changed preparation inputs and refuses before new artifact or case writes", async t => {
   for (const change of ["raw-source", "rendered-input", "target-lock"]) {
     const h = await admittedHarness(t);
+    await assertSyntheticComparison(h);
+    h.calls.length = 0;
     const effects = [];
+    const counters = { environment: 0, build: 0, project: 0 };
     const prepare = h.adapters.prepareProject;
     const adapters = { ...h.adapters, filesystem: refuseWrites(effects),
+      inspectEnvironment: async () => { counters.environment += 1; return h.module.appTransitionVisualToolchain; },
       prepareBuilder: async () => {
+        counters.build += 1;
         if (change === "raw-source") h.admissionObservations.sourceFiles[0].sha256 = "a".repeat(64);
       },
       prepareProject: async (...arguments_) => {
+        counters.project += 1;
         const value = await prepare(...arguments_);
         if (change === "rendered-input") value.influencingFingerprints[0] = { ...value.influencingFingerprints[0], fingerprint: `sha256:${"a".repeat(64)}` };
         if (change === "target-lock") value.files = value.files.map(file => file.path === "pnpm-lock.yaml" ? { ...file, content: Buffer.from("foreign lock") } : file);
@@ -598,13 +638,18 @@ test("changed preparation inputs refuse before artifact or case writes", async t
       },
     };
     await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, adapters), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
+    assert.deepEqual(counters, { environment: 1, build: 1, project: change === "raw-source" ? 0 : 1 }, change);
     assert.deepEqual(effects, []);
     assert.deepEqual(h.calls, []);
   }
 });
 
-test("comparison refuses input drift during the final case before emitting a comparison manifest", async t => {
+test("synthetic comparison reaches final-case input drift before refusing a new comparison manifest", async t => {
   const h = await admittedHarness(t);
+  await assertSyntheticComparison(h);
+  h.calls.length = 0;
+  const runsRoot = join(h.root, "generated-visual-artifacts/app-transitions");
+  const previousRuns = new Set(await readdir(runsRoot));
   const execute = h.adapters.executeCase;
   await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, {
     ...h.adapters, executeCase: async input => {
@@ -614,43 +659,35 @@ test("comparison refuses input drift during the final case before emitting a com
     },
   }), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
   assert.equal(h.calls.length, 8);
-  const runs = await readdir(join(h.root, "generated-visual-artifacts/app-transitions"));
-  assert.equal(runs.length, 1);
-  assert.equal((await readdir(join(h.root, "generated-visual-artifacts/app-transitions", runs[0]))).includes("comparison-manifest.json"), false);
+  const newRuns = (await readdir(runsRoot)).filter(name => !previousRuns.has(name));
+  assert.equal(newRuns.length, 1);
+  assert.equal((await readdir(join(runsRoot, newRuns[0]))).includes("comparison-manifest.json"), false);
 });
 
 async function copiedVisualPolicyFixture(t) {
-  const root = await mkdtemp(join(tmpdir(), "egeria-visual-policy-cache-"));
-  t.after(() => rm(root, { recursive: true, force: true }));
-  const require = createRequire(new URL("../../packages/builder-core/package.json", import.meta.url));
-  const policy = require("./src/lifecycle/app-transition-visual-admission.cjs");
-  const paths = [...policy.record.originalSourceFiles.map(file => file.path), admissionLeaf];
-  for (const group of ["", "multilingual-"]) for (const viewport of ["desktop", "mobile"]) {
-    paths.push(`packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${group}home-${viewport}-chromium-linux.png`);
-  }
-  for (const path of paths) {
-    await mkdir(dirname(join(root, path)), { recursive: true });
-    await filesystem.copyFile(join(sourceRoot, path), join(root, path));
-  }
-  await promisify(execFile)("git", ["init", "--quiet"], { cwd: root });
-  const module = await import(pathToFileURL(join(root, "scripts/verify-app-transition-visuals.mjs")));
-  const fixedRequire = createRequire(join(root, "packages/builder-core/package.json"));
+  const fixture = await createSyntheticAppTransitionAdmission(t);
   const effects = [];
   const adapters = {
+    repositoryRoot: fixture.root,
     filesystem: refuseWrites(effects),
     inspectEnvironment: async () => { effects.push("environment"); throw new Error("CACHED_POLICY_REACHED_ENVIRONMENT"); },
     prepareBuilder: async () => { effects.push("build"); },
     prepareProject: async () => { effects.push("project"); },
     executeCase: async () => { effects.push("case"); },
   };
-  return { root, module, fixedRequire, effects, adapters, copiedPaths: paths.length };
+  return { ...fixture, effects, adapters };
 }
 
-test("preloaded source policy refuses foreign physical leaf bytes before the first producer inspection", async t => {
+test("preloaded synthetic policy refuses foreign physical leaf bytes before the first producer inspection", async t => {
+  const control = await copiedVisualPolicyFixture(t);
+  await assert.rejects(control.module.verifyAppTransitionVisuals({ mode: "compare" }, control.adapters), /^Error: CACHED_POLICY_REACHED_ENVIRONMENT$/);
+  assert.deepEqual(control.effects, ["environment"]);
   const h = await copiedVisualPolicyFixture(t);
   const resolved = h.fixedRequire.resolve("./src/lifecycle/app-transition-visual-admission.cjs");
   const cached = h.fixedRequire("./src/lifecycle/app-transition-visual-admission.cjs");
+  assert.equal(cached.record.syntheticUnitFixture, true);
   const original = await readFile(join(h.root, admissionLeaf), "utf8");
+  assert.equal(original, await readFile(join(control.root, admissionLeaf), "utf8"), "the cold positive uses the same synthetic policy bytes");
   const marker = `"manifestSha256": "${cached.record.manifestSha256}"`;
   assert.equal(original.split(marker).length, 2);
   const foreign = original.replace(marker, `"manifestSha256": "${"f".repeat(64)}"`);
@@ -662,13 +699,13 @@ test("preloaded source policy refuses foreign physical leaf bytes before the fir
     await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
     assert.deepEqual(h.effects, []);
   } finally {
-    t.diagnostic(JSON.stringify({ actualCachePreloaded: true, cachedManifest: cached.record.manifestSha256,
+    t.diagnostic(JSON.stringify({ syntheticUnitOnly: true, actualCachePreloaded: true, cachedManifest: cached.record.manifestSha256,
       originalLeafSha256: sha256(Buffer.from(original)), foreignLeafSha256: sha256(Buffer.from(foreign)),
-      copiedPaths: h.copiedPaths, effects: h.effects }));
+      copiedPaths: h.copiedPaths.length, effects: h.effects }));
   }
 });
 
-test("producer established source policy permits matching reuse and refuses later disk drift", async t => {
+test("producer established synthetic policy permits matching reuse and refuses later disk drift", async t => {
   const h = await copiedVisualPolicyFixture(t);
   for (let inspection = 0; inspection < 2; inspection += 1) {
     await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "compare" }, h.adapters), /^Error: CACHED_POLICY_REACHED_ENVIRONMENT$/);

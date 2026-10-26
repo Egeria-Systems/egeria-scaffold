@@ -31,14 +31,14 @@ const installedState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.6" },
+  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
   installedCapabilities: [{ identifier: "standards", version: "0.5.1", deliveryMode: "hybrid", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" }],
   appliedMigrations: ["current-migration"],
   managedSurfaces: [],
   ejections: [],
   compatibility: {
     node: "22.23.2",
-    pnpm: "11.20.0",
+    pnpm: "11.28.1",
     platformAdapter: "cloudflare-workers",
   },
   lastSuccessfulVerification: {
@@ -67,7 +67,7 @@ const installedStateSource = `{
   "compatibility": {
     "node": "22.23.2",
     "platformAdapter": "cloudflare-workers",
-    "pnpm": "11.20.0"
+    "pnpm": "11.28.1"
   },
   "ejections": [],
   "installedCapabilities": [
@@ -100,7 +100,7 @@ const installedStateSource = `{
   "managedSurfaces": [],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.11.6"
+    "recipeVersion": "0.11.7"
   },
   "projectSchemaVersion": "1.0.0",
   "schemaVersion": "1.0.0"

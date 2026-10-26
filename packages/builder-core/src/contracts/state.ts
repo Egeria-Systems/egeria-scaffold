@@ -358,7 +358,7 @@ export const installedStateSchema = z
     compatibility: z
       .strictObject({
         node: z.literal("22.23.2"),
-        pnpm: z.literal("11.20.0"),
+        pnpm: z.literal("11.28.1"),
         platformAdapter: z.literal("cloudflare-workers"),
       })
       .readonly(),

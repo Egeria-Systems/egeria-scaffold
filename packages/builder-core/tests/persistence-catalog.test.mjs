@@ -44,7 +44,7 @@ test("default generation retains exact default shared subjects while persistence
 });
 
 test("installed persistence selection requires the exact shared versions and current app recipe", async () => {
-  const fixture = new URL("../../../fixtures/generated/app-persistence-0.2.6/.egeria/", import.meta.url);
+  const fixture = new URL("../../../fixtures/generated/app-persistence-0.2.7/.egeria/", import.meta.url);
   const project = parseProjectYaml(await readFile(new URL("project.yaml", fixture), "utf8")).value;
   const state = JSON.parse(await readFile(new URL("state.json", fixture), "utf8"));
   const selected = createVerifiedProjectSnapshot(project, state);

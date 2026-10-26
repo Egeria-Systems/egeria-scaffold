@@ -156,7 +156,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -224,7 +224,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -268,7 +268,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -301,7 +301,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -352,7 +352,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -408,7 +408,7 @@ jobs:
             for (let index = 0; index < (boundedCount ? inheritedCount : 0); index += 1) {
               if (process.env[`GIT_CONFIG_KEY_${index}`] === "safe.directory" &&
                   process.env[`GIT_CONFIG_VALUE_${index}`] === checkoutRoot) {
-                exactRootEntries.push({ origin: `environment:GIT_CONFIG_VALUE_${index}`, value: checkoutRoot });
+                exactRootEntries.push({ origin: `process-env:GIT_CONFIG_VALUE_${index}`, value: checkoutRoot });
               }
             }
             save("context.json", json({ cwd: process.cwd(), checkoutRoot, workspaceRoot,
@@ -508,7 +508,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -542,7 +542,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -552,11 +552,11 @@ jobs:
 
       - name: Generate draft app transition visual review candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.6
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7
 
       - name: Compare all app transition visual subsets
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.6
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()
@@ -592,7 +592,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false

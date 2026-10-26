@@ -1,6 +1,6 @@
 # Program Roadmap
 
-**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.6`, `site@0.12.6` and `app@0.2.6`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
+**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.7`, `site@0.12.7` and `app@0.2.7`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
 
 This is the concise execution sequence. It does not supersede the [full approved source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) or an accepted ADR.
 
@@ -170,7 +170,7 @@ P3C began after P3B closed and did not reopen or weaken P3 or P3B. P3C strengthe
 
 ## P4 — App foundation
 
-The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.6`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
+The current generation boundary implements internal hybrid `app-foundation@0.1.0` and `app@0.2.7`, whose exact recipe is `app-foundation@0.1.0 + site-routing@0.4.0`. App project/state parsing, deterministic rendering, and state-last new-directory generation retain the complete production-site experience and independently support every subset of Calendly, multilingual, and analytics without automatically adding stateful backend infrastructure.
 
 The generated app pins `effect@4.0.0-rc.112` directly and confines it to application, infrastructure, composition, and delivery server modules. Request context stays explicit; an application-owned build-information service receives Cloudflare or in-memory Layers; delivery runs one lazy program once and interprets defect before interruption, interruption before recognized typed failure, and unrecognized or mixed residual failure as unexpected. Pure interruption uses the native abort, `deployment-cloudflare` alone owns `enable_request_signal`, cancellation claims exclude already-started provider work, and the initial application has no retry.
 

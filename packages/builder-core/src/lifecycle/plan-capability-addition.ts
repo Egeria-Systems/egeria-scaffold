@@ -565,7 +565,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
 
   const state = inspection.inference.state.value;
   if (capabilityValue === "application-persistence" && (
-    project.originProfile !== "app" || project.recipeVersion !== "0.2.6" ||
+    project.originProfile !== "app" || project.recipeVersion !== "0.2.7" ||
     snapshot.value.renderingContext?.catalogSnapshot.standards !== "0.5.1"
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   const capabilityInstalled =

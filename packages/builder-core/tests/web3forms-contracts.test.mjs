@@ -54,5 +54,5 @@ test("absent contact selection preserves the existing portfolio source", async (
   assert.equal(result.ok, true);
   assert.equal(result.value.files.some(f => f.path.includes("web3forms")), false);
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
-    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.11.6/${path}`, import.meta.url)));
+    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.11.7/${path}`, import.meta.url)));
 });

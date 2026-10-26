@@ -25,7 +25,7 @@ const historicalHashes = Object.freeze({
 });
 
 export const appTransitionVisualToolchain = Object.freeze({
-  platform: "linux", architecture: "x64", node: "22.23.2", pnpm: "11.20.0",
+  platform: "linux", architecture: "x64", node: "22.23.2", pnpm: "11.28.1",
   playwright: "1.62.1", browserRevision: "1234", browserVersion: "151.0.7922.34",
   image: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
 });
@@ -57,9 +57,9 @@ export function parseAppTransitionVisualArguments(arguments_) {
   const recipeArguments = values.filter(value => value.startsWith("--app-recipe-version="));
   if (recipeArguments.length > 1) fail("VISUAL_ARGUMENT_INVALID");
   const recipeVersion = recipeArguments[0]?.slice("--app-recipe-version=".length);
-  if (recipeVersion !== undefined && !["0.2.6"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
+  if (recipeVersion !== undefined && !["0.2.7"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
   const modes = values.filter(value => !recipeArguments.includes(value));
-  const recipe = { recipeVersion: recipeVersion ?? "0.2.6" };
+  const recipe = { recipeVersion: recipeVersion ?? "0.2.7" };
   if (modes.length === 0) return { mode: "compare", ...recipe };
   if (modes.length === 1 && modes[0] === "--candidates") return { mode: "candidates", ...recipe };
   if (modes.length === 1 && recipeVersion === undefined) {
@@ -240,8 +240,8 @@ async function canonicalVisualAdmission() {
   const record = policy?.record;
   if (typeof policy?.verifyAppTransitionVisualInputIdentity !== "function" ||
       !Array.isArray(policy.baselinePaths) || policy.baselinePaths.length !== 2 ||
-      record?.schemaVersion !== 1 || record.sourceProfile?.name !== "portfolio" || record.sourceProfile.version !== "0.11.6" ||
-      record.targetProfile?.name !== "app" || record.targetProfile.version !== "0.2.6" ||
+      record?.schemaVersion !== 1 || record.sourceProfile?.name !== "portfolio" || record.sourceProfile.version !== "0.11.7" ||
+      record.targetProfile?.name !== "app" || record.targetProfile.version !== "0.2.7" ||
       record.manifestSha256 !== "090d2f4797abc0b0cbf551904b4313bc8a2667c35ad04be6e065aad7816ec8d8" ||
       record.sourceRevision !== "0e4bcf1f29555964d697f14ad0adc562dccf142f" ||
       !Array.isArray(record.originalSourceFiles) || record.originalSourceFiles.length !== 299 ||
@@ -267,7 +267,7 @@ async function visualAdmissionObservations(root, fs) {
   return {
     sourceFiles,
     policySha256: digest(await boundedRead(fs, root, visualAdmissionPath, 1024 * 1024)),
-    targetLockfileFingerprint: `sha256:${digest(await boundedRead(fs, root, "packages/builder-core/lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml"))}`,
+    targetLockfileFingerprint: `sha256:${digest(await boundedRead(fs, root, "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml"))}`,
     baselines,
   };
 }
@@ -319,7 +319,7 @@ async function requirePreparedVisualAdmission(prepared, subset, adapters) {
 }
 
 export async function verifyAppTransitionVisuals(options, injected = {}) {
-  if (options.recipeVersion !== undefined && (!["0.2.6"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
+  if (options.recipeVersion !== undefined && (!["0.2.7"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
   if (!["candidates", "compare", "promote"].includes(options.mode) || (options.mode === "promote" && !/^[a-f0-9]{64}$/.test(options.digest))) fail("VISUAL_ARGUMENT_INVALID");
   const root = injected.repositoryRoot ?? repositoryRoot;
   const adapters = { filesystem, repositoryRoot: root, inspectEnvironment, snapshotSource: () => snapshotSource(root), executeCase, prepareProject,
@@ -397,8 +397,8 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
   }
 }
 
-export async function prepareProject(root, subset, recipeVersion = "0.2.6") {
-  if (!["0.2.6"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
+export async function prepareProject(root, subset, recipeVersion = "0.2.7") {
+  if (!["0.2.7"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const core = await import(pathToFileURL(join(root, "packages/builder-core/dist/index.js")));
   const policy = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-profile-transition.js")));
   const validation = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-transition-content-validation.js")));
@@ -416,7 +416,7 @@ export async function prepareProject(root, subset, recipeVersion = "0.2.6") {
   const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
   const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
-  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.6" ||
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.7" ||
       target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== recipeVersion) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
@@ -577,7 +577,7 @@ async function retainBrowserArtifacts(fs, project, destination) {
 }
 
 export async function executeAppTransitionVisualCase(input, injected = {}) {
-  if (input.recipeVersion !== undefined && !["0.2.6"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
+  if (input.recipeVersion !== undefined && !["0.2.7"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const fs = injected.filesystem ?? filesystem;
   const command = injected.runCommand ?? runCommand;
   if (injected.runCommand && typeof injected.runAudit !== "function") fail("VISUAL_AUDIT_ADAPTER_INVALID");

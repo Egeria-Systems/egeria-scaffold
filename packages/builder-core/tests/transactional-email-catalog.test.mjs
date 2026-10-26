@@ -52,7 +52,7 @@ test("email leaves default and unrelated descriptor contracts unchanged", async 
 });
 
 test("installed email and retained foundation require an exact current profile and shared tuple", async () => {
-  const fixtureState = JSON.parse(await readFile(new URL("../../../fixtures/generated/app-0.2.6/.egeria/state.json", import.meta.url), "utf8"));
+  const fixtureState = JSON.parse(await readFile(new URL("../../../fixtures/generated/app-0.2.7/.egeria/state.json", import.meta.url), "utf8"));
   for (const profile of ["portfolio", "site", "app"]) {
     for (const hasEmail of [false, true]) {
       const rendered = await renderSkeleton(request(profile, hasEmail ? { transactionalEmailResend: true } : {}), createGenerationRenderingContext(false, true));

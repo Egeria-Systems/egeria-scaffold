@@ -21,7 +21,7 @@ import { createGenerationRenderingContext } from "../../../packages/builder-core
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 const lifecycleCohorts = [
-  { label: "current", generation: "current", portfolio: "0.11.6", site: "0.12.6", app: "0.2.6", portfolioFoundation: "portfolio-0.11.6-foundation" },
+  { label: "current", generation: "current", portfolio: "0.11.7", site: "0.12.7", app: "0.2.7", portfolioFoundation: "portfolio-0.11.7-foundation" },
 ];
 
 
@@ -640,7 +640,7 @@ async function withSuccessfulPnpm(run) {
   try {
     await writeFile(
       executable,
-      '#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf "11.20.0\\n"\nfi\nexit 0\n',
+      '#!/bin/sh\nif [ "$1" = "--version" ]; then\n  printf "11.28.1\\n"\nfi\nexit 0\n',
     );
     await chmod(executable, 0o700);
     await run(`${owner}${delimiter}${process.env.PATH}`);
@@ -1059,7 +1059,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.2.6");
+      assert.equal(project.recipeVersion, "0.2.7");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -4112,7 +4112,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(await listTree(join(primary, ".git")), gitBefore);
         const plan = JSON.parse(first.stdout).plan;
         assert.deepEqual([plan.source.profile, plan.source.recipeVersion], [profile, lifecycleCohorts[0][profile]]);
-        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.6"]);
+        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.7"]);
         assert.deepEqual(plan.requiredApprovals, ["transform", "verified-final-diff"]);
         const preserved = new Map(await Promise.all(plan.dispositions
           .filter(({ kind }) => kind === "preserve-file")
@@ -4123,8 +4123,8 @@ for (const profile of ["site"]) {
         assert.equal(execution.stdout.endsWith("\n"), true);
         assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
         const migration = profile === "portfolio"
-          ? "transition-portfolio-0-11-6-to-app-0-2-6"
-          : "transition-site-0-12-6-to-app-0-2-6";
+          ? "transition-portfolio-0-11-7-to-app-0-2-7"
+          : "transition-site-0-12-7-to-app-0-2-7";
         const changedPaths = [...new Set([
           ...plan.actions.map(({ path }) => path),
           ".egeria/project.yaml", ".egeria/migrations.jsonl", ".egeria/state.json",
@@ -4136,7 +4136,7 @@ for (const profile of ["site"]) {
             transition: {
               fromProfile: profile,
               fromRecipeVersion: lifecycleCohorts[0][profile],
-              toProfile: "app", toRecipeVersion: "0.2.6",
+              toProfile: "app", toRecipeVersion: "0.2.7",
             },
             migration, changedPaths,
             verificationChecks: core.appProfileTransitionVerificationChecks,
@@ -4150,7 +4150,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(project.capabilitySettings, sourceProject.capabilitySettings);
         assert.equal(project.selectedCapabilities.includes("multilingual"), allOptionals);
         const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
-        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.6" });
+        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.7" });
         assert.deepEqual(state.appliedMigrations, [migration]);
         assert.deepEqual(state.lastSuccessfulVerification, {
           kind: "profile-transition", checks: core.appProfileTransitionPersistedVerificationChecks,
@@ -5362,7 +5362,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["site"]) {
 }
 
 for (const generation of [
-  { name: "current", generation: "current", recipe: "0.2.6", vitest: "5.0.3", catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "current", generation: "current", recipe: "0.2.7", vitest: "5.0.3", catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
 ]) {
   test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {

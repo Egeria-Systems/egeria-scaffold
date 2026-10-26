@@ -26,7 +26,7 @@ test("current recipes own the lint patch and select exact optional dependency fa
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
   const patchPath = "patches/next-eslint-plugin-next.patch";
   const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
-  const recipes = { portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" };
+  const recipes = { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" };
   for (const profile of ["portfolio", "site", "app"]) {
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
@@ -45,9 +45,9 @@ test("current recipes own the lint patch and select exact optional dependency fa
       assert.equal(manifest.devDependencies.vitest, "5.0.3");
       assert.equal(manifest.dependencies.next, "16.4.1");
       const foundation = manifest.dependencies.effect !== undefined;
-      const expectedLock = options.applicationPersistence ? "app-0.2.6-persistence"
-        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.6"
-        : profile === "portfolio" && foundation ? "portfolio-0.11.6-foundation"
+      const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence"
+        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.7"
+        : profile === "portfolio" && foundation ? "portfolio-0.11.7-foundation"
         : profile + "-" + recipes[profile];
       assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
       for (const next of ["16.3.8", "16.4.0", "^16.4.1"]) {
@@ -75,7 +75,7 @@ function renderingState(core, rendered) {
     schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0",
     origin: { profile: rendered.project.originProfile, recipeVersion: rendered.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces, appliedMigrations: [], ejections: [],
-    compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" },
+    compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
     lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"] },
   };
 }
@@ -138,7 +138,7 @@ const appFoundationPaths = [
 test("app generation preserves production-site bytes across all optional subsets", async () => {
   const core = await import("../dist/index.js");
   for (const generation of [
-    { context: undefined, recipe: "0.2.6", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
+    { context: undefined, recipe: "0.2.7", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
   ]) {
     const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
@@ -1846,7 +1846,7 @@ test("current site rendering uses the patched framework and refuses historical c
   const request = { profile: "site", projectName: "acme-studio", displayName: "Acme Studio", packageVersions };
   const current = assertSuccess(await renderSkeleton(request));
   const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
-  assert.equal(current.project.recipeVersion, "0.12.6");
+  assert.equal(current.project.recipeVersion, "0.12.7");
   assert.equal(manifest.dependencies.next, "16.4.1");
   assert.equal(manifest.devDependencies["eslint-config-next"], "16.3.3");
   assert.equal((await renderSkeleton(request, {
@@ -1949,7 +1949,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.6",
+    recipeVersion: "0.11.7",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -1987,8 +1987,8 @@ test("rendered manifests and desired project match the approved resolved recipe"
       verify:
         "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run build && pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
     },
-    engines: { node: "22.23.2", pnpm: "11.20.0" },
-    packageManager: "pnpm@11.20.0",
+    engines: { node: "22.23.2", pnpm: "11.28.1" },
+    packageManager: "pnpm@11.28.1",
     volta: { node: "22.23.2" },
   });
   assert.equal(
@@ -3354,7 +3354,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
     );
 
     assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.11.6");
+    assert.equal(rendered.project.recipeVersion, "0.11.7");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -3798,7 +3798,7 @@ test("generated deployment is manual, revision-bound, least-privilege, and deplo
     },
   });
   assert.deepEqual(steps["Set up pnpm and Node.js"].with, {
-    version: "11.20.0",
+    version: "11.28.1",
     runtime: "node@22.23.2",
     cache: false,
     install: false,
@@ -4157,7 +4157,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(workflow, /pnpm\/setup@84cb39b217b10273981911c288cd62326dc7c6d2/u);
   assert.match(workflow, /actions\/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a/u);
   assert.match(workflow, /persist-credentials: false/u);
-  assert.match(workflow, /version: 11\.20\.0/u);
+  assert.match(workflow, /version: 11\.28\.1/u);
   assert.match(workflow, /runtime: node@22\.23\.2/u);
   assert.match(workflow, /pnpm install --frozen-lockfile/u);
   assert.match(workflow, /pnpm run lint/u);
@@ -4206,7 +4206,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
           name: "Set up pnpm and Node.js",
           uses: "pnpm/setup@84cb39b217b10273981911c288cd62326dc7c6d2",
           with: {
-            version: "11.20.0",
+            version: "11.28.1",
             runtime: "node@22.23.2",
             cache: false,
             install: false,
@@ -6181,7 +6181,7 @@ test("fresh security declarations match their locked Next across supported depen
 test("security recipes remain outside environment schema controls", async () => {
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.6"], ["site", "0.12.6"], ["app", "0.2.6"]]) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.7"], ["site", "0.12.7"], ["app", "0.2.7"]]) {
     const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
     const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createCurrentProfileRecipes() }));
     assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);
@@ -6192,21 +6192,36 @@ test("security recipes remain outside environment schema controls", async () => 
 });
 
 
-test("security dependency policy shares exact reviewed patches with environment candidates", async () => {
+test("security dependency policy shares exact reviewed patches with environment candidates", async t => {
   const core = await import("../dist/index.js");
   for (const profile of ["portfolio", "site", "app"]) {
     const request = { profile, projectName: "security-policy", displayName: "Security Policy", packageVersions: core.verifiedCapabilityPackageVersions };
     const current = assertSuccess(await core.renderSkeleton(request));
     const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
     const policy = parseGeneratedYaml(current.files, "pnpm-workspace.yaml");
-    assert.equal(policy.overrides["fast-uri@"], "3.1.8");
+    await t.test(profile + " compatible security closure", () => {
+      assert.deepEqual({
+        fastUri: policy.overrides["fast-uri@"],
+        bodyParser: policy.overrides["body-parser@"],
+        undici: policy.overrides["undici@"],
+        miniflareUndici: policy.overrides["miniflare>undici"],
+        jsdomUndici: policy.overrides["jsdom>undici"],
+        qs: policy.overrides["qs@"],
+      }, { fastUri: "3.1.9", bodyParser: "2.4.0", undici: "6.29.1", miniflareUndici: "7.30.1", jsdomUndici: "8.12.2", qs: "6.16.1" });
+      for (const obsolete of ["qs@6.16.0", "undici@7.29.1", "undici@8.10.2"]) {
+        assert.equal(policy.minimumReleaseAgeExclude.includes(obsolete), false);
+      }
+    });
+    await t.test(profile + " exact package manager", () => {
+      const rootManifest = parseGeneratedJson(current.files, "package.json");
+      assert.equal(rootManifest.packageManager, "pnpm@11.28.1");
+      assert.equal(rootManifest.engines.pnpm, "11.28.1");
+    });
     assert.equal(policy.overrides["next@16.3.0"], undefined);
     assert.equal(policy.overrides["next@>=16.2.0 <16.4.1"], "16.4.1");
     assert.equal(policy.overrides["brace-expansion@>=1.0.0 <1.1.21"], "1.1.21");
     assert.equal(policy.overrides["brace-expansion@>=2.0.0 <2.1.7"], "2.1.7");
     assert.equal(policy.overrides["brace-expansion@>=5.0.0 <5.0.12"], "5.0.12");
-    assert.equal(policy.overrides["miniflare>undici"], "7.29.1");
-    assert.equal(policy.overrides["jsdom>undici"], "8.10.2");
     assert.equal(policy.overrides["@node-minify/core@9.0.2>glob"], "10.5.0");
     assert.deepEqual(policy, parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml"));
     assert.equal(policy.minimumReleaseAge, 1440);

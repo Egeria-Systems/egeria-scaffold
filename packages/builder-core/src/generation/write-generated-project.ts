@@ -497,7 +497,7 @@ async function createInstalledState(input: Readonly<{
     ejections: [],
     compatibility: {
       node: "22.23.2",
-      pnpm: "11.20.0",
+      pnpm: "11.28.1",
       platformAdapter: "cloudflare-workers",
     },
     lastSuccessfulVerification: {

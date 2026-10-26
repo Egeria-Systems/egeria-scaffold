@@ -88,7 +88,7 @@ async function loadTextEntries(root) {
 }
 
 async function baseFixtureEntries(profile) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" }[profile]}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }[profile]}`));
 }
 
 async function installedEntries(profile, options = {}) {
@@ -141,7 +141,7 @@ async function installedEntries(profile, options = {}) {
     ejections: [],
     compatibility: {
       node: "22.23.2",
-      pnpm: "11.20.0",
+      pnpm: "11.28.1",
       platformAdapter: "cloudflare-workers",
     },
     lastSuccessfulVerification: {

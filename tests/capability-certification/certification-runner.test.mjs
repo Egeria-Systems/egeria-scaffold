@@ -457,7 +457,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       version: "0.3.0",
     },
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
     verifyFixture: async ({ environment }) => {
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
       assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
@@ -480,7 +480,7 @@ test("section composition certification binds both supported fresh-scaffold prof
     },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.7"),
     verifierIdentifier: "site",
   });
 
@@ -502,7 +502,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       behaviorContractDigest:
         "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
     },
-    recipeVersions: { portfolio: "0.11.6", site: "0.12.6" },
+    recipeVersions: { portfolio: "0.11.7", site: "0.12.7" },
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -702,7 +702,7 @@ test("section composition certification fails closed on authority and journey dr
         version: "0.3.0",
       },
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
       verifyFixture: async () => ({
         ok: true,
         checks: sectionCompositionFixtureChecks,
@@ -723,7 +723,7 @@ test("section composition certification fails closed on authority and journey dr
       },
       profile: "site",
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.6"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.7"),
       verifierIdentifier: "site",
       ...siteOverrides,
     });
@@ -887,6 +887,15 @@ async function copyCertificationRuntime(cleanRoot) {
   await cp(builderCoreDistPath, join(cleanRoot, "packages/builder-core/dist"), {
     recursive: true,
   });
+  const visualAdmissionModulePath =
+    "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs";
+  await mkdir(dirname(join(cleanRoot, visualAdmissionModulePath)), {
+    recursive: true,
+  });
+  await copyFile(
+    join(repositoryRoot, visualAdmissionModulePath),
+    join(cleanRoot, visualAdmissionModulePath),
+  );
   for (const dependency of ["typescript", "yaml", "zod"]) {
     await cp(
       join(builderCoreNodeModulesPath, dependency),
@@ -1459,7 +1468,7 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
   const scaffold = createSuccessfulScaffoldAdapters({
     inferredCapability: { identifier: "standards", version: "0.5.1" },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
     verificationChecks: visualChecks,
   });
 
@@ -1476,7 +1485,7 @@ test("generated testing certification binds a fresh portfolio to the exact stand
         behaviorContractDigest:
           "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
       },
-      recipeVersion: "0.11.6",
+      recipeVersion: "0.11.7",
       checks: [
         "compiled-cli-create",
         "state-inference",
@@ -1533,7 +1542,7 @@ test("generated testing certification rejects missing, extra, or reordered visua
     const scaffold = createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "standards", version: "0.5.1" },
       postCreate: (projectRoot) =>
-        writeRecipeVersion(projectRoot, "0.11.6"),
+        writeRecipeVersion(projectRoot, "0.11.7"),
       verificationChecks: checks,
     });
     await assert.rejects(
@@ -1554,7 +1563,7 @@ test("generated testing certification rejects stale state, recipe, diagnostics, 
       version: "0.5.1",
     }),
     postCreate: (projectRoot) =>
-      writeRecipeVersion(projectRoot, "0.11.6"),
+      writeRecipeVersion(projectRoot, "0.11.7"),
     verificationChecks: visualChecks,
   });
   const cases = [
@@ -1662,7 +1671,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       indexReads += 1;
       return "H selected-evidence.test.mjs\0";
     },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
     verifyFixture: async ({ projectRoot, environment }) => {
       assert.equal(projectRoot, scaffold.state.projectRoot);
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
@@ -1688,7 +1697,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       behaviorContractDigest:
         "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
     },
-    recipeVersion: "0.11.6",
+    recipeVersion: "0.11.7",
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -1958,7 +1967,7 @@ test("content files certification fails closed on invalid authority and evidence
     createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "content-files", version: "0.4.0" },
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.6"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
       verifyFixture: async () => ({ ok: true, checks: contentFixtureChecks }),
       ...overrides,
     });
@@ -2264,7 +2273,7 @@ test("multilingual portfolio verification runs the full isolated project and bro
       environment: { PATH: "/verified/bin" },
       async runCommand(command) {
         commands.push(command);
-        return command.arguments[0] === "--version" ? "11.20.0\n" : "";
+        return command.arguments[0] === "--version" ? "11.28.1\n" : "";
       },
     });
 
@@ -2590,8 +2599,8 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
   };
   try {
     for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
-      ["0.2.6", false, undefined],
-      ["0.2.6", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.2.7", false, undefined],
+      ["0.2.7", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
       ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
     ]) {
       commands.length = 0;

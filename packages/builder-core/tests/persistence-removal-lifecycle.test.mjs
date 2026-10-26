@@ -25,7 +25,7 @@ const digest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("h
 const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), recipe: "0.2.6", appLock: "web-recipe-app-0.2.6" },
+  { profiles: createCurrentProfileRecipes(), recipe: "0.2.7", appLock: "web-recipe-app-0.2.7" },
 ];
 
 async function repository(options = {}) {
@@ -47,7 +47,7 @@ async function repository(options = {}) {
     origin: { profile: "app", recipeVersion: rendered.value.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
     appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [],
-    compatibility: { node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers" },
+    compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
     lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...persistenceGenerationVerificationChecks, "post-state-inference"] },
   };
   files.set(".egeria/state.json", encoder.encode(`${stringifyCanonicalJson(state)}\n`));

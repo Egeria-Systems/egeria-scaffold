@@ -137,7 +137,7 @@ function configurationFor(profile, revision) {
   }
 
   const isPortfolio = profile === "portfolio";
-  const recipeVersion = isPortfolio ? "0.11.6" : "0.12.6";
+  const recipeVersion = isPortfolio ? "0.11.7" : "0.12.7";
   return Object.freeze({
     profile,
     projectName: isPortfolio ? "acme-portfolio" : "acme-site",

@@ -1,10 +1,11 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { createSyntheticAppTransitionAdmission } from "../../../tests/helpers/synthetic-app-transition-admission.mjs";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 const currentTransitionCohorts = [
-  { label: "Current", generation: "current", portfolio: "0.11.6", site: "0.12.6", app: "0.2.6" },
+  { label: "Current", generation: "current", portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" },
 ];
 const currentTransitionContexts = {
   "current": createGenerationRenderingContext(),
@@ -41,7 +42,7 @@ async function fixture(profile, subset = 0, project = { projectName: "transition
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces.issues));
   const state = {
     schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0", origin: { profile, recipeVersion: rendered.value.project.recipeVersion }, installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [], compatibility: {
-      node: "22.23.2", pnpm: "11.20.0", platformAdapter: "cloudflare-workers"
+      node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers"
     }, lastSuccessfulVerification: { kind: "generation", checks }
   };
   files.set(".egeria/state.json", encoder.encode(core.serializeStateJson(state)));
@@ -64,6 +65,7 @@ async function prepare(f) {
     source: f.source, target: f.target, currentFiles: f.files, validators: await loadAppTransitionContentValidators()
   });
 }
+// Explicit injected unit evidence; this never establishes default source admission.
 async function reviewed(f) {
   const prepared = await prepare(f);
   assert.equal(prepared.ok, true, JSON.stringify(prepared));
@@ -96,7 +98,7 @@ for (const profile of ["portfolio", "site"])
       assert.deepEqual(await plan(f, evidence), successful);
       const value = successful.value;
       assert.equal(value.target.profile, "app");
-      assert.equal(value.target.recipeVersion, "0.2.6");
+      assert.equal(value.target.recipeVersion, "0.2.7");
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.1.0"));
       assert.ok(value.target.capabilities.some(({ identifier, version }) => identifier === "site-routing" && version === "0.4.0"));
       assert.equal(value.actions.some(({ path }) => path.startsWith(".egeria/")), false);
@@ -171,18 +173,21 @@ test("app planning preserves both supported Git revision formats and rejects inv
     assert.equal(JSON.stringify([...f.files]), before);
   }
 });
-test("default visual admission accepts all exact subsets and refuses changed first-viewport content", async () => {
+test("default visual admission refuses current subsets while injected unit evidence protects changed first-viewport content", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   for (let subset = 0; subset < 8; subset++) {
     const f = await fixture("portfolio", subset, policy.appTransitionVisualProject);
     const result = await plan(f);
-    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    const evidence = await reviewed(f);
+    assert.equal((await plan(f, evidence)).ok, true, "explicit unit evidence must reach planning before the mutation");
     const path = subset & 2 ? "apps/web/content/en-CA/localized-content.yaml" : "apps/web/content/en-CA/site.yaml";
     const content = parseDocument(decoder.decode(f.files.get(path))).toJS();
     const home = subset & 2 ? content.pages.home : content.home;
     home.sections[0].content.heading = "Changed first viewport";
     f.files.set(path, encoder.encode(stringify(content)));
-    const refused = await plan(f);
+    const refused = await plan(f, evidence);
     assert.equal(refused.ok, false);
     assert.equal(refused.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
@@ -418,12 +423,14 @@ test("visual input fingerprints include rendered build configuration and manifes
   }
 });
 
-test("exact visual inputs refuse changed runtime and lock identities while preserving excluded-content fingerprints", async () => {
+test("synthetic wrapper admission refuses changed runtime and lock identities while preserving excluded-content fingerprints", async context => {
+  const fixture = await createSyntheticAppTransitionAdmission(context);
+  const syntheticPolicy = await import(fixture.verifierUrl);
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
   const cohorts = [
-    { context: currentTransitionContexts.current, lock: "app-0.2.6" },
+    { context: currentTransitionContexts.current, lock: "app-0.2.7" },
   ];
   const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
   for (const [cohortIndex, cohort] of cohorts.entries()) {
@@ -442,37 +449,40 @@ test("exact visual inputs refuse changed runtime and lock identities while prese
     assert.equal(prepared.ok,true);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok,true);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "unit sentinels cannot admit the canonical source");
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok,true);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
     for (const invalidSubset of [
       [...optionalCapabilities, "unknown-capability"],
       ...(optionalCapabilities.length ? [[...optionalCapabilities, optionalCapabilities[0]]] : [["none"]]),
       ...(optionalCapabilities.length > 1 ? [[[...optionalCapabilities].sort().join("+")]] : []),
     ]) {
-      assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: invalidSubset }).ok, false, JSON.stringify(invalidSubset));
+      assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: invalidSubset }).ok, false, JSON.stringify(invalidSubset));
     }
-    for (const otherLock of lockFingerprints.filter(value => value !== targetLockfileFingerprint)) {
-      assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: otherLock }).ok, false, "other cohorts cannot approve these inputs");
+    for (const otherLock of [policy.appTransitionVisualInputRecord, policy.vitestFiveAppTransitionVisualInputRecord,
+      policy.literalLintAppTransitionVisualInputCandidate, policy.viteSecurityAppTransitionVisualInputCandidate]
+      .map(record => record.targetLockfileFingerprint)) {
+      assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: otherLock }).ok, false, "other cohorts cannot approve these inputs");
     }
     for (const pixel of [[255,0,0,255], [0,0,255,255]]) {
       const baselines = policy.appTransitionBaselinePaths.map(path => ({path,content:onePixelPng(pixel)}));
-      assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,baselines}).ok,false,"unreviewed valid PNG bytes cannot self-approve");
+      assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({...identity,baselines}).ok,false,"unreviewed valid PNG bytes cannot self-approve");
     }
     for (const path of ["apps/web/app/globals.css","apps/web/postcss.config.mjs","apps/web/package.json","apps/web/tests/visual/home-visual.spec.ts"]) {
       const altered = {...identity,influencingFingerprints:identity.influencingFingerprints.map(input=>input.path===path?{...input,fingerprint:`sha256:${"d".repeat(64)}`}:input)};
-      assert.equal(policy.verifyAppTransitionVisualInputRecord(altered).ok,false,path);
+      assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(altered).ok,false,path);
     }
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,targetLockfileFingerprint:`sha256:${"e".repeat(64)}`}).ok,false);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({...identity,targetLockfileFingerprint:`sha256:${"e".repeat(64)}`}).ok,false);
     currentFiles.set("apps/web/content/en-CA/long-form/introduction.md",encoder.encode("---\ntitle: Preserved\nsummary: Off home\n---\nCustomized preserved prose.\n"));
     const customized = policy.prepareAppProfileTransition({source:source.value,target:target.value,currentFiles,validators});
     assert.equal(customized.ok,true);
     assert.deepEqual(customized.value.influencingFingerprints, prepared.value.influencingFingerprints);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({...identity,influencingFingerprints:customized.value.influencingFingerprints}).ok,true);
   }
   }
 });
 
-test("historical visual candidates remain inert after exact successor admission", async () => {
+test("historical visual candidates remain inert without current source admission", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
@@ -490,7 +500,7 @@ test("historical visual candidates remain inert after exact successor admission"
   const historical = JSON.parse(await readFile(new URL("../../../docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/transition-inputs.json", import.meta.url), "utf8"));
   assert.deepEqual(candidate, historical.value);
   for (const generation of [
-    { context: createGenerationRenderingContext(), portfolio: "0.11.6", app: "0.2.6", next: "16.4.1", lock: "app-0.2.6" },
+    { context: createGenerationRenderingContext(), portfolio: "0.11.7", app: "0.2.7", next: "16.4.1", lock: "app-0.2.7" },
   ]) for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -511,7 +521,7 @@ test("historical visual candidates remain inert after exact successor admission"
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url))));
     const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current inputs have no real source admission");
     assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: candidate.targetLockfileFingerprint }).ok, false);
     assert.notEqual(core.fingerprintJsonValue(prepared.value.influencingFingerprints), candidate.subsets[[...optionalCapabilities].sort().join("+") || "none"]);
   }
@@ -563,7 +573,7 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
 
 test("retired transition endpoints refuse the historical and current targets", async () => {
   for (const [profile, recipeVersion] of [["portfolio", "0.11.2"], ["site", "0.12.3"]]) {
-    for (const toRecipeVersion of ["0.2.2", "0.2.3", "0.2.6"]) {
+    for (const toRecipeVersion of ["0.2.2", "0.2.3", "0.2.7"]) {
       assert.equal(core.resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion }).ok, false);
     }
   }
@@ -571,23 +581,25 @@ test("retired transition endpoints refuse the historical and current targets", a
 
 test("Vite security incoming transitions admit only exact same-cohort endpoints", async () => {
   const { resolveSupportedProfileTransition } = await import("../dist/lifecycle/supported-profile-transitions.js");
-  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.6", "0.11.3"], ["site", "0.12.6", "0.12.3"]]) {
-    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.6" });
-    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.6" } } });
-    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.6"]]) {
+  for (const [profile, recipeVersion, retainedRecipe] of [["portfolio", "0.11.7", "0.11.3"], ["site", "0.12.7", "0.12.3"]]) {
+    const edge = resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: recipeVersion, toProfile: "app", toRecipeVersion: "0.2.7" });
+    assert.deepEqual(edge, { ok: true, value: { source: { profile, recipeVersion }, target: { profile: "app", recipeVersion: "0.2.7" } } });
+    for (const [source, target] of [[recipeVersion, "0.2.3"], [retainedRecipe, "0.2.7"]]) {
       assert.deepEqual(resolveSupportedProfileTransition({ fromProfile: profile, fromRecipeVersion: source, toProfile: "app", toRecipeVersion: target }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
     }
   }
 });
 
-test("current visual inputs bind every independently frozen subset without inheriting historical admission", async () => {
+test("current preparation fingerprints stay fixed while synthetic wrapper admission protects exact baselines", async testContext => {
+  const fixture = await createSyntheticAppTransitionAdmission(testContext);
+  const syntheticPolicy = await import(fixture.verifierUrl);
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createCurrentProfileRecipes() };
   const subsets = {};
-  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml", import.meta.url))));
+  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml", import.meta.url))));
   for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -605,24 +617,25 @@ test("current visual inputs bind every independently frozen subset without inher
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(prepared.value.influencingFingerprints);
     const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "synthetic policy data is not canonical admission");
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok, true);
     const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({
       path, content: await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${subset & 2 ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url)),
     })));
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
-    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
+    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
   assert.deepEqual(subsets, {
-  "none": "sha256:9803734000314547efb125930cef327b425c8e83bd50e9677acba88a6844163e",
-  "analytics": "sha256:2ea3c5b3e6aa44eab20264b2ae91b33ae69d4802bedb15025193560773936492",
-  "booking-calendly": "sha256:1f44a15d15aef9ac2575216f6a9a19efa41067d1d469c78ae32a4c6a60f4b5bd",
-  "analytics+booking-calendly": "sha256:f750891726da506b3e8b08086e1fe6635b949a341448188d82c5a360685fe540",
-  "multilingual": "sha256:ffce593ed90ebb73a97ef9fefed60b4f1def270f3293dc273354977d9792c9e3",
-  "analytics+multilingual": "sha256:03fc6c83b4036312ee87ce307557e7628d61699902b7c4d61e50fa69d55614c5",
-  "booking-calendly+multilingual": "sha256:2fab3e46b40067235eafa5e4367fa6dcf542567c39ae40b12ed8fc2b68911520",
-  "analytics+booking-calendly+multilingual": "sha256:a98b3d78da20eb5af693c2a19f2cf67fdc150e0e1d11bd9374e25a1a6839ddcf"
+  "none": "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295",
+  "analytics": "sha256:cfe0d58c883f14c8542eee0e431decb0b6eb6a5b351f9c1bfa9e55f40027145c",
+  "booking-calendly": "sha256:7a29d377df99a7724f4f1ad8a8a2ca67aaa1c9e64055fee4dd2c2e74317e519f",
+  "analytics+booking-calendly": "sha256:b40a377ae05d2452c0c4f80f9a19b55a0503659e34382e50d019d4127e6f3414",
+  "multilingual": "sha256:120f44139cb0b11436e47de731cae55571159cbc1f37b3279e21f9494b100154",
+  "analytics+multilingual": "sha256:3833aa085f0a67808d8b540a9c721cd72ee5dd5bc0ede0c8751a6285c5b59ff6",
+  "booking-calendly+multilingual": "sha256:861ac44e56e31399a91116f32d715e50b7900c056bd447bf62b3f027b3e4bb54",
+  "analytics+booking-calendly+multilingual": "sha256:790f9e9177025f0c931836bb48f7983cfb00d8198753be9d39e0593140254c0d"
 });
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
   assert.notDeepEqual(candidate.subsets, subsets);
