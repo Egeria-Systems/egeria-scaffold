@@ -242,8 +242,8 @@ async function canonicalVisualAdmission() {
       !Array.isArray(policy.baselinePaths) || policy.baselinePaths.length !== 2 ||
       record?.schemaVersion !== 1 || record.sourceProfile?.name !== "portfolio" || record.sourceProfile.version !== "0.11.7" ||
       record.targetProfile?.name !== "app" || record.targetProfile.version !== "0.2.7" ||
-      record.manifestSha256 !== "090d2f4797abc0b0cbf551904b4313bc8a2667c35ad04be6e065aad7816ec8d8" ||
-      record.sourceRevision !== "0e4bcf1f29555964d697f14ad0adc562dccf142f" ||
+      record.manifestSha256 !== "2ad0a26ad45871401941d5202781e43233a00e86e9f12e00f447e3d1245a2a6d" ||
+      record.sourceRevision !== "4ed455ccde1e6129ffad4ae825e9aff8dedc56ca" ||
       !Array.isArray(record.originalSourceFiles) || record.originalSourceFiles.length !== 299 ||
       !same(Object.keys(record.bridgeSourceFiles ?? {}).sort(), ["packages/builder-core/src/lifecycle/app-profile-transition.ts", "scripts/verify-app-transition-visuals.mjs"]) ||
       !same(Object.keys(record.subsets ?? {}).sort(), subsets.map(subset => subset.join("+") || "none").sort())) fail("VISUAL_INPUT_ADMISSION_REQUIRED");

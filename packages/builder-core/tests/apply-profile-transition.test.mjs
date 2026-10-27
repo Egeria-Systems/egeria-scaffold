@@ -632,14 +632,14 @@ test("installed incoming app transitions ignore changed generation defaults", as
 for (const profile of ["portfolio", "site"]) {
   for (let subset = 0; subset < 8; subset += 1) {
     const name = profile === "portfolio"
-      ? `app transition refuses unadmitted portfolio optional subset ${subset} before effects`
+      ? `app transition refuses unapproved portfolio optional subset ${subset} before effects`
       : `app transition executes site optional subset ${subset} with state-last persistence`;
     test(name, async () => {
       const source = await appTransitionSource(profile, subset);
       const repository = createRepository(source);
       if (profile === "portfolio") {
         const execution = await invokeApply(repository, { toProfile: "app" });
-        assertFailure(execution.result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });
+        assertFailure(execution.result, { code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" });
         assert.deepEqual(execution.verifierCalls, []);
         assert.deepEqual(repository.writes, []);
         assert.deepEqual(snapshotFiles(repository.files), snapshotFiles(source));
@@ -701,7 +701,7 @@ for (const profile of ["portfolio", "site"]) {
 }
 
 for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming app execution preserves all subsets with exact state-last receipts`, async () => {
-  for (const profile of ["site"]) {
+  for (const profile of ["portfolio", "site"]) {
     for (let subset = 0; subset < 8; subset++) {
       const source = await appTransitionSource(profile, subset, cohort.generation);
       const repository = createRepository(source);

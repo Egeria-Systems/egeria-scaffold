@@ -173,23 +173,24 @@ test("app planning preserves both supported Git revision formats and rejects inv
     assert.equal(JSON.stringify([...f.files]), before);
   }
 });
-test("default visual admission refuses current subsets while injected unit evidence protects changed first-viewport content", async () => {
+test("current visual admission permits reviewed subsets and refuses changed first-viewport content", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   for (let subset = 0; subset < 8; subset++) {
     const f = await fixture("portfolio", subset, policy.appTransitionVisualProject);
+    const before = [...f.files].map(([path, content]) => [path, Buffer.from(content)]);
     const result = await plan(f);
-    assert.equal(result.ok, false, JSON.stringify(result));
-    assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-    const evidence = await reviewed(f);
-    assert.equal((await plan(f, evidence)).ok, true, "explicit unit evidence must reach planning before the mutation");
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual([...f.files].map(([path, content]) => [path, Buffer.from(content)]), before);
     const path = subset & 2 ? "apps/web/content/en-CA/localized-content.yaml" : "apps/web/content/en-CA/site.yaml";
     const content = parseDocument(decoder.decode(f.files.get(path))).toJS();
     const home = subset & 2 ? content.pages.home : content.home;
     home.sections[0].content.heading = "Changed first viewport";
     f.files.set(path, encoder.encode(stringify(content)));
-    const refused = await plan(f, evidence);
+    const changed = [...f.files].map(([path, content]) => [path, Buffer.from(content)]);
+    const refused = await plan(f);
     assert.equal(refused.ok, false);
     assert.equal(refused.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    assert.deepEqual([...f.files].map(([path, content]) => [path, Buffer.from(content)]), changed);
   }
 });
 test("strict data preparation refuses malformed YAML, aliases, duplicate keys, scalar mismatch and locale parity", async () => {
@@ -449,7 +450,7 @@ test("synthetic wrapper admission refuses changed runtime and lock identities wh
     assert.equal(prepared.ok,true);
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier=>["analytics","booking-calendly","multilingual"].includes(identifier));
     const identity = {optionalCapabilities,influencingFingerprints:prepared.value.influencingFingerprints,targetLockfileFingerprint};
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "unit sentinels cannot admit the canonical source");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true, "current exact inputs use the canonical admission");
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok,true);
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, optionalCapabilities: [...optionalCapabilities].reverse() }).ok, true);
     for (const invalidSubset of [
@@ -482,7 +483,7 @@ test("synthetic wrapper admission refuses changed runtime and lock identities wh
   }
 });
 
-test("historical visual candidates remain inert without current source admission", async () => {
+test("historical visual candidates remain inert alongside exact current admission", async () => {
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
@@ -521,7 +522,7 @@ test("historical visual candidates remain inert without current source admission
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${generation.lock}/pnpm-lock.yaml`, import.meta.url))));
     const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current inputs have no real source admission");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true, "current inputs match the exact admitted source");
     assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, targetLockfileFingerprint: candidate.targetLockfileFingerprint }).ok, false);
     assert.notEqual(core.fingerprintJsonValue(prepared.value.influencingFingerprints), candidate.subsets[[...optionalCapabilities].sort().join("+") || "none"]);
   }
@@ -590,7 +591,7 @@ test("Vite security incoming transitions admit only exact same-cohort endpoints"
   }
 });
 
-test("current preparation fingerprints stay fixed while synthetic wrapper admission protects exact baselines", async testContext => {
+test("current preparation fingerprints and canonical admission protect exact baselines", async testContext => {
   const fixture = await createSyntheticAppTransitionAdmission(testContext);
   const syntheticPolicy = await import(fixture.verifierUrl);
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
@@ -617,14 +618,14 @@ test("current preparation fingerprints stay fixed while synthetic wrapper admiss
     const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(prepared.value.influencingFingerprints);
     const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
-    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "synthetic policy data is not canonical admission");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, true, "current preparation matches the canonical admission");
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok, true);
     const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({
       path, content: await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${subset & 2 ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url)),
     })));
-    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
-    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
-    assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
   assert.deepEqual(subsets, {

@@ -16,15 +16,15 @@ const record = freeze({
   "schemaVersion": 1,
   "sourceProfile": {
     "name": "portfolio",
-    "version": "0.11.6"
+    "version": "0.11.7"
   },
   "targetProfile": {
     "name": "app",
-    "version": "0.2.6"
+    "version": "0.2.7"
   },
-  "manifestSha256": "090d2f4797abc0b0cbf551904b4313bc8a2667c35ad04be6e065aad7816ec8d8",
-  "sourceRevision": "0e4bcf1f29555964d697f14ad0adc562dccf142f",
-  "targetLockfileFingerprint": "sha256:d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750",
+  "manifestSha256": "2ad0a26ad45871401941d5202781e43233a00e86e9f12e00f447e3d1245a2a6d",
+  "sourceRevision": "4ed455ccde1e6129ffad4ae825e9aff8dedc56ca",
+  "targetLockfileFingerprint": "sha256:78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706",
   "baselines": {
     "monolingual": [
       "sha256:6f6dd1ddd3049d998ac51b4da17b7eb66ca481b89f9e4947fb68b0bce1af50d5",
@@ -36,55 +36,55 @@ const record = freeze({
     ]
   },
   "subsets": {
-    "none": "sha256:9803734000314547efb125930cef327b425c8e83bd50e9677acba88a6844163e",
-    "analytics": "sha256:2ea3c5b3e6aa44eab20264b2ae91b33ae69d4802bedb15025193560773936492",
-    "booking-calendly": "sha256:1f44a15d15aef9ac2575216f6a9a19efa41067d1d469c78ae32a4c6a60f4b5bd",
-    "analytics+booking-calendly": "sha256:f750891726da506b3e8b08086e1fe6635b949a341448188d82c5a360685fe540",
-    "multilingual": "sha256:ffce593ed90ebb73a97ef9fefed60b4f1def270f3293dc273354977d9792c9e3",
-    "analytics+multilingual": "sha256:03fc6c83b4036312ee87ce307557e7628d61699902b7c4d61e50fa69d55614c5",
-    "booking-calendly+multilingual": "sha256:2fab3e46b40067235eafa5e4367fa6dcf542567c39ae40b12ed8fc2b68911520",
-    "analytics+booking-calendly+multilingual": "sha256:a98b3d78da20eb5af693c2a19f2cf67fdc150e0e1d11bd9374e25a1a6839ddcf"
+    "none": "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295",
+    "analytics": "sha256:cfe0d58c883f14c8542eee0e431decb0b6eb6a5b351f9c1bfa9e55f40027145c",
+    "booking-calendly": "sha256:7a29d377df99a7724f4f1ad8a8a2ca67aaa1c9e64055fee4dd2c2e74317e519f",
+    "analytics+booking-calendly": "sha256:b40a377ae05d2452c0c4f80f9a19b55a0503659e34382e50d019d4127e6f3414",
+    "multilingual": "sha256:120f44139cb0b11436e47de731cae55571159cbc1f37b3279e21f9494b100154",
+    "analytics+multilingual": "sha256:3833aa085f0a67808d8b540a9c721cd72ee5dd5bc0ede0c8751a6285c5b59ff6",
+    "booking-calendly+multilingual": "sha256:861ac44e56e31399a91116f32d715e50b7900c056bd447bf62b3f027b3e4bb54",
+    "analytics+booking-calendly+multilingual": "sha256:790f9e9177025f0c931836bb48f7983cfb00d8198753be9d39e0593140254c0d"
   },
   "originalSourceFiles": [
     {
       "path": "package.json",
-      "sha256": "e5bbca0b80f1510f2798558c9247329557ccce4db6ac0722f8bb84b9e0fb74d3"
+      "sha256": "1927887429728c1d02881db25dd5d70c2bc538df46de0f0b6ead53bbd95ef468"
     },
     {
-      "path": "packages/builder-core/lockfiles/web-recipe-app-0.2.6-persistence/pnpm-lock.yaml",
-      "sha256": "de160f2b39160f89ccda1d21ee97e8d3f602c3ba09a82610e7c4b9bee191aac8"
+      "path": "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml",
+      "sha256": "a7e16b5be977f258f483d0bb7281b1bd8e409967bf51ccd607be2312e16da21d"
     },
     {
-      "path": "packages/builder-core/lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml",
-      "sha256": "d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750"
+      "path": "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml",
+      "sha256": "78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706"
     },
     {
       "path": "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml",
-      "sha256": "d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750"
+      "sha256": "78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706"
     },
     {
-      "path": "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.6-foundation/pnpm-lock.yaml",
-      "sha256": "ad7de609f12e592ee2babfe749b06223618c1e367ea2e36e7a9a05b0c7a7daff"
+      "path": "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.7-foundation/pnpm-lock.yaml",
+      "sha256": "ff44ba1b1f77d18889d748164e8939b2df6ca9e063fd122ab29e8d9925b060c9"
     },
     {
-      "path": "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.6/pnpm-lock.yaml",
-      "sha256": "f9ef2ae3f85c709801425b8e0a3472db2433d395294253d15ce4a25b03db71d1"
+      "path": "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.7/pnpm-lock.yaml",
+      "sha256": "a19f890d98ca4ab97f16488a69e3671783545d1385dd3d6e421649dc1308e0f1"
     },
     {
       "path": "packages/builder-core/lockfiles/web-recipe-portfolio-0.12.0/pnpm-lock.yaml",
-      "sha256": "00cac1256d108e208ddd3fae52c42577b40430e1ec93b86d08e717b66d225dcd"
+      "sha256": "a19f890d98ca4ab97f16488a69e3671783545d1385dd3d6e421649dc1308e0f1"
     },
     {
-      "path": "packages/builder-core/lockfiles/web-recipe-site-0.12.6/pnpm-lock.yaml",
-      "sha256": "5a894e172007d5f0429f6ede1463b01ccd42790e68ef71a3cfda454cf65c4875"
+      "path": "packages/builder-core/lockfiles/web-recipe-site-0.12.7/pnpm-lock.yaml",
+      "sha256": "be78333c0f57123df4d871b89b5f9bc5d9e6eb332aa2d7d276758b5676ab1e79"
     },
     {
       "path": "packages/builder-core/lockfiles/web-recipe-site-0.13.0/pnpm-lock.yaml",
-      "sha256": "5a894e172007d5f0429f6ede1463b01ccd42790e68ef71a3cfda454cf65c4875"
+      "sha256": "be78333c0f57123df4d871b89b5f9bc5d9e6eb332aa2d7d276758b5676ab1e79"
     },
     {
       "path": "packages/builder-core/package.json",
-      "sha256": "70745619ff0271159d5ff24c3e0e59ca112b127a9807a3b072bf09bdc5160ba7"
+      "sha256": "580cf540c0c2af995bd7465729f453d45884528a7df8ec0af42660693dd3e3e4"
     },
     {
       "path": "packages/builder-core/scripts/compile-content-validation.mjs",
@@ -140,7 +140,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/contracts/profile.ts",
-      "sha256": "503c3bb031141aa01639d169f474a70e1a4be4d1f68f39a9851caa1c9f4272de"
+      "sha256": "b0b3e1d3e31f0d85f255960a84b364f0e1f9c06a13ccfd34724de4c373f79f49"
     },
     {
       "path": "packages/builder-core/src/contracts/project.ts",
@@ -152,7 +152,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/contracts/state.ts",
-      "sha256": "a1aadd4b17e2b32d63b632fcc2df3506485133a14d6967bdedc026326fd3a481"
+      "sha256": "0c2458118c418651cd9772082ca23e59db6b72082c8322c7b66183e0bbb36e19"
     },
     {
       "path": "packages/builder-core/src/contracts/surface-target.ts",
@@ -176,7 +176,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/generation/recipe-lockfiles.ts",
-      "sha256": "3839071a42e97b623e264499a115e6f851ee1784880c599c42dd7f3ec42daf09"
+      "sha256": "db21706a69975a602ff5b6461f0821785c4b75e25942fdfa9ac9ef2e4c6b45ff"
     },
     {
       "path": "packages/builder-core/src/generation/render-skeleton.ts",
@@ -196,11 +196,11 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/generation/verify-generated-project.ts",
-      "sha256": "ef46d22fe397a4f32043d48c2b40984604b43d6125b5d93e8ac9292913d88a09"
+      "sha256": "84bd50a9716b8f60bcbf05502a7f0d81781feeb323a185fee5bfc77d026d3011"
     },
     {
       "path": "packages/builder-core/src/generation/write-generated-project.ts",
-      "sha256": "de645169f93e470c32f23bbfd984d88980c248eb7b45aefacc66d58840a30ade"
+      "sha256": "24642819c161fa99b96f1a483095272052f959403ebcb99f056e267e70c1fabd"
     },
     {
       "path": "packages/builder-core/src/index.ts",
@@ -216,7 +216,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/lifecycle/app-profile-transition.ts",
-      "sha256": "c166cfec7c223336c7a384f6ac5f009ec7b9535083aa7265a1afdfde6b75bee2"
+      "sha256": "4f3160334bea9796487b16d3158a0e9c623943cb4027dbc0edbc983a03a03d64"
     },
     {
       "path": "packages/builder-core/src/lifecycle/app-transition-content-validation.ts",
@@ -232,7 +232,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/lifecycle/apply-profile-transition.ts",
-      "sha256": "6f8d2059f9ef4f8f78908f8f691e2fde6df14ba5d66a424a920730d038a59440"
+      "sha256": "b1d1f80d9c4084bb9f6b5ef4726fd06ec0673d9a99f3b4ac6c7b9049cb484e5b"
     },
     {
       "path": "packages/builder-core/src/lifecycle/atomic-file-change-writer.ts",
@@ -268,7 +268,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/lifecycle/plan-capability-addition.ts",
-      "sha256": "5d1793db9f52cc155374e0b2aa17d0ceb531b9bc1476bbbbba231615a68d59f7"
+      "sha256": "f499a995293dfee796145a57e0c57db04f3096d4bb07f9b6e7c654a546199d20"
     },
     {
       "path": "packages/builder-core/src/lifecycle/plan-capability-removal.ts",
@@ -276,7 +276,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/lifecycle/plan-profile-transition.ts",
-      "sha256": "63de8e56197f8af961017962474968b002d6a7c9a54961387403ee1343f87c40"
+      "sha256": "fc7475bebac3fa18ca02a1767e97d0f90a52bde9150e80298170dc4b675df835"
     },
     {
       "path": "packages/builder-core/src/lifecycle/prepare-capability-dependency-change.ts",
@@ -296,7 +296,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/lifecycle/supported-profile-transitions.ts",
-      "sha256": "b24dc5add4add92c8ee36841becc46c919dc8a3e923500aed0ad62a30a927f1c"
+      "sha256": "c9dbddfdd1ed5207afe8847c51d0bf65b1327ff3d3f3571bf333d7490cae95f5"
     },
     {
       "path": "packages/builder-core/src/manifest/create-installed-manifest.ts",
@@ -312,7 +312,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/src/profiles/profile-recipes.ts",
-      "sha256": "a8456b8f37eb1dacadf68fd88f04a4422efe42784ac89c598343d68a64c300dc"
+      "sha256": "41921ffd9ec4c40752324e70f8be40849aeb831c216d6625dc60292137f97053"
     },
     {
       "path": "packages/builder-core/src/repository/cache-reader.ts",
@@ -500,7 +500,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/application-persistence/.github/workflows/migrate-application-database.yml.template",
-      "sha256": "4b79075232434bc24d95775b7f991722a9106d57d4da1957dbb9eded14c392a8"
+      "sha256": "1c1ddb54e0e89f7c8e4cabf223e4e69948952140d004d44321243820c888e0e6"
     },
     {
       "path": "packages/builder-core/templates/application-persistence/apps/web/drizzle.config.ts",
@@ -620,11 +620,11 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/common/.github/workflows/deploy.yml.template",
-      "sha256": "39489d7057e8213b2ed4312bc49f8ef7d353e5672b8d7db37ca394de5be2e85b"
+      "sha256": "04e1516b376d9d45e8c90dd915eedb1edb396135a7a23c9238dbb5f2222169c3"
     },
     {
       "path": "packages/builder-core/templates/common/.github/workflows/quality.yml.template",
-      "sha256": "63388d9e62f42a5f26244bdeac6950fb5428161ea1c0fba7cb364d7ac9bf742a"
+      "sha256": "13b9920479cc580714bef7635505f7cbc445db8c1b06e6c8089055640384737e"
     },
     {
       "path": "packages/builder-core/templates/common/.gitignore.template",
@@ -820,7 +820,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/common/dependency-security/pnpm-workspace.yaml",
-      "sha256": "04039e00fe2c252dd353226d54c254ad4c75022f2c0aea7468bc5da9be5f365a"
+      "sha256": "272e73ffbefe40363dfc4568c7e0aca00d1477ca1059990375b0964f7f03f8ba"
     },
     {
       "path": "packages/builder-core/templates/common/docs/environments.md",
@@ -832,7 +832,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/common/package.json.template",
-      "sha256": "829af5a4e36bfd43972a331995ff37379e63aa826794c0eb1f32391283a5bc2b"
+      "sha256": "d382fc0b2034d4fcbb8cb752a5ce34069ac41f2034f39ccfc8849b4ebfd2611c"
     },
     {
       "path": "packages/builder-core/templates/common/vitest-five/apps/web/package.json.template",
@@ -916,7 +916,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/deployment-cloudflare/application-persistence/.github/workflows/deploy.yml.template",
-      "sha256": "3d3f1e605fc328352fee8219f16d94d1a4c122f12a5cf6be503a5c9fed5c5573"
+      "sha256": "4eb36134e10f5874f524166fdddf6df3b2cb817f4907e73af32dbeecdbbf17d5"
     },
     {
       "path": "packages/builder-core/templates/deployment-cloudflare/application-persistence/apps/web/scripts/check-application-database.mjs.template",
@@ -932,11 +932,11 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/deployment-cloudflare/background-job-delivery/.github/workflows/deploy.persistence.yml.template",
-      "sha256": "c75502fc8874e2c8c2215befa18440a70f4f5e7ca4e43d3746e03a91d27a9970"
+      "sha256": "be346cfa7770ade7dc81eb60d409996108ef626bab5dab6a516548e900bd3314"
     },
     {
       "path": "packages/builder-core/templates/deployment-cloudflare/background-job-delivery/.github/workflows/deploy.yml.template",
-      "sha256": "e89962198d7699803fe6d1722eb607e0ffac45aee2f711ea9cceb303a48a5b64"
+      "sha256": "f32c9bc34431caf9a2d373d31a8a53cd51d40c204769cd1fb8d03a07e20022ad"
     },
     {
       "path": "packages/builder-core/templates/deployment-cloudflare/background-job-delivery/apps/web/scripts/check-job-delivery.mjs",
@@ -1176,7 +1176,7 @@ const record = freeze({
     },
     {
       "path": "packages/builder-core/templates/standards/application-persistence/.github/workflows/quality.yml.template",
-      "sha256": "efacdf80dc82925b502170f4bb97aed0d4e4aef7b2cbdb4f75f2fdb8b42ba790"
+      "sha256": "2dc8288141da88eefabf01da6ab8dceb30c5d96c7a7162b6a6a5568bd6c6f1eb"
     },
     {
       "path": "packages/builder-core/templates/transactional-email-resend/apps/web/src/application/transactional-email-sender.ts",
@@ -1220,11 +1220,11 @@ const record = freeze({
     },
     {
       "path": "pnpm-lock.yaml",
-      "sha256": "44e506c480b4f1ec8c3ab621510c1a75c41dbaae75f538032eaf6b3519b8c0b4"
+      "sha256": "f9c78e1734ccf227c3748c61299c86cb7d9bd463f10212cc1b83109aa711d0c7"
     },
     {
       "path": "pnpm-workspace.yaml",
-      "sha256": "8bee77684f2a5f8320b11c868e935114df5ac97ee6ecf5c016032632b95b9c9d"
+      "sha256": "ee5e48565ddec4675c098726579e4898907ca56421fd22fc77b981d889b94b54"
     },
     {
       "path": "scripts/dependency-audit-exception.json",
@@ -1240,12 +1240,12 @@ const record = freeze({
     },
     {
       "path": "scripts/verify-app-transition-visuals.mjs",
-      "sha256": "6ffe42b90cdcc8c1d1696258a728317e1f20c4058ca4026dcef18add371f5d90"
+      "sha256": "7b4298da7def715e7ee0ff83824397da77c692eb3d05779be8ad054eaa47a63c"
     }
   ],
   "bridgeSourceFiles": {
     "packages/builder-core/src/lifecycle/app-profile-transition.ts": "4f3160334bea9796487b16d3158a0e9c623943cb4027dbc0edbc983a03a03d64",
-    "scripts/verify-app-transition-visuals.mjs": "d74bee21d57ea439d2a158f7b2c9cef141ccc52801f0e159a21f4df4ae925fac"
+    "scripts/verify-app-transition-visuals.mjs": "24ed484f193f698fc5d252202e6ac0338ff7ed358565377d5d83fb2141d24bb1"
   }
 });
 

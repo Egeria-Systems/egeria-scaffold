@@ -205,24 +205,31 @@ test("current visual comparison refuses without exact successor input admission"
   assert.equal(h.calls.length, 0);
 });
 
-test("unchanged current source refuses comparison before environment or preparation", async () => {
+test("current source admission reaches the environment before preparation or writes", async () => {
   const module = await import(producer);
   const effects = [];
   await assert.rejects(module.verifyAppTransitionVisuals({ mode: "compare" }, {
-    inspectEnvironment: async () => { effects.push("environment"); throw new Error("UNEXPECTED_ENVIRONMENT"); },
+    inspectEnvironment: async () => { effects.push("environment"); throw new Error("CURRENT_VISUAL_ADMISSION_REACHED_ENVIRONMENT"); },
     prepareBuilder: async () => { effects.push("preparation"); },
     executeCase: async () => { effects.push("case"); },
-  }), /^Error: VISUAL_INPUT_ADMISSION_REQUIRED$/);
-  assert.deepEqual(effects, []);
+  }), /^Error: CURRENT_VISUAL_ADMISSION_REACHED_ENVIRONMENT$/);
+  assert.deepEqual(effects, ["environment"]);
 });
 
 test("shared visual membership refuses malformed optional subsets", () => {
   const require = createRequire(new URL("../../packages/builder-core/package.json", import.meta.url));
   const policy = require("./src/lifecycle/app-transition-visual-admission.cjs");
   const identity = {
-    influencingFingerprint: "sha256:9803734000314547efb125930cef327b425c8e83bd50e9677acba88a6844163e",
-    targetLockfileFingerprint: "sha256:d8c89e647fc7a4e99b42cbdad9b62ecd3c2c723c5035e0bde4f18876dc227750",
+    influencingFingerprint: "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295",
+    targetLockfileFingerprint: "sha256:78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706",
   };
+  assert.deepEqual(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities: [] }), {
+    optionalCapabilities: [],
+    expectedBaselines: [
+      "sha256:6f6dd1ddd3049d998ac51b4da17b7eb66ca481b89f9e4947fb68b0bce1af50d5",
+      "sha256:00e95d03593487ac4a6bb3e08afe9a1df475ecb76b8b1f1da676259ccf551d27",
+    ],
+  });
   for (const optionalCapabilities of [["none"], ["analytics", "analytics"], ["analytics+booking-calendly"], [null], new Array(1)]) {
     assert.equal(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities }), undefined);
   }
