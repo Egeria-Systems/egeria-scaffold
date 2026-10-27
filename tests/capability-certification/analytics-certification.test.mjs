@@ -458,7 +458,7 @@ test("analytics portfolio verification executes isolated unit, component, build,
       },
       async runCommand(command) {
         commands.push(command);
-        return command.arguments[0] === "--version" ? "11.20.0\n" : "";
+        return command.arguments[0] === "--version" ? "11.28.1\n" : "";
       },
     });
 

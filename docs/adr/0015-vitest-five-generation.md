@@ -6,7 +6,47 @@
 
 [ADR-0016](0016-optional-application-persistence.md) supersedes only the standards-version requirement for explicit application-persistence selection; this ADR continues to own default generation and retained histories.
 
-[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) narrowly permits retiring related unused executable recipes, installed snapshots and historical edges when the complete environment generation activates. This decision remains the historical owner of the exact Vitest generations below. Preserve public generation until activation, historical receipts afterward, installed-manifest authority and zero-write refusal for unsupported or mixed tuples; no old-to-new migration is implied.
+[ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) narrowly permits retiring related unused executable recipes, installed snapshots and historical edges when the complete environment generation activates, with its explicit early-retirement exception for the three unused intermediate recipes. This decision remains the historical owner of the exact Vitest generations below. Preserve public generation until activation, historical receipts afterward, installed-manifest authority and zero-write refusal for unsupported or mixed tuples; no old-to-new migration is implied.
+
+## Patched public generation
+
+The approved unused-public-generation retirement in [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) supersedes continued executable retention of the earlier recipes and upgrade edges described below. Those decisions and exact receipts remain historical provenance.
+
+Current public schema-1 recipes are `portfolio@0.11.7`, `site@0.12.7` and `app@0.2.7`. They pin Vitest `5.0.3`, pin Next `16.4.1`, and use ordinary standards `0.5.1` or persistence standards `0.6.1`. The explicit internal environment candidate keeps its recipe identities and standards `0.7.1`. The compatibility proof pins Next `16.4.1`, ESLint config `16.4.1` and Vitest `5.0.3`; its root lock renews only the necessary dependency closure. The proof-only ESLint alignment and the [security dependency renewal](#security-dependency-renewal) below own the bounded direct-declaration and toolchain exceptions. Public standards and observability package releases, Node `22.23.2`, Effect, all other direct declarations, unrelated overrides and release-age policy remain unchanged.
+
+Five current public lock families and three distinct internal families own these exact graphs. Earlier public locks and fixture generations have no executable selector. Installed supported tuples remain authoritative independently of defaults; reordered capability declarations do not change their meaning. Retired, incomplete, or mixed tuples refuse rather than reconstructing compatibility.
+
+These changes provide no new visual admission or capability certification. Existing receipts apply only to their exact revision and subject; changed standards metadata remains pending with no inherited evidence.
+
+### Security dependency renewal
+
+The security successor selects exact pnpm `11.28.1` for the current builder, compatibility proof and generated repositories, while retaining Node `22.23.2`. This renewal supersedes only the earlier current-generation pnpm-unchanged limitation and the exact Zod-edge disposition in [Proof ESLint alignment](#proof-eslint-alignment) for renewed current graphs; their original receipts remain historical. The official release separates minimum-release-age validation from the tighter time-based selection cutoff and adds a mature fallback. Retain exact package-manager enforcement, the normal `1440`-minute age, generated time-based resolution, strict policy behavior and all unrelated security settings. This decision grants no global Volta/Corepack change or older-client migration.
+
+Builder-core's direct Zod declaration advances from `4.6.5` to `4.6.6`. The renewed root/proof graph selects `4.6.6` for both that declaration and its compatible hooks/validation peer edges through native manifest preference. Generated graphs select compatible transitive Zod `4.6.7`; add no generated direct declaration or Zod override to force the older transitive target. The builder-owned root and [generated dependency policy](../../packages/builder-core/templates/common/dependency-security/pnpm-workspace.yaml) add only the compatible convergence entries `body-parser@: 2.4.0` and `undici@: 6.29.1` beyond the existing bounded override renewals. The existing regular Miniflare and jsdom overrides retain their separate Undici `7.30.1` and `8.12.2` branches. These convergence entries do not authorize incompatible parent-range rewrites, parent/direct declaration bumps, weaker age or peer policy, audit exceptions or wider dependency renewal.
+
+The five public and three internal lock families, root/proof graph, exact runtime consumers, managed fingerprints and state controls renew through their existing owners. Preserve public schema `1`, unactivated internal identities, installed-manifest authority, independent optional capabilities, jobs/refusal boundaries and the approved unused-generation retirement/recovery gates. Capability descriptor identities/digests, public package versions and historical receipts remain unchanged unless a concrete consequence receives separate approval. One private Darwin/ARM64 frozen installation with scripts disabled does not transfer compatibility, peer, audit, runtime, visual or certification acceptance to the remaining subjects; full applicable verification and independent final review still gate adoption.
+
+### Next security renewal
+
+On 2026-10-22, the public dependency successor advances Next from `16.3.8` to `16.4.1` for [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw), [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr) and [GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r). The vendor's [16.4.1 release](https://github.com/vercel/next.js/releases/tag/v16.4.1) fixes all three. The five public, three internal and root/proof locks renew only Next, its exact environment and platform compiler packages, and required peer/snapshot records. The existing Next override advances its upper bound and target to the fixed version; unrelated selected versions and policy remain exact.
+
+The prior public `portfolio@0.11.5`, `site@0.12.5` and `app@0.2.5` identities retire under the precise [unused-generation exception](0020-application-environments.md#early-retirement-of-unused-public-generations). Independently frozen predecessor controls retain their original project/state bytes and refusal coverage. The internal candidate identities remain unchanged and explicitly selected. Next and its lock/workspace fingerprints are builder-owned, so this dependency renewal does not advance the unchanged standards descriptors or package versions. The [compatibility record](../compatibility/nextjs-cloudflare.md#current-local-dependency-renewal) distinguishes current verification from the immutable historical snapshot.
+
+### Proof ESLint alignment
+
+The compatibility proof selects `eslint-config-next@16.4.1` to retain its existing Next/config minor-version alignment contract. Its independent ESLint `9.39.5` and typescript-eslint `8.70.0` boundary remains unchanged. Only the root workspace's exact `@next/eslint-plugin-next` patch and fast-glob-removal parent keys advance from `16.3.5` to `16.4.1`; the canonical literal-root patch bytes remain unchanged.
+
+This proof-only correction permits the config/plugin package records and necessary importer, peer and snapshot edges in the root lock, plus the exact Zod edge changes described below. The eight generated lock graphs, generated lint declarations, capability descriptors, package versions and historical receipts remain unchanged. The [current compatibility record](../compatibility/nextjs-cloudflare.md#current-local-dependency-renewal) distinguishes renewed local evidence from historical acceptance.
+
+The accepted native root resolution changes `eslint-plugin-react-hooks@7.1.1` from `zod@4.6.1` to the already present `zod@4.6.5`, rebinds the `zod-validation-error@4.0.2` peer snapshot to `4.6.5`, and removes the unused `4.6.1` package/snapshot records. Builder-core already selects exact `zod@4.6.5`; its importer and that package's integrity remain unchanged. The resolver's internal reason is unknown. This accepts only the observed six semantic differences, not general dependency convergence.
+
+### Adapter and scoped glob renewal
+
+The 2026-10-22 compatibility amendment selects OpenNext Cloudflare `1.20.12`, required AWS adapter `4.1.11` and Wrangler `4.148.0` for the proof and current generated graphs. Deployment descriptors advance to their exact patch successors `0.3.1`, `0.4.1`, `0.5.1`, `0.6.1` and `0.7.1`; their pending records and renewed private plan do not inherit certification evidence. The preceding proof failed workerd checks because its adapter did not inline `server/preview-props.json`; compatibility with the corrected graph requires actual runtime verification.
+
+The exact parent override `@node-minify/core@9.0.2>glob=10.5.0` removes the vulnerable `glob@10.3.3` edge reported by [GHSA-5j98-mcp5-4vw2](https://github.com/advisories/GHSA-5j98-mcp5-4vw2). It introduces only the required `jackspeak@3.4.3` and `package-json-from-dist@1.0.1` selections. Root and generated workspace policies share that scoped override; release-age, peer, audit and build-permission policies remain unchanged.
+
+[ADR-0016](0016-optional-application-persistence.md#workers-types-patch-successor) owns persistence `0.1.1` and its exact Workers-types peer correction. Only the persistence graph also accepts the observed native `tsx@4.23.13 -> esbuild@0.28.2` edge in place of `0.28.1`: both satisfy the existing `~0.28.0` declaration, and the selected package/platform records already exist unchanged in the graph. The resolver's internal reason is unknown. This exact disposition authorizes no wider convergence, override or manual lock reconstruction. All current security and runtime gates remain required.
 
 ## Context
 
@@ -16,7 +56,7 @@ This ADR supersedes only [ADR-0013](0013-convergent-app-profile.md)'s exact curr
 
 ## Decision
 
-New generation selects standards capability `0.5.0` and Vitest `5.0.0` with these exact recipe versions:
+The initial Vitest 5 generation selected standards capability `0.5.0` and Vitest `5.0.0` with these exact recipe versions:
 
 | Profile | New recipe |
 |---|---|
@@ -26,7 +66,7 @@ New generation selects standards capability `0.5.0` and Vitest `5.0.0` with thes
 
 The app recipe continues to materialize exact `app-foundation@0.1.0 + site-routing@0.4.0`. Public standards remains `0.1.0`; generated app Effect remains `4.0.0-rc.112`. This change creates no package release, backend capability, new test environment, or builder/CLI test-runner migration.
 
-The new generation adds only these incoming app transitions, each across all eight existing Calendly, multilingual, and analytics subsets:
+That generation added only these incoming app transitions, each across all eight existing Calendly, multilingual, and analytics subsets:
 
 ```text
 portfolio@0.11.0 -> app@0.2.0
@@ -43,6 +83,40 @@ Each new recipe selects its own reviewed lock matching the exact Next/ESLint/Vit
 
 The new standards descriptor subject remains pending with a renewed task plan and no carried-forward certification evidence. Historical evidence continues to certify only its exact recorded subject.
 
+## Dependency security successors
+
+The September intermediate cohort below is historical. [ADR-0020](0020-application-environments.md#early-retirement-of-unused-intermediate-recipes) supersedes its executable retention, including original and corrected declarations; complete historical bytes and visual records remain preserved. The later current dependency successors remain supported.
+
+The dependency-only successor dated 2026-09-29 selected schema `1.0.0` recipes `portfolio@0.11.1`, `site@0.12.1` and `app@0.2.1` for new public generation. Fresh generation declares Next `16.3.6`, matching its existing resolved security graph; explicit internal environment candidates use the same corrected declaration. Capability descriptors, all other direct dependency declarations, runtime and presentation sources, settings and removal policies remain unchanged. The exact graph substitutions are `next@16.3.6`, `fast-uri@3.1.8`, major-preserving `brace-expansion@1.1.21`, `2.1.7` and `5.0.12`, Miniflare's `undici@7.29.1` and jsdom's `undici@8.10.2`. The root tooling graph selects the same Next and brace-expansion corrections alongside its Miniflare substitution; it has no fast-uri dependency. The separate `braces@3.0.3` advisory remains unresolved: these corrections do not waive the audit gate or authorize security acceptance. The one-day release age and time-based resolution remain in force, with exact reviewed Undici age exclusions.
+
+Builder-core owns five new complete lock families:
+
+| Recipe selection | Lock identity |
+|---|---|
+| Portfolio | `portfolio-0.11.1` |
+| Site | `site-0.12.1` |
+| App or site with foundation | `app-0.2.1` |
+| App with persistence, independently including email or jobs | `app-0.2.1-persistence` |
+| Portfolio with foundation, independently including email or jobs | `portfolio-0.11.1-foundation` |
+
+Each identity has its own `web-recipe-<identity>/pnpm-lock.yaml`. Exact installed recipe and descriptor tuples select the matching complete policy and graph during planning and application. Addition/removal preserves that recipe view, including foundation retention; it cannot silently adopt the latest generation. Historical locks, fixtures, rendered bytes, diagnostics, supported operations and both historical Vitest declarations remain exact. Supported already materialized schema-1 security projects retain their exact original Next declarations (`16.3.0` for portfolio without foundation, `16.3.3` with foundation or for site/app); corrected projects retain `16.3.6`. Selection requires the exact installed recipe/descriptor tuple and managed Next fingerprint, with matching actual manifest and lock bytes. Unknown or inconsistent declarations refuse before mutation. This finite selection adds no automatic migration or recipe replacement. There is no historical-to-security migration or mixed-cohort edge.
+
+The only additional incoming edges are `portfolio@0.11.1 -> app@0.2.1` and `site@0.12.1 -> app@0.2.1`, covering the same eight optional subsets. Their exact new visual inputs and candidate manifest require separate review and approval even when the resulting pixels match existing baselines. All previous edges and receipt identifiers remain available.
+
+That cohort's eleven fixture contracts selected complete versioned successor roots through `scripts/verify-generated-skeletons.mjs`. Their unmerged current manifest/state pairs may be canonically regenerated for this declaration correction only when every other generated byte remains equal. Previous unversioned fixture roots, historical locks and records, and all PNG baselines remain immutable. Corrected transition inputs still require separate exact-input and candidate-manifest review and approval. Frozen installation, peers, audit/signatures, source/runtime/browser verification, visual evidence and independent review remain required. Dependency verification supplies implementation evidence, not a new capability certification. [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) still owns later schema-2 activation and related retirement; this schema-1 successor activates neither.
+
+### Successor dependency closure dated 2026-10-09
+
+At this dated dependency-closure boundary, public generation selected schema `1.0.0` recipes `portfolio@0.11.2`, `site@0.12.2` and `app@0.2.2`, with direct Next `16.3.8`. Five new complete lock families are `portfolio-0.11.2`, `site-0.12.2`, `app-0.2.2`, `portfolio-0.11.2-foundation` and `app-0.2.2-persistence`. Their finite selection preserves the corresponding foundation, persistence, independent email and jobs behavior described above. All capability descriptors, other direct declarations, settings, runtime and presentation sources, build permissions, release-age policy and prior age exclusions remain unchanged.
+
+Each generated family replaces exactly thirty-nine package identities: Next `16.3.8` and its env/SWC companions, sharp `0.35.5` and its native/wasm/libvips closure, source-map-js `1.2.2`, and proxy-addr `2.0.8`. Root tooling applies the same closure and additionally replaces shell-quote `1.10.0` with `1.11.0` through a root-only override, for forty replacements. The unactivated internal environment recipes retain portfolio `0.12.0`, site `0.13.0` and app `0.3.0` identities while renewing their exact graphs, workspace policy, Next declaration and derived fingerprints. These changes do not activate schema-2 public generation.
+
+All other supported public recipes, locks and fixtures remain exact; the September intermediate cohort is retired only under the [narrow ADR-0020 exception](0020-application-environments.md#early-retirement-of-unused-intermediate-recipes). Installed recipe/descriptor selection cannot adopt this new graph through an unrelated operation. The only new incoming edges are `portfolio@0.11.2 -> app@0.2.2` and `site@0.12.2 -> app@0.2.2`, each with the existing eight optional subsets. Current portfolio inputs remain unadmitted by the exact visual acceptance records and must refuse before mutation until separate input review and visual admission. Existing site-to-app no-visual-change handling remains unchanged; no mixed-cohort transition is introduced.
+
+That dependency closure selected eleven newly materialized roots: `portfolio-0.11.2`, `portfolio-calendly-0.11.2`, `portfolio-email-0.11.2`, `site-0.12.2`, `site-contact-form-0.12.2`, `site-multilingual-0.12.2`, `site-multilingual-analytics-0.12.2`, `app-0.2.2`, `app-all-optional-integrations-0.2.2`, `app-persistence-0.2.2` and `app-persistence-email-0.2.2`. Canonical rendering changes only project/state controls and fingerprints, the direct Next declaration, workspace policy and lock. Every unrelated generated byte and PNG remains identical to its retained counterpart. Copied historical verification records are retained provenance, not new runtime verification.
+
+Raw full-severity graph audits still report the unresolved `braces@3.0.3` advisory. The existing audit exception remains unchanged, freshness-revoked and unbound to the new graphs. Source preparation, compiler results and deterministic or mocked tests establish neither installed-root readmission nor generated application, Worker, browser, visual, hosted, provider or capability-certification acceptance. Those checks and any residual security decision remain separately gated.
+
 ## Rejected alternatives
 
 - Changing the existing standards descriptor or retained locks would alter materialized repository meaning and invalidate historical fingerprints or evidence.
@@ -57,3 +131,23 @@ New projects receive Vitest 5; retained projects keep their existing supported b
 ## Enforcement
 
 This ADR owns the generation and edge decision. The [capability model](../architecture/capability-model.md) owns capability and lifecycle behavior, and the [enforcement map](../architecture/enforcement-map.md) owns actual verification gates. The separate [app transition visual-evidence gate](../architecture/capability-model.md#app-transition-visual-evidence) requires review of the fixed new inputs and exact candidate manifest before acceptance; recomputing fingerprints does not supply approval. Independent requirements, architecture, and test-evidence review and exact final-diff approval remain required. Passing Node, jsdom, static, or build checks establishes only the boundaries actually exercised; this decision provides no deployment, provider, accessibility-conformance, or production-readiness claim.
+
+## Literal lint roots successors
+
+The schema-1 tooling successors introduced `portfolio@0.11.3`, `site@0.12.3` and `app@0.2.3`. Their explicit rendering and installed-snapshot selection preserve the `.2` capability descriptors and all unrelated generated bytes. The builder kernel owns `patches/next-eslint-plugin-next.patch` as a managed file. Workspace policy binds that patch to the exact Next ESLint plugin version and removes only that parent's `fast-glob` edge. Root/proof policy and the internal application-environment candidates use the same canonical patch; internal candidates do not activate schema 2.
+
+The five successor lock families introduced at that boundary were `portfolio-0.11.3`, `portfolio-0.11.3-foundation`, `site-0.12.3`, `app-0.2.3` and `app-0.2.3-persistence`. Installed `.2` and older supported cohorts retain their exact recipes, locks, fixtures and operations. The introduced incoming edges were exact `.3` portfolio/site to `.3` app; mixed cohorts remain unsupported. The later [portfolio-only retirement](0020-application-environments.md#early-retirement-of-the-unused-portfolio-literal-root-recipe) removes portfolio `.3`, its two exclusive locks and incoming edge while preserving site/app `.3`. At that historical boundary, the visual candidate verifier refused explicit `--app-recipe-version=0.2.3` before preparation while omitted `.2` and explicit `.4` selections remained supported. Those selections are now retired under [patched public generation](#patched-public-generation); the current verifier defaults to `app@0.2.7` and accepts only that explicit recipe version. Selecting a candidate is not visual acceptance.
+
+Public generation and the active immutable-fixture verifier selected `.3` together at that historical activation. Eleven complete fixture roots were materialized byte-for-byte from actual successor generation outputs with new successful generation receipts; their direct CLI, verifier and default assertions select the same cohort. Retained `.2` and older supported fixtures, locks and historical evidence remain exact. This coupled source activation carries the completed generation evidence; it does not establish remaining full-kernel, audit/signature, browser, visual or final-diff acceptance.
+
+## Vite security successors
+
+The schema-1 dependency successors are `portfolio@0.11.4`, `site@0.12.4` and `app@0.2.4`. Their five canonical lock families select Vite `8.2.4`, with its exact Rolldown `1.2.5` and PostCSS `8.5.26` closure. Root tooling also selects `launch-editor@2.14.2`. Capability descriptors, direct Next/ESLint/Vitest/Effect declarations, application sources, content and PNG bytes remain unchanged.
+
+The existing recipe-aware workspace renderer owns the narrow Vite override and exact `vite@8.2.4` release-age exclusion for these successors and the internal environment candidates. Retain the one-day policy, time-based resolution, prior exclusions and build permissions. Do not modify the shared retained workspace template. The unactivated environment recipes keep `portfolio@0.12.0`, `site@0.13.0` and `app@0.3.0`, renew their three independent locks, and select the successor foundation/persistence families without activating schema 2.
+
+Every earlier supported public cohort retains its exact recipes, descriptors, locks, fixtures and lifecycle behavior, subject only to the explicit [early-retirement exceptions](0020-application-environments.md#generation-and-precise-supersessions). Site/app `.3` remain supported; portfolio `.3` is retired. Historical graphs do not acquire current security acceptance from continued support. The only new incoming edges are `portfolio@0.11.4 -> app@0.2.4` and `site@0.12.4 -> app@0.2.4`, each preserving the same eight optional subsets. Mixed cohorts remain unsupported and no automatic migration is added.
+
+Historically, the `.4` visual input candidate remained separate from the retained `.3` candidate and excluded from admitted records. At that boundary, the visual verifier accepted explicit `--app-recipe-version=0.2.4` and omitted arguments selected `.2`; both selections are now retired under [patched public generation](#patched-public-generation). Portfolio transitions must continue to refuse before mutation until a person reviews all four images and approves the exact new manifest digest, even when pixels match. Site-to-app retains its existing no-visual-change handling.
+
+The public defaults and eleven active immutable-fixture contracts were materialized and published together at `c1a8e6c09832e7155df4b33676645a93c3317dac`. That revision has completed local builder-kernel verification and hosted retained-fixture and transition-candidate reproduction evidence. Its dependency review failed on the subsequently retired portfolio `.3` manifests. Those results do not validate a changed retirement candidate: affected verification, fresh full-PR dependency review, distinct independent reviews and final-diff approval remain required. Exact human visual admission remains separate, and the admitted transition comparison was skipped on the draft PR. Historical verification records remain bound to their original inputs.

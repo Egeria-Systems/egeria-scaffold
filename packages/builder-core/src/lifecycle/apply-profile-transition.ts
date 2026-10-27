@@ -4,14 +4,12 @@ import { isAbsolute, join, resolve } from "node:path";
 
 import {
   createCapabilityCatalogSnapshot,
-  vitestFourCapabilityCatalogSnapshot,
   vitestFiveCapabilityCatalogSnapshot,
 } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   appGenerationVerificationChecks,
-  ordinaryGenerationVerificationChecks,
 } from "../contracts/generation-verification.js";
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
 import {
@@ -19,8 +17,6 @@ import {
   type MigrationRecord,
 } from "../contracts/migration.js";
 import {
-  profileTransitionPersistedVerificationChecks,
-  profileTransitionVerificationChecks,
   appProfileTransitionPersistedVerificationChecks,
   appProfileTransitionVerificationChecks,
   installedStateSchema,
@@ -29,7 +25,6 @@ import {
 } from "../contracts/state.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
 import {
-  renderSkeleton,
   type RenderedSkeleton,
 } from "../generation/render-skeleton.js";
 import type {
@@ -38,9 +33,7 @@ import type {
 } from "../generation/verify-generated-project.js";
 import { inferRepository } from "../inference/infer-repository.js";
 import { createInstalledManifest } from "../manifest/create-installed-manifest.js";
-import { fingerprintFileContent } from "../ownership/fingerprint.js";
 import { materializeInstalledSurfaces } from "../ownership/materialize-surfaces.js";
-import { createProfileRecipeSnapshot } from "../profiles/profile-recipes.js";
 import {
   createFileSystemRepositoryReader,
   type RepositoryReader,
@@ -72,32 +65,13 @@ import {
   type ControlSnapshot,
 } from "./lifecycle-control-snapshot.js";
 import {
-  planProfileTransition,
   prepareAppProfileTransitionExecution,
   type PreparedAppProfileTransition,
-  type ProfileTransitionAction,
-  type ProfileTransitionPlan,
   type ProfileTransitionPlanningFailureCode,
 } from "./plan-profile-transition.js";
 
 const encoder = new TextEncoder();
-const historicalMigrationIdentifier = "transition-portfolio-0-10-0-to-site-0-10-0";
 const maximumExactFileBytes = 16 * 1024 * 1024;
-const exactActionShape = [
-  ["replace-file", ".egeria/project.yaml"],
-  ["create-file", "apps/web/app/about/page.tsx"],
-  ["create-file", "apps/web/content/en-CA/about.yaml"],
-  ["replace-file", "apps/web/content/en-CA/long-form/introduction.md"],
-  ["replace-file", "apps/web/content/en-CA/site.yaml"],
-  [
-    "replace-file",
-    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-  ],
-  [
-    "replace-file",
-    "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-  ],
-] as const;
 
 export type ProfileTransitionPhase =
   | "precondition"
@@ -140,19 +114,14 @@ export type ProfileTransitionExecutionResult =
         transition: Readonly<{
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
-          toProfile: "site" | "app";
-          toRecipeVersion: "0.10.0" | "0.1.0" | "0.2.0";
+          toProfile: "app";
+          toRecipeVersion: "0.2.7";
         }>;
         migration:
-          | typeof historicalMigrationIdentifier
-          | "transition-portfolio-0-10-0-to-app-0-1-0"
-          | "transition-site-0-11-0-to-app-0-1-0"
-          | "transition-portfolio-0-11-0-to-app-0-2-0"
-          | "transition-site-0-12-0-to-app-0-2-0";
+          | "transition-portfolio-0-11-7-to-app-0-2-7"
+          | "transition-site-0-12-7-to-app-0-2-7";
         changedPaths: readonly string[];
-        verificationChecks:
-          | typeof profileTransitionVerificationChecks
-          | typeof appProfileTransitionVerificationChecks;
+        verificationChecks: typeof appProfileTransitionVerificationChecks;
       }>;
     }>
   | Readonly<{
@@ -183,7 +152,7 @@ type MaterializedTransition = Readonly<{
   changes: readonly ProfileTransitionFileChange[];
   targetBytes: ReadonlyMap<string, Uint8Array>;
   rendered: RenderedSkeleton;
-  currentFiles?: ReadonlyMap<string, Uint8Array>;
+  currentFiles: ReadonlyMap<string, Uint8Array>;
 }>;
 
 type PathIdentity = Readonly<{
@@ -254,110 +223,6 @@ function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
   return left.device === right.device && left.inode === right.inode;
 }
 
-function controlEvidenceMatches(
-  controls: ControlSnapshot,
-  plan: ProfileTransitionPlan,
-): boolean {
-  const sources = new Map([
-    [".egeria/migrations.jsonl", controls.migrationSource],
-    [".egeria/project.yaml", controls.projectSource],
-    [".egeria/state.json", controls.stateSource],
-  ]);
-
-  return (
-    plan.controlFiles.length === sources.size &&
-    plan.controlFiles.every(({ path, fingerprint }) => {
-      const source = sources.get(path);
-      return (
-        source !== undefined &&
-        fingerprintFileContent(encoder.encode(source)) === fingerprint
-      );
-    })
-  );
-}
-
-function hasExactActionShape(actions: readonly ProfileTransitionAction[]): boolean {
-  return (
-    JSON.stringify(actions.map(({ kind, path }) => [kind, path])) ===
-    JSON.stringify(exactActionShape)
-  );
-}
-
-async function materializeTransition(input: Readonly<{
-  reader: RepositoryReader;
-  controls: ControlSnapshot;
-  plan: ProfileTransitionPlan;
-}>): Promise<MaterializedTransition | undefined> {
-  if (!hasExactActionShape(input.plan.actions)) {
-    return undefined;
-  }
-
-  const rendered = await renderSkeleton(
-    {
-      profile: "site",
-      projectName: input.controls.project.value.project.name,
-      displayName: input.controls.project.value.project.displayName,
-      packageVersions: verifiedCapabilityPackageVersions,
-      ...(input.controls.project.value.capabilitySettings["booking-calendly"] ===
-      undefined
-        ? {}
-        : {
-            bookingCalendly:
-              input.controls.project.value.capabilitySettings[
-                "booking-calendly"
-              ],
-          }),
-    },
-    {
-      catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
-      profiles: createProfileRecipeSnapshot("0.10.0"),
-    },
-  );
-  if (!rendered.ok) {
-    return undefined;
-  }
-
-  const renderedFiles = new Map(
-    rendered.value.files.map(({ path, content }) => [path, content]),
-  );
-  const changes: ProfileTransitionFileChange[] = [];
-  const targetBytes = new Map<string, Uint8Array>();
-
-  for (const action of input.plan.actions) {
-    const current = await input.reader.readBytes?.(action.path);
-    const content =
-      action.path === ".egeria/project.yaml"
-        ? encoder.encode(serializeProjectYaml(rendered.value.project))
-        : renderedFiles.get(action.path);
-
-    if (
-      current === undefined ||
-      content === undefined ||
-      (action.kind === "create-file" && current.kind !== "missing") ||
-      (action.kind === "replace-file" &&
-        (current.kind !== "file" ||
-          action.currentSubject.kind !== "fingerprint" ||
-          fingerprintFileContent(current.content) !==
-            action.currentSubject.fingerprint)) ||
-      fingerprintFileContent(content) !== action.targetFingerprint
-    ) {
-      return undefined;
-    }
-
-    changes.push({
-      path: action.path,
-      expected:
-        current.kind === "file"
-          ? { kind: "file", content: current.content }
-          : { kind: "missing" },
-      content,
-    });
-    targetBytes.set(action.path, content);
-  }
-
-  return { changes, targetBytes, rendered: rendered.value };
-}
-
 function materializeAppTransition(
   prepared: PreparedAppProfileTransition,
 ): MaterializedTransition | undefined {
@@ -389,11 +254,10 @@ function materializeAppTransition(
 
 function verificationIsExact(
   value: GeneratedProjectVerification,
-  app: boolean,
 ): boolean {
   return sameValues(
     value.checks,
-    app ? appGenerationVerificationChecks : ordinaryGenerationVerificationChecks,
+    appGenerationVerificationChecks,
   );
 }
 
@@ -526,7 +390,7 @@ function requirePendingInference(input: Readonly<{
   inference: Awaited<ReturnType<typeof inferRepository>>;
   currentState: InstalledState;
   desiredCapabilities: readonly string[];
-  target?: MaterializedTransition;
+  target: MaterializedTransition;
 }>): boolean {
   if (
     input.inference.state.kind !== "valid" ||
@@ -564,15 +428,13 @@ function requirePendingInference(input: Readonly<{
       surface,
     ]),
   );
-  const expected = input.target === undefined
-    ? undefined
-    : materializeInstalledSurfaces({
+  const expected = materializeInstalledSurfaces({
         files: input.target.targetBytes,
         surfaces: [...input.target.rendered.surfaces, ...createBuilderStateSurfaces()],
       });
-  if (expected?.ok === false) return false;
+  if (!expected.ok) return false;
   const targetSurfaces = new Map(
-    expected?.ok ? expected.value.map(surface => [surface.identifier, surface]) : [],
+    expected.value.map(surface => [surface.identifier, surface]),
   );
   return (
     input.inference.surfaces.length === input.currentState.managedSurfaces.length &&
@@ -580,20 +442,14 @@ function requirePendingInference(input: Readonly<{
       const surface = surfaces.get(evidence.identifier);
       const targetSurface = targetSurfaces.get(evidence.identifier);
       if (
-        input.target !== undefined &&
-        (surface === undefined || targetSurface === undefined ||
-          !sameSurfaceDescriptor(surface, targetSurface))
+        surface === undefined || targetSurface === undefined ||
+          !sameSurfaceDescriptor(surface, targetSurface)
       ) return false;
-      const expectedStatus = input.target !== undefined
-        ? surface?.ownership === "application-owned" ? "application-owned"
-          : surface?.fingerprint === targetSurface?.fingerprint ? "confirmed" : "drifted"
-        : surface?.identifier === "builder-project-configuration"
-          ? "drifted"
-          : surface?.ownership === "application-owned"
-            ? "application-owned"
-            : "confirmed";
+      const expectedStatus = surface.ownership === "application-owned"
+        ? "application-owned"
+        : surface.fingerprint === targetSurface.fingerprint ? "confirmed" : "drifted";
       return (
-        evidence.path === surface?.path &&
+        evidence.path === surface.path &&
         evidence.status === expectedStatus
       );
     })
@@ -664,9 +520,7 @@ function createNextState(input: Readonly<{
     managedSurfaces,
     lastSuccessfulVerification: {
       kind: "profile-transition",
-      checks: input.rendered.project.originProfile === "app"
-        ? appProfileTransitionPersistedVerificationChecks
-        : profileTransitionPersistedVerificationChecks,
+      checks: appProfileTransitionPersistedVerificationChecks,
     },
   });
   return parsed.success ? parsed.data : undefined;
@@ -754,7 +608,7 @@ export async function applyProfileTransition(input: Readonly<{
   now?: () => string;
 }>): Promise<ProfileTransitionExecutionResult> {
   const runtimeTarget: unknown = Reflect.get(input, "toProfile");
-  if (runtimeTarget !== "site" && runtimeTarget !== "app") return failure("PROFILE_TRANSITION_UNSUPPORTED", "precondition", "not-required");
+  if (runtimeTarget !== "app") return failure("PROFILE_TRANSITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
     return failure(
@@ -789,52 +643,25 @@ export async function applyProfileTransition(input: Readonly<{
     return failure(initialGit.code, "precondition", "not-required");
   }
 
-  let planResult: Awaited<ReturnType<typeof planProfileTransition>>;
-  let appPreparation: PreparedAppProfileTransition | undefined;
+  let appPreparation: PreparedAppProfileTransition;
   try {
-    if (input.toProfile === "app") {
-      const prepared = await prepareAppProfileTransitionExecution({
-        reader,
-        git: initialGit,
-        inspectCreateTargets: inspectCreateTargetsValue,
-        inspectWorktree: inspectWorktreeValue,
-      });
-      if (!prepared.ok) {
-        return failure(prepared.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-      }
-      appPreparation = prepared.value;
-      planResult = { ok: true, value: prepared.value.plan };
-    } else {
-      planResult = await planProfileTransition({
-        reader,
-        git: initialGit,
-        toProfile: input.toProfile,
-      });
+    const prepared = await prepareAppProfileTransitionExecution({
+      reader, git: initialGit,
+      inspectCreateTargets: inspectCreateTargetsValue,
+      inspectWorktree: inspectWorktreeValue,
+    });
+    if (!prepared.ok) {
+      return failure(prepared.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID", "precondition", "not-required");
     }
+    appPreparation = prepared.value;
   } catch {
     return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
   }
-  if (!planResult.ok) {
-    return failure(
-      planResult.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID",
-      "precondition",
-      "not-required",
-    );
-  }
-  const plan = planResult.value;
-  const app = plan.target.profile === "app";
-  const migrationIdentifier = app
-    ? plan.target.recipeVersion === "0.2.0"
-      ? plan.source.profile === "portfolio"
-        ? "transition-portfolio-0-11-0-to-app-0-2-0"
-        : "transition-site-0-12-0-to-app-0-2-0"
-      : plan.source.profile === "portfolio"
-        ? "transition-portfolio-0-10-0-to-app-0-1-0"
-        : "transition-site-0-11-0-to-app-0-1-0"
-    : historicalMigrationIdentifier;
-  const persistedChecks = app
-    ? appProfileTransitionPersistedVerificationChecks
-    : profileTransitionPersistedVerificationChecks;
+  const plan = appPreparation.plan;
+  const migrationIdentifier = plan.source.profile === "portfolio"
+    ? "transition-portfolio-0-11-7-to-app-0-2-7"
+    : "transition-site-0-12-7-to-app-0-2-7";
+  const persistedChecks = appProfileTransitionPersistedVerificationChecks;
   const desiredCapabilities = plan.target.capabilities.map(
     ({ identifier }) => identifier,
   );
@@ -851,24 +678,13 @@ export async function applyProfileTransition(input: Readonly<{
   try {
     controls = await readControlSnapshot(reader);
     if (controls !== undefined) {
-      if (appPreparation !== undefined) {
-        materialized = materializeAppTransition(appPreparation);
-      } else if (controlEvidenceMatches(controls, plan as ProfileTransitionPlan)) {
-        materialized = await materializeTransition({ reader, controls, plan: plan as ProfileTransitionPlan });
-      }
+      materialized = materializeAppTransition(appPreparation);
     }
   } catch {
     return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
   }
   if (controls === undefined) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  }
-  if (appPreparation === undefined && !controlEvidenceMatches(controls, plan as ProfileTransitionPlan)) {
-    return failure(
-      "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID",
-      "precondition",
-      "not-required",
-    );
   }
   if (
     controls.state.value.appliedMigrations.includes(migrationIdentifier) ||
@@ -890,24 +706,22 @@ export async function applyProfileTransition(input: Readonly<{
     );
   }
 
-  if (app) {
-    // Re-run the complete policy with a new reader cache immediately before writes.
-    try {
-      const refreshed = await prepareAppProfileTransitionExecution({
-        reader,
-        git: initialGit,
-        inspectCreateTargets: inspectCreateTargetsValue,
-        inspectWorktree: inspectWorktreeValue,
-      });
-      if (!refreshed.ok) return failure(refreshed.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-      if (refreshed.value.plan.planFingerprint !== input.approvedPlanFingerprint) {
-        return failure("PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", "precondition", "not-required");
-      }
-      materialized = materializeAppTransition(refreshed.value);
-      if (materialized === undefined) return failure("PROFILE_TRANSITION_ACTION_CONFLICT", "precondition", "not-required");
-    } catch {
-      return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
+  // Re-run the complete policy with a new reader cache immediately before writes.
+  try {
+    const refreshed = await prepareAppProfileTransitionExecution({
+      reader,
+      git: initialGit,
+      inspectCreateTargets: inspectCreateTargetsValue,
+      inspectWorktree: inspectWorktreeValue,
+    });
+    if (!refreshed.ok) return failure(refreshed.issues[0]?.code ?? "PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+    if (refreshed.value.plan.planFingerprint !== input.approvedPlanFingerprint) {
+      return failure("PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", "precondition", "not-required");
     }
+    materialized = materializeAppTransition(refreshed.value);
+    if (materialized === undefined) return failure("PROFILE_TRANSITION_ACTION_CONFLICT", "precondition", "not-required");
+  } catch {
+    return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
   }
 
   const createPaths = plan.actions.flatMap((action) =>
@@ -941,35 +755,33 @@ export async function applyProfileTransition(input: Readonly<{
     return failure("GIT_WORKTREE_CHANGED", "precondition", "not-required");
   }
 
-  if (materialized.currentFiles !== undefined) {
-    for (const [path, source] of [
-      [".egeria/project.yaml", controls.projectSource],
-      [".egeria/state.json", controls.stateSource],
-      [".egeria/migrations.jsonl", controls.migrationSource],
-    ] as const) {
-      const approved = materialized.currentFiles.get(path);
-      if (approved === undefined || !sameBytes(approved, encoder.encode(source))) {
-        return failure("PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", "precondition", "not-required");
-      }
-    }
-    if (!(await hasExactBytes({
-      root,
-      reader,
-      expected: materialized.currentFiles,
-      paths: [...materialized.currentFiles.keys()],
-      useFileSystemPathChecks,
-    }))) {
+  for (const [path, source] of [
+    [".egeria/project.yaml", controls.projectSource],
+    [".egeria/state.json", controls.stateSource],
+    [".egeria/migrations.jsonl", controls.migrationSource],
+  ] as const) {
+    const approved = materialized.currentFiles.get(path);
+    if (approved === undefined || !sameBytes(approved, encoder.encode(source))) {
       return failure("PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", "precondition", "not-required");
     }
-    try {
-      for (const path of createPaths) {
-        if ((await reader.readBytes?.(path))?.kind !== "missing") {
-          return failure("PROFILE_TRANSITION_ACTION_CONFLICT", "precondition", "not-required");
-        }
+  }
+  if (!(await hasExactBytes({
+    root,
+    reader,
+    expected: materialized.currentFiles,
+    paths: [...materialized.currentFiles.keys()],
+    useFileSystemPathChecks,
+  }))) {
+    return failure("PROFILE_TRANSITION_PLAN_APPROVAL_INVALID", "precondition", "not-required");
+  }
+  try {
+    for (const path of createPaths) {
+      if ((await reader.readBytes?.(path))?.kind !== "missing") {
+        return failure("PROFILE_TRANSITION_ACTION_CONFLICT", "precondition", "not-required");
       }
-    } catch {
-      return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
     }
+  } catch {
+    return failure("REPOSITORY_OPEN_FAILED", "precondition", "not-required");
   }
 
   let transformed;
@@ -996,7 +808,7 @@ export async function applyProfileTransition(input: Readonly<{
       "inspect-worktree",
     );
   }
-  if (!verified.ok || !verificationIsExact(verified.value, app)) {
+  if (!verified.ok || !verificationIsExact(verified.value)) {
     return failure(
       "PROFILE_TRANSITION_VERIFICATION_FAILED",
       "verify",
@@ -1006,11 +818,7 @@ export async function applyProfileTransition(input: Readonly<{
 
   const targetCatalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
-    app
-      ? plan.target.recipeVersion === "0.2.0"
-        ? vitestFiveCapabilityCatalogSnapshot
-        : vitestFourCapabilityCatalogSnapshot
-      : { standards: "0.4.0" },
+    vitestFiveCapabilityCatalogSnapshot,
   );
   if (!targetCatalog.ok) {
     return failure(
@@ -1037,19 +845,19 @@ export async function applyProfileTransition(input: Readonly<{
   }
   const actionPaths = [
     ...plan.actions.map(({ path }) => path),
-    ...(app ? [".egeria/project.yaml"] : []),
+    ".egeria/project.yaml",
   ];
-  const pendingPaths = app ? [...materialized.targetBytes.keys()] : actionPaths;
+  const pendingPaths = [...materialized.targetBytes.keys()];
   if (
     pendingControls?.projectSource !==
-      (app ? controls.projectSource : serializeProjectYaml(materialized.rendered.project)) ||
+      controls.projectSource ||
     pendingControls.stateSource !== controls.stateSource ||
     pendingControls.migrationSource !== controls.migrationSource ||
     !requirePendingInference({
       inference: pendingInference,
       currentState: controls.state.value,
       desiredCapabilities,
-      ...(app ? { target: materialized } : {}),
+      target: materialized,
     }) ||
     !(await hasExactBytes({
       root,
@@ -1100,29 +908,27 @@ export async function applyProfileTransition(input: Readonly<{
     );
   }
 
-  if (app) {
-    const projectBytes = encoder.encode(serializeProjectYaml(materialized.rendered.project));
-    try {
-      const written = await writer.write([{
-        path: ".egeria/project.yaml",
-        expected: { kind: "file", content: encoder.encode(controls.projectSource) },
-        content: projectBytes,
-      }]);
-      const reread = await reader.readBytes?.(".egeria/project.yaml");
-      if (!written.ok || reread?.kind !== "file" || !sameBytes(reread.content, projectBytes)) {
-        return failure("PROFILE_TRANSITION_PROJECT_WRITE_FAILED", "persist-project", "inspect-worktree");
-      }
-    } catch {
+  const projectBytes = encoder.encode(serializeProjectYaml(materialized.rendered.project));
+  try {
+    const written = await writer.write([{
+      path: ".egeria/project.yaml",
+      expected: { kind: "file", content: encoder.encode(controls.projectSource) },
+      content: projectBytes,
+    }]);
+    const reread = await reader.readBytes?.(".egeria/project.yaml");
+    if (!written.ok || reread?.kind !== "file" || !sameBytes(reread.content, projectBytes)) {
       return failure("PROFILE_TRANSITION_PROJECT_WRITE_FAILED", "persist-project", "inspect-worktree");
     }
-    materialized = {
-      ...materialized,
-      targetBytes: new Map([
-        ...materialized.targetBytes,
-        [".egeria/project.yaml", projectBytes],
-      ]),
-    };
+  } catch {
+    return failure("PROFILE_TRANSITION_PROJECT_WRITE_FAILED", "persist-project", "inspect-worktree");
   }
+  materialized = {
+    ...materialized,
+    targetBytes: new Map([
+      ...materialized.targetBytes,
+      [".egeria/project.yaml", projectBytes],
+    ]),
+  };
 
   const preparedMigration = prepareMigrationRecord({
     currentSource: controls.migrationSource,
@@ -1279,7 +1085,7 @@ export async function applyProfileTransition(input: Readonly<{
       root,
       reader,
       expected: finalExpected,
-      paths: app ? [...finalExpected.keys()].sort(compareText) : changedPaths,
+      paths: [...finalExpected.keys()].sort(compareText),
       useFileSystemPathChecks,
       ...(input.afterExactFileRead === undefined
         ? {}
@@ -1306,9 +1112,7 @@ export async function applyProfileTransition(input: Readonly<{
       },
       migration: migrationIdentifier,
       changedPaths,
-      verificationChecks: app
-        ? appProfileTransitionVerificationChecks
-        : profileTransitionVerificationChecks,
+      verificationChecks: appProfileTransitionVerificationChecks,
     },
   };
 }

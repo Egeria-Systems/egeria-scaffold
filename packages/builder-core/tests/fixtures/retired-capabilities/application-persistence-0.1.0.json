@@ -1,0 +1,373 @@
+{
+  "sourceCommit": "73e3cfdc4166a0d008a6c84b47b4a3a2084af71f",
+  "capability": "application-persistence",
+  "descriptor": {
+    "identifier": "application-persistence",
+    "version": "0.1.0",
+    "deliveryMode": "hybrid",
+    "stateClassifications": [
+      "repository-stateful",
+      "external-stateful",
+      "persistent-data"
+    ],
+    "removalPolicy": "export-and-remove",
+    "dependencies": [
+      "app-foundation"
+    ],
+    "optionalIntegrations": [],
+    "conflicts": [],
+    "supportedProfiles": [
+      "app"
+    ],
+    "requiredPackages": [
+      "drizzle-orm",
+      "drizzle-kit",
+      "@cloudflare/workers-types"
+    ],
+    "environmentVariables": [
+      "STAGING_APPLICATION_DATABASE_ID",
+      "PRODUCTION_APPLICATION_DATABASE_ID"
+    ],
+    "secrets": [
+      "CLOUDFLARE_ACCOUNT_ID",
+      "CLOUDFLARE_API_TOKEN"
+    ],
+    "platformResources": [
+      "cloudflare-d1-database"
+    ],
+    "externalDomains": [],
+    "contentSecurityPolicyContributions": [],
+    "browserStorage": [],
+    "dataClassifications": [
+      "application-owned-persistent-data"
+    ],
+    "retentionAssumptions": [
+      "operator-approved-export-and-recovery-retention"
+    ],
+    "privilegedOperations": [
+      "database-migration",
+      "database-export",
+      "database-restoration"
+    ],
+    "threatReviewLevel": "elevated",
+    "adapterSemanticRequirements": [
+      "d1-prepared-statements",
+      "d1-atomic-batch",
+      "wrangler-migration-ledger"
+    ],
+    "managedSurfaces": [
+      {
+        "identifier": "persistence-orm-package",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/package.json",
+        "ownership": "merge-managed",
+        "fingerprintTarget": {
+          "kind": "json-value",
+          "pointer": "/dependencies/drizzle-orm"
+        },
+        "mergeStrategy": "json-property"
+      },
+      {
+        "identifier": "persistence-migration-tool-package",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/package.json",
+        "ownership": "merge-managed",
+        "fingerprintTarget": {
+          "kind": "json-value",
+          "pointer": "/devDependencies/drizzle-kit"
+        },
+        "mergeStrategy": "json-property"
+      },
+      {
+        "identifier": "persistence-worker-types-package",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/package.json",
+        "ownership": "merge-managed",
+        "fingerprintTarget": {
+          "kind": "json-value",
+          "pointer": "/devDependencies/@cloudflare~1workers-types"
+        },
+        "mergeStrategy": "json-property"
+      },
+      {
+        "identifier": "persistence-drizzle-configuration",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/drizzle.config.ts",
+        "ownership": "managed",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-schema",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/src/infrastructure/persistence/schema.ts",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-binding-specification",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/tests/bindings/application-persistence.test.ts",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-test-schema",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/tests/bindings/fixtures/schema.ts",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-test-worker",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/tests/bindings/fixtures/worker.ts",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-test-table-migration",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-test-index-migration",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-migration-workflow",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": ".github/workflows/migrate-application-database.yml",
+        "ownership": "managed",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-operator-guide",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "docs/application-persistence.md",
+        "ownership": "application-owned",
+        "fingerprintTarget": {
+          "kind": "file"
+        },
+        "mergeStrategy": "replace-file"
+      },
+      {
+        "identifier": "persistence-db-generate-script",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/package.json",
+        "ownership": "merge-managed",
+        "fingerprintTarget": {
+          "kind": "json-value",
+          "pointer": "/scripts/db:generate"
+        },
+        "mergeStrategy": "json-property"
+      },
+      {
+        "identifier": "persistence-db-migrate-local-script",
+        "owner": {
+          "kind": "capability",
+          "identifier": "application-persistence"
+        },
+        "path": "apps/web/package.json",
+        "ownership": "merge-managed",
+        "fingerprintTarget": {
+          "kind": "json-value",
+          "pointer": "/scripts/db:migrate:local"
+        },
+        "mergeStrategy": "json-property"
+      }
+    ],
+    "inferenceProbes": [
+      {
+        "kind": "package",
+        "path": "apps/web/package.json",
+        "section": "dependencies",
+        "packageName": "drizzle-orm",
+        "version": "0.45.2"
+      },
+      {
+        "kind": "package",
+        "path": "apps/web/package.json",
+        "section": "devDependencies",
+        "packageName": "drizzle-kit",
+        "version": "0.31.10"
+      },
+      {
+        "kind": "package",
+        "path": "apps/web/package.json",
+        "section": "devDependencies",
+        "packageName": "@cloudflare/workers-types",
+        "version": "5.20260730.1"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/drizzle.config.ts"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/src/infrastructure/persistence/schema.ts"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/tests/bindings/application-persistence.test.ts"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/tests/bindings/fixtures/schema.ts"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/tests/bindings/fixtures/worker.ts"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql"
+      },
+      {
+        "kind": "file",
+        "path": "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql"
+      },
+      {
+        "kind": "file",
+        "path": ".github/workflows/migrate-application-database.yml"
+      },
+      {
+        "kind": "file",
+        "path": "docs/application-persistence.md"
+      },
+      {
+        "kind": "json-value",
+        "path": "apps/web/package.json",
+        "pointer": "/scripts/db:generate",
+        "expected": "drizzle-kit generate --config drizzle.config.ts"
+      },
+      {
+        "kind": "json-value",
+        "path": "apps/web/package.json",
+        "pointer": "/scripts/db:migrate:local",
+        "expected": "node scripts/check-application-database.mjs local && wrangler d1 migrations apply APP_DB --local --config wrangler.jsonc --x-provision=false --x-auto-create=false"
+      }
+    ],
+    "migrationPlanners": [
+      "add-application-persistence-0-1-0",
+      "remove-application-persistence-0-1-0"
+    ],
+    "verificationPlan": [
+      "binding-runtime-tests",
+      "migration-generation",
+      "migration-replay",
+      "database-environment-isolation",
+      "export-and-removal-review",
+      "typecheck",
+      "next-build",
+      "opennext-build"
+    ],
+    "documentationEvidenceRequirements": [
+      "schema-and-migration-ownership",
+      "environment-isolation-and-migration-authority",
+      "backup-export-and-recovery-boundaries",
+      "machine-and-human-removal-review"
+    ],
+    "removalAndRecoveryRequirements": [
+      "review-exact-export-and-recovery-evidence",
+      "review-required-uncertainty-dispositions",
+      "preserve-application-owned-schema-and-migrations",
+      "refuse-surviving-package-references",
+      "separate-source-and-persistent-data-recovery"
+    ]
+  },
+  "registryRecord": {
+    "subject": {
+      "descriptorVersion": "0.1.0",
+      "behaviorContractDigest": "sha256:dcb911f024f4a0cf792396bf919e2387f0193fae6608071c6dea7aa371eb4c95"
+    },
+    "requiredEvidence": [
+      "cleanup-recovery",
+      "deployed-application",
+      "existing-repository-lifecycle",
+      "fresh-scaffold",
+      "provider-confirmed"
+    ],
+    "status": "pending",
+    "taskPlan": "docs/superpowers/plans/2026-09-14-application-persistence-certification.md",
+    "evidence": []
+  },
+  "predecessorControls": [
+    {
+      "path": "packages/builder-core/tests/fixtures/retired-recipes/app-persistence-0.2.5.json",
+      "sha256": "bd357a10ec6bbc03656e3c996894c5f2d23c404861f7e9b6e9492376fe4e6e69"
+    },
+    {
+      "path": "packages/builder-core/tests/fixtures/retired-recipes/app-persistence-email-0.2.5.json",
+      "sha256": "fd648e6ffc083b7f1b1cce63e8446ab90922957f0ed7633f32c30063673ab443"
+    }
+  ],
+  "retirement": "Executable 0.1.0 is retired without migration; this file is inert historical evidence and refusal input."
+}
