@@ -225,97 +225,32 @@ async function promote(options, adapters) {
   return { status: "promoted", manifestSha256: options.digest, paths: written };
 }
 
-const visualAdmissionPath = "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs";
-const visualAdmissionRequire = createRequire(new URL("../packages/builder-core/package.json", import.meta.url));
-let loadedVisualAdmission;
-
-async function canonicalVisualAdmission() {
-  const bytes = await boundedRead(filesystem, repositoryRoot, visualAdmissionPath, 1024 * 1024);
-  const sha256 = digest(bytes);
-  if (loadedVisualAdmission && loadedVisualAdmission.sha256 !== sha256) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  // Reject cache entries established before this producer observed the file.
-  if (!loadedVisualAdmission && Object.hasOwn(visualAdmissionRequire.cache,
-    visualAdmissionRequire.resolve("./src/lifecycle/app-transition-visual-admission.cjs"))) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  const policy = loadedVisualAdmission?.policy ?? visualAdmissionRequire("./src/lifecycle/app-transition-visual-admission.cjs");
-  const record = policy?.record;
-  if (typeof policy?.verifyAppTransitionVisualInputIdentity !== "function" ||
-      !Array.isArray(policy.baselinePaths) || policy.baselinePaths.length !== 2 ||
-      record?.schemaVersion !== 1 || record.sourceProfile?.name !== "portfolio" || record.sourceProfile.version !== "0.11.7" ||
-      record.targetProfile?.name !== "app" || record.targetProfile.version !== "0.2.7" ||
-      record.manifestSha256 !== "2ad0a26ad45871401941d5202781e43233a00e86e9f12e00f447e3d1245a2a6d" ||
-      record.sourceRevision !== "4ed455ccde1e6129ffad4ae825e9aff8dedc56ca" ||
-      !Array.isArray(record.originalSourceFiles) || record.originalSourceFiles.length !== 299 ||
-      !same(Object.keys(record.bridgeSourceFiles ?? {}).sort(), ["packages/builder-core/src/lifecycle/app-profile-transition.ts", "scripts/verify-app-transition-visuals.mjs"]) ||
-      !same(Object.keys(record.subsets ?? {}).sort(), subsets.map(subset => subset.join("+") || "none").sort())) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  const paths = record.originalSourceFiles.map(file => file.path);
-  if (new Set(paths).size !== paths.length || !same(paths, [...paths].sort()) ||
-      record.originalSourceFiles.some(file => !safeRelative(file.path) || file.path === visualAdmissionPath || !/^[a-f0-9]{64}$/.test(file.sha256)) ||
-      Object.values(record.bridgeSourceFiles).some(value => typeof value !== "string" || !/^[a-f0-9]{64}$/.test(value)) ||
-      digest(await boundedRead(filesystem, repositoryRoot, visualAdmissionPath, 1024 * 1024)) !== sha256) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  loadedVisualAdmission = { policy, sha256 };
-  return loadedVisualAdmission;
-}
-
-async function visualAdmissionObservations(root, fs) {
-  const sourceFiles = (await rawSourceFiles(root, fs)).filter(file => file.path !== visualAdmissionPath);
+async function snapshotComparisonInputs(adapters) {
+  const sourceFiles = await rawSourceFiles(adapters.repositoryRoot, adapters.filesystem);
   const baselines = [];
   for (const asset of assets) {
-    const bytes = await boundedRead(fs, root, asset.templatePath);
-    validateImage(bytes, asset.viewport);
-    baselines.push({ identifier: asset.identifier, fingerprint: `sha256:${digest(bytes)}` });
+    const content = await boundedRead(adapters.filesystem, adapters.repositoryRoot, asset.templatePath);
+    validateImage(content, asset.viewport);
+    baselines.push({ identifier: asset.identifier, templatePath: asset.templatePath, sha256: digest(content) });
   }
-  return {
-    sourceFiles,
-    policySha256: digest(await boundedRead(fs, root, visualAdmissionPath, 1024 * 1024)),
-    targetLockfileFingerprint: `sha256:${digest(await boundedRead(fs, root, "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml"))}`,
-    baselines,
-  };
+  return { sourceFiles, baselines };
 }
 
-async function requireVisualAdmission(adapters) {
-  try {
-    const { policy, sha256 } = await canonicalVisualAdmission();
-    const observed = adapters.admissionObservations ?? await visualAdmissionObservations(adapters.repositoryRoot, adapters.filesystem);
-    const expected = policy.record.originalSourceFiles.map(file => ({
-      path: file.path, sha256: policy.record.bridgeSourceFiles[file.path] ?? file.sha256,
-    }));
-    if (observed?.policySha256 !== sha256 || !same(observed.sourceFiles, expected) ||
-        observed.targetLockfileFingerprint !== policy.record.targetLockfileFingerprint ||
-        !Array.isArray(observed.baselines) || observed.baselines.length !== assets.length) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-    for (const subset of subsets) {
-      const expectedBaselines = [];
-      for (const asset of assets.filter(asset => (asset.group === "multilingual") === subset.includes("multilingual"))) {
-        const matching = observed.baselines.filter(entry => entry?.identifier === asset.identifier);
-        if (matching.length !== 1) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-        expectedBaselines.push({ path: policy.baselinePaths[expectedBaselines.length], fingerprint: matching[0].fingerprint });
-      }
-      const identity = policy.verifyAppTransitionVisualInputIdentity({ optionalCapabilities: subset,
-        influencingFingerprint: policy.record.subsets[subset.join("+") || "none"],
-        targetLockfileFingerprint: observed.targetLockfileFingerprint, baselineFingerprints: expectedBaselines });
-      if (identity === undefined || !same(identity.optionalCapabilities, subset)) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-    }
-    return policy;
-  } catch {
-    return fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  }
+async function requireComparisonInputs(adapters, expected) {
+  const actual = await snapshotComparisonInputs(adapters).catch(() => undefined);
+  if (!same(actual, expected)) fail("VISUAL_SOURCE_CHANGED");
 }
 
-async function requirePreparedVisualAdmission(prepared, subset, adapters) {
-  try {
-    const policy = await import(new URL("../packages/builder-core/dist/lifecycle/app-profile-transition.js", import.meta.url));
-    const locks = prepared.files.filter(file => file.path === "pnpm-lock.yaml");
-    if (locks.length !== 1) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-    const baselines = [];
-    for (const asset of assets.filter(asset => (asset.group === "multilingual") === subset.includes("multilingual"))) {
-      baselines.push({ path: policy.appTransitionBaselinePaths[baselines.length], content: await boundedRead(adapters.filesystem, adapters.repositoryRoot, asset.templatePath) });
-    }
-    const result = policy.verifyAppTransitionVisualInputRecord({ optionalCapabilities: subset,
-      influencingFingerprints: prepared.influencingFingerprints,
-      targetLockfileFingerprint: `sha256:${digest(locks[0].content)}`, baselines });
-    if (!result.ok) fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  } catch {
-    fail("VISUAL_INPUT_ADMISSION_REQUIRED");
-  }
+async function requirePreparedMeasurementIdentity(prepared, adapters) {
+  const policy = await import(new URL("../packages/builder-core/dist/lifecycle/app-profile-transition.js", import.meta.url));
+  if (prepared.sourceProject?.schemaVersion !== "1.0.0" || prepared.sourceProject.originProfile !== "portfolio" || prepared.sourceProject.recipeVersion !== "0.11.7" ||
+      prepared.targetProject?.schemaVersion !== "1.0.0" || prepared.targetProject.originProfile !== "app" || prepared.targetProject.recipeVersion !== "0.2.7" ||
+      !Array.isArray(prepared.files) || prepared.files.length === 0 || prepared.files.some(file => !safeRelative(file.path) || !(file.content instanceof Uint8Array)) ||
+      new Set(prepared.files.map(file => file.path)).size !== prepared.files.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
+  const locks = prepared.files.filter(file => file.path === "pnpm-lock.yaml");
+  const expectedLock = await boundedRead(adapters.filesystem, adapters.repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml");
+  if (locks.length !== 1 || !Buffer.from(locks[0].content).equals(expectedLock) ||
+      !same(prepared.influencingFingerprints, policy.appTransitionInfluencingFingerprints(prepared.files.filter(file => file.path !== "pnpm-lock.yaml")))) fail("VISUAL_INPUT_IDENTITY_MISSING");
 }
 
 export async function verifyAppTransitionVisuals(options, injected = {}) {
@@ -328,39 +263,52 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
       if (result.exitCode !== 0) fail("VISUAL_BUILDER_BUILD_FAILED");
     }, ...injected };
   if (options.mode === "promote") return promote(options, adapters);
-  if (options.mode === "compare") await requireVisualAdmission(adapters);
+  const comparisonInputs = options.mode === "compare" ? await snapshotComparisonInputs(adapters) : undefined;
   const toolchain = await adapters.inspectEnvironment();
   if (!same(toolchain, appTransitionVisualToolchain)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
   await adapters.prepareBuilder();
+  const source = await adapters.snapshotSource();
   const preparedProjects = [];
   if (options.mode === "compare") {
-    await requireVisualAdmission(adapters);
+    await requireComparisonInputs(adapters, comparisonInputs);
     for (const subset of subsets) {
       const prepared = await adapters.prepareProject(root, subset, options.recipeVersion);
-      await requirePreparedVisualAdmission(prepared, subset, adapters);
+      await requirePreparedMeasurementIdentity(prepared, adapters);
       preparedProjects.push(prepared);
     }
-    await requireVisualAdmission(adapters);
+    await requireComparisonInputs(adapters, comparisonInputs);
+    if (!same(source, await adapters.snapshotSource())) fail("VISUAL_SOURCE_CHANGED");
   }
-  const source = await adapters.snapshotSource();
   const fs = adapters.filesystem;
   const runPath = `${artifactRoot}/${randomUUID()}`;
   const run = await safePath(fs, root, runPath, { directories: true });
   const identity = await readPathIdentity(run);
   const cases = [];
+  const comparisonBaselines = [];
+  const baselineContent = new Map();
   try {
+    for (const baseline of comparisonInputs?.baselines ?? []) {
+      const asset = assets.find(asset => asset.identifier === baseline.identifier);
+      const content = await boundedRead(fs, root, baseline.templatePath);
+      if (digest(content) !== baseline.sha256) fail("VISUAL_SOURCE_CHANGED");
+      const path = `baselines/${baseline.identifier}.png`;
+      if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+      await writeExclusive(fs, run, path, content);
+      baselineContent.set(baseline.identifier, content);
+      comparisonBaselines.push({ ...baseline, path, ...viewports[asset.viewport] });
+    }
     for (const [index, subset] of subsets.entries()) {
-      if (options.mode === "compare") await requireVisualAdmission(adapters);
+      if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
       const name = subset.length ? subset.join("-") : "default";
       const casePath = `${runPath}/${name}`;
       const artifactDirectory = await safePath(fs, root, casePath, { directories: true });
       const baselines = {};
       if (options.mode === "compare") {
-        for (const asset of assets.filter(({ group }) => (group === "multilingual") === subset.includes("multilingual"))) baselines[asset.viewport] = await boundedRead(fs, root, asset.templatePath);
+        for (const asset of assets.filter(({ group }) => (group === "multilingual") === subset.includes("multilingual"))) baselines[asset.viewport] = baselineContent.get(asset.identifier);
       }
       const value = await adapters.executeCase({ subset, mode: options.mode, baselines, artifactDirectory, repositoryRoot: root, recipeVersion: options.recipeVersion, preparedProject: preparedProjects[index] });
-      if (options.mode === "compare") await requireVisualAdmission(adapters);
+      if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
       if (!value.project?.files?.length || !value.influencingFingerprints?.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
       const images = {};
@@ -381,16 +329,17 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
       if (group.length !== 4 || group.some(({ images }) => images[asset.viewport].sha256 !== representative.sha256)) fail("VISUAL_SUBSET_MISMATCH");
       representatives.push({ ...asset, candidatePath: representative.path, sha256: representative.sha256, historicalMatch: representative.sha256 === asset.historicalSha256 });
     }
-    if (options.mode === "compare") await requireVisualAdmission(adapters);
+    if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
     if (!same(source, await adapters.snapshotSource())) fail("VISUAL_SOURCE_CHANGED");
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
-    const manifest = { schemaVersion: 1, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives };
+    const manifest = { schemaVersion: 1, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives, ...(options.mode === "compare" ? { baselines: comparisonBaselines } : {}) };
     const bytes = Buffer.from(json(manifest));
     const manifestPath = `${runPath}/${options.mode === "candidates" ? "candidate" : "comparison"}-manifest.json`;
     await writeExclusive(fs, root, manifestPath, bytes);
     return { status: manifest.status, manifestPath, manifestSha256: digest(bytes), assets: representatives };
   } catch (error) {
-    const sourceUnchanged = same(source, await adapters.snapshotSource());
+    const sourceUnchanged = await adapters.snapshotSource().then(current => same(source, current), () => false) &&
+      (options.mode !== "compare" || await snapshotComparisonInputs(adapters).then(current => same(comparisonInputs, current), () => false));
     if (await pathIdentityMatches(identity)) await writeExclusive(fs, run, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", sourceUnchanged, cases }));
     if (!sourceUnchanged) fail("VISUAL_SOURCE_CHANGED");
     throw error;
@@ -655,13 +604,15 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
       const reportPath = join(root, `${pass}-report.json`);
       const result = await command({ executable: "pnpm", arguments: ["--dir", "apps/web", "run", "test:visual", "--reporter=json", "--retries=0"], cwd: project, environment: { ...environment, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath } });
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+      const visualCheck = { name: pass, exitCode: result.exitCode, artifacts: [] };
+      checks.push(visualCheck);
       await writeExclusive(fs, passRoot, "process.log", `${result.stdout}\n${result.stderr}`);
       const retained = await retainBrowserArtifacts(fs, project, passRoot);
+      visualCheck.artifacts = retained;
       const report = await boundedRead(fs, root, `${pass}-report.json`);
       await writeExclusive(fs, passRoot, "report.json", report);
       validateAppTransitionVisualReport(JSON.parse(report.toString("utf8")), pass === "candidate");
       if (![0, 1].includes(result.exitCode) || (pass !== "candidate" && result.exitCode !== 0)) fail("VISUAL_COMPARISON_FAILED");
-      checks.push({ name: pass, exitCode: result.exitCode, artifacts: retained });
       for (const viewport of Object.keys(viewports)) {
         const matches = retained.filter(({ path }) => path.endsWith(`/${viewport}-captured.png`));
         if (matches.length !== 1) fail("VISUAL_CAPTURE_MISSING");

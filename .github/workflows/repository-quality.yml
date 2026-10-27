@@ -551,10 +551,12 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate draft app transition visual review candidates
+        id: visual_candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
         run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7
 
       - name: Compare all app transition visual subsets
+        id: visual_comparison
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
         run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7
 
@@ -569,13 +571,19 @@ jobs:
           retention-days: 7
 
       - name: Upload app transition visual evidence
-        if: failure() || (github.event_name == 'pull_request' && github.event.pull_request.draft)
+        if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: app-transition-visual-artifacts
-          path: generated-visual-artifacts/app-transitions/
-          if-no-files-found: ignore
-          include-hidden-files: true
+          path: |
+            generated-visual-artifacts/app-transitions/**/*.json
+            generated-visual-artifacts/app-transitions/**/*.png
+            generated-visual-artifacts/app-transitions/**/*.log
+            generated-visual-artifacts/app-transitions/**/*.txt
+            generated-visual-artifacts/app-transitions/**/*.md
+          if-no-files-found: ${{ (steps.visual_candidates.outcome == 'success' || steps.visual_comparison.outcome == 'success') && 'error' || 'warn' }}
+          include-hidden-files: false
           retention-days: 7
 
   compatibility-proof:

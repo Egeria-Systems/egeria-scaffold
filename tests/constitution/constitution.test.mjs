@@ -5396,3 +5396,27 @@ test("accepted removal-reference hardening closes before app foundation eligibil
   );
   assert.equal(removalReferenceGuardColumns[4], referenceHardeningPhase);
 });
+
+
+test("app transition hosted retention preserves successful measurements and bounded failure evidence", async () => {
+  const workflow = parse(await readFile(join(repositoryRoot, ".github/workflows/repository-quality.yml"), "utf8"));
+  const job = workflow.jobs["app-transition-visuals"];
+  const upload = job.steps.find(step => step.with?.name === "app-transition-visual-artifacts");
+  assert.equal(upload.if, "always()");
+  assert.equal(upload["timeout-minutes"], 5);
+  assert.equal(upload.with["include-hidden-files"], false);
+  assert.equal(upload.with["retention-days"], 7);
+  assert.deepEqual(upload.with.path.trim().split("\n"), [
+    "generated-visual-artifacts/app-transitions/**/*.json",
+    "generated-visual-artifacts/app-transitions/**/*.png",
+    "generated-visual-artifacts/app-transitions/**/*.log",
+    "generated-visual-artifacts/app-transitions/**/*.txt",
+    "generated-visual-artifacts/app-transitions/**/*.md",
+  ]);
+  assert.equal(upload.with["if-no-files-found"], "${{ (steps.visual_candidates.outcome == 'success' || steps.visual_comparison.outcome == 'success') && 'error' || 'warn' }}");
+  assert.equal(job.steps.find(step => step.run?.includes("--candidates --app-recipe-version=0.2.7")).id, "visual_candidates");
+  assert.equal(job.steps.find(step => step.run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").id, "visual_comparison");
+  assert.equal(job["timeout-minutes"], 45);
+  assert.deepEqual(workflow.permissions, { contents: "read" });
+  assert.equal(job.steps.some(step => /--promote|--update-snapshots/u.test(step.run ?? "")), false);
+});
