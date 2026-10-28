@@ -13,6 +13,8 @@ import {
   type ProjectConfiguration,
   type ApplicationEnvironmentProjectConfiguration,
   calendlyBookingSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  type ApplicationEnvironmentBookingSettings,
   web3FormsContactSettingsSchema,
   type Web3FormsContactSettings,
   type CalendlyBookingSettings,
@@ -50,9 +52,9 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "analytics" | "booking-calendly" | "multilingual" | "transactional-email-resend";
+    identifier: "analytics" | "multilingual" | "transactional-email-resend";
     version: "0.1.0";
-  }> | Readonly<{ identifier: "contact-form-web3forms"; version: "0.1.0" | "0.2.0" }>
+  }> | Readonly<{ identifier: "contact-form-web3forms" | "booking-calendly"; version: "0.1.0" | "0.2.0" }>
     | Readonly<{ identifier: "application-persistence"; version: "0.1.1" }>
     | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
   settings:
@@ -73,6 +75,7 @@ export type CapabilityAdditionPlan = Readonly<{
         mode: "link" | "inline" | "popup";
         destination: "redacted";
       }>
+    | ApplicationEnvironmentBookingSettings
     | Readonly<{ accessKey: "redacted" }>
     | null;
   currentCapabilities: readonly string[];
@@ -170,7 +173,7 @@ function sameOrderedValues(
 
 function fingerprintPlan(input: Readonly<{
   plan: CapabilityAdditionPlanBody;
-  settings: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings | null;
+  settings: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings | null;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   persistenceSnapshot?: string;
 }>): `sha256:${string}` {
@@ -509,13 +512,14 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-  settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    capabilityValue !== "contact-form-web3forms" || input.settings !== undefined
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly") ||
+    (capabilityValue === "contact-form-web3forms" && input.settings !== undefined)
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
   if (
@@ -530,7 +534,9 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
   }
 
-  const settingsResult = capabilityValue === "booking-calendly"
+  const environmentBookingSettings = input.renderingContext !== undefined && capabilityValue === "booking-calendly"
+    ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
+  const settingsResult = input.renderingContext === undefined && capabilityValue === "booking-calendly"
     ? calendlyBookingSettingsSchema.safeParse(input.settings)
     : undefined;
   const contactSettingsResult = input.renderingContext === undefined && capabilityValue === "contact-form-web3forms"
@@ -539,6 +545,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ? analyticsSettingsSchema.safeParse(input.settings)
     : undefined;
   if (
+    (environmentBookingSettings !== undefined && !environmentBookingSettings.success) ||
     (settingsResult !== undefined && !settingsResult.success) ||
     (contactSettingsResult !== undefined && !contactSettingsResult.success) ||
     (analyticsSettingsResult !== undefined && !analyticsSettingsResult.success) ||
@@ -622,9 +629,15 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
   };
+  const environmentProject = project.schemaVersion === "2.0.0" ? project : undefined;
+  const environmentRenderRequest = {
+    ...commonRenderRequest,
+    ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
+    ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
+  };
   const currentResult = input.renderingContext === undefined
     ? await renderSkeleton(renderRequest, snapshot.value.renderingContext)
-    : await renderSkeleton(commonRenderRequest, input.renderingContext);
+    : await renderSkeleton(environmentRenderRequest, input.renderingContext);
 
   if (!currentResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -669,7 +682,11 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         : capabilityValue === "application-persistence"
           ? { applicationPersistence: true as const }
           : { multilingual: true as const }),
-  }, targetContext) : await renderSkeleton({ ...commonRenderRequest, contactFormWeb3Forms: true }, input.renderingContext);
+  }, targetContext) : await renderSkeleton({
+    ...environmentRenderRequest,
+    ...(capabilityValue === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
+    ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
+  }, input.renderingContext);
 
   if (!desiredResult.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -708,7 +725,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       status: "approval-required",
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
-      capability: capabilityValue === "contact-form-web3forms"
+      capability: capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
         ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
         : capabilityValue === "background-job-delivery"
           ? { identifier: capabilityValue, version: "0.2.0" }
@@ -740,6 +757,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
               ],
               providerIdentifiers: "redacted",
             }
+          : environmentBookingSettings?.success === true ? { mode: environmentBookingSettings.data.mode }
           : settingsResult?.success === true
           ? {
               mode: settingsResult.data.mode,
@@ -785,6 +803,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
         settings:
           analyticsSettingsResult?.success === true
             ? analyticsSettingsResult.data
+            : environmentBookingSettings?.success === true ? environmentBookingSettings.data
             : settingsResult?.success === true
               ? settingsResult.data
               : contactSettingsResult?.success === true ? contactSettingsResult.data : null,
@@ -799,7 +818,7 @@ export async function planCapabilityAddition(input: Readonly<{
   reader: RepositoryReader;
   git: Extract<GitWorktreeInspection, Readonly<{ ok: true }>>;
   capability: "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
-  settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
   renderingContext?: ApplicationEnvironmentRenderingContext;
 }>): Promise<PlanningResult<CapabilityAdditionPlan>> {
   return planCapabilityAdditionUnchecked(input);
