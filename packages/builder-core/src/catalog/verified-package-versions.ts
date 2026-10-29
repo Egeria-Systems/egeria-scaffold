@@ -17,6 +17,7 @@ import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
   applicationEnvironmentCatalogSnapshot,
+  applicationEnvironmentPersistenceCatalogSnapshot,
   createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
   vitestFiveCapabilityCatalogSnapshot,
@@ -184,11 +185,12 @@ export async function readVerifiedProjectSnapshot(
     const state = parseStateJson(stateSource.content, "2.0.0");
     if (!project.ok || !state.ok || project.value.originProfile !== state.value.origin.profile ||
         project.value.recipeVersion !== state.value.origin.recipeVersion) return invalid();
-    const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
+    const installedContext = createApplicationEnvironmentRenderingContext(project.value.selectedCapabilities.includes("application-persistence"));
+    const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, installedContext.catalogSnapshot);
     if (!catalog.ok) return catalog;
-    const resolved = resolveCapabilities({ profile: project.value.originProfile, requestedCapabilities: project.value.selectedCapabilities }, catalog.value, context.profiles);
+    const resolved = resolveCapabilities({ profile: project.value.originProfile, requestedCapabilities: project.value.selectedCapabilities }, catalog.value, installedContext.profiles);
     if (!resolved.ok || canonicalInstalledManifest(createInstalledManifest(resolved.value)) !== canonicalInstalledManifest(state.value.installedCapabilities)) return invalid();
-    return { ok: true, value: { reader, catalog: catalog.value, profiles: context.profiles, renderingContext: context } };
+    return { ok: true, value: { reader, catalog: catalog.value, profiles: installedContext.profiles, renderingContext: installedContext } };
   }
   const project = projectSource.kind === "file"
     ? parseProjectYaml(projectSource.content)
@@ -209,17 +211,19 @@ export async function readVerifiedProjectSnapshot(
     : snapshot;
 }
 
-export function createApplicationEnvironmentRenderingContext(): ApplicationEnvironmentRenderingContext {
+export function createApplicationEnvironmentRenderingContext(applicationPersistence = false): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
-    catalogSnapshot: applicationEnvironmentCatalogSnapshot,
+    catalogSnapshot: applicationPersistence ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot,
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
 }
 
 export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
   try {
-    return stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext());
+    return [false, true].some((persistence) =>
+      stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence)),
+    );
   } catch {
     return false;
   }
