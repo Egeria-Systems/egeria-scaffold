@@ -54,9 +54,9 @@ export type CapabilityAdditionPlan = Readonly<{
   baseRevision: string;
   profile: ProfileIdentifier;
   capability: Readonly<{
-    identifier: "multilingual" | "transactional-email-resend";
+    identifier: "multilingual";
     version: "0.1.0";
-  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly"; version: "0.1.0" | "0.2.0" }>
+  }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "transactional-email-resend"; version: "0.1.0" | "0.2.0" }>
     | Readonly<{ identifier: "application-persistence"; version: "0.1.1" | "0.2.0" }>
     | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
   settings:
@@ -486,6 +486,7 @@ async function deriveActions(input: Readonly<{
       return planningFailure("PROJECT_INSPECTION_INVALID");
     }
 
+    if (input.current.project.schemaVersion === "2.0.0" && pair.current.path === "apps/web/.dev.vars.example" && current.kind === "file" && current.content !== expected) continue;
     if (current.kind !== "file" || current.content !== expected) {
       return planningFailure("PROJECT_DRIFT_DETECTED");
     }
@@ -520,7 +521,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const capabilityValue: unknown = Reflect.get(input, "capability");
   if (input.renderingContext !== undefined && (
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence") ||
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence" && capabilityValue !== "transactional-email-resend") ||
     (capabilityValue === "contact-form-web3forms" && input.settings !== undefined)
   )) return planningFailure("CAPABILITY_ADDITION_UNSUPPORTED");
 
@@ -609,7 +610,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   }
 
   const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
-  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"));
+  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"), project.selectedCapabilities.includes("app-foundation"));
   const targetContext = environmentTargetContext ?? (capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery"
     ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(
         capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
@@ -643,6 +644,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const environmentProject = project.schemaVersion === "2.0.0" ? project : undefined;
   const environmentRenderRequest = {
     ...commonRenderRequest,
+    ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
     ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
     ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
@@ -697,6 +699,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
           : { multilingual: true as const }),
   }, targetContext) : await renderSkeleton({
     ...environmentRenderRequest,
+    ...(capabilityValue === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
     ...(capabilityValue === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(capabilityValue === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
     ...(environmentBookingSettings?.success ? { bookingCalendly: environmentBookingSettings.data } : {}),
@@ -740,7 +743,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       status: "approval-required",
       baseRevision: input.git.identity.revision,
       profile: project.originProfile,
-      capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly"
+      capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "transactional-email-resend"
         ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
         : capabilityValue === "background-job-delivery"
           ? { identifier: capabilityValue, version: "0.2.0" }
