@@ -6222,7 +6222,9 @@ test("security dependency policy shares exact reviewed patches with environment 
     assert.equal(policy.overrides["brace-expansion@>=1.0.0 <1.1.21"], "1.1.21");
     assert.equal(policy.overrides["brace-expansion@>=2.0.0 <2.1.7"], "2.1.7");
     assert.equal(policy.overrides["brace-expansion@>=5.0.0 <5.0.12"], "5.0.12");
-    assert.equal(policy.overrides["@node-minify/core@9.0.2>glob"], "10.5.0");
+    assert.equal(policy.overrides["@node-minify/core@9.0.2>glob"], "14.0.3");
+    assert.equal(policy.overrides["@opennextjs/cloudflare@1.20.12>glob"], "14.0.3");
+    assert.equal(policy.overrides["minimatch@>=7.0.0 <11.0.4"], "11.0.4");
     assert.deepEqual(policy, parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml"));
     assert.equal(policy.minimumReleaseAge, 1440);
     assert.equal(policy.resolutionMode, "time-based");

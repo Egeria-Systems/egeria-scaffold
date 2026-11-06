@@ -5338,7 +5338,7 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 });
 
 
-for (const cohort of lifecycleCohorts) for (const profile of ["site"]) {
+for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
   test(`compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);

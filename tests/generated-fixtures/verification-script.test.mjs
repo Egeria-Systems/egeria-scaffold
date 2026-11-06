@@ -860,7 +860,7 @@ test("fixture inspection rejects unapproved dependency and execution policy", as
       const root = await copyFixture(owner, "portfolio", name);
       const policyPath = join(root, "pnpm-workspace.yaml");
       const policy = await readFile(policyPath, "utf8");
-      const changed = policy.replace('  "@node-minify/core@9.0.2>glob": "10.5.0"\n', replacement);
+      const changed = policy.replace('  "@node-minify/core@9.0.2>glob": "14.0.3"\n', replacement);
       assert.notEqual(changed, policy);
       await writeFile(policyPath, changed);
       await expectFixtureError(() => inspectGeneratedFixture(root, "portfolio"), "FIXTURE_WORKSPACE_POLICY_INVALID");

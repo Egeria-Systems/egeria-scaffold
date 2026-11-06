@@ -12,7 +12,7 @@ const baselinePaths = Object.freeze([
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
 ]);
-const record = freeze({
+const historicalRecord = freeze({
   "schemaVersion": 1,
   "sourceProfile": {
     "name": "portfolio",
@@ -1246,6 +1246,30 @@ const record = freeze({
   "bridgeSourceFiles": {
     "packages/builder-core/src/lifecycle/app-profile-transition.ts": "4f3160334bea9796487b16d3158a0e9c623943cb4027dbc0edbc983a03a03d64",
     "scripts/verify-app-transition-visuals.mjs": "24ed484f193f698fc5d252202e6ac0338ff7ed358565377d5d83fb2141d24bb1"
+  }
+});
+
+// The inherited originalSourceFiles and bridgeSourceFiles remain historical
+// provenance. measurementSource binds the immutable accepted comparison inventory.
+const record = freeze({
+  ...historicalRecord,
+  "manifestSha256": "a0584dd25efd2e9677a576373d8e2edf57466f4df84e7dcd225333b910a073ac",
+  "sourceRevision": "2996ea7ddf7bb64c4aafbc6cea0f635d05dfddcc",
+  "targetLockfileFingerprint": "sha256:c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf",
+  "subsets": {
+    "none": "sha256:89b41a370fa416652524be5cada85023b7bed1f5b53c3d7e2e4604ee164deafa",
+    "analytics": "sha256:496330cebd0db61f0b1786c82afe8cfeeb8e4821e71903f35db5ea362f00b7c8",
+    "booking-calendly": "sha256:0c5385780a9d719d69fab976cfd1c922ecdcb7530eb63f205ea0116a4f58a721",
+    "analytics+booking-calendly": "sha256:59e22c7cf69a89395459c3f6506acfdbc227de3ac6258fc792a8cf5cf21732a1",
+    "multilingual": "sha256:72205528326a0560b49ddb135bb459cf974604f2c93e738dac093b963b1c6edc",
+    "analytics+multilingual": "sha256:b94690ad66991002040feb63e94eef9cdc306ea8362abab08b4fdb5f26072a9d",
+    "booking-calendly+multilingual": "sha256:84c63618e48ce54709f96fedc50614428b3e6cfb545e1d4d98492beb3f78578f",
+    "analytics+booking-calendly+multilingual": "sha256:83f66efb96e15069df8f2b0eb21184011d10a5f25ecc384ae9605385bddcceb2"
+  },
+  "measurementSource": {
+    "fingerprint": "sha256:3fad1a3317efdd041422e95c5c7d17439e25e64550400970e2009eb68cb1a41d",
+    "rawFileCount": 422,
+    "compiledFileCount": 130
   }
 });
 

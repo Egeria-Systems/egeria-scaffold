@@ -374,7 +374,7 @@
       "path": "apps/web/tests/integration/health-worker.test.ts"
     },
     {
-      "fingerprint": "sha256:a7e16b5be977f258f483d0bb7281b1bd8e409967bf51ccd607be2312e16da21d",
+      "fingerprint": "sha256:36495ec3782522ba9777a1d92e2c541664723913a40ffbbfebed6fa41dfc7942",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -824,7 +824,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:cb96fe2bc6543fe43e373134801b443316fc70552a98d6d0614c127c7d97e714",
+      "fingerprint": "sha256:8b7e5ea4f42445b22e0768654743a369d38439644c7e7f4d4b44fbe88c0c14c0",
       "fingerprintTarget": {
         "kind": "file"
       },

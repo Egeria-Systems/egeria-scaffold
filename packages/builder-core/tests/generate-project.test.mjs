@@ -106,7 +106,7 @@ test("application environment dependency locks are isolated from retained recipe
     const lock = parseYaml(lockBytes.toString("utf8"));
     const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
     assert.deepEqual(lock.overrides, workspace.overrides);
-    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "brace-expansion@2.1.7", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
+    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
     for (const vulnerable of ["next@16.3.3", "fast-uri@3.1.6", "fast-uri@3.1.7", "brace-expansion@1.1.18", "brace-expansion@2.1.4", "brace-expansion@5.0.9", "undici@7.29.0", "undici@8.10.0", "fast-uri@3.1.8", "body-parser@2.3.0", "undici@6.29.0", "undici@7.29.1", "undici@8.10.2", "zod@4.4.3", "zod@4.6.5", "zod@4.6.6", "qs@6.16.0", "content-type@2.0.0", "content-type@2.0.2"]) assert.equal(lock.packages[vulnerable], undefined);
     await withTestRoot(async root => {
       await mkdir(join(root, "apps/web"), { recursive: true });
@@ -2300,7 +2300,7 @@ test("security lock selection requires complete exact recipe manifests", async (
     const lock = parseYaml(bytes.toString("utf8"));
     const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
     assert.deepEqual(lock.overrides, workspace.overrides);
-    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "brace-expansion@2.1.7", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
+    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
     for (const old of ["next@16.3.3", "fast-uri@3.1.6", "fast-uri@3.1.7", "brace-expansion@1.1.18", "brace-expansion@2.1.4", "brace-expansion@5.0.9", "undici@7.29.0", "undici@8.10.0", "fast-uri@3.1.8", "body-parser@2.3.0", "undici@6.29.0", "undici@7.29.1", "undici@8.10.2", "zod@4.4.3", "zod@4.6.5", "zod@4.6.6", "qs@6.16.0", "content-type@2.0.0", "content-type@2.0.2"]) assert.equal(lock.packages[old], undefined);
     for (const [section, key] of [["dependencies", "next"], ["devDependencies", "eslint-config-next"], ["devDependencies", "vitest"], ["dependencies", "effect"], ...(options.applicationPersistence ? [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]] : [])]) {
       assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, { ...manifest, [section]: { ...manifest[section], [key]: "9.9.9" } }), undefined);

@@ -813,7 +813,9 @@ overrides:
   "vite@8.2.4>rolldown": "1.2.5"
   "vite@8.2.4>postcss": "8.5.26"
   "@next/eslint-plugin-next@${pluginVersion}>fast-glob": "-"
-  "@node-minify/core@9.0.2>glob": "10.5.0"
+  "@node-minify/core@9.0.2>glob": "14.0.3"
+  "@opennextjs/cloudflare@1.20.12>glob": "14.0.3"
+  "minimatch@>=7.0.0 <11.0.4": "11.0.4"
   "fast-uri@": 3.1.9
   "body-parser@": 2.4.0
   "undici@": 6.29.1
@@ -851,7 +853,9 @@ overrides:
   vite@8.2.4>rolldown: 1.2.5
   vite@8.2.4>postcss: 8.5.26
   '@next/eslint-plugin-next@${pluginVersion}>fast-glob': '-'
-  '@node-minify/core@9.0.2>glob': 10.5.0
+  '@node-minify/core@9.0.2>glob': 14.0.3
+  '@opennextjs/cloudflare@1.20.12>glob': 14.0.3
+  minimatch@>=7.0.0 <11.0.4: 11.0.4
   fast-uri@: 3.1.9
   body-parser@: 2.4.0
   undici@: 6.29.1
@@ -1266,14 +1270,14 @@ async function inspectFixture(root, contract) {
     fail("FIXTURE_EFFECT_BOUNDARY_INVALID");
   }
   const expectedLockFingerprint = persistence
-    ? "a7e16b5be977f258f483d0bb7281b1bd8e409967bf51ccd607be2312e16da21d"
+    ? "36495ec3782522ba9777a1d92e2c541664723913a40ffbbfebed6fa41dfc7942"
     : contract.profile === "portfolio"
       ? contract.expectedAppFoundationVersion === undefined
-        ? "a19f890d98ca4ab97f16488a69e3671783545d1385dd3d6e421649dc1308e0f1"
-        : "ff44ba1b1f77d18889d748164e8939b2df6ca9e063fd122ab29e8d9925b060c9"
+        ? "6ce7136134adf7d0aeb4d8a8dcfc342f880e94bce2c529f65d37135e42f0d3b1"
+        : "0afb20558ade96aba5269e715db64d07ce92ee54bec28bd4287494221e42afb0"
       : contract.expectedAppFoundationVersion === undefined
-        ? "be78333c0f57123df4d871b89b5f9bc5d9e6eb332aa2d7d276758b5676ab1e79"
-        : "78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706";
+        ? "a525d279565c5917d578462efd5dbfe47f735c07cf3693fbba5a3619c2c3c120"
+        : "c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf";
   if (fingerprint(lockfile) !== expectedLockFingerprint) {
     fail("FIXTURE_LOCKFILE_INVALID");
   }

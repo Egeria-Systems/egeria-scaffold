@@ -228,8 +228,8 @@ test("shared visual membership refuses malformed optional subsets", () => {
   const require = createRequire(new URL("../../packages/builder-core/package.json", import.meta.url));
   const policy = require("./src/lifecycle/app-transition-visual-admission.cjs");
   const identity = {
-    influencingFingerprint: "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295",
-    targetLockfileFingerprint: "sha256:78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706",
+    influencingFingerprint: "sha256:89b41a370fa416652524be5cada85023b7bed1f5b53c3d7e2e4604ee164deafa",
+    targetLockfileFingerprint: "sha256:c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf",
   };
   assert.deepEqual(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities: [] }), {
     optionalCapabilities: [],
@@ -238,6 +238,8 @@ test("shared visual membership refuses malformed optional subsets", () => {
       "sha256:00e95d03593487ac4a6bb3e08afe9a1df475ecb76b8b1f1da676259ccf551d27",
     ],
   });
+  assert.equal(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities: [], targetLockfileFingerprint: "sha256:78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706" }), undefined);
+  assert.equal(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities: [], influencingFingerprint: "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295" }), undefined);
   for (const optionalCapabilities of [["none"], ["analytics", "analytics"], ["analytics+booking-calendly"], [null], new Array(1)]) {
     assert.equal(policy.verifyAppTransitionVisualInputIdentity({ ...identity, optionalCapabilities }), undefined);
   }
@@ -376,7 +378,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
     assert.equal(result.project.sourceProject.recipeVersion, "0.11.7");
     assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
     assert.equal(result.project.targetProject.recipeVersion, "0.2.7");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
@@ -726,7 +728,7 @@ test("fresh comparison measures stable unaccepted inputs without granting lifecy
   influenced.fingerprint = `sha256:${sha256(file.content)}`;
   const policy = await import(h.verifierUrl);
   const input = { optionalCapabilities: [], influencingFingerprints: prepared.influencingFingerprints,
-    targetLockfileFingerprint: "sha256:78ac7e12de2b35c3486eb9f471d80cf2ae33c370768838d7e0fdb62bf85c9706" };
+    targetLockfileFingerprint: "sha256:c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf" };
   assert.equal(policy.verifyAppTransitionVisualInputRecord(input).ok, false);
   const adapters = { ...h.adapters };
   const result = await h.module.verifyAppTransitionVisuals({ mode: "compare" }, adapters);

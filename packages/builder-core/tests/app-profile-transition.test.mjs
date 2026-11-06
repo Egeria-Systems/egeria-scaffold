@@ -629,14 +629,14 @@ test("current preparation fingerprints and canonical admission protect exact bas
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
   assert.deepEqual(subsets, {
-  "none": "sha256:4a159aa4fd322131abd5c2d272b9c2312870e0012fbaa945c6b57191de631295",
-  "analytics": "sha256:cfe0d58c883f14c8542eee0e431decb0b6eb6a5b351f9c1bfa9e55f40027145c",
-  "booking-calendly": "sha256:7a29d377df99a7724f4f1ad8a8a2ca67aaa1c9e64055fee4dd2c2e74317e519f",
-  "analytics+booking-calendly": "sha256:b40a377ae05d2452c0c4f80f9a19b55a0503659e34382e50d019d4127e6f3414",
-  "multilingual": "sha256:120f44139cb0b11436e47de731cae55571159cbc1f37b3279e21f9494b100154",
-  "analytics+multilingual": "sha256:3833aa085f0a67808d8b540a9c721cd72ee5dd5bc0ede0c8751a6285c5b59ff6",
-  "booking-calendly+multilingual": "sha256:861ac44e56e31399a91116f32d715e50b7900c056bd447bf62b3f027b3e4bb54",
-  "analytics+booking-calendly+multilingual": "sha256:790f9e9177025f0c931836bb48f7983cfb00d8198753be9d39e0593140254c0d"
+  "none": "sha256:89b41a370fa416652524be5cada85023b7bed1f5b53c3d7e2e4604ee164deafa",
+  "analytics": "sha256:496330cebd0db61f0b1786c82afe8cfeeb8e4821e71903f35db5ea362f00b7c8",
+  "booking-calendly": "sha256:0c5385780a9d719d69fab976cfd1c922ecdcb7530eb63f205ea0116a4f58a721",
+  "analytics+booking-calendly": "sha256:59e22c7cf69a89395459c3f6506acfdbc227de3ac6258fc792a8cf5cf21732a1",
+  "multilingual": "sha256:72205528326a0560b49ddb135bb459cf974604f2c93e738dac093b963b1c6edc",
+  "analytics+multilingual": "sha256:b94690ad66991002040feb63e94eef9cdc306ea8362abab08b4fdb5f26072a9d",
+  "booking-calendly+multilingual": "sha256:84c63618e48ce54709f96fedc50614428b3e6cfb545e1d4d98492beb3f78578f",
+  "analytics+booking-calendly+multilingual": "sha256:83f66efb96e15069df8f2b0eb21184011d10a5f25ecc384ae9605385bddcceb2"
 });
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
   assert.notDeepEqual(candidate.subsets, subsets);
