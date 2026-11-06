@@ -168,19 +168,21 @@ function validateRequest(
 
   if (applicationEnvironments) {
     if (includesContact && value.contactFormWeb3Forms !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
-    if (includesAnalytics && !applicationEnvironmentAnalyticsSettingsSchema.safeParse(value.analytics).success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "analytics"], "invalid-settings");
+    const analytics = includesAnalytics ? applicationEnvironmentAnalyticsSettingsSchema.safeParse(value.analytics) : undefined;
+    if (analytics !== undefined && !analytics.success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "analytics"], "invalid-settings");
     const booking = includesCalendly ? applicationEnvironmentBookingSettingsSchema.safeParse(value.bookingCalendly) : undefined;
     if (booking !== undefined && !booking.success) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "bookingCalendly"], "invalid-settings");
     for (const key of ["multilingual", "applicationPersistence", "transactionalEmailResend", "backgroundJobDelivery"] as const) {
       if (Object.hasOwn(value, key) && value[key] !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", key], "invalid-selection");
     }
-    if (includesAnalytics || includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+    if (includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
     return {
       ok: true,
       value: {
         profile: value.profile as ApplicationEnvironmentProjectGenerationRequest["profile"],
         projectName: value.projectName as string,
         displayName: value.displayName as string,
+        ...(analytics?.success ? { analytics: analytics.data } : {}),
         ...(booking?.success ? { bookingCalendly: booking.data } : {}),
         ...(includesContact ? { contactFormWeb3Forms: true } : {}),
         ...(includesMultilingual ? { multilingual: true } : {}),
