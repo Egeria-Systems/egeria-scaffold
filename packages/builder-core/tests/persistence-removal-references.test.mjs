@@ -129,3 +129,13 @@ test("removing an unrelated capability does not treat retained persistence impor
   });
   assert.deepEqual(result, { ok: true, warnings: [] });
 });
+
+
+test("environment persistence removal refuses surviving mapper consumers before deleting its configuration", async () => {
+  const path = "apps/web/src/configuration/application-database.ts";
+  const consumer = "apps/web/src/consumer.ts";
+  const result = await inspect([[path, "export const resolveApplicationDatabaseEnvironment = value => value;"], [consumer, 'import { resolveApplicationDatabaseEnvironment } from "./configuration/application-database";']], {
+    actions: [{ kind: "delete-file", path }],
+  });
+  assert.deepEqual(result, { ok: false, conflicts: [consumer] });
+});

@@ -13,14 +13,21 @@ const exampleHash = "906bfcb10142df41a32676dffe6660675f775d40d5edcc179523e9536cb
 const stagingId = "11111111-1111-4111-8111-111111111111";
 const productionId = "22222222-2222-4222-8222-222222222222";
 
-async function fixture(context) {
+async function fixture(context, applicationEnvironments = false) {
   const root = await realpath(await mkdtemp(path.join(tmpdir(), "persistence-operations-")));
   context.after(() => rm(root, { recursive: true, force: true }));
   const web = path.join(root, "apps/web");
   await mkdir(path.join(web, "scripts"), { recursive: true });
-  await writeFile(path.join(web, "scripts/check-application-database.mjs"), (await readFile(scriptSource, "utf8")).replace("{{workerEntryJson}}", JSON.stringify(".open-next/worker.js")));
-  const source = await readFile(new URL("deployment-cloudflare/application-persistence/apps/web/wrangler.jsonc.template", templateRoot), "utf8");
+  const prefix = `deployment-cloudflare/application-persistence/${applicationEnvironments ? "application-environments/" : ""}`;
+  await writeFile(path.join(web, "scripts/check-application-database.mjs"), (await readFile(applicationEnvironments ? new URL(`${prefix}apps/web/scripts/check-application-database.mjs.template`, templateRoot) : scriptSource, "utf8")).replace("{{workerEntryJson}}", JSON.stringify(".open-next/worker.js")));
+  const source = await readFile(new URL(`${prefix}apps/web/wrangler.jsonc.template`, templateRoot), "utf8");
   await writeFile(path.join(web, "wrangler.jsonc"), source.replaceAll("{{workerName}}", "example-app"));
+  if (applicationEnvironments) {
+    await mkdir(path.join(web, "src/configuration"), { recursive: true });
+    for (const [name, owner] of [["application-environment", "common"], ["application-database", "application-persistence/application-environments"]]) {
+      await writeFile(path.join(web, `src/configuration/${name}.ts`), await readFile(new URL(`${owner}/apps/web/src/configuration/${name}.ts`, templateRoot)));
+    }
+  }
   await writeFile(path.join(root, ".gitignore"), ".wrangler/\n");
   for (const args of [["init", "--initial-branch=main"], ["add", "."], ["-c", "user.name=Test", "-c", "user.email=test@example.invalid", "-c", "commit.gpgsign=false", "commit", "-m", "Initial fixture"]]) {
     const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
@@ -30,6 +37,7 @@ async function fixture(context) {
   return {
     root, web,
     environment: {
+      ...(applicationEnvironments ? { APPLICATION_ENVIRONMENT: "staging" } : {}),
       APPLICATION_DATABASE_ENVIRONMENT: "staging",
       STAGING_APPLICATION_DATABASE_ID: stagingId,
       PRODUCTION_APPLICATION_DATABASE_ID: productionId,
@@ -74,6 +82,55 @@ test("local setup and an absent migration directory require no remote IDs or cre
   assert.deepEqual(JSON.parse(result.stdout), { ok: true, mode: "local", migrationCount: 0, migrationSetSha256: emptyHash });
 });
 
+test("environment persistence preflight rejects invalid or conflicting application targets before derived output", async context => {
+  for (const [overrides, code] of [
+    [{ APPLICATION_ENVIRONMENT: undefined }, "APPLICATION_DATABASE_APPLICATION_ENVIRONMENT_INVALID"],
+    [{ APPLICATION_ENVIRONMENT: "private-invalid-target" }, "APPLICATION_DATABASE_APPLICATION_ENVIRONMENT_INVALID"],
+    [{ APPLICATION_ENVIRONMENT: "development" }, "APPLICATION_DATABASE_APPLICATION_TARGET_MISMATCH"],
+    [{ APPLICATION_ENVIRONMENT: "production" }, "APPLICATION_DATABASE_APPLICATION_TARGET_MISMATCH"],
+    [{ APPLICATION_DATABASE_ENVIRONMENT: "production" }, "APPLICATION_DATABASE_APPLICATION_TARGET_MISMATCH"],
+  ]) {
+    const subject = await fixture(context, true);
+    refusal(run(subject, "remote-deploy", overrides), code);
+    await assert.rejects(readFile(path.join(subject.web, ".wrangler/application-database/wrangler.remote.json")), { code: "ENOENT" });
+  }
+});
+
+test("environment persistence local mode requires development and local while hashing stays target independent", async context => {
+  const subject = await fixture(context, true);
+  for (const APPLICATION_ENVIRONMENT of [undefined, "development"]) {
+    const result = run(subject, "local", { APPLICATION_ENVIRONMENT, APPLICATION_DATABASE_ENVIRONMENT: "local" });
+    assert.equal(result.status, 0, result.stderr);
+  }
+  for (const overrides of [
+    { APPLICATION_ENVIRONMENT: "staging", APPLICATION_DATABASE_ENVIRONMENT: "local" },
+    { APPLICATION_ENVIRONMENT: "development", APPLICATION_DATABASE_ENVIRONMENT: "production" },
+    { APPLICATION_ENVIRONMENT: "development", APPLICATION_DATABASE_ENVIRONMENT: "invalid" },
+  ]) refusal(run(subject, "local", overrides), "APPLICATION_DATABASE_APPLICATION_TARGET_MISMATCH");
+  refusal(run(subject, "local", { APPLICATION_ENVIRONMENT: "private-invalid-target" }), "APPLICATION_DATABASE_APPLICATION_ENVIRONMENT_INVALID");
+  assert.equal(run(subject, "migration-hash", { APPLICATION_ENVIRONMENT: "invalid", APPLICATION_DATABASE_ENVIRONMENT: "invalid" }).status, 0);
+});
+
+test("environment persistence rejects missing target vars and redirected bindings in every named configuration", async context => {
+  for (const target of ["local", "staging", "production"]) {
+    for (const mutate of [
+      value => { delete value.vars.APPLICATION_ENVIRONMENT; },
+      value => { value.vars.APPLICATION_ENVIRONMENT = "unknown"; },
+      value => { value.vars.APPLICATION_DATABASE_ENVIRONMENT = "wrong"; },
+      value => { value.d1_databases = []; },
+      value => { value.d1_databases[0].binding = "OTHER_DB"; },
+      value => { value.d1_databases[0].remote = true; },
+    ]) {
+      const subject = await fixture(context, true);
+      const file = path.join(subject.web, "wrangler.jsonc");
+      const config = JSON.parse(await readFile(file, "utf8"));
+      mutate(target === "local" ? config : config.env[target]);
+      await writeFile(file, JSON.stringify(config));
+      refusal(run(subject, "local", { APPLICATION_ENVIRONMENT: "development", APPLICATION_DATABASE_ENVIRONMENT: "local" }), "APPLICATION_DATABASE_CONFIGURATION_INVALID");
+    }
+  }
+});
+
 test("migration review hashes exact SQL names and bytes without printing SQL", async (context) => {
   const subject = await fixture(context);
   await mkdir(path.join(subject.web, "migrations"));
@@ -87,8 +144,9 @@ test("migration review hashes exact SQL names and bytes without printing SQL", a
   assert.doesNotMatch(changed.stdout + changed.stderr, /private-value|SELECT/);
 });
 
-test("remote deployment derives isolated named bindings and preserves managed source", async (context) => {
-  const subject = await fixture(context);
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment persistence " : ""}remote deployment derives isolated named bindings and preserves managed source`, async (context) => {
+  const subject = await fixture(context, applicationEnvironments);
   const original = await readFile(path.join(subject.web, "wrangler.jsonc"));
   const result = run(subject, "remote-deploy", { SOURCE_REVIEW_REFERENCE: "", RECOVERY_POINT_REFERENCE: "" });
   assert.equal(result.status, 0, result.stderr);
@@ -107,7 +165,10 @@ test("remote deployment derives isolated named bindings and preserves managed so
   assert.deepEqual(await readFile(path.join(subject.web, "wrangler.jsonc")), original);
   assert.doesNotMatch(result.stdout + result.stderr, /11111111|22222222/);
 });
+}
 
+
+for (const applicationEnvironments of [false, true]) {
 for (const [name, overrides, code] of [
   ["missing IDs", { STAGING_APPLICATION_DATABASE_ID: "" }, "APPLICATION_DATABASE_IDS_REQUIRED"],
   ["duplicate IDs", { PRODUCTION_APPLICATION_DATABASE_ID: stagingId }, "APPLICATION_DATABASE_IDS_NOT_ISOLATED"],
@@ -118,15 +179,17 @@ for (const [name, overrides, code] of [
   ["non-main ref", { GITHUB_REF: "refs/heads/feature" }, "APPLICATION_DATABASE_REVISION_MISMATCH"],
   ["changed migration set", { MIGRATION_SET_SHA256: "a".repeat(64) }, "APPLICATION_DATABASE_MIGRATIONS_CHANGED"],
 ]) {
-  test(`remote preflight refuses ${name} before writing derived configuration`, async (context) => {
-    const subject = await fixture(context);
-    refusal(run(subject, "remote-deploy", overrides), code);
+  test(`${applicationEnvironments ? "environment persistence " : ""}remote preflight refuses ${name} before writing derived configuration`, async (context) => {
+    const subject = await fixture(context, applicationEnvironments);
+    refusal(run(subject, "remote-deploy", overrides), applicationEnvironments && name === "unknown environment" ? "APPLICATION_DATABASE_APPLICATION_TARGET_MISMATCH" : code);
     await assert.rejects(readFile(path.join(subject.web, ".wrangler/application-database/wrangler.remote.json")), { code: "ENOENT" });
   });
 }
+}
 
-test("remote migration requires SQL and explicit review and recovery references", async (context) => {
-  const subject = await fixture(context);
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment persistence " : ""}remote migration requires SQL and explicit review and recovery references`, async (context) => {
+  const subject = await fixture(context, applicationEnvironments);
   refusal(run(subject, "remote-migrate"), "APPLICATION_DATABASE_NO_MIGRATIONS");
   await mkdir(path.join(subject.web, "migrations"));
   await writeFile(path.join(subject.web, "migrations/0000_example.sql"), "SELECT 1;\n");
@@ -136,25 +199,35 @@ test("remote migration requires SQL and explicit review and recovery references"
   const result = run(subject, "remote-migrate", { MIGRATION_SET_SHA256: exampleHash });
   assert.equal(result.status, 0, result.stderr);
 });
+}
 
-test("remote operation refuses checkout bytes changed after source review", async (context) => {
-  const subject = await fixture(context);
+
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment persistence " : ""}remote operation refuses checkout bytes changed after source review`, async (context) => {
+  const subject = await fixture(context, applicationEnvironments);
   const source = path.join(subject.web, "wrangler.jsonc");
   await writeFile(source, (await readFile(source, "utf8")).replace("example-app-staging", "other-app-staging"));
   refusal(run(subject, "remote-deploy"), "APPLICATION_DATABASE_SOURCE_CHANGED");
 });
+}
 
-test("remote operation verifies actual checkout even when supplied revision claims agree", async (context) => {
-  const subject = await fixture(context);
+
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment persistence " : ""}remote operation verifies actual checkout even when supplied revision claims agree`, async (context) => {
+  const subject = await fixture(context, applicationEnvironments);
   refusal(run(subject, "remote-deploy", { EXPECTED_REVISION: "a".repeat(40), GITHUB_SHA: "a".repeat(40) }), "APPLICATION_DATABASE_REVISION_MISMATCH");
 });
+}
 
-for (const [workflowPath, mode, environment, operation] of [
+
+for (const [workflowPath, mode, environment, operation, applicationEnvironments = false] of [
   ["deployment-cloudflare/application-persistence/.github/workflows/deploy.yml.template", "remote-deploy", "production", "opennextjs-cloudflare"],
   ["application-persistence/.github/workflows/migrate-application-database.yml.template", "remote-migrate", "staging", "wrangler"],
+  ["deployment-cloudflare/application-persistence/application-environments/.github/workflows/deploy.yml.template", "remote-deploy", "production", "opennextjs-cloudflare", true],
+  ["application-persistence/application-environments/.github/workflows/migrate-application-database.yml.template", "remote-migrate", "staging", "wrangler", true],
 ]) {
-  test(`${mode} workflow refuses invalid target before reaching its provider command`, async (context) => {
-    const subject = await fixture(context);
+  test(`${applicationEnvironments ? "environment persistence " : ""}${mode} workflow refuses invalid target before reaching its provider command`, async (context) => {
+    const subject = await fixture(context, applicationEnvironments);
     const workflow = parse((await readFile(new URL(workflowPath, templateRoot), "utf8")).replaceAll(/{{[A-Za-z0-9]+}}/g, "expression"));
     assert.deepEqual(workflow.permissions, { contents: "read" });
     assert.equal(workflow.concurrency["cancel-in-progress"], false);
@@ -175,6 +248,7 @@ for (const [workflowPath, mode, environment, operation] of [
     const env = {
       PATH: `${tools}:${path.dirname(process.execPath)}:${process.env.PATH}`,
       ...subject.environment,
+      ...(applicationEnvironments ? { APPLICATION_ENVIRONMENT: job.env.APPLICATION_ENVIRONMENT === "expression" ? environment : job.env.APPLICATION_ENVIRONMENT } : {}),
       APPLICATION_DATABASE_ENVIRONMENT: environment,
       EXPECTED_DATABASE_ID: environment === "production" ? productionId : stagingId,
       MIGRATION_SET_SHA256: exampleHash,
@@ -195,11 +269,39 @@ for (const [workflowPath, mode, environment, operation] of [
     assert.equal(args[args.indexOf("--config") + 1], ".wrangler/application-database/wrangler.remote.json");
     assert(args.includes("--x-provision=false"));
     assert(args.includes("--x-auto-create=false"));
+    if (mode === "remote-migrate") assert(args.includes("--remote"));
   });
 }
 
-test("local and remote checks reject redirected migration input and output paths", async (context) => {
-  const subject = await fixture(context);
+test("environment persistence migration rehearsal overrides inherited remote targets and executes only local SQL", async context => {
+  const subject = await fixture(context, true);
+  const core = await import("../dist/index.js");
+  const rendered = await core.renderSkeleton({ profile: "app", projectName: "example", displayName: "Example", applicationPersistence: true, packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext(true));
+  assert.equal(rendered.ok, true, JSON.stringify(rendered));
+  const files = new Map(rendered.value.files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
+  const workflow = parse(files.get(".github/workflows/migrate-application-database.yml"));
+  const job = Object.values(workflow.jobs)[0];
+  const localStep = job.steps.find(step => step.run === "pnpm --dir apps/web run db:migrate:local");
+  assert.ok(localStep);
+  const tools = await realpath(await mkdtemp(path.join(tmpdir(), "persistence-local-command-")));
+  context.after(() => rm(tools, { recursive: true, force: true }));
+  const sentinel = path.join(tools, "called.json");
+  await writeFile(path.join(tools, "pnpm"), `#!${process.execPath}\nrequire("node:child_process").execFileSync("bash", ["-euo", "pipefail", "-c", process.env.LOCAL_DATABASE_COMMAND], { cwd: process.env.LOCAL_WEB_ROOT, stdio: "inherit" });\n`);
+  await writeFile(path.join(tools, "wrangler"), `#!${process.execPath}\nrequire("node:fs").writeFileSync(process.env.PROVIDER_SENTINEL, JSON.stringify(process.argv.slice(2)));\n`);
+  for (const name of ["pnpm", "wrangler"]) await chmod(path.join(tools, name), 0o700);
+  const result = spawnSync("bash", ["--noprofile", "--norc", "-euo", "pipefail", "-c", localStep.run], { cwd: subject.root, encoding: "utf8", env: {
+    PATH: `${tools}:${path.dirname(process.execPath)}:${process.env.PATH}`,
+    APPLICATION_ENVIRONMENT: "staging", APPLICATION_DATABASE_ENVIRONMENT: "staging", ...localStep.env,
+    LOCAL_WEB_ROOT: subject.web, LOCAL_DATABASE_COMMAND: JSON.parse(files.get("apps/web/package.json")).scripts["db:migrate:local"], PROVIDER_SENTINEL: sentinel,
+  } });
+  assert.equal(result.status, 0, result.stderr);
+  const arguments_ = JSON.parse(await readFile(sentinel, "utf8"));
+  assert.deepEqual(arguments_, ["d1", "migrations", "apply", "APP_DB", "--local", "--config", "wrangler.jsonc", "--x-provision=false", "--x-auto-create=false"]);
+});
+
+for (const applicationEnvironments of [false, true]) {
+test(`${applicationEnvironments ? "environment persistence " : ""}local and remote checks reject redirected migration input and output paths`, async (context) => {
+  const subject = await fixture(context, applicationEnvironments);
   const outside = path.join(subject.root, "outside");
   await mkdir(outside);
   await symlink(outside, path.join(subject.web, "migrations"));
@@ -209,3 +311,4 @@ test("local and remote checks reject redirected migration input and output paths
   await symlink(outside, path.join(subject.web, ".wrangler/application-database"));
   refusal(run(subject, "remote-deploy"), "APPLICATION_DATABASE_FILES_INVALID");
 });
+}
