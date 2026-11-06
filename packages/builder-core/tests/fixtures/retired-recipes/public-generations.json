@@ -1,0 +1,3453 @@
+{
+  "retiredPublicRecipes": [
+    {
+      "schema": "1.0.0",
+      "profile": "portfolio",
+      "recipeVersion": "0.9.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "portfolio",
+      "recipeVersion": "0.10.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "portfolio",
+      "recipeVersion": "0.11.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "portfolio",
+      "recipeVersion": "0.11.2"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "portfolio",
+      "recipeVersion": "0.11.4"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.9.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.10.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.11.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.12.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.12.2"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.12.3"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "site",
+      "recipeVersion": "0.12.4"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "app",
+      "recipeVersion": "0.1.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "app",
+      "recipeVersion": "0.2.0"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "app",
+      "recipeVersion": "0.2.2"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "app",
+      "recipeVersion": "0.2.3"
+    },
+    {
+      "schema": "1.0.0",
+      "profile": "app",
+      "recipeVersion": "0.2.4"
+    }
+  ],
+  "frozenFixtures": [
+    {
+      "sourceFixture": "fixtures/generated/app",
+      "projectSha256": "1d315ddd558d181392acae0a3203bfad07365a0aea9fb1561a65724919e3dc7e",
+      "stateSha256": "3bdf6f9c7ba384b8b5e5e0711be3b8b1c894e36fe3b2bb5f99a8c9f8c31e4e2a",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-0.2.2",
+      "projectSha256": "1439494051c3d8c4431a831143a47bedf39c1117dcf1b56a75209dbcdeaa4ec9",
+      "stateSha256": "4506a4e1bc7e1a9e91700763694b6a8fddb523746fa1e93e1ee7781674a00687",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-0.2.3",
+      "projectSha256": "a711ff9dc9846a1b4a1709214f9940302b0870f4361bc0172f176246065ff764",
+      "stateSha256": "21d14bfdabea0e00033ee445b7202780689e2172fd359751fb0f0048fc3373dd",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-0.2.4",
+      "projectSha256": "8fc87f02ff094515f7d9b6c8f405439f782730fc07a49305ed1fd9f00f74031a",
+      "stateSha256": "6c12f0fa29b7c4d765daa2ef771f065dcbc8e4f0f9d67b9df62ead9a2e22bda2",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-all-optional-integrations",
+      "projectSha256": "ce9ef897d492a4faf75533c66b7f680439419063684d4b3fd35befdfd7aa928f",
+      "stateSha256": "ac514d2b0ead62ff7433e90823a724291009c5e9b4a72b266d41655566abc809",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-all-optional-integrations-0.2.2",
+      "projectSha256": "fa7d8db921d84d84b85e383ad181bbfed5e8d9a52a8bde292725137335f9e89f",
+      "stateSha256": "2ebe1d5dccdcafc789d4e629f77a87f5d42d617dd3047b30f2552a40e8debb6b",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-all-optional-integrations-0.2.3",
+      "projectSha256": "02c87e54678c736215f75bec3bed4b338012df25083cb2e1b27ece36fc66ed1d",
+      "stateSha256": "d5773c3a6d91af9a0a58fba4f333695988d41a43fbefafeee918acdb3af3fa8a",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-all-optional-integrations-0.2.4",
+      "projectSha256": "d1b0e50daa15a55ac612f858264cb95e187d1b6790676a50f13a0e23d5d3b2a1",
+      "stateSha256": "60848536a11d00f69472b83dd388da24248f988191924b42da127479f1decaa2",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence",
+      "projectSha256": "3683cb04b4130340bc8b9cd0cc5d19967ca3cef7fe6fc2892b605c828f6d0c6f",
+      "stateSha256": "202c670ec38ec4f751b1b425626b0a458a8141b1d83c6b1587942502de6852d5",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-0.2.2",
+      "projectSha256": "184e8f1e5fbc444c8e7995d40f9c778c4241cc96ff807b6f3e4091be2523e7c1",
+      "stateSha256": "218d07ec0961d66af33c43684b3812b4fe1c40cacad7b4938fffc0af55ca1a94",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-0.2.3",
+      "projectSha256": "9f1737ee8611d9941a80c6dfede77344b54b8f854a222034ef01b0c6a16f03cc",
+      "stateSha256": "27ecf35c042762fa9937b23af35b0b7b28a962e143737de88b57c03a435bf3c3",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-0.2.4",
+      "projectSha256": "79860782927b2a489f4cdb8e6430282c88a1d55e0d03961b1f0e7cb6cb42607b",
+      "stateSha256": "1cbd0e7da79ac5b39d5e30c351eb55233fee62cd009ece8334aac11b4f84764c",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-email",
+      "projectSha256": "efa59c4246c418a52793aca94cb8f16d6214315189fe283c54488f0d50c02610",
+      "stateSha256": "dc53ffdd65559fc49352a133e1be56159cd39a15216241d3b445d169aa8926e8",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-email-0.2.2",
+      "projectSha256": "70fdef5907caba0c55aee08fa7a47c4fe3b89ca0b8780b8281b523d17342e760",
+      "stateSha256": "16e28d44426c8f60ecd67b97c206a0c75ff91fbc6c8137e05d11982cc02b7acf",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-email-0.2.3",
+      "projectSha256": "a0185edb88614baceb4a39c5db455c83ec386b7976cfd83d30f7dac561197909",
+      "stateSha256": "5091117d7ca845953b0b60181a936f38be37ec835d6269d09e2c92467415829e",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/app-persistence-email-0.2.4",
+      "projectSha256": "ca4e00319cc650b806d8d105622cffaf4fa8e85baff3910d18c9b34accab1b76",
+      "stateSha256": "6a1e053b3823d91fd570c4ebb74355e2b28e5c615a1daec135ed6250352eb491",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "app",
+        "recipeVersion": "0.2.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.6.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "application-persistence",
+          "removalPolicy": "export-and-remove",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio",
+      "projectSha256": "b441de3976bb5590f11bd4602235adaeb3d2608b1dd3465be2c7d9a0f9d7ef90",
+      "stateSha256": "02b36f418f70e7bacd4266a6d5660477dc2ef3961c493dcd88dfef0c92b521df",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-0.11.2",
+      "projectSha256": "788a3ca75a33e087e986cdf2a12c4e34b853c3ddf6d7d35ba80237b1e4a3bb6d",
+      "stateSha256": "9928acfdc714942554a99aa984d3d8df205108ab76c78923a0ad130af1b520ba",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-0.11.4",
+      "projectSha256": "767aa0b992e7624af7d7438a4555979174f1717410c3431ba0ca19fe47fff42b",
+      "stateSha256": "3f3aea27fdbb7a4ad804b8460fc48931288e35a78663ed565c8e49841962737a",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-calendly",
+      "projectSha256": "6ed0092e45b0f31abecdb92ba57eb6af11174160c5d2613d0edf45d41e5d11e4",
+      "stateSha256": "4122bfd7f7d25a5718d04efaf6a928180e5bd5ce4f520402c5b0c53b73a92f77",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-calendly-0.11.2",
+      "projectSha256": "4f7b066a37eccb4e99ab4e5f98a3e750de2876932818da9d4227052c9f42230d",
+      "stateSha256": "a1eef219e89a09e41f1f34081d86716bf8ce1e0836e626d3e5fa1553b29e679e",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-calendly-0.11.4",
+      "projectSha256": "f4f8bc0d9f8c75106cbddc09707d32542acb7d8ca3f65e5c8abb392e6351a165",
+      "stateSha256": "40d25f7f63aaf0d7f651b5801950c79da9e4ec9597b8789dd46ac480291773e2",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "booking-calendly",
+          "removalPolicy": "automatic",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-email",
+      "projectSha256": "e98f8144924e829fc524230bed7fa0475e593fd9d7ceb7cdd919f88c3e9f66a4",
+      "stateSha256": "758661e0cb96d6872c2a11c621ada3e58e1bbff4e6cd5f838a30917c856bcbb2",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-email-0.11.2",
+      "projectSha256": "c2f4e3dc89392675bbc3923735a238c56f3e584528e5af52cb4113f74b5afbec",
+      "stateSha256": "ca9b733035214097ec5ff443b03a6206bd99bcef9d6fcfd25a0c954fba76215f",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/portfolio-email-0.11.4",
+      "projectSha256": "d1d5508147daf16ff90804005abbf4d392496b202abbe6b02edcbb6af6792c16",
+      "stateSha256": "a56dac52702c13ac51cbd70bb06daf3ba095df3bd9f675cd801aa82b9e847161",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "portfolio",
+        "recipeVersion": "0.11.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "app-foundation",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.2.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "transactional-email-resend",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site",
+      "projectSha256": "686b81b133683a1c3a8342b0f6d454d4f7c0498ec7053879298fb3e790488f32",
+      "stateSha256": "1f9e46f63c27570dd4b0cdaf9b7a2b4e6343c41f69f3d578f25511893e020992",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-0.12.2",
+      "projectSha256": "199d510fa014a37b71e0bf2c0a77e0f7613c9d4d662dc55f5ff81ff5befd66ab",
+      "stateSha256": "2c4ced869c00cd8412112816361036316481c91852b3cbc53a54b96610ba20de",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-0.12.3",
+      "projectSha256": "ae9be83b0fa152185b69a9f0e6ccc41ae99accf8fe8532e0c589d7bd302da711",
+      "stateSha256": "2e48538ad127d72686703944cde3f436953faf098f3c826060fe6fd7e8d4c0d7",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-0.12.4",
+      "projectSha256": "8b31884f9afd5b0f77cf63f8c07526995e91c4f2e0e0e6abd6fda197f7e81c19",
+      "stateSha256": "2a1d0afa2ba531e6046fd78291cc5c4b4fca10c22d281effd1cabbaa1fc1cefd",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-contact-form",
+      "projectSha256": "c312bdabf7fbf663d1627486cdc2fa5e85a11660388b7e5418876b0d810a0e74",
+      "stateSha256": "dcf888e7d16588908cc4288719df036f3ccf8e445f917219fd7273ef551e2021",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "contact-form-web3forms",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-contact-form-0.12.2",
+      "projectSha256": "99855a3077e890c83f98cadebac2e70b9da18b159872cd80a9fed793f104410e",
+      "stateSha256": "0d9f357ce1ab33c0ff5191f199a7ad8eb0f89dd109d263d0d97bdff55279460a",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "contact-form-web3forms",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-contact-form-0.12.3",
+      "projectSha256": "5b0dea7ea7f02d549df6ad8022b797649ec8e3c0dc1efdda4f1ebfa935effcd1",
+      "stateSha256": "15eccd0a782805fad30257b237d38e91f99f430e019d0c34f99d12d676ddf7f5",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "contact-form-web3forms",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-contact-form-0.12.4",
+      "projectSha256": "c9cd0abe150b8070790b753fc922318cc9873eb5a42d28202c646aba07889f72",
+      "stateSha256": "bd363a56a9d972c4f274fd8e16be8feb495fc4f6736cfb01c6d38b4c32c3dcfd",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "contact-form-web3forms",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful",
+            "persistent-data"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual",
+      "projectSha256": "432d388149707759365602b1cc99c2f32235575254a04f3eb6a7c6d7399f85a1",
+      "stateSha256": "6e51499cac8f45e16e00f7cc57976c2d685a53b262acb678593f7b2c63da8220",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-0.12.2",
+      "projectSha256": "e2cbbdda13abcff59ce002df9df1c54866e084cd78463c0a3141485f303708f9",
+      "stateSha256": "26845d2ca009c6a3b3665052f379bd40796021ce5d6603e031bdc2e538ce4488",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-0.12.3",
+      "projectSha256": "6b49910e3ae8f8437ca2e8e9c4dab88cce4df2609ede3aa2af9517d210ba1a88",
+      "stateSha256": "f9e86ea712bed892a57af0eea07e17cffda45eb797a847ed30b7f8d9ab4f7d02",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-0.12.4",
+      "projectSha256": "c996d12c5703554f195e4adb6a16cd2614dd1bdf8a1bc9efc28b671ca959cbbb",
+      "stateSha256": "82ca550f39bdf99a2cf293639014e26e48b406fae068c3113eb6c528f2196e70",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-analytics",
+      "projectSha256": "c5fd328a70560fd4539d9009dd4a46dffe71cc4aed914d585a0248cc36768601",
+      "stateSha256": "832c3fe5b6a4737499196fbeb13bb231475b59f2ccb26fef717686b87ce6cda1",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.0"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-analytics-0.12.2",
+      "projectSha256": "99849e260ee929fc4c30b5b145439b7ea1c91b71e4652c8206cf412b877d5394",
+      "stateSha256": "03fcb408e9379268f026a8921ddb3e16be006311ef9eb7a81a19f695b3897173",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.2"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-analytics-0.12.3",
+      "projectSha256": "dc1d2ae77d25e8be77b585d949d8228c1bde477baaeccbb577cc40f980e45709",
+      "stateSha256": "87935246ea88ecb67751c7c427954aaede7943be1b328747b6c45029992d86bf",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.3"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    },
+    {
+      "sourceFixture": "fixtures/generated/site-multilingual-analytics-0.12.4",
+      "projectSha256": "a758d5a02d42dd82f0fdb0395a6d5318f4d7beb8d842d87c0b5dd5850d5fd7fd",
+      "stateSha256": "882bcab94e8dc06c56e5b892bec25f07f9c66838966b55d8a5b0aace7afb0163",
+      "schemaVersion": "1.0.0",
+      "origin": {
+        "profile": "site",
+        "recipeVersion": "0.12.4"
+      },
+      "installedCapabilities": [
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "standards",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.5.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "content-files",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "section-composition",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "deployment-cloudflare",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "observability",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.3.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "site-routing",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.4.0"
+        },
+        {
+          "deliveryMode": "hybrid",
+          "identifier": "analytics",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful",
+            "external-stateful"
+          ],
+          "version": "0.1.0"
+        },
+        {
+          "deliveryMode": "source-generated",
+          "identifier": "multilingual",
+          "removalPolicy": "reviewed",
+          "stateClassifications": [
+            "repository-stateful"
+          ],
+          "version": "0.1.0"
+        }
+      ]
+    }
+  ],
+  "retiredWorkspacePolicies": [
+    {
+      "sourceFiles": [
+        "fixtures/generated/portfolio/pnpm-workspace.yaml",
+        "fixtures/generated/portfolio-calendly/pnpm-workspace.yaml",
+        "fixtures/generated/site/pnpm-workspace.yaml",
+        "fixtures/generated/site-contact-form/pnpm-workspace.yaml",
+        "fixtures/generated/site-multilingual/pnpm-workspace.yaml",
+        "fixtures/generated/site-multilingual-analytics/pnpm-workspace.yaml"
+      ],
+      "sha256": "e275962d66858bac11abb379d17774c3cb4719a71aee683565fa7a07b4096ea7",
+      "workspaceYaml": "packages:\n  - \"apps/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\nminimumReleaseAgeExclude:\n  - \"@egeria-systems/observability@0.3.0\"\n  - \"fast-uri@3.1.6\"\n  - \"qs@6.16.0\"\n  - \"js-yaml@4.3.2\"\n  - \"sharp@0.35.4\"\n  - \"@img/sharp-darwin-arm64@0.35.4\"\n  - \"@img/sharp-darwin-x64@0.35.4\"\n  - \"@img/sharp-freebsd-wasm32@0.35.4\"\n  - \"@img/sharp-libvips-darwin-arm64@1.3.3\"\n  - \"@img/sharp-libvips-darwin-x64@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linux-ppc64@1.3.3\"\n  - \"@img/sharp-libvips-linux-riscv64@1.3.3\"\n  - \"@img/sharp-libvips-linux-s390x@1.3.3\"\n  - \"@img/sharp-libvips-linux-x64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-x64@1.3.3\"\n  - \"@img/sharp-linux-arm@0.35.4\"\n  - \"@img/sharp-linux-arm64@0.35.4\"\n  - \"@img/sharp-linux-ppc64@0.35.4\"\n  - \"@img/sharp-linux-riscv64@0.35.4\"\n  - \"@img/sharp-linux-s390x@0.35.4\"\n  - \"@img/sharp-linux-x64@0.35.4\"\n  - \"@img/sharp-linuxmusl-arm64@0.35.4\"\n  - \"@img/sharp-linuxmusl-x64@0.35.4\"\n  - \"@img/sharp-wasm32@0.35.4\"\n  - \"@img/sharp-webcontainers-wasm32@0.35.4\"\n  - \"@img/sharp-win32-arm64@0.35.4\"\n  - \"@img/sharp-win32-ia32@0.35.4\"\n  - \"@img/sharp-win32-x64@0.35.4\"\n\nresolutionMode: time-based\n\noverrides:\n  \"fast-uri@\": 3.1.6\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.0\n  \"next@16.3.0\": 16.3.3\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.4\": 0.35.4\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n"
+    },
+    {
+      "sourceFiles": [
+        "fixtures/generated/portfolio-email/pnpm-workspace.yaml",
+        "fixtures/generated/app/pnpm-workspace.yaml",
+        "fixtures/generated/app-all-optional-integrations/pnpm-workspace.yaml"
+      ],
+      "sha256": "a2929e9a4745c82ab64ea3758645dc72f1b2af5a2f9639a8ee64e2c89e826867",
+      "workspaceYaml": "packages:\n  - \"apps/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\nminimumReleaseAgeExclude:\n  - \"@egeria-systems/observability@0.3.0\"\n  - \"fast-uri@3.1.6\"\n  - \"qs@6.16.0\"\n  - \"js-yaml@4.3.2\"\n  - \"sharp@0.35.4\"\n  - \"@img/sharp-darwin-arm64@0.35.4\"\n  - \"@img/sharp-darwin-x64@0.35.4\"\n  - \"@img/sharp-freebsd-wasm32@0.35.4\"\n  - \"@img/sharp-libvips-darwin-arm64@1.3.3\"\n  - \"@img/sharp-libvips-darwin-x64@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linux-ppc64@1.3.3\"\n  - \"@img/sharp-libvips-linux-riscv64@1.3.3\"\n  - \"@img/sharp-libvips-linux-s390x@1.3.3\"\n  - \"@img/sharp-libvips-linux-x64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-x64@1.3.3\"\n  - \"@img/sharp-linux-arm@0.35.4\"\n  - \"@img/sharp-linux-arm64@0.35.4\"\n  - \"@img/sharp-linux-ppc64@0.35.4\"\n  - \"@img/sharp-linux-riscv64@0.35.4\"\n  - \"@img/sharp-linux-s390x@0.35.4\"\n  - \"@img/sharp-linux-x64@0.35.4\"\n  - \"@img/sharp-linuxmusl-arm64@0.35.4\"\n  - \"@img/sharp-linuxmusl-x64@0.35.4\"\n  - \"@img/sharp-wasm32@0.35.4\"\n  - \"@img/sharp-webcontainers-wasm32@0.35.4\"\n  - \"@img/sharp-win32-arm64@0.35.4\"\n  - \"@img/sharp-win32-ia32@0.35.4\"\n  - \"@img/sharp-win32-x64@0.35.4\"\n\nresolutionMode: time-based\n\noverrides:\n  \"fast-uri@\": 3.1.6\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.0\n  \"next@16.3.0\": 16.3.3\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.4\": 0.35.4\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n  msgpackr-extract: false\n"
+    },
+    {
+      "sourceFiles": [
+        "fixtures/generated/app-persistence/pnpm-workspace.yaml",
+        "fixtures/generated/app-persistence-email/pnpm-workspace.yaml"
+      ],
+      "sha256": "92b0ebd3f271bb41aa36cc3ee8e7b21963d2107ec9abf78c332e0fb5da496dbf",
+      "workspaceYaml": "packages:\n  - \"apps/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\nminimumReleaseAgeExclude:\n  - \"@egeria-systems/observability@0.3.0\"\n  - \"fast-uri@3.1.6\"\n  - \"qs@6.16.0\"\n  - \"js-yaml@4.3.2\"\n  - \"sharp@0.35.4\"\n  - \"@img/sharp-darwin-arm64@0.35.4\"\n  - \"@img/sharp-darwin-x64@0.35.4\"\n  - \"@img/sharp-freebsd-wasm32@0.35.4\"\n  - \"@img/sharp-libvips-darwin-arm64@1.3.3\"\n  - \"@img/sharp-libvips-darwin-x64@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm@1.3.3\"\n  - \"@img/sharp-libvips-linux-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linux-ppc64@1.3.3\"\n  - \"@img/sharp-libvips-linux-riscv64@1.3.3\"\n  - \"@img/sharp-libvips-linux-s390x@1.3.3\"\n  - \"@img/sharp-libvips-linux-x64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-arm64@1.3.3\"\n  - \"@img/sharp-libvips-linuxmusl-x64@1.3.3\"\n  - \"@img/sharp-linux-arm@0.35.4\"\n  - \"@img/sharp-linux-arm64@0.35.4\"\n  - \"@img/sharp-linux-ppc64@0.35.4\"\n  - \"@img/sharp-linux-riscv64@0.35.4\"\n  - \"@img/sharp-linux-s390x@0.35.4\"\n  - \"@img/sharp-linux-x64@0.35.4\"\n  - \"@img/sharp-linuxmusl-arm64@0.35.4\"\n  - \"@img/sharp-linuxmusl-x64@0.35.4\"\n  - \"@img/sharp-wasm32@0.35.4\"\n  - \"@img/sharp-webcontainers-wasm32@0.35.4\"\n  - \"@img/sharp-win32-arm64@0.35.4\"\n  - \"@img/sharp-win32-ia32@0.35.4\"\n  - \"@img/sharp-win32-x64@0.35.4\"\n\nresolutionMode: time-based\n\noverrides:\n  \"fast-uri@\": 3.1.6\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.29.0\n  \"next@16.3.0\": 16.3.3\n  \"qs@\": 6.16.0\n  \"sharp@>=0.35.0 <0.35.4\": 0.35.4\n  \"@esbuild-kit/core-utils>esbuild\": 0.25.4\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n  msgpackr-extract: false\n"
+    }
+  ]
+}

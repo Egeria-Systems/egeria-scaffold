@@ -150,7 +150,7 @@ function configurationFor(revision) {
   if (!catalog.ok || !fixture) throw createError("CERTIFICATION_SUBJECT_INVALID");
   const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: [] }, catalog.value, profileRecipes);
   const descriptor = catalog.value.find(({ identifier }) => identifier === "observability");
-  if (!resolved.ok || resolved.value.recipeVersion !== "0.2.0" || !descriptor ||
+  if (!resolved.ok || resolved.value.recipeVersion !== "0.2.7" || !descriptor ||
       !isDeepStrictEqual(createCertificationSubject(descriptor, ["cleanup-recovery", "deployed-application", "fresh-scaffold"]), subject)) {
     throw createError("CERTIFICATION_SUBJECT_INVALID");
   }
@@ -168,13 +168,13 @@ function configurationFor(revision) {
     expectedCapabilitySettings: fixture.expectedCapabilitySettings,
     capabilityIdentifier: "observability",
     capabilityVersion: "0.3.0",
-    expectedRecipeVersion: "0.2.0",
+    expectedRecipeVersion: "0.2.7",
     verifierIdentifier: "app",
     expectedVerificationChecks,
     expectedFixtureChecks,
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.2.7",
       evidenceRevision: revision,
       cleanup: "identity-checked",
     }),
@@ -190,12 +190,12 @@ export function validateObservabilityDeploymentCandidate(input) {
     const project = parseProjectYaml(input.projectSource);
     const state = input.infer?.result?.state;
     const capabilities = input.infer?.result?.capabilities;
-    if (!project.ok || project.value.originProfile !== "app" || project.value.recipeVersion !== "0.2.0" ||
+    if (!project.ok || project.value.originProfile !== "app" || project.value.recipeVersion !== "0.2.7" ||
         project.value.project.name !== configuration.projectName || project.value.project.displayName !== configuration.displayName ||
         !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
         !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings) ||
         input.infer?.ok !== true || input.infer.command !== "infer" || state?.kind !== "valid" ||
-        !isDeepStrictEqual(state.value?.origin, { profile: "app", recipeVersion: "0.2.0" }) ||
+        !isDeepStrictEqual(state.value?.origin, { profile: "app", recipeVersion: "0.2.7" }) ||
         !isDeepStrictEqual(state.value?.installedCapabilities, configuration.expectedInstalledCapabilities) ||
         !Array.isArray(capabilities) || !isDeepStrictEqual(capabilities.map(({ identifier }) => identifier).sort(), [...configuration.expectedCapabilities].sort()) ||
         capabilities.some(({ category }) => category !== "confirmed") ||
@@ -209,7 +209,7 @@ export function validateObservabilityDeploymentCandidate(input) {
     }
     return {
       ok: true, capability: "observability", version: "0.3.0", subject,
-      profile: "app", recipeVersion: "0.2.0", revision: input.revision,
+      profile: "app", recipeVersion: "0.2.7", revision: input.revision,
       checks: ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff", "complete-installed-manifest", "current-app-subject"],
     };
   } catch (error) {

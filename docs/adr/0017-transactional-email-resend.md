@@ -6,6 +6,8 @@
 
 [ADR-0020](0020-application-environments.md#generation-and-precise-supersessions) adds environment-bound configuration and exact nonproduction recipient restrictions and permits only necessary unused shared-snapshot retirement at complete generation activation. Preserve independent selection, profile identity, foundation composition and the attempt, timeout, idempotency and uncertain-outcome semantics below.
 
+Current public recipe and retained-snapshot applicability follows [ADR-0020](0020-application-environments.md#early-retirement-of-unused-public-generations) and [ADR-0015](0015-vitest-five-generation.md#patched-public-generation). Earlier version tuples below describe their original decision. The early retirement changes unused executable support only; removal, data, provider and outcome safeguards remain unchanged.
+
 ## Context
 
 Transactional email needs a provider-neutral application boundary and explicit provider semantics without introducing a business workflow. The user approved current-profile support, native HTTP transport, the sender and reliability contract, and privacy/removal behavior on 2026-09-22.
@@ -23,6 +25,8 @@ The Resend adapter uses native fetch against the fixed HTTPS sending endpoint, r
 Composition reads runtime configuration and validates credential shape and sender/domain consistency locally. It does not verify DNS or provision credentials. Operators separately verify the sending domain and provide a sending-only domain-restricted key. Builds and tests use no real credentials. Events contain only bounded outcome and stable error codes; addresses, content, credentials, idempotency keys, message references and raw responses are excluded. Event reporting failures cannot change the send outcome.
 
 Reviewed removal binds source ownership, preservation/ejection decisions, surviving references, exact plan inputs and provider/credential/retention dispositions. It changes source only. Existing isolated guarded writes, verification, re-inference, migration append and state-last persistence remain mandatory. Provider accounts, keys, DNS, retained messages and source recovery remain separate operations.
+
+[ADR-0015's dependency security successors](0015-vitest-five-generation.md#dependency-security-successors) extend this same optional contract and lifecycle eligibility to the corresponding schema-1 patch recipes. Prior decisions, descriptor versions, capability settings, dependencies, removal rules and historical behavior remain unchanged; no migration or additional capability transition is introduced.
 
 ## Consequences
 

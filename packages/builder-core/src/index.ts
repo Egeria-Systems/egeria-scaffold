@@ -38,16 +38,12 @@ export type {
 export * from "./lifecycle/git-worktree-inspection.js";
 export * from "./lifecycle/apply-capability-addition.js";
 export * from "./lifecycle/apply-capability-removal.js";
-export * from "./lifecycle/apply-capability-upgrade.js";
 export * from "./lifecycle/apply-profile-transition.js";
 export * from "./lifecycle/capability-addition-writer.js";
 export * from "./lifecycle/capability-removal-writer.js";
-export * from "./lifecycle/capability-upgrade-writer.js";
 export * from "./lifecycle/profile-transition-writer.js";
 export * from "./lifecycle/plan-capability-addition.js";
 export * from "./lifecycle/plan-capability-removal.js";
-export * from "./lifecycle/plan-capability-upgrade.js";
-export * from "./lifecycle/supported-capability-upgrades.js";
 export * from "./lifecycle/plan-profile-transition.js";
 export * from "./lifecycle/supported-profile-transitions.js";
 export type {
@@ -64,6 +60,24 @@ export * from "./repository/repository-reader.js";
 export * from "./state/codecs.js";
 export * from "./contracts/persistence-removal-evidence.js";
 export * from "./lifecycle/review-persistence-removal-evidence.js";
+
+export {
+  applicationEnvironmentAnalyticsSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  applicationEnvironmentProjectConfigurationSchema,
+  type ApplicationEnvironmentAnalyticsSettings,
+  type ApplicationEnvironmentBookingSettings,
+  type ApplicationEnvironmentProjectConfiguration,
+} from "./contracts/project.js";
+
+export {
+  applicationEnvironmentInstalledStateSchema,
+  type ApplicationEnvironmentInstalledState,
+} from "./contracts/state.js";
+
+export { createApplicationEnvironmentRenderingContext } from "./catalog/verified-package-versions.js";
+export type { ApplicationEnvironmentProjectGenerationRequest } from "./generation/write-generated-project.js";
+export type { ApplicationEnvironmentGenerationRequest, ApplicationEnvironmentRenderingContext } from "./generation/render-skeleton.js";
 
 export * from "./contracts/job-removal-evidence.js";
 export * from "./lifecycle/review-job-removal-evidence.js";

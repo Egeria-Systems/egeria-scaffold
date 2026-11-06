@@ -82,6 +82,8 @@ jobs:
             "scripts/verify-generated-skeletons.mjs"
             "scripts/verify-app-transition-visuals.mjs"
             "scripts/lib/isolated-process.mjs"
+            "scripts/lib/dependency-audit.mjs"
+            "scripts/dependency-audit-exception.json"
             "tests/generated-fixtures/**"
           )
           compatibility_paths=(
@@ -143,7 +145,7 @@ jobs:
 
   builder-and-packages:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 180
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -154,7 +156,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -177,8 +179,10 @@ jobs:
       - name: Test builder core
         run: pnpm run test:builder-core
 
-      - name: Test CLI
-        run: pnpm run test:cli
+      - name: Test CLI excluding dedicated lifecycle jobs
+        env:
+          CLI_TEST_SKIP_PATTERN: (?:^compiled current jobs lifecycle on portfolio completes production verification$)|(?:^compiled current jobs lifecycle on app-persistence-email completes production verification$)|(?:^compiled current app optional lifecycle completes production verification$)|(?:^compiled current email lifecycle on portfolio verifies and retains its foundation$)|(?:^compiled current email lifecycle on site verifies and retains its foundation$)|(?:^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$)|(?:^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$)
+        run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
 
       - name: Test public packages
         run: pnpm run test:packages
@@ -198,6 +202,88 @@ jobs:
       - name: Check release intent
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
 
+  cli-jobs:
+    name: CLI jobs (${{ matrix.fixture }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - fixture: portfolio
+            test-pattern: ^compiled current jobs lifecycle on portfolio completes production verification$
+          - fixture: app-persistence-email
+            test-pattern: ^compiled current jobs lifecycle on app-persistence-email completes production verification$
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.28.1
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
+      - name: Test CLI jobs lifecycle
+        env:
+          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
+
+  cli-lifecycle:
+    name: CLI lifecycle (${{ matrix.group }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - group: app-optionals
+            test-pattern: ^compiled current app optional lifecycle completes production verification$
+          - group: email-portfolio
+            test-pattern: ^compiled current email lifecycle on portfolio verifies and retains its foundation$
+          - group: email-site
+            test-pattern: ^compiled current email lifecycle on site verifies and retains its foundation$
+          - group: hosted-contact-portfolio
+            test-pattern: ^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$
+          - group: hosted-contact-app
+            test-pattern: ^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.28.1
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build builder and packages
+        run: pnpm run build:builder
+
+      - name: Test CLI lifecycle
+        env:
+          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
+
   generated-projects:
     needs: [scope]
     if: needs.scope.outputs.generated-projects == 'true'
@@ -215,7 +301,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -226,14 +312,18 @@ jobs:
       - name: Build production generator
         run: pnpm run build:builder
 
-      - name: Test generated fixture contracts and determinism
-        run: pnpm run test:generated-fixtures
-
-      - name: Verify fresh jobs runtime generation
-        run: pnpm run test:generated-jobs
-
       - name: Verify generated visual regressions
         run: pnpm run verify:generated-visuals
+
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
 
       - name: Upload generated visual failure artifacts
         if: failure()
@@ -244,6 +334,190 @@ jobs:
           if-no-files-found: ignore
           include-hidden-files: false
           retention-days: 7
+
+  generated-fixtures:
+    needs: [scope]
+    if: needs.scope.outputs.generated-projects == 'true'
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.28.1
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Record native Git prerequisite outcomes
+        id: git_prerequisite
+        continue-on-error: true
+        timeout-minutes: 2
+        run: |
+          node --input-type=module <<'NODE'
+          import * as filesystem from "node:fs";
+          import path from "node:path";
+          import { spawnSync } from "node:child_process";
+          
+          const maximumBytes = 1024 * 1024;
+          const recordingErrors = [];
+          const closedError = error => error ? {
+            code: typeof error.code === "string" ? error.code : null,
+            errno: typeof error.errno === "number" ? error.errno : null,
+            syscall: typeof error.syscall === "string" ? error.syscall : null,
+          } : null;
+          
+          try {
+            const runnerTemporaryDirectory = filesystem.realpathSync(process.env.RUNNER_TEMP);
+            const artifactDirectory = filesystem.mkdtempSync(path.join(runnerTemporaryDirectory, "git-prerequisite-"));
+            filesystem.chmodSync(artifactDirectory, 0o700);
+            filesystem.appendFileSync(process.env.GITHUB_OUTPUT, `directory=${artifactDirectory}\n`);
+            const save = (name, bytes) => {
+              try {
+                filesystem.writeFileSync(path.join(artifactDirectory, name), bytes, { flag: "wx", mode: 0o600 });
+                return true;
+              } catch (error) {
+                recordingErrors.push({ file: name, error: closedError(error) });
+                return false;
+              }
+            };
+            const json = value => `${JSON.stringify(value, null, 2)}\n`;
+            const checkoutRoot = filesystem.realpathSync(process.cwd());
+            const workspaceRoot = filesystem.realpathSync(process.env.GITHUB_WORKSPACE);
+            if (checkoutRoot !== workspaceRoot) throw Object.assign(new Error(), { code: "CHECKOUT_WORKSPACE_MISMATCH" });
+            const ownership = name => {
+              try {
+                const information = filesystem.lstatSync(name);
+                return { uid: information.uid, gid: information.gid,
+                  type: information.isSymbolicLink() ? "symlink" : information.isDirectory() ? "directory" : information.isFile() ? "file" : "other" };
+              } catch (error) {
+                return { error: closedError(error) };
+              }
+            };
+            const inheritedCount = Number(process.env.GIT_CONFIG_COUNT ?? "0");
+            const boundedCount = Number.isInteger(inheritedCount) && inheritedCount >= 0 && inheritedCount <= 32;
+            const exactRootEntries = [];
+            for (let index = 0; index < (boundedCount ? inheritedCount : 0); index += 1) {
+              if (process.env[`GIT_CONFIG_KEY_${index}`] === "safe.directory" &&
+                  process.env[`GIT_CONFIG_VALUE_${index}`] === checkoutRoot) {
+                exactRootEntries.push({ origin: `process-env:GIT_CONFIG_VALUE_${index}`, value: checkoutRoot });
+              }
+            }
+            save("context.json", json({ cwd: process.cwd(), checkoutRoot, workspaceRoot,
+              effectiveUid: process.geteuid(), effectiveGid: process.getegid(),
+              checkoutOwnership: ownership(checkoutRoot), gitOwnership: ownership(path.join(checkoutRoot, ".git")),
+              home: process.env.HOME ?? null,
+              runtime: { node: process.version, platform: process.platform, architecture: process.arch },
+              safeDirectoryObservation: { exactRootEntries, inheritedEntryInspectionComplete: boundedCount,
+                fileConfigurationRead: false, completeConfigurationInventory: false },
+            }));
+          
+            const environment = { ...process.env, GIT_OPTIONAL_LOCKS: "0" };
+            const listingArguments = ["ls-files", "--cached", "--others", "--exclude-standard", "-z"];
+            const outcomes = [];
+            for (const [name, arguments_] of [["inherited", listingArguments],
+              ["exact-root", ["-c", `safe.directory=${checkoutRoot}`, ...listingArguments]]]) {
+              const started = Date.now();
+              const result = spawnSync("git", arguments_, { cwd: checkoutRoot, env: environment,
+                encoding: null, shell: false, timeout: 30000, killSignal: "SIGKILL", maxBuffer: maximumBytes });
+              const stdout = result.stdout ?? Buffer.alloc(0);
+              const stderr = result.stderr ?? Buffer.alloc(0);
+              const stdoutPrefix = stdout.subarray(0, maximumBytes);
+              const stderrPrefix = stderr.subarray(0, maximumBytes - stdoutPrefix.length);
+              const stdoutSaved = save(`${name}.stdout`, stdoutPrefix);
+              const stderrSaved = save(`${name}.stderr`, stderrPrefix);
+              const outcome = { name, executable: "git", arguments: arguments_, cwd: checkoutRoot,
+                optionalLocks: "0", nativeExit: result.status, signal: result.signal,
+                processError: closedError(result.error), elapsedMilliseconds: Date.now() - started,
+                stdout: { capturedBytes: stdout.length, savedBytes: stdoutSaved ? stdoutPrefix.length : null, saved: stdoutSaved },
+                stderr: { capturedBytes: stderr.length, savedBytes: stderrSaved ? stderrPrefix.length : null, saved: stderrSaved },
+                captureComplete: stdoutSaved && stderrSaved && !result.error && !result.signal &&
+                  stdout.length + stderr.length <= maximumBytes,
+              };
+              const processMetadataSaved = save(`${name}.process.json`, json(outcome));
+              outcomes.push({ ...outcome, processMetadataSaved });
+            }
+            const summarySaved = save("summary.json", json({ observationsOnly: true,
+              timeoutMillisecondsPerChild: 30000, maximumBytesPerChild: maximumBytes, outcomes, recordingErrors }));
+            const incomplete = !summarySaved || recordingErrors.length > 0 ||
+              outcomes.some(outcome => !outcome.captureComplete || !outcome.processMetadataSaved || outcome.nativeExit !== 0);
+            console.log(JSON.stringify({ diagnosticRecording: incomplete ? "native-failure-or-incomplete" : "recorded",
+              outcomes: outcomes.map(({ name, nativeExit, signal, captureComplete }) => ({ name, nativeExit, signal, captureComplete })),
+              recordingErrorCount: recordingErrors.length }));
+            if (incomplete) process.exitCode = 1;
+          } catch (error) {
+            console.error(JSON.stringify({ diagnosticRecording: "failed", error: closedError(error) }));
+            process.exitCode = 1;
+          }
+          NODE
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build production generator
+        run: pnpm run build:builder
+
+      - name: Test generated fixture contracts and determinism
+        env:
+          GIT_CONFIG_COUNT: "1"
+          GIT_CONFIG_KEY_0: safe.directory
+          GIT_CONFIG_VALUE_0: ${{ github.workspace }}
+        run: pnpm run test:generated-fixtures
+
+      - name: Retain native Git prerequisite evidence
+        if: always() && steps.git_prerequisite.outputs.directory != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: generated-fixtures-git-prerequisite
+          path: |
+            ${{ steps.git_prerequisite.outputs.directory }}/context.json
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.stdout
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.stderr
+            ${{ steps.git_prerequisite.outputs.directory }}/inherited.process.json
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.stdout
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.stderr
+            ${{ steps.git_prerequisite.outputs.directory }}/exact-root.process.json
+            ${{ steps.git_prerequisite.outputs.directory }}/summary.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 7
+
+  generated-jobs:
+    needs: [scope]
+    if: needs.scope.outputs.generated-projects == 'true'
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
+      options: --shm-size=1g
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+
+      - name: Set up pnpm and Node.js
+        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
+        with:
+          version: 11.28.1
+          runtime: node@22.23.2
+          cache: false
+          install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify fresh jobs runtime generation
+        run: pnpm run test:generated-jobs
 
   app-transition-visuals:
     needs: [scope]
@@ -268,7 +542,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false
@@ -277,21 +551,39 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Generate draft app transition visual review candidates
+        id: visual_candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates
+        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7
 
       - name: Compare all app transition visual subsets
+        id: visual_comparison
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals
+        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7
+
+      - name: Retain raw dependency audits and security exception dispositions
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: app-transition-dependency-audits
+          path: generated-visual-artifacts/dependency-audit/
+          if-no-files-found: ignore
+          include-hidden-files: false
+          retention-days: 7
 
       - name: Upload app transition visual evidence
-        if: failure() || (github.event_name == 'pull_request' && github.event.pull_request.draft)
+        if: always()
+        timeout-minutes: 5
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: app-transition-visual-artifacts
-          path: generated-visual-artifacts/app-transitions/
-          if-no-files-found: ignore
-          include-hidden-files: true
+          path: |
+            generated-visual-artifacts/app-transitions/**/*.json
+            generated-visual-artifacts/app-transitions/**/*.png
+            generated-visual-artifacts/app-transitions/**/*.log
+            generated-visual-artifacts/app-transitions/**/*.txt
+            generated-visual-artifacts/app-transitions/**/*.md
+          if-no-files-found: ${{ (steps.visual_candidates.outcome == 'success' || steps.visual_comparison.outcome == 'success') && 'error' || 'warn' }}
+          include-hidden-files: false
           retention-days: 7
 
   compatibility-proof:
@@ -308,7 +600,7 @@ jobs:
       - name: Set up pnpm and Node.js
         uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
         with:
-          version: 11.20.0
+          version: 11.28.1
           runtime: node@22.23.2
           cache: false
           install: false

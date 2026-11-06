@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
@@ -7,6 +7,61 @@ import test from "node:test";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const builtEntry = resolve(packageRoot, "dist/index.js");
 const core = await import(pathToFileURL(builtEntry));
+
+test("retired structured controls cannot fall back to current generation", async () => {
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
+  for (const name of (await readdir(root)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
+    const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
+    for (const [variant, { state }] of Object.entries(control.variants)) {
+      for (const [projectInput, stateInput] of [[control.project, state], [control.project, undefined], [undefined, state]]) {
+        const result = createVerifiedProjectSnapshot(projectInput, stateInput);
+        assert.equal(result.ok, false, `${name}: ${variant}`);
+        assert.equal(result.issues[0].code, "PROJECT_INSPECTION_INVALID");
+      }
+    }
+  }
+});
+
+test("retired controls refuse lifecycle planning and execution before effects", async () => {
+  const controls = resolve(packageRoot, "tests/fixtures/retired-recipes");
+  const root = "/generated/project";
+  const git = { ok: true, identity: { root, revision: "a".repeat(40), attachedRef: "refs/heads/retired-control-test", gitDirectory: "/generated/common/.git/worktrees/retired-control-test", commonDirectory: "/generated/common/.git" } };
+  for (const name of (await readdir(controls)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
+    const control = JSON.parse(await readFile(resolve(controls, name), "utf8"));
+    for (const [variant, { state }] of Object.entries(control.variants)) {
+      const files = new Map([[".egeria/project.yaml", control.projectYaml], [".egeria/state.json", JSON.stringify(state)]]);
+      const before = structuredClone(files);
+      const effects = [];
+      const reader = {
+        async readText(path) { return files.has(path) ? { kind: "file", content: files.get(path) } : { kind: "missing" }; },
+        async readBytes(path) { return files.has(path) ? { kind: "file", content: new TextEncoder().encode(files.get(path)) } : { kind: "missing" }; },
+      };
+      const execution = {
+        root, reader, approvedPlanFingerprint: `sha256:${"a".repeat(64)}`,
+        inspectWorktree: async () => git,
+        inspectCreateTargets: async () => ({ ok: true }),
+        inspectExpectedChanges: async () => ({ ok: true }),
+        writer: { async write() { effects.push("write"); return { ok: true }; } },
+        verifier: { async verifyInIsolatedCopy() { effects.push("verify"); return { ok: false }; } },
+      };
+      const results = [
+        await core.planCapabilityAddition({ reader, git, capability: "multilingual" }),
+        await core.planCapabilityRemoval({ reader, git, capability: "multilingual" }),
+        await core.planProfileTransition({ reader, git, toProfile: "app" }),
+        await core.applyCapabilityAddition({ ...execution, capability: "multilingual" }),
+        await core.applyCapabilityRemoval({ ...execution, capability: "multilingual" }),
+        await core.applyProfileTransition({ ...execution, toProfile: "app" }),
+      ];
+      for (const result of results) {
+        assert.equal(result.ok, false, `${name}: ${variant}`);
+        assert.ok(["PROJECT_INSPECTION_INVALID", "PROJECT_STATE_INCOMPATIBLE"].includes(result.code ?? result.issues?.[0]?.code), JSON.stringify(result));
+      }
+      assert.deepEqual(effects, [], `${name}: ${variant}`);
+      assert.deepEqual(files, before);
+    }
+  }
+});
 const builtDeclaration = await readFile(
   resolve(packageRoot, "dist/index.d.ts"),
   "utf8",
@@ -28,7 +83,7 @@ function assertIssues(result, expectedIssues) {
 }
 
 function createCatalog() {
-  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
+  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
 }
 
 function resolveRequest(
@@ -63,7 +118,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.0",
+    recipeVersion: "0.2.7",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -81,7 +136,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.0");
+    assert.equal(resolution.recipeVersion, "0.2.7");
     assert.deepEqual(
       identifiers,
       [
@@ -266,7 +321,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.5.0");
+  assert.equal(standards.version, "0.5.1");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -708,7 +763,7 @@ test("the current catalog preserves existing capability contracts while widening
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.0",
+      version: "0.3.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -790,14 +845,14 @@ test("the current catalog preserves existing capability contracts while widening
           path: "apps/web/package.json",
           section: "dependencies",
           packageName: "@opennextjs/cloudflare",
-          version: "1.20.2",
+          version: "1.20.12",
         },
         {
           kind: "package",
           path: "apps/web/package.json",
           section: "devDependencies",
           packageName: "wrangler",
-          version: "4.118.0",
+          version: "4.148.0",
         },
         { kind: "file", path: ".github/workflows/deploy.yml" },
         { kind: "file", path: "apps/web/next.config.ts" },
@@ -1788,7 +1843,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.0",
+      recipeVersion: "0.11.7",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1800,7 +1855,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.0",
+      recipeVersion: "0.12.7",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1813,7 +1868,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.0",
+      recipeVersion: "0.2.7",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1837,7 +1892,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.0");
+  assert.equal(portfolio.recipeVersion, "0.11.7");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1873,7 +1928,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.0" : "0.12.0",
+      profile === "portfolio" ? "0.11.7" : "0.12.7",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1919,7 +1974,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.5.0",
+      version: "0.5.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1940,7 +1995,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.0",
+      version: "0.3.1",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -1969,9 +2024,9 @@ test("current recipes add app while historical portfolio and site snapshots stay
       recipeVersion,
     })),
     [
-      { identifier: "portfolio", recipeVersion: "0.11.0" },
-      { identifier: "site", recipeVersion: "0.12.0" },
-      { identifier: "app", recipeVersion: "0.2.0" },
+      { identifier: "portfolio", recipeVersion: "0.11.7" },
+      { identifier: "site", recipeVersion: "0.12.7" },
+      { identifier: "app", recipeVersion: "0.2.7" },
     ],
   );
 
@@ -1983,35 +2038,10 @@ test("current recipes add app while historical portfolio and site snapshots stay
     "upgrade-site-routing-0-3-0-to-0-4-0",
   ]);
 
-  const historicalCatalog = assertOk(
-    core.createCapabilityCatalogSnapshot(packageVersions, {
-      standards: "0.4.0",
-      siteRouting: "0.3.0",
-    }),
-  );
-  assert.equal(
-    historicalCatalog.find(({ identifier }) => identifier === "site-routing")
-      ?.version,
-    "0.3.0",
-  );
-  assert.equal(historicalCatalog.length, 9);
-  assert.equal(
-    historicalCatalog.some(({ identifier }) => identifier === "app-foundation"),
-    false,
-  );
-  for (const descriptor of historicalCatalog) {
-    assert.deepEqual(
-      descriptor.supportedProfiles,
-      descriptor.identifier === "site-routing"
-        ? ["site"]
-        : ["portfolio", "site"],
-      descriptor.identifier,
-    );
-  }
-  assert.deepEqual(core.createProfileRecipeSnapshot("0.10.0"), [
-    { ...core.profileRecipes[0], recipeVersion: "0.10.0" },
-    { ...core.profileRecipes[1], recipeVersion: "0.10.0" },
-  ]);
+  assert.equal(core.createCapabilityCatalogSnapshot(packageVersions, {
+    standards: "0.4.0", siteRouting: "0.3.0",
+  }).ok, false);
+
 });
 
 test("resolution traverses dependency identifiers lexically rather than trusting descriptor order", () => {
@@ -2228,22 +2258,115 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 });
 
 
-test("supported profile transition admits only the historical and two exact incoming app edges", () => {
+test("supported profile transitions admit only the current incoming app edges", () => {
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
-    ["portfolio", "0.10.0", "site", "0.10.0"],
-    ["portfolio", "0.10.0", "app", "0.1.0"],
-    ["site", "0.11.0", "app", "0.1.0"],
-    ["portfolio", "0.11.0", "app", "0.2.0"],
-    ["site", "0.12.0", "app", "0.2.0"],
+    ["portfolio", "0.11.7", "app", "0.2.7"],
+    ["site", "0.12.7", "app", "0.2.7"],
   ]) {
     assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
       ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
     });
   }
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
+    ["portfolio", "0.10.0", "site", "0.10.0"],
+    ["portfolio", "0.10.0", "app", "0.1.0"],
+    ["site", "0.11.0", "app", "0.1.0"],
+    ["portfolio", "0.11.0", "app", "0.2.0"],
+    ["site", "0.12.0", "app", "0.2.0"],
+    ["portfolio", "0.11.2", "app", "0.2.2"],
+    ["site", "0.12.2", "app", "0.2.2"],
+    ["site", "0.12.3", "app", "0.2.3"],
     ["site", "0.10.0", "app", "0.1.0"], ["portfolio", "0.9.0", "app", "0.1.0"],
     ["site", "0.12.0", "app", "0.1.0"], ["app", "0.1.0", "app", "0.1.0"],
     ["app", "0.1.0", "portfolio", "0.10.0"], ["portfolio", "0.10.0", "app", "0.2.0"],
     ["unknown", "0.10.0", "app", "0.1.0"],
+    ...["portfolio", "site"].flatMap(fromProfile => {
+      const pairs = fromProfile === "portfolio"
+        ? [["0.10.0", "0.1.0"], ["0.11.0", "0.2.0"], ["0.11.2", "0.2.2"], ["0.11.7", "0.2.7"]]
+        : [["0.11.0", "0.1.0"], ["0.12.0", "0.2.0"], ["0.12.2", "0.2.2"], ["0.12.3", "0.2.3"], ["0.12.7", "0.2.7"]];
+      return pairs.flatMap(([fromVersion, expectedTarget]) => ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.7"].flatMap(toVersion => toVersion === expectedTarget ? [] : [[fromProfile, fromVersion, "app", toVersion]]));
+    }),
+    ["portfolio", "0.11.1", "app", "0.2.1"],
+    ["site", "0.12.1", "app", "0.2.1"],
+    ["portfolio", "0.12.1", "app", "0.2.1"],
+    ["site", "0.11.1", "app", "0.2.1"],
+    ["portfolio", "0.11.1", "app", "9.9.9"],
   ]) assert.equal(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}).ok, false);
+});
+
+
+test("retired portfolio recipes cannot select locks or incoming app edges", async () => {
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  for (const foundation of [false, true]) {
+    const manifest = {
+      dependencies: { next: "16.4.1", ...(foundation ? { effect: "4.0.0-rc.112" } : {}) },
+      devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.0" },
+    };
+    assert.equal(resolveRecipeLockfileVersion({ originProfile: "portfolio", recipeVersion: "0.11.3" }, manifest), undefined);
+  }
+  for (const toRecipeVersion of ["0.1.0", "0.2.0", "0.2.2", "0.2.3", "0.2.7"]) {
+    assert.deepEqual(core.resolveSupportedProfileTransition({
+      fromProfile: "portfolio", fromRecipeVersion: "0.11.3", toProfile: "app", toRecipeVersion,
+    }), { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" });
+  }
+});
+
+const deploymentSnapshotCases = [
+  {
+    name: "ordinary",
+    version: "0.3.1",
+    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" },
+  },
+  {
+    name: "persistence",
+    version: "0.4.1",
+    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.1.0", applicationPersistence: "0.1.1" },
+  },
+  {
+    name: "jobs",
+    version: "0.5.1",
+    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0" },
+  },
+  {
+    name: "jobs with persistence",
+    version: "0.6.1",
+    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0", applicationPersistence: "0.1.1" },
+  },
+  {
+    name: "explicit internal environments",
+    version: "0.7.1",
+    snapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0" },
+  },
+];
+
+test("current deployment snapshots select exact supported adapter packages", async (t) => {
+  for (const { name, version, snapshot } of deploymentSnapshotCases) {
+    await t.test(name, () => {
+      const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+        ...snapshot,
+        deploymentCloudflare: version,
+      });
+      assert.equal(result.ok, true, JSON.stringify(result.issues));
+      const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
+      assert.equal(deployment.version, version);
+      const packages = Object.fromEntries(deployment.inferenceProbes
+        .filter(({ kind }) => kind === "package")
+        .map(({ packageName, version }) => [packageName, version]));
+      assert.equal(packages["@opennextjs/cloudflare"], "1.20.12");
+      assert.equal(packages.wrangler, "4.148.0");
+    });
+  }
+});
+
+test("retired deployment tuples are refused by snapshot selection", async (t) => {
+  for (const { name, version, snapshot } of deploymentSnapshotCases) {
+    await t.test(name, () => {
+      const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+        ...snapshot,
+        deploymentCloudflare: version.replace(/\.1$/, ".0"),
+      });
+      assert.equal(result.ok, false);
+      assert.equal(result.issues.some(({ code }) => code === "CAPABILITY_DESCRIPTOR_VERSION_INVALID"), true);
+    });
+  }
 });

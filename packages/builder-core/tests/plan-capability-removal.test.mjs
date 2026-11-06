@@ -3,6 +3,13 @@ import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
+const currentCohorts = [
+  { profiles: createCurrentProfileRecipes(), supportedProfiles: ["portfolio", "site"] },
+];
+
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -81,7 +88,7 @@ async function loadTextEntries(root) {
 }
 
 async function baseFixtureEntries(profile) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }[profile]}`));
 }
 
 async function installedEntries(profile, options = {}) {
@@ -96,7 +103,7 @@ async function installedEntries(profile, options = {}) {
     ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
     ...(options.multilingual === true ? { multilingual: true } : {}),
     ...(options.analytics === undefined ? {} : { analytics: options.analytics }),
-  });
+  }, { ...createGenerationRenderingContext(), profiles: options.profiles ?? createCurrentProfileRecipes() });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -106,7 +113,7 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(repositoryRoot, `fixtures/generated/${profile}/pnpm-lock.yaml`),
+        createRecipeLockfileUrl(resolveRecipeLockfileVersion(rendered.value.project, JSON.parse(decoder.decode(byteFiles.get("apps/web/package.json"))))),
       ),
     ),
   );
@@ -134,7 +141,7 @@ async function installedEntries(profile, options = {}) {
     ejections: [],
     compatibility: {
       node: "22.23.2",
-      pnpm: "11.20.0",
+      pnpm: "11.28.1",
       platformAdapter: "cloudflare-workers",
     },
     lastSuccessfulVerification: {
@@ -1034,8 +1041,8 @@ async function postRemovalEntriesWithEjection(path, surfaceOverrides = {}) {
 }
 
 test("capability removal plan is exact and read-only for portfolio and site", async () => {
-  for (const profile of ["portfolio", "site"]) {
-    const result = await planFromEntries(await installedEntries(profile));
+  for (const { profiles, supportedProfiles } of currentCohorts) for (const profile of supportedProfiles) {
+    const result = await planFromEntries(await installedEntries(profile, { profiles }));
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.match(result.value.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
     assert.deepEqual(
@@ -1229,14 +1236,14 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
   const historicalRecipe = new Map(base);
   historicalRecipe.set(
     ".egeria/project.yaml",
-    core.serializeProjectYaml({
+    JSON.stringify({
       ...project.value,
       recipeVersion: "0.9.0",
     }),
   );
   historicalRecipe.set(
     ".egeria/state.json",
-    core.serializeStateJson({
+    JSON.stringify({
       ...state.value,
       origin: { ...state.value.origin, recipeVersion: "0.9.0" },
     }),
@@ -1245,7 +1252,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
   const mismatchedOrigin = new Map(base);
   mismatchedOrigin.set(
     ".egeria/state.json",
-    core.serializeStateJson({
+    JSON.stringify({
       ...state.value,
       origin: { ...state.value.origin, profile: "site" },
     }),
@@ -1254,7 +1261,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
   const mismatchedMigrations = new Map(base);
   mismatchedMigrations.set(
     ".egeria/state.json",
-    core.serializeStateJson({
+    JSON.stringify({
       ...state.value,
       appliedMigrations: ["add-booking-calendly-0-1-0"],
     }),
@@ -1263,7 +1270,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
   const unsupportedInstalledVersion = new Map(base);
   unsupportedInstalledVersion.set(
     ".egeria/state.json",
-    core.serializeStateJson({
+    JSON.stringify({
       ...state.value,
       installedCapabilities: state.value.installedCapabilities.map(
         (capability) =>
@@ -1278,7 +1285,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
     { entries: historicalRecipe, code: "PROJECT_INSPECTION_INVALID" },
     { entries: mismatchedOrigin, code: "PROJECT_INSPECTION_INVALID" },
     { entries: mismatchedMigrations, code: "PROJECT_INSPECTION_INVALID" },
-    { entries: unsupportedInstalledVersion, code: "PROJECT_DRIFT_DETECTED" },
+    { entries: unsupportedInstalledVersion, code: "PROJECT_INSPECTION_INVALID" },
   ]) {
     assertFailure(await planFromEntries(entries), code);
   }
@@ -1599,4 +1606,17 @@ test("capability removal plan fingerprint binds its review requirements", async 
       plan: { ...plan, reviewRequirements: [] },
     }),
   );
+});
+
+
+test("current cohort refuses managed drift and surviving references without mutation", async () => {
+  for (const profile of ["portfolio", "site"]) for (const mode of ["managed-drift", "surviving-reference"]) {
+    const entries = await installedEntries(profile, { profiles: createCurrentProfileRecipes() });
+    if (mode === "managed-drift") entries.set("apps/web/package.json", "changed managed manifest\n");
+    else entries.set("apps/web/src/custom-booking.ts", 'import { CalendlyBooking } from "./integrations/booking-calendly/calendly-booking";\n');
+    const before = [...entries];
+    const result = await planFromEntries(entries);
+    assert.equal(result.ok, false, JSON.stringify(result));
+    assert.deepEqual([...entries], before);
+  }
 });

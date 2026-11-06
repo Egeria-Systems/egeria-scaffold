@@ -1,0 +1,74 @@
+diff --git a/dist/utils/get-root-dirs.js b/dist/utils/get-root-dirs.js
+--- a/dist/utils/get-root-dirs.js
++++ b/dist/utils/get-root-dirs.js
+@@ -8,13 +8,34 @@
+         return getRootDirs;
+     }
+ });
+-var _fastglob = require("fast-glob");
++var fs = require("node:fs");
++var path = require("node:path");
+ /**
+- * Process a Next.js root directory glob.
+- */ var processRootDir = function(rootDir) {
+-    return (0, _fastglob.globSync)(rootDir.replace(/\\/g, '/'), {
+-        onlyDirectories: true
+-    });
++ * Resolve an explicit literal Next.js root. Backslashes are separators,
++ * never glob escapes. Filesystem validation follows for the complete setting.
++ */ var processRootDir = function(rootDir, index) {
++    var setting = 'settings.next.rootDir[' + index + ']';
++    if (typeof rootDir !== 'string' || rootDir.length === 0) {
++        throw new Error(setting + ': use a nonempty literal directory string.');
++    }
++    if (/[*?\[\]{}()]/.test(rootDir) || rootDir.startsWith('!')) {
++        throw new Error(setting + ': glob syntax is unsupported; list literal directories explicitly.');
++    }
++    var normalized = rootDir.replace(/\\/g, '/');
++    if (/^\/\/[?.]\//.test(normalized)) {
++        throw new Error(setting + ': Windows device paths are unsupported; use a native directory path.');
++    }
++    if (/^[a-zA-Z]:/.test(normalized)) {
++        if (process.platform !== 'win32' || !/^[a-zA-Z]:\//.test(normalized)) {
++            throw new Error(setting + ': use a native absolute path, not a foreign or drive-relative path.');
++        }
++    } else if (/^[a-zA-Z][a-zA-Z\d+.-]*:/.test(normalized)) {
++        throw new Error(setting + ': URLs are unsupported; use a native directory path.');
++    }
++    if (process.platform !== 'win32' && normalized.startsWith('//')) {
++        throw new Error(setting + ': UNC paths require Windows; use a native directory path.');
++    }
++    return path.resolve(normalized);
+ };
+ var getRootDirs = function(context) {
+     var rootDirs = [
+@@ -22,12 +43,23 @@
+     ];
+     var nextSettings = context.settings.next || {};
+     var rootDir = nextSettings.rootDir;
+-    if (typeof rootDir === 'string') {
+-        rootDirs = processRootDir(rootDir);
+-    } else if (Array.isArray(rootDir)) {
+-        rootDirs = rootDir.map(function(dir) {
+-            return typeof dir === 'string' ? processRootDir(dir) : [];
+-        }).flat();
++    if (rootDir === undefined) {
++        return rootDirs;
+     }
++    var configuredRoots = typeof rootDir === 'string' ? [rootDir] : rootDir;
++    if (!Array.isArray(configuredRoots) || configuredRoots.length === 0) {
++        throw new Error('settings.next.rootDir: use a literal directory string or a nonempty array of directory strings.');
++    }
++    rootDirs = Array.from(configuredRoots, processRootDir);
++    rootDirs.forEach(function(directory, index) {
++        try {
++            if (!fs.statSync(directory).isDirectory()) {
++                throw new Error('not a directory');
++            }
++            fs.accessSync(directory, process.platform === 'win32' ? fs.constants.R_OK : fs.constants.R_OK | fs.constants.X_OK);
++        } catch (_) {
++            throw new Error('settings.next.rootDir[' + index + ']: use an existing directory with read access' + (process.platform === 'win32' ? '.' : ' and search access.'));
++        }
++    });
+     return rootDirs;
+ };

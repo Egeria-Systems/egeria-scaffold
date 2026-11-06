@@ -17,7 +17,7 @@ const validProject = {
     defaultLocale: "en-CA",
   },
   originProfile: "portfolio",
-  recipeVersion: "0.1.0",
+  recipeVersion: "0.11.7",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
   capabilitySettings: {},
@@ -38,11 +38,11 @@ const validState = {
   schemaVersion: "1.0.0",
   builderVersion: "0.0.0",
   projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.1.0" },
+  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
   installedCapabilities: [
     {
       identifier: "standards",
-      version: "0.1.0",
+      version: "0.5.1",
       deliveryMode: "package-backed",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -53,7 +53,7 @@ const validState = {
   ejections: [],
   compatibility: {
     node: "22.23.2",
-    pnpm: "11.20.0",
+    pnpm: "11.28.1",
     platformAdapter: "cloudflare-workers",
   },
   lastSuccessfulVerification: {
@@ -65,6 +65,8 @@ const validState = {
       "frozen-install",
       "lint",
       "typecheck",
+      "unit-tests",
+      "component-tests",
       "next-build",
       "opennext-build",
       "post-state-inference",
@@ -143,7 +145,7 @@ project:
   displayName: No
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.1.0
+recipeVersion: 0.11.7
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -166,7 +168,7 @@ project:
   defaultLocale: en-CA
   displayName: Sample Portfolio
   name: sample-portfolio
-recipeVersion: 0.1.0
+recipeVersion: 0.11.7
 schemaVersion: 1.0.0
 selectedCapabilities:
   - standards
@@ -197,7 +199,7 @@ project:
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.1.0
+recipeVersion: 0.11.7
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -215,7 +217,7 @@ project:
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.1.0
+recipeVersion: 0.11.7
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -273,7 +275,7 @@ test("profile-transition receipts require the exact conservative persisted check
 
   const transitionState = {
     ...validState,
-    origin: { profile: "site", recipeVersion: "0.10.0" },
+    origin: { profile: "site", recipeVersion: "0.12.7" },
     lastSuccessfulVerification: {
       kind: "profile-transition",
       checks: expectedChecks,

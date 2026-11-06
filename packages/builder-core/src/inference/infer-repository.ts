@@ -1,6 +1,7 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type {
+  ApplicationEnvironmentInstalledState,
   InstalledCapability,
   InstalledState,
   InstalledSurface,
@@ -53,14 +54,14 @@ export type SurfaceEvidence = Readonly<{
   code?: string;
 }>;
 
-export type RepositoryStateEvidence =
-  | Readonly<{ kind: "valid"; value: InstalledState }>
+export type RepositoryStateEvidence<S = InstalledState> =
+  | Readonly<{ kind: "valid"; value: S }>
   | Readonly<{ kind: "missing" }>
   | Readonly<{ kind: "invalid"; issues: readonly ContractIssue[] }>
   | Readonly<{ kind: "ambiguous"; code: string }>;
 
-export type RepositoryInference = Readonly<{
-  state: RepositoryStateEvidence;
+export type RepositoryInference<S = InstalledState> = Readonly<{
+  state: RepositoryStateEvidence<S>;
   capabilities: readonly CapabilityEvidence[];
   surfaces: readonly SurfaceEvidence[];
 }>;
@@ -100,7 +101,8 @@ function surfaceEvidence(
 
 async function inferState(
   reader: RepositoryReader,
-): Promise<RepositoryStateEvidence> {
+  projectSchemaVersion?: "2.0.0",
+): Promise<RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>> {
   const result = await reader.readText(".egeria/state.json");
 
   switch (result.kind) {
@@ -111,7 +113,9 @@ async function inferState(
     case "error":
       return { kind: "ambiguous", code: result.code };
     case "file": {
-      const parsed = parseStateJson(result.content);
+      const parsed = projectSchemaVersion === "2.0.0"
+        ? parseStateJson(result.content, "2.0.0")
+        : parseStateJson(result.content);
       return parsed.ok
         ? { kind: "valid", value: parsed.value }
         : { kind: "invalid", issues: parsed.issues };
@@ -142,7 +146,7 @@ function installedMetadataMatches(
 async function inferCapabilities(
   reader: RepositoryReader,
   catalog: readonly CapabilityDescriptor[],
-  state: RepositoryStateEvidence,
+  state: RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>,
 ): Promise<readonly CapabilityEvidence[]> {
   const sortedCatalog = [...catalog].sort((left, right) =>
     compareText(left.identifier, right.identifier),
@@ -299,7 +303,7 @@ async function inferManagedSurface(
 
 async function inferSurfaces(
   reader: RepositoryReader,
-  state: RepositoryStateEvidence,
+  state: RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>,
 ): Promise<readonly SurfaceEvidence[]> {
   if (state.kind !== "valid") {
     return [];
@@ -325,11 +329,13 @@ async function inferSurfaces(
   });
 }
 
+export function inferRepository(request: InferRepositoryRequest & Readonly<{ projectSchemaVersion: "2.0.0" }>): Promise<RepositoryInference<ApplicationEnvironmentInstalledState>>;
+export function inferRepository(request: InferRepositoryRequest): Promise<RepositoryInference>;
 export async function inferRepository(
-  request: InferRepositoryRequest,
-): Promise<RepositoryInference> {
+  request: InferRepositoryRequest & Readonly<{ projectSchemaVersion?: "2.0.0" }>,
+): Promise<RepositoryInference<InstalledState | ApplicationEnvironmentInstalledState>> {
   const reader = createCachingRepositoryReader(request.reader);
-  const state = await inferState(reader);
+  const state = await inferState(reader, request.projectSchemaVersion);
   const capabilities = await inferCapabilities(reader, request.catalog, state);
   const surfaces = await inferSurfaces(reader, state);
 

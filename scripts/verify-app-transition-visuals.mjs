@@ -8,6 +8,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
+import { runDependencyAudit } from "./lib/dependency-audit.mjs";
 import { cleanupOwnedDirectory, createIsolatedProcessEnvironment, isolatedProcessOptions, pathIdentityMatches, readPathIdentity } from "./lib/isolated-process.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,7 +25,7 @@ const historicalHashes = Object.freeze({
 });
 
 export const appTransitionVisualToolchain = Object.freeze({
-  platform: "linux", architecture: "x64", node: "22.23.2", pnpm: "11.20.0",
+  platform: "linux", architecture: "x64", node: "22.23.2", pnpm: "11.28.1",
   playwright: "1.62.1", browserRevision: "1234", browserVersion: "151.0.7922.34",
   image: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
 });
@@ -53,10 +54,16 @@ function safeRelative(path) {
 
 export function parseAppTransitionVisualArguments(arguments_) {
   const values = arguments_[0] === "--" ? arguments_.slice(1) : arguments_;
-  if (values.length === 0) return { mode: "compare" };
-  if (values.length === 1 && values[0] === "--candidates") return { mode: "candidates" };
-  if (values.length === 1) {
-    const match = /^--promote-reviewed-manifest-sha256=([a-f0-9]{64})$/.exec(values[0]);
+  const recipeArguments = values.filter(value => value.startsWith("--app-recipe-version="));
+  if (recipeArguments.length > 1) fail("VISUAL_ARGUMENT_INVALID");
+  const recipeVersion = recipeArguments[0]?.slice("--app-recipe-version=".length);
+  if (recipeVersion !== undefined && !["0.2.7"].includes(recipeVersion)) fail("VISUAL_ARGUMENT_INVALID");
+  const modes = values.filter(value => !recipeArguments.includes(value));
+  const recipe = { recipeVersion: recipeVersion ?? "0.2.7" };
+  if (modes.length === 0) return { mode: "compare", ...recipe };
+  if (modes.length === 1 && modes[0] === "--candidates") return { mode: "candidates", ...recipe };
+  if (modes.length === 1 && recipeVersion === undefined) {
+    const match = /^--promote-reviewed-manifest-sha256=([a-f0-9]{64})$/.exec(modes[0]);
     if (match) return { mode: "promote", digest: match[1] };
   }
   return fail("VISUAL_ARGUMENT_INVALID");
@@ -111,16 +118,25 @@ function validateImage(bytes, viewport) {
   if (!buffer.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])) || buffer.toString("ascii", 12, 16) !== "IHDR" || buffer.readUInt32BE(16) !== expected.width || buffer.readUInt32BE(20) !== expected.height) fail("VISUAL_IMAGE_INVALID");
 }
 
-async function snapshotSource(root) {
+async function sourcePaths(root) {
   const { stdout } = await execute("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { ...isolatedProcessOptions, cwd: root });
   const excluded = new Set(assets.map(({ templatePath }) => templatePath));
-  const paths = [...new Set(stdout.split("\0").filter(Boolean))].filter((path) => !excluded.has(path) && (
+  return [...new Set(stdout.split("\0").filter(Boolean))].filter((path) => !excluded.has(path) && (
     ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"].includes(path) ||
     /^packages\/builder-core\/(src\/|templates\/|lockfiles\/|scripts\/|package.json$|tsconfig)/.test(path) ||
-    path === "scripts/verify-app-transition-visuals.mjs" || path === "scripts/lib/isolated-process.mjs"
+    ["scripts/verify-app-transition-visuals.mjs", "scripts/lib/isolated-process.mjs",
+      "scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json"].includes(path)
   )).sort();
+}
+
+async function rawSourceFiles(root, fs = filesystem) {
   const files = [];
-  for (const path of paths) files.push({ path, sha256: digest(await boundedRead(filesystem, root, path)) });
+  for (const path of await sourcePaths(root)) files.push({ path, sha256: digest(await boundedRead(fs, root, path)) });
+  return files;
+}
+
+async function snapshotSource(root) {
+  const files = await rawSourceFiles(root);
   async function compiled(directory) {
     const absolute = await safePath(filesystem, root, directory, { directories: true, create: false });
     for (const entry of await filesystem.readdir(absolute, { withFileTypes: true })) {
@@ -209,35 +225,90 @@ async function promote(options, adapters) {
   return { status: "promoted", manifestSha256: options.digest, paths: written };
 }
 
+async function snapshotComparisonInputs(adapters) {
+  const sourceFiles = await rawSourceFiles(adapters.repositoryRoot, adapters.filesystem);
+  const baselines = [];
+  for (const asset of assets) {
+    const content = await boundedRead(adapters.filesystem, adapters.repositoryRoot, asset.templatePath);
+    validateImage(content, asset.viewport);
+    baselines.push({ identifier: asset.identifier, templatePath: asset.templatePath, sha256: digest(content) });
+  }
+  return { sourceFiles, baselines };
+}
+
+async function requireComparisonInputs(adapters, expected) {
+  const actual = await snapshotComparisonInputs(adapters).catch(() => undefined);
+  if (!same(actual, expected)) fail("VISUAL_SOURCE_CHANGED");
+}
+
+async function requirePreparedMeasurementIdentity(prepared, adapters) {
+  const policy = await import(new URL("../packages/builder-core/dist/lifecycle/app-profile-transition.js", import.meta.url));
+  if (prepared.sourceProject?.schemaVersion !== "1.0.0" || prepared.sourceProject.originProfile !== "portfolio" || prepared.sourceProject.recipeVersion !== "0.11.7" ||
+      prepared.targetProject?.schemaVersion !== "1.0.0" || prepared.targetProject.originProfile !== "app" || prepared.targetProject.recipeVersion !== "0.2.7" ||
+      !Array.isArray(prepared.files) || prepared.files.length === 0 || prepared.files.some(file => !safeRelative(file.path) || !(file.content instanceof Uint8Array)) ||
+      new Set(prepared.files.map(file => file.path)).size !== prepared.files.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
+  const locks = prepared.files.filter(file => file.path === "pnpm-lock.yaml");
+  const expectedLock = await boundedRead(adapters.filesystem, adapters.repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml");
+  if (locks.length !== 1 || !Buffer.from(locks[0].content).equals(expectedLock) ||
+      !same(prepared.influencingFingerprints, policy.appTransitionInfluencingFingerprints(prepared.files.filter(file => file.path !== "pnpm-lock.yaml")))) fail("VISUAL_INPUT_IDENTITY_MISSING");
+}
+
 export async function verifyAppTransitionVisuals(options, injected = {}) {
+  if (options.recipeVersion !== undefined && (!["0.2.7"].includes(options.recipeVersion) || options.mode === "promote")) fail("VISUAL_ARGUMENT_INVALID");
   if (!["candidates", "compare", "promote"].includes(options.mode) || (options.mode === "promote" && !/^[a-f0-9]{64}$/.test(options.digest))) fail("VISUAL_ARGUMENT_INVALID");
   const root = injected.repositoryRoot ?? repositoryRoot;
-  const adapters = { filesystem, repositoryRoot: root, inspectEnvironment, snapshotSource: () => snapshotSource(root), executeCase,
+  const adapters = { filesystem, repositoryRoot: root, inspectEnvironment, snapshotSource: () => snapshotSource(root), executeCase, prepareProject,
     prepareBuilder: async () => {
       const result = await runCommand({ executable: "pnpm", arguments: ["--filter", "@egeria-systems/builder-core", "run", "build"], cwd: root, environment: createIsolatedProcessEnvironment() });
       if (result.exitCode !== 0) fail("VISUAL_BUILDER_BUILD_FAILED");
     }, ...injected };
   if (options.mode === "promote") return promote(options, adapters);
+  const comparisonInputs = options.mode === "compare" ? await snapshotComparisonInputs(adapters) : undefined;
   const toolchain = await adapters.inspectEnvironment();
   if (!same(toolchain, appTransitionVisualToolchain)) fail("VISUAL_ENVIRONMENT_UNSUPPORTED");
   await adapters.prepareBuilder();
   const source = await adapters.snapshotSource();
+  const preparedProjects = [];
+  if (options.mode === "compare") {
+    await requireComparisonInputs(adapters, comparisonInputs);
+    for (const subset of subsets) {
+      const prepared = await adapters.prepareProject(root, subset, options.recipeVersion);
+      await requirePreparedMeasurementIdentity(prepared, adapters);
+      preparedProjects.push(prepared);
+    }
+    await requireComparisonInputs(adapters, comparisonInputs);
+    if (!same(source, await adapters.snapshotSource())) fail("VISUAL_SOURCE_CHANGED");
+  }
   const fs = adapters.filesystem;
   const runPath = `${artifactRoot}/${randomUUID()}`;
   const run = await safePath(fs, root, runPath, { directories: true });
   const identity = await readPathIdentity(run);
   const cases = [];
+  const comparisonBaselines = [];
+  const baselineContent = new Map();
   try {
-    for (const subset of subsets) {
+    for (const baseline of comparisonInputs?.baselines ?? []) {
+      const asset = assets.find(asset => asset.identifier === baseline.identifier);
+      const content = await boundedRead(fs, root, baseline.templatePath);
+      if (digest(content) !== baseline.sha256) fail("VISUAL_SOURCE_CHANGED");
+      const path = `baselines/${baseline.identifier}.png`;
+      if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+      await writeExclusive(fs, run, path, content);
+      baselineContent.set(baseline.identifier, content);
+      comparisonBaselines.push({ ...baseline, path, ...viewports[asset.viewport] });
+    }
+    for (const [index, subset] of subsets.entries()) {
+      if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
       const name = subset.length ? subset.join("-") : "default";
       const casePath = `${runPath}/${name}`;
       const artifactDirectory = await safePath(fs, root, casePath, { directories: true });
       const baselines = {};
       if (options.mode === "compare") {
-        for (const asset of assets.filter(({ group }) => (group === "multilingual") === subset.includes("multilingual"))) baselines[asset.viewport] = await boundedRead(fs, root, asset.templatePath);
+        for (const asset of assets.filter(({ group }) => (group === "multilingual") === subset.includes("multilingual"))) baselines[asset.viewport] = baselineContent.get(asset.identifier);
       }
-      const value = await adapters.executeCase({ subset, mode: options.mode, baselines, artifactDirectory, repositoryRoot: root });
+      const value = await adapters.executeCase({ subset, mode: options.mode, baselines, artifactDirectory, repositoryRoot: root, recipeVersion: options.recipeVersion, preparedProject: preparedProjects[index] });
+      if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
       if (!value.project?.files?.length || !value.influencingFingerprints?.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
       const images = {};
@@ -258,22 +329,25 @@ export async function verifyAppTransitionVisuals(options, injected = {}) {
       if (group.length !== 4 || group.some(({ images }) => images[asset.viewport].sha256 !== representative.sha256)) fail("VISUAL_SUBSET_MISMATCH");
       representatives.push({ ...asset, candidatePath: representative.path, sha256: representative.sha256, historicalMatch: representative.sha256 === asset.historicalSha256 });
     }
+    if (options.mode === "compare") await requireComparisonInputs(adapters, comparisonInputs);
     if (!same(source, await adapters.snapshotSource())) fail("VISUAL_SOURCE_CHANGED");
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
-    const manifest = { schemaVersion: 1, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives };
+    const manifest = { schemaVersion: 1, status: options.mode === "candidates" ? "candidates" : "compared", source, toolchain, cases, assets: representatives, ...(options.mode === "compare" ? { baselines: comparisonBaselines } : {}) };
     const bytes = Buffer.from(json(manifest));
     const manifestPath = `${runPath}/${options.mode === "candidates" ? "candidate" : "comparison"}-manifest.json`;
     await writeExclusive(fs, root, manifestPath, bytes);
     return { status: manifest.status, manifestPath, manifestSha256: digest(bytes), assets: representatives };
   } catch (error) {
-    const sourceUnchanged = same(source, await adapters.snapshotSource());
+    const sourceUnchanged = await adapters.snapshotSource().then(current => same(source, current), () => false) &&
+      (options.mode !== "compare" || await snapshotComparisonInputs(adapters).then(current => same(comparisonInputs, current), () => false));
     if (await pathIdentityMatches(identity)) await writeExclusive(fs, run, "failure.json", json({ code: /^VISUAL_[A-Z_]+$/.test(error.message) ? error.message : "VISUAL_VERIFICATION_FAILED", sourceUnchanged, cases }));
     if (!sourceUnchanged) fail("VISUAL_SOURCE_CHANGED");
     throw error;
   }
 }
 
-async function prepareProject(root, subset) {
+export async function prepareProject(root, subset, recipeVersion = "0.2.7") {
+  if (!["0.2.7"].includes(recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const core = await import(pathToFileURL(join(root, "packages/builder-core/dist/index.js")));
   const policy = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-profile-transition.js")));
   const validation = await import(pathToFileURL(join(root, "packages/builder-core/dist/lifecycle/app-transition-content-validation.js")));
@@ -285,16 +359,21 @@ async function prepareProject(root, subset) {
     ...(subset.includes("booking-calendly") ? { bookingCalendly: policy.appTransitionVisualBookingSettings } : {}),
     ...(subset.includes("multilingual") ? { multilingual: true } : {}),
   };
-  const source = await core.renderSkeleton({ ...request, profile: "portfolio" });
-  const target = await core.renderSkeleton({ ...request, profile: "app" });
+  const { createGenerationRenderingContext } = await import(pathToFileURL(join(root, "packages/builder-core/dist/catalog/verified-package-versions.js")));
+  const recipes = await import(pathToFileURL(join(root, "packages/builder-core/dist/profiles/profile-recipes.js")));
+  const context = { ...createGenerationRenderingContext(), profiles: recipes.createCurrentProfileRecipes() };
+  const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
+  const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   if (!source.ok || !target.ok) fail("VISUAL_RENDER_FAILED");
+  if (source.value.project.schemaVersion !== "1.0.0" || source.value.project.originProfile !== "portfolio" || source.value.project.recipeVersion !== "0.11.7" ||
+      target.value.project.schemaVersion !== "1.0.0" || target.value.project.originProfile !== "app" || target.value.project.recipeVersion !== recipeVersion) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value,
     currentFiles: new Map(source.value.files.map(({ path, content }) => [path, content])),
     validators: await validation.loadAppTransitionContentValidators() });
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== "app-0.2.0") fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== `app-${recipeVersion}`) fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };
@@ -314,7 +393,7 @@ export function createAppTransitionVisualSpec(source, multilingual) {
     // Playwright's pixel comparator can ignore antialiasing differences even
     // at zero tolerance. Stabilize retained actual bytes independently of the
     // expected image; exact reproduction and baseline checks remain separate.
-    result = result.replace(assertion, `  try {\n${assertion}\n  } finally {\n    let previousCapture: Buffer = Buffer.alloc(0);\n    let captureAttempt = 0;\n    await expect.poll(async () => {\n      const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n      const unchanged = previousCapture.equals(actual);\n      previousCapture = actual;\n      return unchanged;\n    }, { timeout: 5_000 }).toBe(true);\n    await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n  }`);
+    result = result.replace(assertion, `  let previousCapture: Buffer = Buffer.alloc(0);\n  let captureAttempt = 0;\n  await expect.poll(async () => {\n    const actual = await page.screenshot({ path: testInfo.outputPath(\`${viewport}-capture-\${captureAttempt++}.png\`), animations: "disabled", caret: "hide", scale: "css" });\n    const unchanged = previousCapture.equals(actual);\n    previousCapture = actual;\n    return unchanged;\n  }, { timeout: 5_000 }).toBe(true);\n  await writeFile(testInfo.outputPath("${viewport}-captured.png"), previousCapture);\n${assertion}`);
   }
   // Every exercised provider remains intercepted. Unexpected external traffic
   // fails the visual proof instead of contacting a live provider.
@@ -447,9 +526,12 @@ async function retainBrowserArtifacts(fs, project, destination) {
 }
 
 export async function executeAppTransitionVisualCase(input, injected = {}) {
+  if (input.recipeVersion !== undefined && !["0.2.7"].includes(input.recipeVersion)) fail("VISUAL_RECIPE_IDENTITY_INVALID");
   const fs = injected.filesystem ?? filesystem;
   const command = injected.runCommand ?? runCommand;
-  const prepared = await (injected.prepareProject ?? prepareProject)(input.repositoryRoot, input.subset);
+  if (injected.runCommand && typeof injected.runAudit !== "function") fail("VISUAL_AUDIT_ADAPTER_INVALID");
+  const audit = injected.runAudit ?? runDependencyAudit;
+  const prepared = input.preparedProject ?? await (injected.prepareProject ?? prepareProject)(input.repositoryRoot, input.subset, input.recipeVersion);
   const root = await fs.mkdtemp(join(tmpdir(), "egeria-app-transition-visual-"));
   const identity = await readPathIdentity(root);
   await fs.chmod(root, 0o700);
@@ -468,6 +550,21 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
   let build;
   async function checked(name, arguments_) {
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+    if (name === "dependency-audit") {
+      try {
+        const disposition = await audit({ executable: "pnpm", cwd: project, environment, timeout: 15 * 60 * 1000 });
+        if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+        checks.push({ name, exitCode: disposition.rawExitCode, disposition });
+        const auditAccepted = disposition.status === "passed"
+          ? disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode)
+          : disposition.status === "accepted-with-security-exception" && disposition.thresholdExitCode === 1 && disposition.rawExitCode === 1;
+        if (!auditAccepted) fail("VISUAL_PROJECT_CHECK_FAILED");
+      } catch (error) {
+        if (error.auditDisposition) checks.push({ name, exitCode: error.auditDisposition.rawExitCode, disposition: error.auditDisposition });
+        fail("VISUAL_PROJECT_CHECK_FAILED");
+      }
+      return;
+    }
     const result = await command({ executable: "pnpm", arguments: arguments_, cwd: project, environment });
     if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
     await writeExclusive(fs, input.artifactDirectory, `${name}.log`, `${result.stdout}\n${result.stderr}`);
@@ -480,7 +577,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
     const commands = [
       ["frozen-install", ["install", "--frozen-lockfile", "--store-dir", support.store]],
       ["peer-dependencies", ["peers", "check"]],
-      ["dependency-audit", ["audit", "--audit-level", "moderate"]],
+      ["dependency-audit", ["audit", "--audit-level", "info", "--json"]],
       ["registry-signatures", ["audit", "signatures"]],
       ["lint", ["run", "lint"]],
       ["cloudflare-types", ["--dir", "apps/web", "run", "cf-typegen"]],
@@ -507,13 +604,15 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
       const reportPath = join(root, `${pass}-report.json`);
       const result = await command({ executable: "pnpm", arguments: ["--dir", "apps/web", "run", "test:visual", "--reporter=json", "--retries=0"], cwd: project, environment: { ...environment, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath } });
       if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
+      const visualCheck = { name: pass, exitCode: result.exitCode, artifacts: [] };
+      checks.push(visualCheck);
       await writeExclusive(fs, passRoot, "process.log", `${result.stdout}\n${result.stderr}`);
       const retained = await retainBrowserArtifacts(fs, project, passRoot);
+      visualCheck.artifacts = retained;
       const report = await boundedRead(fs, root, `${pass}-report.json`);
       await writeExclusive(fs, passRoot, "report.json", report);
       validateAppTransitionVisualReport(JSON.parse(report.toString("utf8")), pass === "candidate");
       if (![0, 1].includes(result.exitCode) || (pass !== "candidate" && result.exitCode !== 0)) fail("VISUAL_COMPARISON_FAILED");
-      checks.push({ name: pass, exitCode: result.exitCode, artifacts: retained });
       for (const viewport of Object.keys(viewports)) {
         const matches = retained.filter(({ path }) => path.endsWith(`/${viewport}-captured.png`));
         if (matches.length !== 1) fail("VISUAL_CAPTURE_MISSING");

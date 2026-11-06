@@ -694,7 +694,7 @@ test("package release workflow is manual, exact-commit-bound, and least privileg
     isPinnedGitHubActionReference(setupReference, "pnpm/setup"),
     true,
   );
-  assert.match(workflow, /^          version: 11\.20\.0$/m);
+  assert.match(workflow, /^          version: 11\.28\.1$/m);
   assert.match(workflow, /^          runtime: node@22\.23\.2$/m);
   assert.match(workflow, /^          cache: false$/m);
   assert.match(workflow, /^          install: false$/m);
