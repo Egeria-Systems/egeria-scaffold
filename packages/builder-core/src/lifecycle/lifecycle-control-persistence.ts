@@ -1,5 +1,5 @@
 import type { MigrationRecord } from "../contracts/migration.js";
-import type { InstalledState } from "../contracts/state.js";
+import type { ApplicationEnvironmentInstalledState, InstalledState } from "../contracts/state.js";
 import {
   parseMigrationLog,
   serializeMigrationRecord,
@@ -105,7 +105,7 @@ export async function persistMigrationRecord(input: Readonly<{
 
 export async function persistInstalledState(input: Readonly<{
   currentSource: string;
-  state: InstalledState;
+  state: InstalledState | ApplicationEnvironmentInstalledState;
   write: LifecycleControlWriter;
 }>): Promise<LifecycleControlPersistenceResult> {
   const source = serializeStateJson(input.state);

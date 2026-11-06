@@ -25,6 +25,8 @@ The preflight checks process inputs only. Next validates again after loading its
 
 ## Explicit target builds
 
+Supply the prerequisites for every selected service alongside these target inputs. When hosted contact is selected, follow its generated `docs/contact-form-web3forms.md` guide for the public destination and complete build examples.
+
 ```sh
 APPLICATION_ENVIRONMENT=staging pnpm --dir apps/web run check:environment:deployment
 APPLICATION_ENVIRONMENT=staging pnpm --dir apps/web run build
