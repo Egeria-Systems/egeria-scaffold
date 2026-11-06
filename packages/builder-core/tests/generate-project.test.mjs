@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import {
   chmod,
   cp,
@@ -14,7 +15,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { parse as parseYaml } from "yaml";
@@ -836,22 +837,51 @@ async function withTestRoot(run) {
   }
 }
 
-async function createFakePnpmExecutable(owner) {
+const syntheticEnvironment = {
+  ARBITRARY_INHERITED_VALUE: "",
+  UV_USE_IO_URING: "synthetic=parent-only",
+};
+
+async function createFakePnpmExecutable(owner, { observeEntryEnvironment = false } = {}) {
   const executable = join(owner, "fake-pnpm");
   const controlPath = join(owner, "fake-pnpm-control.json");
   const logPath = join(owner, "fake-pnpm-log.jsonl");
-const source = `#!${process.execPath}
+  const readLinuxEntry = observeEntryEnvironment && process.platform === "linux";
+  const source = `#!${process.execPath}
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { basename, dirname, join } from "node:path";
 
 const control = JSON.parse(readFileSync(${JSON.stringify(controlPath)}, "utf8"));
 const arguments_ = process.argv.slice(2);
 const operation = arguments_.join(" ");
+const entries = ${readLinuxEntry}
+  ? readFileSync(0, "utf8").split("\\0").filter(Boolean).map((entry) => {
+      const separator = entry.indexOf("=");
+      return [entry.slice(0, separator), entry.slice(separator + 1)];
+    })
+  : Object.entries(process.env);
+// The verifier uses the fixture owner's spelling even when cwd resolves a temporary-directory alias.
+const support = join(${JSON.stringify(owner)}, basename(dirname(process.cwd())), "support");
+// Persist every key, but record a value only when it matches that key's fixture expectation.
+const expectedEnvironment = {
+  CI: "true",
+  NEXT_TELEMETRY_DISABLED: "1",
+  WRANGLER_SEND_METRICS: "false",
+  NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/",
+  HOME: join(support, "home"),
+  NPM_CONFIG_USERCONFIG: join(support, ".npmrc"),
+  VOLTA_HOME: ${JSON.stringify(join(await realpath(owner), ".volta"))},
+  VOLTA_FEATURE_PNPM: "1",
+  ...${JSON.stringify(syntheticEnvironment)},
+};
 appendFileSync(
   ${JSON.stringify(logPath)},
   JSON.stringify({
     arguments: arguments_,
     cwd: process.cwd(),
-    environment: process.env,
+    environment: Object.fromEntries(entries.map(([key, value]) => [
+      key, Object.hasOwn(expectedEnvironment, key) && expectedEnvironment[key] === value ? value : null,
+    ])),
     gitControlPresent: existsSync(".git"),
   }) + "\\n",
 );
@@ -873,7 +903,14 @@ if (operation === "--version") {
 }
 `;
 
-  await writeFile(executable, source);
+  if (readLinuxEntry) {
+    // The shell opens its initial environment before the Node launcher can alter it.
+    const quotedNode = "'" + process.execPath.replaceAll("'", "'\\''") + "'";
+    await writeFile(`${executable}.mjs`, source);
+    await writeFile(executable, `#!/bin/sh\n${quotedNode} "$0.mjs" "$@" <"/proc/$$/environ"\nexit "$?"\n`);
+  } else {
+    await writeFile(executable, source);
+  }
   await chmod(executable, 0o700);
   await writeFile(controlPath, "{}\n");
 
@@ -1030,10 +1067,33 @@ test("lockfile preparation reports a failed exclusive-write source mutation", as
   });
 });
 
+test("the fake pnpm records empty and explicitly supplied Linux entry environments", {
+  skip: process.platform !== "linux",
+}, async () => {
+  await withTestRoot(async (owner) => {
+    const fakePnpm = await createFakePnpmExecutable(owner, { observeEntryEnvironment: true });
+    const collidingValues = { UNASSERTED_SYNTHETIC_VALUE: "false", CI: "false" };
+    for (const environment of [{}, syntheticEnvironment, collidingValues]) {
+      execFileSync(fakePnpm.executable, ["--version"], {
+        cwd: owner,
+        env: environment,
+        timeout: 5_000,
+      });
+    }
+    const calls = await fakePnpm.readCalls();
+    assert.deepEqual(calls.map(({ environment }) => environment), [
+      {},
+      syntheticEnvironment,
+      { UNASSERTED_SYNTHETIC_VALUE: null, CI: null },
+    ]);
+  });
+});
+
 test("the pnpm verifier materializes reviewed recipe bytes before exact isolated commands", async (context) => {
   const originalEnvironment = {
     WRANGLER_SEND_METRICS: process.env.WRANGLER_SEND_METRICS,
     ARBITRARY_INHERITED_VALUE: process.env.ARBITRARY_INHERITED_VALUE,
+    ...(process.platform === "linux" && { UV_USE_IO_URING: process.env.UV_USE_IO_URING }),
   };
   context.after(() => {
     for (const [key, value] of Object.entries(originalEnvironment)) {
@@ -1046,9 +1106,12 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
   });
   process.env.WRANGLER_SEND_METRICS = "true";
   process.env.ARBITRARY_INHERITED_VALUE = "must-not-reach-child";
+  if (process.platform === "linux") {
+    process.env.UV_USE_IO_URING = syntheticEnvironment.UV_USE_IO_URING;
+  }
 
   await withTestRoot(async (owner) => {
-    const fakePnpm = await createFakePnpmExecutable(owner);
+    const fakePnpm = await createFakePnpmExecutable(owner, { observeEntryEnvironment: true });
     const source = await createVerifierSource(owner);
     await writeFile(join(source, ".git"), "gitdir: /private/shared-git-authority\n");
     const canonicalSource = await realpath(source);
@@ -1108,6 +1171,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       "NPM_TOKEN",
       "NODE_OPTIONS",
       "ARBITRARY_INHERITED_VALUE",
+      "UV_USE_IO_URING",
     ];
     const allowedEnvironmentKeys = new Set([
       "CI",
@@ -1168,10 +1232,10 @@ test("the pnpm verifier preserves only derived Volta tool resolution with an iso
     const calls = await fakePnpm.readCalls();
     const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
     assert.equal(calls.length, 9);
-    for (const { environment } of calls) {
+    for (const { cwd, environment } of calls) {
       assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
       assert.equal(environment.VOLTA_FEATURE_PNPM, "1");
-      assert.notEqual(environment.HOME, canonicalVoltaHome);
+      assert.equal(environment.HOME, join(owner, basename(dirname(cwd)), "support", "home"));
     }
   });
 });
