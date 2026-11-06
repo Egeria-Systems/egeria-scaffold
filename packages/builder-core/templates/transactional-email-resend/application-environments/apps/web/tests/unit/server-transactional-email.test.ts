@@ -3,20 +3,31 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TransactionalEmailSender } from "@/src/application/transactional-email-sender";
 import { serverTransactionalEmailLayer } from "@/src/composition/server-transactional-email";
 
-const { getCloudflareContext, reportTransactionalEmailEvent } = vi.hoisted(() => ({
+import * as eventReporting from "@/src/infrastructure/observability/transactional-email-events";
+
+const { getCloudflareContext } = vi.hoisted(() => ({
   getCloudflareContext: vi.fn<() => Promise<unknown>>(),
-  reportTransactionalEmailEvent: vi.fn(),
 }));
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext }));
-vi.mock("@/src/infrastructure/observability/transactional-email-events", () => ({ reportTransactionalEmailEvent }));
+vi.mock("@/src/infrastructure/observability/transactional-email-events", { spy: true });
+const records: unknown[] = [];
+async function settleReports() {
+  for (const result of vi.mocked(eventReporting.reportTransactionalEmailEvent).mock.results) {
+    if (result.type === "return") await result.value;
+  }
+}
 
 const send = Effect.gen(function* () {
   const sender = yield* TransactionalEmailSender;
   return yield* sender.send({ to: "recipient@example.net", subject: "Test", text: "Test", idempotencyKey: "opaque-test-key" });
 }).pipe(Effect.provide(serverTransactionalEmailLayer));
 
-beforeEach(() => { vi.stubEnv("NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "production"); });
-afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetAllMocks(); });
+beforeEach(() => {
+  vi.stubEnv("NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "production");
+  records.length = 0;
+  vi.spyOn(console, "info").mockImplementation(record => { records.push(record); });
+});
+afterEach(async () => { await settleReports(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.resetAllMocks(); });
 
 it("loads runtime secrets lazily and uses native fetch only after local validation", async () => {
   const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "controlled-message-reference" }));
@@ -27,9 +38,12 @@ it("loads runtime secrets lazily and uses native fetch only after local validati
   } });
   expect(getCloudflareContext).not.toHaveBeenCalled();
   expect(await Effect.runPromise(send)).toEqual({ status: "accepted", messageReference: "controlled-message-reference" });
-  expect(getCloudflareContext).toHaveBeenCalledExactlyOnceWith({ async: true });
+  await settleReports();
+  expect(getCloudflareContext).toHaveBeenCalledWith({ async: true });
+  expect(records).toHaveLength(1);
+  expect(records[0]).toMatchObject({ event_name: "transactional.email.send", environment: "production" });
   expect(request).toHaveBeenCalledOnce();
-  expect(reportTransactionalEmailEvent).toHaveBeenCalledExactlyOnceWith({ outcome: "accepted" });
+  expect(eventReporting.reportTransactionalEmailEvent).toHaveBeenCalledExactlyOnceWith({ outcome: "accepted" });
 });
 
 it("contains unavailable runtime configuration without revealing provider exceptions", async () => {
@@ -58,7 +72,11 @@ it.each([
   const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: "controlled-message-reference" }));
   vi.stubGlobal("fetch", request);
   const exit = await Effect.runPromiseExit(send);
+  await settleReports();
   expect(request.mock.calls.length).toBe(attempts);
+  expect(records).toHaveLength(runtime === "staging" ? 1 : 0);
+  if (runtime === "staging") expect(records[0]).toMatchObject({ environment: "staging" });
+  expect(JSON.stringify(records)).not.toMatch(/recipient@|sender@|re_controlled|opaque-test-key|controlled-message-reference/u);
   if (outcome === "accepted") expect(Exit.isSuccess(exit)).toBe(true);
   else {
     expect(Exit.isFailure(exit)).toBe(true);
@@ -91,5 +109,7 @@ it("runs the documented local example with intercepted transport", async () => {
     });
   }).pipe(Effect.provide(serverTransactionalEmailLayer));
   const result = await Effect.runPromise(program);
+  await settleReports();
   expect({ status: result.status, attemptedCalls }).toEqual({ status: "accepted", attemptedCalls: 1 });
+  expect(records[0]).toMatchObject({ environment: "development" });
 });

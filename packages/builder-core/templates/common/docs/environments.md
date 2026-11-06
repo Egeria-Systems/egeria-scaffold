@@ -46,7 +46,10 @@ For production-like local evidence, build an explicit target, prepare OpenNext o
 
 ## Service configuration and recovery
 
-The examples contain configuration names only for selected capabilities. Better Stack is optional: leave both runtime provider fields empty for console-only operation. The consuming observability and selected-service guides own provider validation, setup and composed examples as those environment consumers become available.
+The examples contain configuration names only for selected capabilities. Better Stack is optional: leave both runtime provider fields empty for console-only operation. The [observability guide][observability-guide] owns provider validation, setup, staging browser diagnostics and composed examples; selected-service guides own their independent configuration.
+
+<!-- This link resolves in the generated repository. -->
+[observability-guide]: observability.md
 
 Use appropriate shared nonproduction provider resources within one project; keep production resources separate. Local persistent state stays simulated. Provider rules or actual security and test-interference boundaries can require finer separation. Analytics collection stays off by default and requires explicit activation plus visitor consent. Common target declarations alone do not prove resource isolation, Access protection, workflow approval or provider behavior.
 
