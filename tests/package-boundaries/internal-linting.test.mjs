@@ -160,6 +160,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.analytics.tsx",
         messages: [],
       },
