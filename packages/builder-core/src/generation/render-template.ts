@@ -24,6 +24,16 @@ const templateTokenNames = new Set([
   "displayNameJson",
   "workerName",
   "workerEntryJson",
+  "githubSourceRevisionOutputExpression",
+  "githubVerifiedRevisionExpression",
+  "githubTokenExpression",
+  "githubSiteOriginExpression",
+  "githubExpectedStagingDatabaseIdExpression",
+  "githubExpectedProductionDatabaseIdExpression",
+  "githubStagingJobRetentionReviewedExpression",
+  "githubProductionJobRetentionReviewedExpression",
+  "githubAccessClientIdExpression",
+  "githubAccessClientSecretExpression",
   "githubWorkflowExpression",
   "githubRefExpression",
   "githubShaExpression",
@@ -45,7 +55,7 @@ const templateTokenNames = new Set([
   "web3FormsAccessKeyJson",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubSourceRevisionOutputExpression|githubVerifiedRevisionExpression|githubTokenExpression|githubSiteOriginExpression|githubExpectedStagingDatabaseIdExpression|githubExpectedProductionDatabaseIdExpression|githubStagingJobRetentionReviewedExpression|githubProductionJobRetentionReviewedExpression|githubAccessClientIdExpression|githubAccessClientSecretExpression|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -61,6 +71,17 @@ const applicationEnvironmentAnalyticsSettingsSource =
   "analytics/application-environments/apps/web/src/integrations/analytics/analytics-settings.ts.template";
 const analyticsTokenNames = new Set(["analyticsSettingsJson"]);
 const fixedTemplateTokens = {
+  githubSourceRevisionOutputExpression: "${{ steps.source.outputs.revision }}",
+  githubVerifiedRevisionExpression: "${{ needs.verify-source.outputs.revision }}",
+  githubTokenExpression: "${{ github.token }}",
+  githubSiteOriginExpression: "${{ vars.NEXT_PUBLIC_SITE_URL }}",
+  githubExpectedStagingDatabaseIdExpression: "${{ inputs.expected_staging_database_id }}",
+  githubExpectedProductionDatabaseIdExpression: "${{ inputs.expected_production_database_id }}",
+  githubStagingJobRetentionReviewedExpression: "${{ inputs.staging_job_retention_reviewed }}",
+  githubProductionJobRetentionReviewedExpression: "${{ inputs.production_job_retention_reviewed }}",
+  githubAccessClientIdExpression: "${{ secrets.CF_ACCESS_CLIENT_ID }}",
+  githubAccessClientSecretExpression: "${{ secrets.CF_ACCESS_CLIENT_SECRET }}",
+
   githubWorkflowExpression: "${{ github.workflow }}",
   githubRefExpression: "${{ github.ref }}",
   githubShaExpression: "${{ github.sha }}",

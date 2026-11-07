@@ -100,10 +100,10 @@ for (const [profile, lockfile] of [
     assert.equal(project.recipeVersion, { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile]);
     assert.equal(versions["transactional-email-resend"], "0.2.0");
     assert.equal(versions["app-foundation"], "0.3.0");
-    assert.equal(versions.standards, "0.7.1");
-    assert.equal(versions["deployment-cloudflare"], "0.7.1");
+    assert.equal(versions.standards, "0.9.0");
+    assert.equal(versions["deployment-cloudflare"], "0.9.0");
     assert.equal(versions["application-persistence"], undefined);
-    assert.equal(versions["site-routing"], profile === "portfolio" ? undefined : "0.4.0");
+    assert.equal(versions["site-routing"], profile === "portfolio" ? undefined : "0.5.0");
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.dependencies.resend, undefined);
@@ -131,8 +131,8 @@ test("environment email composes with independently selected current persistence
   assert.equal(versions["transactional-email-resend"], "0.2.0");
   assert.equal(versions["app-foundation"], "0.3.0");
   assert.equal(versions["application-persistence"], "0.2.0");
-  assert.equal(versions.standards, "0.8.0");
-  assert.equal(versions["deployment-cloudflare"], "0.8.0");
+  assert.equal(versions.standards, "0.10.0");
+  assert.equal(versions["deployment-cloudflare"], "0.10.0");
   const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
   assert.equal(resolveRecipeLockfileVersion(project, manifest), "app-0.2.7-persistence");
 });

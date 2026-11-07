@@ -175,7 +175,6 @@ function validateRequest(
     for (const key of ["multilingual", "applicationPersistence", "transactionalEmailResend", "backgroundJobDelivery"] as const) {
       if (Object.hasOwn(value, key) && value[key] !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", key], "invalid-selection");
     }
-    if (includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
     return {
       ok: true,
       value: {
@@ -188,6 +187,7 @@ function validateRequest(
         ...(includesMultilingual ? { multilingual: true } : {}),
         ...(includesPersistence ? { applicationPersistence: true } : {}),
         ...(includesEmail ? { transactionalEmailResend: true } : {}),
+        ...(includesJobs ? { backgroundJobDelivery: true } : {}),
       },
     };
   }

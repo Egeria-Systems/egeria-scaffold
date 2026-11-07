@@ -1,5 +1,7 @@
 # Application persistence
 
+Follow [Application environments](environments.md) for the single origin, source build identity, prepared receipts, protected test transport and GitHub release setup. Service configuration below supplements those requirements.
+
 `APP_DB` is an optional Cloudflare D1 binding. Drizzle defines application schema and generates SQL; Wrangler applies SQL and owns the `d1_migrations` ledger. Do not also run a Drizzle runtime migrator against this database.
 
 The starter schema is empty. Add tables only for a concrete application requirement. Keep Cloudflare bindings and Drizzle in infrastructure or composition code. When a use case needs persistence, define a narrow port at that consuming boundary and implement its D1 adapter; do not introduce a generic database service or expose D1 types through domain, presentation, or client code.

@@ -146,6 +146,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/common/application-environments/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/common/apps/web/app/error.tsx",
         messages: [],
       },
@@ -187,6 +192,16 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/contact-form-web3forms/application-environments/apps/web/app/layout.multilingual-analytics.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/apps/web/app/layout.multilingual.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/apps/web/app/layout.tsx",
         messages: [],
       },
       {
@@ -241,6 +256,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/multilingual/application-environments/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/multilingual/application-environments/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
         messages: [],
       },
@@ -282,6 +302,16 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/multilingual/apps/web/src/presentation/localized-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/application-environments/apps/web/app/about/production-page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/site/application-environments/apps/web/app/work/featured/page.tsx",
         messages: [],
       },
       {

@@ -1,5 +1,7 @@
 # Analytics configuration and operations
 
+Follow [Application environments](environments.md) for the single origin, source build identity, prepared receipts, protected test transport and GitHub release setup. Service configuration below supplements those requirements.
+
 Analytics selection belongs to `.egeria/project.yaml`; destinations and activation belong to the build environment. This environment-aware generation is an internal candidate until the complete public generator is activated. Use the existing approved internal generation workflow; there is no public environment-selection CLI switch to enable it early.
 
 The generated selection contains only chosen providers, Clarity's audience declaration and optional operational integrations. Keep identifiers, origins and activation values out of project/state controls. Provider identifiers are public browser configuration, not credentials; never supply API keys or private data through these variables.
@@ -15,7 +17,7 @@ Use `apps/web/.env.local` for Next development or supply process variables to th
 | `NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN` | Cloudflare manual Web Analytics site token, 32 hexadecimal characters |
 | `NEXT_PUBLIC_GA4_MEASUREMENT_ID` | GA4 stream identifier, `G-` followed by 6–20 uppercase letters/digits |
 | `NEXT_PUBLIC_CLARITY_PROJECT_ID` | Clarity project identifier, 8–32 lowercase letters/digits |
-| `NEXT_PUBLIC_SITE_URL` | Selected Clarity's exact browser origin; HTTPS for staging/production |
+| `NEXT_PUBLIC_SITE_URL` | Common canonical site origin; selected Clarity also checks the browser origin |
 | `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | Selected Search Console HTML token, 16–128 URL-safe letters/digits/underscore/hyphen; required only in production |
 
 Do not set `NEXT_PUBLIC_APPLICATION_ENVIRONMENT` separately; the build derives it. An independently supplied conflicting value refuses the build. A Clarity origin may have one trailing slash but no credentials, other path, query or fragment. Development also accepts HTTP loopback origins. When Clarity is selected, a different browser origin prevents the whole selected collection set from loading.
@@ -63,6 +65,7 @@ Next reads the copied `.env.local`; leave collection false there. Fill contact/b
 
 ```sh
 export APPLICATION_ENVIRONMENT=staging
+export BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # synthetic local example
 export NEXT_PUBLIC_ANALYTICS_ENABLED=true
 export NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=0123456789abcdef0123456789abcdef
 export NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-TEST123456
@@ -85,6 +88,7 @@ Build production separately from the same reviewed source after selecting produc
 
 ```sh
 export APPLICATION_ENVIRONMENT=production
+export BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa # synthetic local example
 export NEXT_PUBLIC_ANALYTICS_ENABLED=true
 export NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN=fedcba9876543210fedcba9876543210
 export NEXT_PUBLIC_GA4_MEASUREMENT_ID=G-PROD123456

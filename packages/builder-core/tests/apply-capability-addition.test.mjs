@@ -1274,7 +1274,7 @@ test("environment persistence addition verifies bindings before changing control
     const state = core.parseStateJson(repository.files.get(".egeria/state.json"), "2.0.0");
     assert.equal(state.ok, true);
     assert.deepEqual(state.value.appliedMigrations, ["add-application-persistence-0-2-0"]);
-    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.8.0");
+    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.10.0");
     for (const identifier of ["contact-form-web3forms", "booking-calendly", "multilingual"]) assert.ok(state.value.installedCapabilities.some(capability => capability.identifier === identifier));
     assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   }
@@ -1417,6 +1417,26 @@ test("environment analytics addition retains selection through late replan and s
       assert.equal(repository.files.get(".egeria/state.json"), stateBefore);
       assert.equal(repository.files.get(".egeria/migrations.jsonl"), "");
       assert.equal(repository.writes.length, scenario === "changed-selection" ? 0 : 1);
+    }
+  }
+});
+
+
+test("environment jobs lifecycle refuses before repository adapters", async () => {
+  const forbidden = () => { throw new Error("repository adapter must not run"); };
+  for (const persistence of [false, true]) {
+    const renderingContext = core.createApplicationEnvironmentRenderingContext(persistence, false, true);
+    for (const operation of ["add", "remove"]) {
+      const code = operation === "add" ? "CAPABILITY_ADDITION_UNSUPPORTED" : "CAPABILITY_REMOVAL_UNSUPPORTED";
+      const common = { capability: "background-job-delivery", renderingContext, reader: { readText: forbidden }, git };
+      const planned = await (operation === "add" ? core.planCapabilityAddition : core.planCapabilityRemoval)(common);
+      assert.equal(planned.ok, false);
+      assert.equal(planned.issues[0].code, code);
+      const result = await (operation === "add" ? core.applyCapabilityAddition : core.applyCapabilityRemoval)({
+        ...common, root, approvedPlanFingerprint: `sha256:${"a".repeat(64)}`,
+        inspectWorktree: forbidden, writer: { write: forbidden }, verifier: { verifyInIsolatedCopy: forbidden },
+      });
+      assert.deepEqual(result, { ok: false, code, phase: "precondition", recovery: "not-required" });
     }
   }
 });

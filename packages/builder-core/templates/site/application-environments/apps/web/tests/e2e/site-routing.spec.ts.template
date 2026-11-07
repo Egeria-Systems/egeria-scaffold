@@ -1,0 +1,52 @@
+import { expect, test } from "./application-test";
+
+const siteTitle = {{displayNameJson}};
+const siteOrigin = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").origin;
+const routes = [
+  { path: "/", title: siteTitle },
+  { path: "/about", title: "About" },
+  { path: "/work/featured", title: "Featured work" },
+] as const;
+
+test("serves route metadata and active navigation across a nested route", async ({
+  openApplicationPage, page,
+}) => {
+  for (const route of routes) {
+    await openApplicationPage(page, route.path);
+    await expect(page).toHaveTitle(route.title);
+    await expect(page.locator('meta[name="description"]')).toHaveAttribute(
+      "content",
+      /\S/u,
+    );
+    await expect(page.locator('nav a[aria-current="page"]')).toHaveAttribute(
+      "href",
+      route.path,
+    );
+  }
+});
+
+test("publishes crawl metadata, redirects the work index, and serves a content-backed not-found page", async ({
+  openApplicationPage, page,
+  getApplicationResponse,
+}) => {
+  const sitemap = await getApplicationResponse("/sitemap.xml");
+  expect(sitemap.ok()).toBe(true);
+  expect(await sitemap.text()).toContain(`${siteOrigin}/work/featured`);
+
+  const robots = await getApplicationResponse("/robots.txt");
+  expect(robots.ok()).toBe(true);
+  const robotsContent = await robots.text();
+  expect(robotsContent).toContain(`${siteOrigin}/sitemap.xml`);
+  expect(robotsContent).toContain(process.env.APPLICATION_ENVIRONMENT === "production" ? "Allow: /" : "Disallow: /");
+
+  await openApplicationPage(page, "/work");
+  await expect(page).toHaveURL(/\/work\/featured$/u);
+
+  const missing = await openApplicationPage(page, "/missing-page");
+  expect(missing?.status()).toBe(404);
+  expect(await page.locator('meta[name="robots"]').evaluateAll(elements => elements.map(element => element.getAttribute("content")).join(","))).toContain("noindex");
+  await expect(page).toHaveTitle("Page not found");
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Page not found" }),
+  ).toBeVisible();
+});

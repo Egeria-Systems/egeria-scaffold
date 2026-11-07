@@ -23,20 +23,73 @@ pnpm --dir apps/web run dev
 
 The preflight checks process inputs only. Next validates again after loading its own environment files. Actual `.env*` and `.dev.vars*` files are ignored; only the examples belong in source control. Never put secrets into a `NEXT_PUBLIC_` variable or Next configuration's `env` map. Public values are visible to visitors and must be selected before compilation.
 
-## Explicit target builds
+## Origin and prepared target builds
 
-Supply the prerequisites for every selected service alongside these target inputs. When hosted contact is selected, follow its generated `docs/contact-form-web3forms.md` guide for the public destination and complete build examples.
+`NEXT_PUBLIC_SITE_URL` is the single canonical site origin for metadata, sitemap, language links and selected analytics. Staging/production require an HTTPS origin without credentials, a path, query or fragment. Development alone may default to `http://localhost:3000` or use HTTP loopback. Next compiles the literal public input; Worker variables cannot replace it. Nonproduction metadata is noindex/nofollow and its robots file disallows crawling. Robots is not access control.
+
+Release preflight also requires `BUILD_SOURCE_REVISION`, exactly 40 lowercase hexadecimal characters. Next's actual build ID binds that revision and target. Do not set `NEXT_DEPLOYMENT_ID` or override `deploymentId`. Use separate fresh checkouts or generated temporary directories for each target; never reuse a receipt to relabel an old build. Supply every selected service's inputs alongside the following values.
+
+These local examples use a clearly synthetic revision and placeholder origins. They do not represent source approval or deploy anything:
 
 ```sh
-APPLICATION_ENVIRONMENT=staging pnpm --dir apps/web run check:environment:deployment
-APPLICATION_ENVIRONMENT=staging pnpm --dir apps/web run build
-APPLICATION_ENVIRONMENT=production pnpm --dir apps/web run check:environment:deployment
-APPLICATION_ENVIRONMENT=production pnpm --dir apps/web run build
+export BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+export APPLICATION_ENVIRONMENT=staging
+export NEXT_PUBLIC_SITE_URL=https://staging.example.test
+pnpm --dir apps/web run check:environment:deployment
+pnpm --dir apps/web run build
+CLOUDFLARE_ENV=staging pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
 ```
 
-Build the two targets separately from the same reviewed revision. A runtime variable cannot retarget an existing artifact; changing any public build value requires rebuilding. Missing or malformed deployment targets refuse preflight. Diagnostics identify the field and reason without printing the rejected value.
+In a second fresh checkout, use the same synthetic revision and production inputs:
 
-Wrangler's default target is development. Its named `staging` and `production` declarations provide matching runtime values. Select the matching Wrangler environment when running a local preview of a target artifact. Vars and bindings do not inherit into named environments; retain each declared binding. Local preview is diagnostic evidence. GitHub Actions remains the sole deployment authority, and actual deployment, protected staging and provider operations require their own approval.
+```sh
+export BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+export APPLICATION_ENVIRONMENT=production
+export NEXT_PUBLIC_SITE_URL=https://www.example.test
+pnpm --dir apps/web run check:environment:deployment
+pnpm --dir apps/web run build
+CLOUDFLARE_ENV=production pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild
+```
+
+If jobs are selected, prepare their separately bundled wrapper and native input metadata before recording:
+
+```sh
+(cd apps/web && pnpm exec wrangler deploy --dry-run --env "$APPLICATION_ENVIRONMENT" --outdir .open-next/jobs-bundle --metafile .open-next/jobs-inputs.json --x-provision=false --x-auto-create=false)
+```
+
+Then record and check only the prepared output. The generated preview config invokes the adapter directly and simulates bindings locally; it does not run `next dev` or rebuild. Supply the selected service guides' independent test expectations too.
+
+```sh
+pnpm --dir apps/web run check:prepared-artifact record "$APPLICATION_ENVIRONMENT" "$BUILD_SOURCE_REVISION" --local
+pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$BUILD_SOURCE_REVISION" --local
+pnpm --dir apps/web run test:e2e:preview
+pnpm --dir apps/web run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$BUILD_SOURCE_REVISION" --local
+```
+
+Run development browser tests before these final builds. After recording, do not run any command that rebuilds or starts Next development. A changed/missing artifact or unsupported bundling input fails closed. Preserve the failing receipt and logs, inspect the cause, and rebuild in a new temporary checkout after correction. Do not overwrite a receipt. The receipt detects accidental mixing; it is not a signature or authenticity proof. The pinned real bundle, copied build ID and queue Text-module import still need actual local verification before acceptance.
+
+## GitHub and Cloudflare release setup
+
+The generated workflow verifies one reviewed clean main revision, deploys staging, completes protected smoke checks, then gates a separate production build through GitHub's native production environment. Reruns are refused: dispatch a fresh reviewed run. Release concurrency queues without cancelling an active release. Persistence deployments and migrations share a target-specific database lock; deployment never invokes migrations. Jobs dispatch requires separate exact-true staging and production retention attestations.
+
+Configure named `staging` and `production` GitHub environments. Each must allow exactly the `main` branch through selected-branch policies, with no tags or wildcard branch rules. Production requires at least one native reviewer and self-review prevention. Before enabling release, verify repository visibility/plan eligibility, actual reviewer eligibility, and disable administrator bypass in GitHub settings. The read-only API guard checks available rules and the current run's separate human approval; unavailable or malformed responses refuse. It cannot establish bypass settings or eliminate races after a read.
+
+| Configuration | Owner |
+| --- | --- |
+| `NEXT_PUBLIC_SITE_URL`, `DEPLOY_URL`, selected public integration values | GitHub environment variables, per target; both origins must be identical exact HTTPS origins |
+| `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN` | Target GitHub environment secrets; available only in the deployment step |
+| `CF_ACCESS_CLIENT_ID`, `CF_ACCESS_CLIENT_SECRET` | Staging GitHub environment secrets; available only in protected readiness/smoke |
+| Resend, Better Stack and other private application values | Worker secret stores, independently configured per target; never build inputs |
+| Reviewed database IDs and migration-set hash | Explicit dispatch inputs checked against target variables, source and SQL |
+| Local build/runtime inputs | Ignored `.env.local` / `.dev.vars`; do not commit actual values |
+
+Keep public boolean-like strings raw so the owning validator applies its exact semantics. Do not forward unselected provider inputs. A change to public build configuration requires a new target build.
+
+Configure reviewed custom routes/domains before deployment: named staging/production Workers have `workers_dev: false` and `preview_urls: false`. No client hostname or Cloudflare resource is invented. Independently inspect every alternate hostname, route and version URL in the actual account. Protect the complete staging origin with an Access **Service Auth** policy for the machine service token; also test expected denial without it. Human Access sessions used for staging diagnostics are a separate contract in the observability guide.
+
+Protected tests send service-token headers only to the exact `DEPLOY_URL`. API redirects are bounded and validated one hop at a time; browser authenticated redirects fail closed. Intentional routing uses `getApplicationResponse` and `openApplicationPage`. Unmocked external requests and sockets are denied; provider tests return controlled responses. Trace, screenshots, video, HAR, debug modes and request-audit attachments are forbidden during protected runs. Do not enable runner/step debugging or print these secrets. Readiness is bounded and uses the same protected transport, not unauthenticated curl.
+
+Run `pnpm --dir apps/web run test:deployment-contracts` for local artifact/native-protection contracts and `test:transport` for the dedicated HTTPS loopback canaries. The latter alone allows ephemeral self-signed canary certificates; deployed tests keep TLS verification enabled. These checks do not certify GitHub approvals, live Access coverage, provider retention, accessibility conformance or production safety. Only GitHub Actions has deployment authority, after the actual environment, source, data and provider approvals.
 
 ## Foundation health example
 
