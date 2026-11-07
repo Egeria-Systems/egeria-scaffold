@@ -2334,8 +2334,9 @@ const deploymentSnapshotCases = [
   },
   {
     name: "explicit internal environments",
-    version: "0.7.1",
-    snapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0" },
+    version: "0.9.0",
+    retiredVersions: ["0.7.0", "0.7.1", "0.8.0"],
+    snapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0" },
   },
 ];
 
@@ -2359,14 +2360,16 @@ test("current deployment snapshots select exact supported adapter packages", asy
 });
 
 test("retired deployment tuples are refused by snapshot selection", async (t) => {
-  for (const { name, version, snapshot } of deploymentSnapshotCases) {
+  for (const { name, version, retiredVersions = [version.replace(/\.1$/, ".0")], snapshot } of deploymentSnapshotCases) {
     await t.test(name, () => {
-      const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
-        ...snapshot,
-        deploymentCloudflare: version.replace(/\.1$/, ".0"),
-      });
-      assert.equal(result.ok, false);
-      assert.equal(result.issues.some(({ code }) => code === "CAPABILITY_DESCRIPTOR_VERSION_INVALID"), true);
+      for (const retiredVersion of retiredVersions) {
+        const result = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+          ...snapshot,
+          deploymentCloudflare: retiredVersion,
+        });
+        assert.equal(result.ok, false, retiredVersion);
+        assert.equal(result.issues.some(({ code }) => code === "CAPABILITY_DESCRIPTOR_VERSION_INVALID"), true);
+      }
     });
   }
 });
