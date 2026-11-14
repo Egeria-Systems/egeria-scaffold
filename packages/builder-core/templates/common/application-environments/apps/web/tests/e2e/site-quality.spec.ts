@@ -126,7 +126,7 @@ test("renders structured content without page or console errors", async ({
 });
 
 test("uses the configured origin and target for every emitted page metadata", async ({ page, openApplicationPage }) => {
-  const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").origin;
+  const origin = new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").origin;
   const production = process.env.APPLICATION_ENVIRONMENT === "production";
   for (const path of await discoverContentPaths(page, openApplicationPage)) {
     await openApplicationPage(page, path);
