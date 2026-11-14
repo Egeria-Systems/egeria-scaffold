@@ -2434,8 +2434,17 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   assert.ok(stepNames.indexOf("Add deployed-only journey specification") < stepNames.indexOf("Prepare protected staging artifact"));
   assert.match(stepsByName["Add deployed-only journey specification"].run, /git[^\n]+status --porcelain=v1 --untracked-files=all/u);
   assert.match(stepsByName["Add deployed-only journey specification"].run, /SYNTHETIC_GENERATED_REVISION/u);
-  const deployment = stepsByName["Deploy synthetic client Worker"].run;
-  assert.ok(deployment.indexOf('run check:prepared-artifact verify staging') < deployment.indexOf('opennextjs-cloudflare deploy'));
+  const deployment = stepsByName["Deploy synthetic client Worker"].run.split("\n");
+  const verificationIndex = deployment.indexOf(
+    'pnpm --dir "$JOURNEY_ROOT/apps/web" run check:prepared-artifact verify staging "$EXPECTED_REVISION" --builder-generated="$SYNTHETIC_GENERATED_REVISION"',
+  );
+  const deployIndex = deployment.findIndex((line) =>
+    line.startsWith('pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare deploy '),
+  );
+  assert.ok(
+    verificationIndex >= 0 && deployIndex > verificationIndex,
+    "verify the prepared staging artifact before deploying",
+  );
   const browser = stepsByName["Test deployed synthetic client journey"].env;
   assert.equal(browser.APPLICATION_ENVIRONMENT, "staging");
   assert.equal(browser.NEXT_PUBLIC_SITE_URL, "${{ vars.DEPLOY_URL }}");
