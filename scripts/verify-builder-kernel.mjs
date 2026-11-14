@@ -98,7 +98,7 @@ function outputObservation(line, skeletonOutput) {
     const evidence = skeletonEvidence(text);
     if (evidence) return { text: JSON.stringify(evidence) };
   }
-  const compiler = /^(?:(.{1,600})\((\d{1,7}),(\d{1,5})\): )?error (TS\d{4}):/u.exec(message);
+  const compiler = /^(?:(.{1,600})\((\d{1,7}),(\d{1,5})\): )?error (TS\d{4,5}):/u.exec(message);
   if (compiler) {
     const [, file, line, column, code] = compiler;
     const location = file && sourceLocation(file, line, column, prefix?.[1]);

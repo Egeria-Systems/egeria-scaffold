@@ -89,9 +89,10 @@ if (fixture.killChild === command) {
   process.kill(stage.pid, "SIGKILL");
 }
 if (fixture.repairDiagnostics && command === "run typecheck:builder") {
-  console.error("\u001b[31mpackages/builder-core typecheck: src/fixture.ts(4,12): error TS2322: Bearer fixtureSecretValueNeverRetain\u001b[0m");
-  console.error("packages/builder-core typecheck: src/fixtureSecretValueNeverRetain.ts(1,1): error TS2322: synthetic");
-  console.error("packages/builder-core typecheck: src/alias.ts(1,1): error TS2322: synthetic");
+  console.error("\u001b[31mpackages/builder-core typecheck: src/fixture.ts(4,12): error TS18048: Bearer fixtureSecretValueNeverRetain\u001b[0m");
+  console.error("packages/builder-core typecheck: src/fixture.ts(5,12): error TS2322: synthetic");
+  console.error("packages/builder-core typecheck: src/fixtureSecretValueNeverRetain.ts(1,1): error TS18048: synthetic");
+  console.error("packages/builder-core typecheck: src/alias.ts(1,1): error TS18048: synthetic");
   console.error("[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] fixtureSecretValueNeverRetain");
   process.exit(2);
 }
@@ -403,10 +404,13 @@ test("the public kernel report retains safe repair locations for assertions and 
   const compiler = rows["typecheck:builder"];
   assert.equal(assertion.status, "failed");
   assert.match(assertion.diagnostic, /Test failure at tests\/package-boundaries\/assertion\.test\.mjs:3:\d+/u);
-  assert.match(compiler.diagnostic, /packages\/builder-core\/src\/fixture\.ts:4:12.*TS2322/u);
+  assert.equal(compiler.diagnostic, "packages/builder-core/src/fixture.ts:4:12 TS18048");
   const assertionLog = await readFile(assertion.steps[0].log, "utf8");
   const compilerLog = await readFile(compiler.steps[0].log, "utf8");
   assert.match(assertionLog, /ERR_ASSERTION/u);
+  assert.match(compilerLog, /^stderr packages\/builder-core\/src\/fixture\.ts:4:12 TS18048$/mu);
+  assert.match(compilerLog, /^stderr packages\/builder-core\/src\/fixture\.ts:5:12 TS2322$/mu);
+  assert.match(compilerLog, /^stderr TS18048$/mu);
   assert.match(compilerLog, /ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL/u);
   assert.doesNotMatch(assertionLog + compilerLog + result.stdout + result.stderr,
     /fixtureSecretValueNeverRetain|src\/alias\.ts|\x1b/u);
