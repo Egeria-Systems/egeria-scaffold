@@ -8,6 +8,14 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+
+import { readPathIdentity } from "../../scripts/lib/isolated-process.mjs";
+import {
+  formatGeneratedFixtureFailure,
+  generatedFixtureContracts,
+  verifyGeneratedProjectForTesting,
+} from "../../scripts/verify-generated-skeletons.mjs";
 
 const root = new URL("../../", import.meta.url);
 const manifest = JSON.parse(await readFile(new URL("package.json", root), "utf8"));
@@ -96,7 +104,10 @@ if (fixture.repairDiagnostics && command === "run typecheck:builder") {
   console.error("[ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL] fixtureSecretValueNeverRetain");
   process.exit(2);
 }
-if (fixture.failures?.includes(command)) {
+if (command === "run verify:generated-skeletons" && fixture.skeletonFailures) {
+  for (const failure of fixture.skeletonFailures) console.error(JSON.stringify(failure));
+  process.exitCode = 1;
+} else if (fixture.failures?.includes(command)) {
   console.log("\u001b[31mnot ok 1 - \u001b[0m");
   console.error("BROWSER_PREVIEW_FAILED");
   console.error("authorization=Bearer fixtureSecretValueNeverRetain");
@@ -391,6 +402,55 @@ test("the public kernel command finishes independent groups after failures", { t
     assert.doesNotMatch(log + result.stdout + result.stderr, /fixtureSecretValueNeverRetain|\x1b/u);
   }
   assert.equal(rows["changeset:status"].status, "passed");
+});
+
+test("the public kernel report retains generated skeleton failure codes", { timeout: 60000 }, async context => {
+  const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === "portfolio");
+  const portfolio = new URL("../../" + relativeRoot, import.meta.url);
+  const ownerParent = await mkdtemp(join(tmpdir(), "kernel-skeleton-diagnostics-"));
+  context.after(() => rm(ownerParent, { recursive: true, force: true }));
+
+  const privateValue = "fixtureSecretValueNeverRetain";
+  const commandFailures = [
+    ["audit signatures", "REGISTRY_SIGNATURE_CHECK_FAILED"],
+    ["run test:unit", "UNIT_TESTS_FAILED"],
+    ["run test:component", "COMPONENT_TESTS_FAILED"],
+  ];
+  const skeletonFailures = [];
+  for (const [failedCommand, code] of commandFailures) {
+    await assert.rejects(verifyGeneratedProjectForTesting(fileURLToPath(portfolio), "portfolio", {
+      createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
+      runCommand: async ({ arguments: arguments_ }) => {
+        if (arguments_.join(" ") === failedCommand) throw new Error(privateValue);
+        return arguments_[0] === "--version" ? manifest.packageManager.slice("pnpm@".length) : "";
+      },
+    }), error => {
+      const failure = formatGeneratedFixtureFailure(error);
+      assert.deepEqual(failure, { ok: false, code });
+      skeletonFailures.push({ ...failure, privateValue });
+      return true;
+    });
+  }
+  const unknownCode = "UNRECOGNIZED_FIXTURE_FAILURE";
+  skeletonFailures.push({ ok: false, code: unknownCode, privateValue });
+
+  const invocation = await fixtureInvocation(context, { skeletonFailures });
+  const result = await invocation.finish();
+  const { rows } = await readReport(invocation);
+  const group = rows["verify:generated-skeletons"];
+  assert.deepEqual([result.code, result.signal], [1, null]);
+  assert.equal(group.status, "failed");
+  assert.equal(group.diagnostic, "REGISTRY_SIGNATURE_CHECK_FAILED");
+  assert.equal(group.steps[0].exitCode, 1);
+  assert.equal(rows["changeset:status"].status, "passed");
+  assert.ok(result.completed.includes("run changeset:status"));
+
+  const log = await readFile(group.steps[0].log, "utf8");
+  const diagnostics = log.split("\n").filter(line => line.startsWith("stderr "));
+  assert.deepEqual(diagnostics, commandFailures.map(([, code]) => "stderr " + code));
+  const retained = [log, JSON.stringify(rows), result.stdout, result.stderr].join("\n");
+  assert.equal(retained.includes(privateValue), false);
+  assert.equal(retained.includes(unknownCode), false);
 });
 
 test("the public kernel report retains safe repair locations for assertions and prefixed compiler failures", {
