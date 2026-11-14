@@ -105,6 +105,11 @@ if (fixture.repairDiagnostics && command === "run typecheck:builder") {
   process.exit(2);
 }
 if (command === "run verify:generated-skeletons" && fixture.skeletonFailures) {
+  console.log(JSON.stringify(fixture.skeletonFailures[0]));
+  console.error(fixture.skeletonFailures[0].code);
+  console.error('{"ok":false,"code":"PEER_DEPENDENCY_CHECK_FAILED",');
+  console.error('{"ok":false,"code":"CLOUDFLARE_TYPE_GENERATION_FAILED","code":"PEER_DEPENDENCY_CHECK_FAILED"}');
+  console.error('{"ok":false,"code":"CLOUDFLARE_TYPE_GENERATION_FAILED","ok":true}');
   for (const failure of fixture.skeletonFailures) console.error(JSON.stringify(failure));
   process.exitCode = 1;
 } else if (fixture.failures?.includes(command)) {
@@ -115,6 +120,9 @@ if (command === "run verify:generated-skeletons" && fixture.skeletonFailures) {
   console.log("# fail 1");
   process.exitCode = 7;
 } else {
+  if (command === "run changeset:status" && fixture.skeletonFailures) {
+    console.error(JSON.stringify(fixture.skeletonFailures[0]));
+  }
   if (command === "run verify:generated-skeletons") {
     console.log(JSON.stringify({
       ok: true, fixtures: ["portfolio", "fixtureSecretValueNeverRetain"],
@@ -405,20 +413,27 @@ test("the public kernel command finishes independent groups after failures", { t
 });
 
 test("the public kernel report retains generated skeleton failure codes", { timeout: 60000 }, async context => {
-  const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === "portfolio");
-  const portfolio = new URL("../../" + relativeRoot, import.meta.url);
   const ownerParent = await mkdtemp(join(tmpdir(), "kernel-skeleton-diagnostics-"));
   context.after(() => rm(ownerParent, { recursive: true, force: true }));
 
   const privateValue = "fixtureSecretValueNeverRetain";
   const commandFailures = [
+    ["--dir apps/web run cf-typegen", "CLOUDFLARE_TYPE_GENERATION_FAILED"],
+    ["peers check", "PEER_DEPENDENCY_CHECK_FAILED"],
+    ["--dir apps/web run test:deployment-contracts", "DEPLOYMENT_CONTRACTS_FAILED"],
+    ["--dir apps/web run browser:install", "BROWSER_INSTALL_FAILED"],
+    ["--dir apps/web run test:transport", "TRANSPORT_CONTRACTS_FAILED"],
+    ["run typecheck", "CLEAN_TYPECHECK_FAILED", "app-persistence-jobs-email"],
+    ["--dir apps/web exec node scripts/check-job-delivery.mjs local", "JOB_CONFIGURATION_FAILED", "app-persistence-jobs-email"],
     ["audit signatures", "REGISTRY_SIGNATURE_CHECK_FAILED"],
     ["run test:unit", "UNIT_TESTS_FAILED"],
     ["run test:component", "COMPONENT_TESTS_FAILED"],
   ];
   const skeletonFailures = [];
-  for (const [failedCommand, code] of commandFailures) {
-    await assert.rejects(verifyGeneratedProjectForTesting(fileURLToPath(portfolio), "portfolio", {
+  for (const [failedCommand, code, identifier = "portfolio"] of commandFailures) {
+    const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === identifier);
+    const fixture = fileURLToPath(new URL("../../" + relativeRoot, import.meta.url));
+    await assert.rejects(verifyGeneratedProjectForTesting(fixture, identifier, {
       createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
       runCommand: async ({ arguments: arguments_ }) => {
         if (arguments_.join(" ") === failedCommand) throw new Error(privateValue);
@@ -440,7 +455,7 @@ test("the public kernel report retains generated skeleton failure codes", { time
   const group = rows["verify:generated-skeletons"];
   assert.deepEqual([result.code, result.signal], [1, null]);
   assert.equal(group.status, "failed");
-  assert.equal(group.diagnostic, "REGISTRY_SIGNATURE_CHECK_FAILED");
+  assert.equal(group.diagnostic, "CLOUDFLARE_TYPE_GENERATION_FAILED");
   assert.equal(group.steps[0].exitCode, 1);
   assert.equal(rows["changeset:status"].status, "passed");
   assert.ok(result.completed.includes("run changeset:status"));
@@ -448,7 +463,10 @@ test("the public kernel report retains generated skeleton failure codes", { time
   const log = await readFile(group.steps[0].log, "utf8");
   const diagnostics = log.split("\n").filter(line => line.startsWith("stderr "));
   assert.deepEqual(diagnostics, commandFailures.map(([, code]) => "stderr " + code));
-  const retained = [log, JSON.stringify(rows), result.stdout, result.stderr].join("\n");
+  assert.doesNotMatch(log, /^stdout .*CLOUDFLARE_TYPE_GENERATION_FAILED/mu);
+  const laterLog = await readFile(rows["changeset:status"].steps[0].log, "utf8");
+  assert.doesNotMatch(laterLog, /CLOUDFLARE_TYPE_GENERATION_FAILED/u);
+  const retained = [log, laterLog, JSON.stringify(rows), result.stdout, result.stderr].join("\n");
   assert.equal(retained.includes(privateValue), false);
   assert.equal(retained.includes(unknownCode), false);
 });

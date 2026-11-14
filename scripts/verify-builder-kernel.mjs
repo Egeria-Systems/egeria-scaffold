@@ -41,6 +41,12 @@ const diagnosticCodes = new Set([
   "BINDING_INTEGRATION_FAILED", "JOB_BUNDLE_FAILED", "APPLICATION_ENVIRONMENT_INVALID",
 ]);
 
+const skeletonFailureCodes = new Set([
+  "CLOUDFLARE_TYPE_GENERATION_FAILED", "PEER_DEPENDENCY_CHECK_FAILED",
+  "DEPLOYMENT_CONTRACTS_FAILED", "BROWSER_INSTALL_FAILED", "TRANSPORT_CONTRACTS_FAILED",
+  "CLEAN_TYPECHECK_FAILED", "JOB_CONFIGURATION_FAILED",
+]);
+
 // Persist only bounded, recognized observations. Test names, messages, paths and
 // URLs are arbitrary child data and may contain credentials or private inputs.
 function skeletonEvidence(text) {
@@ -87,7 +93,7 @@ function sourceLocation(file, line, column, packageRoot = "") {
   }
 }
 
-function outputObservation(line, skeletonOutput) {
+function outputObservation(line, skeletonOutput, skeletonError) {
   const text = stripVTControlCharacters(line).trim();
   const prefix = /^((?:apps|packages|proofs)\/[\w.-]+) [\w:-]+: (.+)$/u.exec(text);
   const message = prefix?.[2] ?? text;
@@ -113,9 +119,18 @@ function outputObservation(line, skeletonOutput) {
   }
   const category = /^failureType: ['"]?(testTimeoutFailure|testCodeFailure)['"]?$/u.exec(message)?.[1];
   if (category) return { text: category === "testTimeoutFailure" ? "Test timed out" : "Test code failed", priority: 2 };
-  const code = /^\{"ok":false,"code":"([A-Z_]+)"/u.exec(message)?.[1] ??
+  const failureCode = /^\{"ok":false,"code":"([A-Z_]+)"/u.exec(message)?.[1];
+  const code = failureCode ??
     /^(?:code: ['"]?|\[)?([A-Z][A-Z0-9_]{2,80})(?:['"]?$|[:\s\]])/u.exec(message)?.[1];
   if (diagnosticCodes.has(code)) return { text: code, priority: 2 };
+  if (skeletonError && skeletonFailureCodes.has(failureCode)) {
+    let envelope;
+    try { envelope = JSON.parse(message); } catch { return undefined; }
+    if (envelope !== null && typeof envelope === "object" &&
+        envelope.ok === false && envelope.code === failureCode) {
+      return { text: failureCode, priority: 2 };
+    }
+  }
   return undefined;
 }
 
@@ -308,7 +323,8 @@ async function runChild(step, log, setActive) {
   });
   function record(source, line, skeletonOutput) {
     let observation;
-    try { observation = outputObservation(line, skeletonOutput); } catch { capture = "failed"; }
+    const skeletonError = source === "stderr" && step.name === "verify:generated-skeletons";
+    try { observation = outputObservation(line, skeletonOutput, skeletonError); } catch { capture = "failed"; }
     if (!observation) return;
     if (observation.priority > (firstDiagnostic?.priority ?? 0)) firstDiagnostic = observation;
     logLine(source + " " + observation.text);
