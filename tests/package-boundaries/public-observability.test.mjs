@@ -9,7 +9,7 @@ import test from "node:test";
 
 const execFileAsync = promisify(execFile);
 const nonMutatingPnpmArguments = Object.freeze([
-  "--config.verify-deps-before-run=warn",
+  "--config.verify-deps-before-run=error",
 ]);
 const repositoryRoot = resolve(
   dirname(fileURLToPath(import.meta.url)),

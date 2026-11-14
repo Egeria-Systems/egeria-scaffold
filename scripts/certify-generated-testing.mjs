@@ -22,17 +22,20 @@ const expectedVerificationChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
   "visual-regression",
 ]);
 const subject = Object.freeze({
-  descriptorVersion: "0.5.1",
-  behaviorContractDigest:
-    "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
+  descriptorVersion: "0.9.0",
+  behaviorContractDigest: "sha256:3a2fa4c930a6f9b3c75cd03b38db173d080589050a7b4c9ebedb9a9594cedf3c",
 });
 
 export class GeneratedTestingCertificationError extends Error {
@@ -50,14 +53,14 @@ const configuration = Object.freeze({
   createArguments: Object.freeze([]),
   expectedCapabilities,
   capabilityIdentifier: "standards",
-  capabilityVersion: "0.5.1",
-  expectedRecipeVersion: "0.11.7",
+  capabilityVersion: "0.9.0",
+  expectedRecipeVersion: "0.12.0",
   verifierIdentifier: "portfolio",
   verificationOptions: Object.freeze({ includeVisual: true }),
   expectedVerificationChecks,
   receipt: Object.freeze({
     subject,
-    recipeVersion: "0.11.7",
+    recipeVersion: "0.12.0",
   }),
   createError: (code) => new GeneratedTestingCertificationError(code),
   isCertificationError: (error) =>

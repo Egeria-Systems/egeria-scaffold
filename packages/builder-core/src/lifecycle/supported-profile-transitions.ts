@@ -6,14 +6,14 @@ export type SupportedProfileTransitionResolutionFailureCode =
 
 export type SupportedProfileTransitionEndpoint = Readonly<{
   profile: "portfolio" | "site" | "app";
-  recipeVersion: "0.11.7" | "0.12.7" | "0.2.7";
+  recipeVersion: "0.12.0" | "0.13.0" | "0.3.0";
 }>;
 
 export type SupportedAppProfileTransition = Readonly<{
   source:
-    | Readonly<{ profile: "portfolio"; recipeVersion: "0.11.7" }>
-    | Readonly<{ profile: "site"; recipeVersion: "0.12.7" }>;
-  target: Readonly<{ profile: "app"; recipeVersion: "0.2.7" }>;
+    | Readonly<{ profile: "portfolio"; recipeVersion: "0.12.0" }>
+    | Readonly<{ profile: "site"; recipeVersion: "0.13.0" }>;
+  target: Readonly<{ profile: "app"; recipeVersion: "0.3.0" }>;
 }>;
 
 export type SupportedProfileTransition = SupportedAppProfileTransition;
@@ -38,14 +38,14 @@ export function resolveSupportedProfileTransition(input: Readonly<{
   if (input.fromProfile !== "portfolio" && input.fromProfile !== "site") {
     return { ok: false, code: "PROFILE_TRANSITION_SOURCE_UNSUPPORTED" };
   }
-  if (input.toRecipeVersion !== "0.2.7" ||
-      input.fromRecipeVersion !== (input.fromProfile === "portfolio" ? "0.11.7" : "0.12.7")) {
+  if (input.toRecipeVersion !== "0.3.0" ||
+      input.fromRecipeVersion !== (input.fromProfile === "portfolio" ? "0.12.0" : "0.13.0")) {
     return { ok: false, code: "PROFILE_TRANSITION_EDGE_MISSING" };
   }
   return { ok: true, value: {
     source: input.fromProfile === "portfolio"
-      ? { profile: "portfolio", recipeVersion: "0.11.7" }
-      : { profile: "site", recipeVersion: "0.12.7" },
-    target: { profile: "app", recipeVersion: "0.2.7" },
+      ? { profile: "portfolio", recipeVersion: "0.12.0" }
+      : { profile: "site", recipeVersion: "0.13.0" },
+    target: { profile: "app", recipeVersion: "0.3.0" },
   } };
 }

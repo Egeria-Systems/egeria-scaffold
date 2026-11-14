@@ -11,6 +11,7 @@ import { runInNewContext } from "node:vm";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { parseProjectYaml, serializeProjectYaml } from "../../packages/builder-core/dist/index.js";
 import { createSyntheticAppTransitionAdmission } from "../helpers/synthetic-app-transition-admission.mjs";
 
 const producer = new URL("../../scripts/verify-app-transition-visuals.mjs", import.meta.url);
@@ -47,9 +48,9 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
   assert.equal(exists, true, "the app transition visual producer is not implemented");
   const module = await import(producer);
   assert.equal(typeof module.verifyAppTransitionVisuals, "function");
-  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.2.7" });
-  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.2.7" });
-  for (const recipeVersion of ["0.2.7"]) {
+  assert.deepEqual(module.parseAppTransitionVisualArguments([]), { mode: "compare", recipeVersion: "0.3.0" });
+  assert.deepEqual(module.parseAppTransitionVisualArguments(["--", "--candidates"]), { mode: "candidates", recipeVersion: "0.3.0" });
+  for (const recipeVersion of ["0.3.0"]) {
     assert.deepEqual(module.parseAppTransitionVisualArguments(["--candidates", `--app-recipe-version=${recipeVersion}`]), { mode: "candidates", recipeVersion });
   }
   const digest = "a".repeat(64);
@@ -58,6 +59,11 @@ test("app transition visual producer exposes bounded candidate, comparison, and 
     assert.throws(() => module.parseAppTransitionVisualArguments(arguments_), /VISUAL_ARGUMENT_INVALID/);
   }
 });
+
+async function visualTestTarget(subset) {
+  const { prepareProject } = await import(producer);
+  return (await prepareProject(sourceRoot, subset)).targetProject;
+}
 
 async function harness(t, overrides = {}) {
   const module = await import(producer);
@@ -164,12 +170,19 @@ test("promotion requires the unchanged reviewed manifest and writes only the fou
   const h = await harness(t);
   await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "promote", digest: "0".repeat(64) }, h.adapters), /VISUAL_REVIEWED_MANIFEST_MISSING/);
   assert.deepEqual(await readdir(h.root), []);
+  const snapshot = "apps/web/tests/visual/home-visual.spec.ts-snapshots";
+  const installed = join(h.root, "packages/builder-core/templates/portfolio", snapshot);
+  const current = `packages/builder-core/templates/portfolio/application-environments/${snapshot}`;
+  const filenames = ["", "multilingual-"].flatMap(prefix => ["desktop", "mobile"].map(viewport =>
+    `app-transition-${prefix}home-${viewport}-chromium-linux.png`));
+  await mkdir(installed, { recursive: true });
+  for (const name of filenames) await writeFile(join(installed, name), "existing comparison reference");
   const candidate = await h.module.verifyAppTransitionVisuals({ mode: "candidates" }, h.adapters);
   await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "promote", digest: "0".repeat(64) }, h.adapters), /VISUAL_REVIEWED_MANIFEST_MISSING/);
   await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "promote", digest: candidate.manifestSha256 }, { ...h.adapters, snapshotSource: async () => ({ changed: true }) }), /VISUAL_SOURCE_CHANGED/);
   const result = await h.module.verifyAppTransitionVisuals({ mode: "promote", digest: candidate.manifestSha256 }, h.adapters);
-  assert.equal(result.paths.length, 4);
-  assert.equal(result.paths.every((path) => path.startsWith("packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-") && path.endsWith("-chromium-linux.png")), true);
+  assert.deepEqual(result.paths, filenames.map(name => `${current}/${name}`));
+  for (const name of filenames) assert.equal(await readFile(join(installed, name), "utf8"), "existing comparison reference");
   await access(join(h.root, candidate.manifestPath));
   await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "promote", digest: candidate.manifestSha256 }, h.adapters), /VISUAL_PROMOTION_COLLISION/);
 });
@@ -339,7 +352,12 @@ test("visual capture stabilizes and saves before screenshot comparison and prese
   }
 });
 
-for (const [preparation, mode] of [["synthetic", "candidates"], ["current", "candidates"], ["synthetic", "compare"]])
+for (const [preparation, mode, subset] of [
+  ["synthetic", "candidates", []],
+  ["current", "candidates", ["analytics"]],
+  ["synthetic", "compare", []],
+  ["current", "compare", ["analytics", "booking-calendly", "multilingual"]],
+])
 test(`${preparation} visual ${mode} preserve captures and receipts without retaining traces`, async (t) => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url), "utf8");
@@ -347,9 +365,13 @@ test(`${preparation} visual ${mode} preserve captures and receipts without retai
   await mkdir(artifactDirectory);
   const commands = [];
   let ownedProject;
-  const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode, baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.7" }, {
-    ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
+  let browserProjectYaml;
+  const repositoryRoot = preparation === "synthetic" ? h.root : sourceRoot;
+  const preparedProject = preparation === "current" && mode === "compare"
+    ? await h.module.prepareProject(repositoryRoot, subset, "0.3.0")
+    : undefined;
+  const result = await h.module.executeAppTransitionVisualCase({ subset, mode, baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.3.0", preparedProject }, {
+    ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: await visualTestTarget(subset), files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
     ], influencingFingerprints: [{ path: "app.tsx", fingerprint: "sha256:synthetic" }] }) } : {}),
@@ -362,6 +384,9 @@ test(`${preparation} visual ${mode} preserve captures and receipts without retai
     runCommand: async (input) => {
       commands.push(input);
       ownedProject = input.cwd;
+      if (preparation === "current" && input.arguments.includes("test:e2e:dev")) {
+        browserProjectYaml = await readFile(join(input.cwd, ".egeria/project.yaml"));
+      }
       if (input.arguments.includes("test:visual")) {
         for (const [viewport, content] of Object.entries(h.images)) {
           const path = join(input.cwd, "apps/web/test-results", viewport, `${viewport}-captured.png`);
@@ -380,10 +405,22 @@ test(`${preparation} visual ${mode} preserve captures and receipts without retai
     },
   });
   if (preparation !== "synthetic") {
-    assert.equal(result.project.sourceProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.sourceProject.recipeVersion, "0.11.7");
-    assert.equal(result.project.targetProject.schemaVersion, "1.0.0");
-    assert.equal(result.project.targetProject.recipeVersion, "0.2.7");
+    assert.deepEqual(browserProjectYaml, Buffer.from(serializeProjectYaml(result.project.targetProject)));
+    const parsed = parseProjectYaml(browserProjectYaml.toString("utf8"));
+    assert.equal(parsed.ok, true);
+    assert.deepEqual(parsed.value, result.project.targetProject);
+    assert.deepEqual(
+      ["analytics", "booking-calendly", "multilingual"].filter(capability => parsed.value.selectedCapabilities.includes(capability)),
+      subset,
+    );
+    assert.deepEqual(result.project.files.filter(file => file.path === ".egeria/project.yaml"), [
+      { path: ".egeria/project.yaml", sha256: sha256(browserProjectYaml) },
+    ]);
+    assert.equal(result.influencingFingerprints.some(file => file.path === ".egeria/project.yaml"), false);
+    assert.equal(result.project.sourceProject.schemaVersion, "2.0.0");
+    assert.equal(result.project.sourceProject.recipeVersion, "0.12.0");
+    assert.equal(result.project.targetProject.schemaVersion, "2.0.0");
+    assert.equal(result.project.targetProject.recipeVersion, "0.3.0");
     assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
@@ -428,7 +465,10 @@ test("visual prerequisites retain raw and threshold audit results and reject inc
     await mkdir(artifactDirectory);
     const commands = [];
     await assert.rejects(h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot: h.root, artifactDirectory }, {
-      prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
+      prepareProject: async (_root, subset) => ({
+        targetProject: await visualTestTarget(subset),
+        files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [],
+      }),
       runAudit: async () => {
         if (throws) throw Object.assign(new Error("DEPENDENCY_AUDIT_FAILED"), { auditDisposition: disposition });
         return disposition;
@@ -547,7 +587,7 @@ test("comparison refuses incoherent prepared identities before artifact or case 
     prepared => { prepared.files = prepared.files.filter(file => file.path !== "pnpm-lock.yaml"); },
     prepared => { prepared.files.find(file => file.path === "pnpm-lock.yaml").content = Buffer.from("foreign lock"); },
     prepared => { prepared.influencingFingerprints[0].fingerprint = `sha256:${"a".repeat(64)}`; },
-    prepared => { prepared.targetProject.schemaVersion = "2.0.0"; },
+    prepared => { prepared.targetProject.schemaVersion = "1.0.0"; },
     prepared => { prepared.targetProject.recipeVersion = "0.2.6"; },
   ];
   for (const change of changes) {
@@ -571,7 +611,7 @@ test("comparison rejects missing or unsafe source, lock, PNG and policy before e
   h.effects.length = 0;
   const paths = [admissionLeaf, "scripts/verify-app-transition-visuals.mjs", "packages/builder-core/src/lifecycle/app-profile-transition.ts",
     "packages/builder-core/templates/common/apps/web/app/globals.css", "packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts",
-    "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml",
+    "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml",
     "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png"];
   for (const path of paths) for (const kind of ["missing", "symlink"]) {
     const effects = [];
@@ -768,7 +808,10 @@ test("visual command failure retains its exit when its report is missing or malf
     const artifactDirectory = join(h.root, report === undefined ? "missing-report" : "invalid-report");
     await mkdir(artifactDirectory);
     await assert.rejects(h.module.executeAppTransitionVisualCase({ subset: [], mode: "compare", baselines: {}, repositoryRoot: h.root, artifactDirectory }, {
-      prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
+      prepareProject: async (_root, subset) => ({
+        targetProject: await visualTestTarget(subset),
+        files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [],
+      }),
       runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
       inspectBrowser: async () => ({ synthetic: true }),
       inspectBuild: async () => ({ synthetic: true }),
@@ -787,7 +830,7 @@ test("visual command failure retains its exit when its report is missing or malf
 
 test("comparison binds operation inputs before build and refuses their drift before artifact writes", async t => {
   for (const path of [admissionLeaf, "packages/builder-core/src/lifecycle/app-profile-transition.ts",
-    "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml",
+    "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml",
     "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-mobile-chromium-linux.png",
     "packages/builder-core/src/fresh-measurement-input.ts"]) {
     const h = await comparisonHarness(t);
@@ -884,7 +927,10 @@ test(`preview diagnostics preserve the initiating failure with ${scenario}`, asy
     subset: ["analytics"], mode: "compare", baselines: {}, repositoryRoot: h.root, artifactDirectory,
   }, {
     filesystem: { ...filesystem, mkdtemp: () => mkdtemp(join(h.root, "preview-project-")) },
-    prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
+    prepareProject: async (_root, subset) => ({
+      targetProject: await visualTestTarget(subset),
+      files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [],
+    }),
     runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
     inspectBuild: async () => ({ synthetic: true }),
     inspectBrowser: async () => assert.fail("failed preview must prevent screenshot comparison"),

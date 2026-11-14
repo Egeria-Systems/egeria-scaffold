@@ -1,3 +1,4 @@
+import { syntheticApplicationEnvironment } from "./verify-generated-skeletons.mjs";
 import { constants, copyFile, mkdir, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,8 +19,7 @@ const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const subject = Object.freeze({
   descriptorVersion: "0.3.0",
-  behaviorContractDigest:
-    "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
+  behaviorContractDigest: "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
 });
 const fixedVerificationChecks = Object.freeze([
   "pnpm-version",
@@ -32,8 +32,12 @@ const fixedVerificationChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -137,7 +141,7 @@ function configurationFor(profile, revision) {
   }
 
   const isPortfolio = profile === "portfolio";
-  const recipeVersion = isPortfolio ? "0.11.7" : "0.12.7";
+  const recipeVersion = isPortfolio ? "0.12.0" : "0.13.0";
   return Object.freeze({
     profile,
     projectName: isPortfolio ? "acme-portfolio" : "acme-site",
@@ -274,6 +278,7 @@ async function verifySectionCompositionFixture({
 
   const childEnvironment = {
     ...environment,
+    ...syntheticApplicationEnvironment([], {}, "development", "http://localhost:3000"),
     HOME: home,
     USERPROFILE: home,
     TMPDIR: temporary,

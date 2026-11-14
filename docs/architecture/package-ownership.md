@@ -1,5 +1,9 @@
 # Package Ownership
 
+## Current environment integration
+
+The [current environment generation](capability-model.md#current-environment-generation) owns the schema-2 source candidate and exact runtime/acceptance limits. Its current tuple and lifecycle definitions supersede only earlier executable generation/edge statements below under [ADR-0020](../adr/0020-application-environments.md#public-environment-generation-activation). Historical accepted decisions and evidence retain their original identities. This candidate is not complete or releasable; source integration, generated runtime/security admission, four exact visual approvals, hosted consumer reconciliation and fourteen separate certification renewals remain open.
+
 **Status:** Controlling package and API ownership through the approved builder kernel, generated validated content, responsive portfolio presentation, generated unit/component/browser and visual regression quality, Calendly initial scaffolding, the exact supported capability and incoming app transactions, exact read-only lifecycle planning boundaries, bounded production observability, committed golden fixtures, and existing public releases, with repository changes limited to verified new-directory generation or those exact state-last transactions
 
 **Sources:** [ADR-0005](../adr/0005-evidence-driven-package-extraction.md), [ADR-0013](../adr/0013-convergent-app-profile.md), [ADR-0014](../adr/0014-selective-effect-application-runtime.md), [ADR-0015](../adr/0015-vitest-five-generation.md), [architecture overview](overview.md), the approved private implementation plans for the lean builder, builder kernel, atomic project generation, Calendly initial scaffolding, and public-package release

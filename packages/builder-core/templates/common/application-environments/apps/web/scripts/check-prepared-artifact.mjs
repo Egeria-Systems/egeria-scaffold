@@ -212,11 +212,45 @@ function validateReleaseSource(target, revision) {
   } catch { refuse("PREPARED_ARTIFACT_SOURCE_INVALID"); }
 }
 
+function readRepositorySource(root, revision) {
+  directory(root);
+  if (realpathSync(root) !== root) refuse("PREPARED_ARTIFACT_SOURCE_INVALID");
+  const git = args => execFileSync("git", ["--no-optional-locks", "--no-replace-objects", "--no-lazy-fetch", "-c", "core.fsmonitor=false", "-c", "core.untrackedCache=false", ...args], {
+    cwd: root, encoding: "utf8", timeout: 10000, maxBuffer: maximumMetadataBytes, stdio: ["ignore", "pipe", "pipe"],
+    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_OPTIONAL_LOCKS: "0" },
+  });
+  if (git(["rev-parse", "--show-toplevel"]).trim() !== root || git(["rev-parse", "HEAD"]).trim() !== revision ||
+      git(["status", "--porcelain=v1", "--untracked-files=all"]) !== "" ||
+      git(["ls-files", "-v", "-z"]).split("\0").some(entry => /^[a-zS]/u.test(entry))) refuse("PREPARED_ARTIFACT_SOURCE_INVALID");
+  const gitDirectory = git(["rev-parse", "--absolute-git-dir"]).trim();
+  directory(gitDirectory);
+  const identity = createHash("sha256").update(JSON.stringify([root, gitDirectory].map(path => {
+    const stat = lstatSync(path, { bigint: true });
+    return { path: realpathSync(path), device: String(stat.dev), inode: String(stat.ino) };
+  }))).digest("hex");
+  return { revision, identity };
+}
+
+function readBuilderGeneratedSource(target, revision, generatedRevision) {
+  try {
+    const workspace = process.env.GITHUB_WORKSPACE;
+    if (target === "development" || process.env.GITHUB_REF !== "refs/heads/main" || process.env.GITHUB_SHA !== revision ||
+        process.env.EXPECTED_REVISION !== revision || !workspace || !isAbsolute(workspace) || resolve(workspace) !== workspace) refuse("PREPARED_ARTIFACT_SOURCE_INVALID");
+    const generatedRoot = resolve("../..");
+    if (resolve(".") !== join(generatedRoot, "apps", "web") || generatedRoot === workspace ||
+        generatedRoot.startsWith(`${workspace}${sep}`) || workspace.startsWith(`${generatedRoot}${sep}`)) refuse("PREPARED_ARTIFACT_SOURCE_INVALID");
+    return { kind: "builder-generated", builder: readRepositorySource(workspace, revision), generated: readRepositorySource(generatedRoot, generatedRevision) };
+  } catch { refuse("PREPARED_ARTIFACT_SOURCE_INVALID"); }
+}
+
 function main() {
-  const [mode, target, revision, local, ...extra] = process.argv.slice(2);
+  const [mode, target, revision, option, ...extra] = process.argv.slice(2);
+  const local = option === "--local";
+  const generatedRevision = /^--builder-generated=([a-f0-9]{40})$/u.exec(option ?? "")?.[1];
   const identity = parseApplicationBuildId(`egeria-${target}-${revision}`);
-  if ((mode !== "record" && mode !== "verify") || !identity.ok || extra.length !== 0 || (local !== undefined && local !== "--local")) refuse("PREPARED_ARTIFACT_ARGUMENT_INVALID");
-  if (local !== "--local") validateReleaseSource(target, revision);
+  if ((mode !== "record" && mode !== "verify") || !identity.ok || extra.length !== 0 || (option !== undefined && !local && generatedRevision === undefined)) refuse("PREPARED_ARTIFACT_ARGUMENT_INVALID");
+  const source = generatedRevision === undefined ? undefined : readBuilderGeneratedSource(target, revision, generatedRevision);
+  if (!local && source === undefined) validateReleaseSource(target, revision);
   directory(".next");
   directory(".open-next");
   directory(".open-next/assets");
@@ -227,7 +261,7 @@ function main() {
       config?.env?.NEXT_PUBLIC_APPLICATION_ENVIRONMENT !== target || config?.output !== "standalone" || config?.deploymentId !== undefined) refuse("PREPARED_ARTIFACT_IDENTITY_INVALID");
   const wrangler = artifactConfiguration(JSON.parse(readMetadata("wrangler.jsonc")), target);
   const inputs = bundleInputs(wrangler);
-  if (wrangler.d1_databases && local !== "--local") {
+  if (wrangler.d1_databases && !local) {
     directory(".wrangler"); directory(".wrangler/application-database");
     const remote = artifactConfiguration(JSON.parse(readMetadata(".wrangler/application-database/wrangler.remote.json")), target, true);
     if (remote.main !== wrangler.main) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
@@ -235,7 +269,8 @@ function main() {
   }
   const { files, symlinks } = inspectFiles(inputs);
   if (!files.some(file => file.path === ".open-next/worker.js")) refuse("PREPARED_ARTIFACT_WORKER_UNSUPPORTED");
-  const receipt = { schemaVersion: 2, target, revision, buildId, files, symlinks };
+  if (source !== undefined && JSON.stringify(readBuilderGeneratedSource(target, revision, generatedRevision)) !== JSON.stringify(source)) refuse("PREPARED_ARTIFACT_SOURCE_INVALID");
+  const receipt = { schemaVersion: 2, target, revision, buildId, files, symlinks, ...(source === undefined ? {} : { source }) };
   const serialized = `${JSON.stringify(receipt)}\n`;
   if (Buffer.byteLength(serialized) > maximumMetadataBytes) refuse("PREPARED_ARTIFACT_SIZE_INVALID");
   if (mode === "record") writeFileSync(receiptPath, serialized, { flag: "wx", mode: 0o600 });

@@ -1,5 +1,5 @@
-import { applicationEnvironmentRecipeVersions, publicRecipeVersions } from "../contracts/profile.js";
-import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
+import { applicationEnvironmentRecipeVersions } from "../contracts/profile.js";
+import { backgroundJobFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
 import { deriveTemplateDestination } from "./render-template.js";
@@ -108,6 +108,7 @@ const portfolioTemplateSources: readonly TemplateSource[] = [
     contentKind: "binary",
   },
 ];
+
 
 const productionSiteTemplateSources: readonly TemplateSource[] = [
   ...textTemplateSources([
@@ -331,7 +332,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion: string = publicRecipeVersions[profile],
+  recipeVersion: string = applicationEnvironmentRecipeVersions[profile],
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -339,26 +340,24 @@ export function createTemplateCatalog(
   includeTransactionalEmail = false,
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
-  backgroundJobVersion: "0.1.0" | "0.2.0" | "0.3.0" = "0.2.0",
-  applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  if (recipeVersion !== (applicationEnvironments ? applicationEnvironmentRecipeVersions : publicRecipeVersions)[profile]) {
+  if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
   }
   const app = profile === "app";
   const productionSite = app || profile === "site";
   const sources = [
-    ...([{
+    {
       source: "common/literal-lint-roots/patches/next-eslint-plugin-next.patch",
       destinationSource: "common/patches/next-eslint-plugin-next.patch",
       contentKind: "text" as const,
-    }]),
-    ...(applicationEnvironments ? textTemplateSources([
+    },
+    ...(textTemplateSources([
       "common/apps/web/src/configuration/application-environment.ts",
       "common/apps/web/scripts/check-application-environment.mjs",
       "common/apps/web/tests/unit/application-environment.test.ts",
       "common/docs/environments.md",
-    ]) : []),
+    ])),
     ...commonTemplateSources.map(entry => entry.source === "common/pnpm-workspace.yaml"
       ? { ...entry, source: "common/dependency-security/pnpm-workspace.yaml", destinationSource: entry.source }
       : [
@@ -430,45 +429,40 @@ export function createTemplateCatalog(
       !includeBackgroundJobs || destinationSource === undefined || !["common/apps/web/wrangler.jsonc.template", "common/.github/workflows/deploy.yml.template"].includes(destinationSource))] : []),
     ...(includeBackgroundJobs ? [
       ...backgroundJobFiles.map(({ path }) => ({
-        source: `background-job-delivery/${backgroundJobVersion === "0.2.0" && ["docs/background-job-delivery.md", "apps/web/tests/integration/job-worker.test.ts", "apps/web/tests/integration/fixtures/job-worker.mjs"].includes(path) ? "operations/" : ""}${path}`,
+        source: `background-job-delivery/${(["docs/background-job-delivery.md", "apps/web/tests/integration/job-worker.test.ts", "apps/web/tests/integration/fixtures/job-worker.mjs"].includes(path)) ? "operations/" : ""}${path}`,
         destinationSource: `background-job-delivery/${path}`,
         contentKind: "text" as const,
       })),
-      ...(backgroundJobVersion === "0.2.0" ? backgroundJobOperationFiles.map(({ path }) => ({
-        source: `background-job-delivery/operations/${path}`,
-        destinationSource: `background-job-delivery/${path}`,
-        contentKind: "text" as const,
-      })) : []),
       { source: "deployment-cloudflare/background-job-delivery/apps/web/worker.mjs", destinationSource: "common/apps/web/worker.mjs", contentKind: "text" as const },
       { source: "deployment-cloudflare/background-job-delivery/apps/web/scripts/check-job-delivery.mjs", destinationSource: "common/apps/web/scripts/check-job-delivery.mjs", contentKind: "text" as const },
       { source: `deployment-cloudflare/background-job-delivery/apps/web/wrangler${includeApplicationPersistence ? ".persistence" : ""}.jsonc.template`, destinationSource: "common/apps/web/wrangler.jsonc.template", contentKind: "text" as const },
       { source: `deployment-cloudflare/background-job-delivery/.github/workflows/deploy${includeApplicationPersistence ? ".persistence" : ""}.yml.template`, destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" as const },
     ] : []),
   ];
-  if (applicationEnvironments) {
+  {
     for (const path of ["apps/web/tests/unit/observability-environment.test.ts", "docs/observability.md", "apps/web/src/configuration/site-origin.ts", "apps/web/src/configuration/application-build.ts",
       "apps/web/tests/unit/site-origin.test.ts", "apps/web/tests/unit/application-build.test.ts",
       "apps/web/scripts/check-prepared-artifact.mjs", "apps/web/scripts/check-deployment-protection.mjs",
-      "apps/web/scripts/browser-development-server.ts",
+      "apps/web/scripts/browser-development-server.ts", "apps/web/scripts/prepare-ci-git.sh",
       "apps/web/tests/scripts/prepared-artifact.test.mjs", "apps/web/tests/scripts/deployment-protection.test.mjs",
       "apps/web/tests/e2e/application-test.ts", "apps/web/tests/e2e/application-transport.ts",
       "apps/web/tests/transport/application-transport.spec.ts", "apps/web/playwright.transport.config.ts"]) {
       sources.push({ source: `common/application-environments/${path}`, destinationSource: `common/${path}`, contentKind: "text" });
     }
   }
-  if (applicationEnvironments && (app || includeFoundation)) {
+  if (((app || includeFoundation))) {
     sources.push({
       source: "app-foundation/application-environments/apps/web/src/infrastructure/cloudflare/application-environment.ts",
       destinationSource: "app-foundation/apps/web/src/infrastructure/cloudflare/application-environment.ts",
       contentKind: "text",
     });
   }
-  if (applicationEnvironments && includeApplicationPersistence) {
+  if ((includeApplicationPersistence)) {
     for (const path of ["apps/web/src/configuration/application-database.ts", "apps/web/tests/unit/application-database-environment.test.ts"]) {
       sources.push({ source: `application-persistence/application-environments/${path}`, destinationSource: `application-persistence/${path}`, contentKind: "text" });
     }
   }
-  if (applicationEnvironments && includeWeb3Forms) {
+  if ((includeWeb3Forms)) {
     for (const path of ["apps/web/tests/unit/contact-configuration.test.ts", "apps/web/tests/component/contact-availability.test.tsx"]) {
       sources.push({
         source: `contact-form-web3forms/application-environments/${path}`,
@@ -477,19 +471,19 @@ export function createTemplateCatalog(
       });
     }
   }
-  if (applicationEnvironments && includeBookingCalendly) {
+  if ((includeBookingCalendly)) {
     for (const path of ["apps/web/content/fr-CA/booking-calendly.yaml", "apps/web/tests/unit/booking-configuration.test.ts", "apps/web/tests/component/booking-availability.test.tsx"]) {
       sources.push({ source: `booking-calendly/application-environments/${path}`, destinationSource: `booking-calendly/${path}`, contentKind: "text" });
     }
     sources.push({ source: "booking-calendly/docs/booking-calendly.md", contentKind: "text" });
   }
-  if (applicationEnvironments && includeAnalytics) {
+  if ((includeAnalytics)) {
     for (const path of ["apps/web/src/integrations/analytics/analytics-configuration.ts", "apps/web/tests/unit/analytics-configuration.test.ts"]) {
       sources.push({ source: `analytics/application-environments/${path}`, destinationSource: `analytics/${path}`, contentKind: "text" });
     }
   }
-  const selectedSources = sources.filter(entry => !applicationEnvironments || entry.source !== "site/apps/web/content/en-CA/routing.yaml").map((entry) => {
-    if (!applicationEnvironments) return entry;
+  const selectedSources = sources.filter(entry => (entry.source !== "site/apps/web/content/en-CA/routing.yaml")).map((entry) => {
+
     if ([
       "common/README.md.template", "common/apps/web/app/layout.tsx", "multilingual/apps/web/app/layout.tsx",
       "booking-calendly/docs/booking-calendly.md",

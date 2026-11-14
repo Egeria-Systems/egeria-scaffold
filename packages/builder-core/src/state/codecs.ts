@@ -6,8 +6,6 @@ import {
   type MigrationRecord,
 } from "../contracts/migration.js";
 import {
-  applicationEnvironmentProjectConfigurationSchema,
-  type ApplicationEnvironmentProjectConfiguration,
   projectConfigurationSchema,
   type ProjectConfiguration,
 } from "../contracts/project.js";
@@ -17,8 +15,6 @@ import type {
 } from "../contracts/result.js";
 import { validateContract } from "../contracts/result.js";
 import {
-  applicationEnvironmentInstalledStateSchema,
-  type ApplicationEnvironmentInstalledState,
   installedStateSchema,
   type InstalledState,
 } from "../contracts/state.js";
@@ -138,12 +134,9 @@ function withOneTerminalNewline(value: string): string {
   return `${value.replace(/\n+$/u, "")}\n`;
 }
 
-export function parseProjectYaml(source: string, schemaVersion: "2.0.0"): ValidationResult<ApplicationEnvironmentProjectConfiguration>;
-export function parseProjectYaml(source: string): ValidationResult<ProjectConfiguration>;
 export function parseProjectYaml(
   source: string,
-  schemaVersion: "1.0.0" | "2.0.0" = "1.0.0",
-): ValidationResult<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration> {
+): ValidationResult<ProjectConfiguration> {
   try {
     const document = parseDocument(source, {
       version: "1.2",
@@ -164,18 +157,14 @@ export function parseProjectYaml(
     }
 
     const value = document.toJS({ maxAliasCount: 0, mapAsMap: false }) as unknown;
-    return schemaVersion === "2.0.0"
-      ? validateWithCode(applicationEnvironmentProjectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID")
-      : validateWithCode(projectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID");
+    return validateWithCode(projectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID");
   } catch {
     return invalidResult("PROJECT_YAML_INVALID", [], "document-error");
   }
 }
 
-export function serializeProjectYaml(value: ProjectConfiguration | ApplicationEnvironmentProjectConfiguration): string {
-  const validated = value.schemaVersion === "2.0.0"
-    ? requireValid(applicationEnvironmentProjectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID")
-    : requireValid(projectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID");
+export function serializeProjectYaml(value: ProjectConfiguration): string {
+  const validated = requireValid(projectConfigurationSchema, value, "PROJECT_SCHEMA_INVALID");
   const source = stringify(validated, {
     version: "1.2",
     schema: "core",
@@ -189,12 +178,9 @@ export function serializeProjectYaml(value: ProjectConfiguration | ApplicationEn
   return withOneTerminalNewline(source);
 }
 
-export function parseStateJson(source: string, schemaVersion: "2.0.0"): ValidationResult<ApplicationEnvironmentInstalledState>;
-export function parseStateJson(source: string): ValidationResult<InstalledState>;
 export function parseStateJson(
   source: string,
-  schemaVersion: "1.0.0" | "2.0.0" = "1.0.0",
-): ValidationResult<InstalledState | ApplicationEnvironmentInstalledState> {
+): ValidationResult<InstalledState> {
   let value: unknown;
 
   try {
@@ -203,15 +189,11 @@ export function parseStateJson(
     return invalidResult("STATE_JSON_INVALID", [], "syntax");
   }
 
-  return schemaVersion === "2.0.0"
-    ? validateWithCode(applicationEnvironmentInstalledStateSchema, value, "STATE_SCHEMA_INVALID")
-    : validateWithCode(installedStateSchema, value, "STATE_SCHEMA_INVALID");
+  return validateWithCode(installedStateSchema, value, "STATE_SCHEMA_INVALID");
 }
 
-export function serializeStateJson(value: InstalledState | ApplicationEnvironmentInstalledState): string {
-  const validated = value.schemaVersion === "2.0.0"
-    ? requireValid(applicationEnvironmentInstalledStateSchema, value, "STATE_SCHEMA_INVALID")
-    : requireValid(installedStateSchema, value, "STATE_SCHEMA_INVALID");
+export function serializeStateJson(value: InstalledState): string {
+  const validated = requireValid(installedStateSchema, value, "STATE_SCHEMA_INVALID");
   const canonical = canonicalizeJsonValue(validated);
   return `${JSON.stringify(canonical, null, 2)}\n`;
 }

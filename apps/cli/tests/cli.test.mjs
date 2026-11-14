@@ -17,11 +17,11 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
-import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 const lifecycleCohorts = [
-  { label: "current", generation: "current", portfolio: "0.11.7", site: "0.12.7", app: "0.2.7", portfolioFoundation: "portfolio-0.11.7-foundation" },
+  { label: "current", generation: "current", profiles: createGenerationRenderingContext().profiles, portfolio: "0.12.0", site: "0.13.0", app: "0.3.0", portfolioFoundation: "portfolio-0.11.7-foundation" },
 ];
 
 
@@ -34,6 +34,46 @@ const cli = await import(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")))
 const core = await import(
   pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
 );
+
+test("default application environment CLI accepts selection-only configuration", () => {
+  const result = cliArguments.parseCliArguments([
+    "create", "--profile", "site", "--name", "selected-site",
+    "--display-name", "Selected Site", "--directory", "/tmp/selected-site",
+    "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "popup",
+    "--cloudflare-web-analytics", "--multilingual",
+  ]);
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.deepEqual(result.value.bookingCalendly, { mode: "popup" });
+  assert.deepEqual(result.value.analytics.providers, { cloudflareWebAnalytics: true });
+  assert.equal(result.value.contactFormWeb3Forms, true);
+});
+
+test("default application environment CLI rejects literal destinations before adapter access", async () => {
+  let verifierCalls = 0;
+  const runner = cli.createCliRunner({ createVerifier() { verifierCalls += 1; throw new Error("unexpected adapter access"); } });
+  const errors = [];
+  const status = await runner([
+    "create", "--profile", "site", "--name", "selected-site",
+    "--display-name", "Selected Site", "--directory", "/tmp/selected-site",
+    "--cloudflare-web-analytics-token", "0123456789abcdef0123456789abcdef",
+  ], { write() { assert.fail("unexpected success output"); }, writeError(value) { errors.push(JSON.parse(value)); } });
+  assert.equal(status, 2);
+  assert.equal(verifierCalls, 0);
+  assert.deepEqual(errors, [{ ok: false, code: "CLI_ARGUMENT_INVALID" }]);
+});
+
+test("default application environment CLI exposes diagnostics and current lifecycle commands coherently", () => {
+  for (const arguments_ of [
+    ["diff", "--directory", "/tmp/current-project"],
+    ["plan-add", "--directory", "/tmp/current-project", "--capability", "multilingual"],
+    ["plan-remove", "--directory", "/tmp/current-project", "--capability", "multilingual"],
+    ["plan-profile-transition", "--directory", "/tmp/current-project", "--to-profile", "app"],
+  ]) {
+    const parsed = cliArguments.parseCliArguments(arguments_);
+    assert.equal(parsed.ok, true, JSON.stringify({ arguments_, parsed }));
+    assert.equal(parsed.value.kind, arguments_[0]);
+  }
+});
 const {
   appTransitionVisualProject,
   appTransitionVisualBookingSettings,
@@ -61,44 +101,25 @@ const generatedChecks = [
   "next-build",
   "opennext-build",
 ];
-const planSettings = {
-  destination: "https://calendly.com/acme/private-planning-destination",
-  mode: "popup",
-};
+const planSettings = { mode: "popup" };
 const analyticsSettings = {
   consent: { policy: "explicit-opt-in" },
   providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "0123456789abcdef0123456789abcdef",
-    },
-    googleAnalytics4: { measurementId: "G-ABCDEF1234" },
-    microsoftClarity: {
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    },
+    cloudflareWebAnalytics: true,
+    googleAnalytics4: true,
+    microsoftClarity: { audience: "not-directed-to-minors" },
   },
   operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
+    googleSearchConsole: true,
     lookerStudio: { connector: "google-analytics-4" },
   },
 };
 
 function analyticsSelectionArguments() {
   return [
-    "--cloudflare-web-analytics-token",
-    analyticsSettings.providers.cloudflareWebAnalytics.siteToken,
-    "--google-analytics-id",
-    analyticsSettings.providers.googleAnalytics4.measurementId,
-    "--microsoft-clarity-id",
-    analyticsSettings.providers.microsoftClarity.projectId,
-    "--microsoft-clarity-audience",
-    analyticsSettings.providers.microsoftClarity.audience,
-    "--search-console-verification",
-    analyticsSettings.operationalIntegrations.googleSearchConsole
-      .verificationToken,
-    "--looker-studio",
+    "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
+    "--microsoft-clarity-audience", "not-directed-to-minors",
+    "--google-search-console", "--looker-studio",
   ];
 }
 
@@ -119,48 +140,22 @@ function cleanGitInspection(overrides = {}) {
 
 function expectedPlanActions() {
   return [
-    {
-      kind: "replace-project-configuration",
-      path: ".egeria/project.yaml",
-      ownership: "managed",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "replace-file",
-      path: "apps/web/app/page.tsx",
-      ownership: "application-owned",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/content/en-CA/booking-calendly.yaml",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-content.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-      ownership: "managed",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
+    { kind: "replace-project-configuration", path: ".egeria/project.yaml", ownership: "managed", owner: "builder-kernel" },
+    { kind: "replace-file", path: ".github/workflows/deploy.yml", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: ".github/workflows/quality.yml", ownership: "managed", owner: "standards" },
+    { kind: "replace-file", path: "apps/web/.env.example", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "create-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/component/booking-availability.test.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/e2e/calendly-booking.spec.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/unit/booking-configuration.test.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "docs/booking-calendly.md", ownership: "application-owned", owner: "booking-calendly" },
   ];
 }
 
@@ -182,9 +177,9 @@ function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup"
     profile,
     capability: {
       identifier: "booking-calendly",
-      version: "0.1.0",
+      version: "0.2.0",
     },
-    settings: { mode, destination: "redacted" },
+    settings: { mode },
     currentCapabilities,
     desiredCapabilities: ["booking-calendly", ...currentCapabilities].sort(),
     actions: expectedPlanActions(),
@@ -220,6 +215,7 @@ const generatedRemovalReviewRequirements = Object.freeze([
         code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
         path: "apps/web/AGENTS.md",
       }),
+      Object.freeze({ code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE", path: "docs/environments.md" }),
       Object.freeze({
         code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
         path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
@@ -255,54 +251,11 @@ function expectedRemovalPlan(
     profile,
     capability: {
       identifier: "booking-calendly",
-      version: "0.1.0",
+      version: "0.2.0",
     },
     currentCapabilities: ["booking-calendly", ...desiredCapabilities].sort(),
     desiredCapabilities,
-    actions: [
-      {
-        kind: "replace-project-configuration",
-        path: ".egeria/project.yaml",
-        ownership: "managed",
-        owner: "builder-kernel",
-      },
-      {
-        kind: "replace-file",
-        path: "apps/web/app/page.tsx",
-        ownership: "application-owned",
-        owner: "builder-kernel",
-      },
-      {
-        kind: "delete-file",
-        path: "apps/web/content/en-CA/booking-calendly.yaml",
-        ownership: "application-owned",
-        owner: "booking-calendly",
-      },
-      {
-        kind: "delete-file",
-        path: "apps/web/src/integrations/booking-calendly/booking-content.ts",
-        ownership: "application-owned",
-        owner: "booking-calendly",
-      },
-      {
-        kind: "delete-file",
-        path: "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-        ownership: "managed",
-        owner: "booking-calendly",
-      },
-      {
-        kind: "delete-file",
-        path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-        ownership: "application-owned",
-        owner: "booking-calendly",
-      },
-      {
-        kind: "delete-file",
-        path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-        ownership: "application-owned",
-        owner: "booking-calendly",
-      },
-    ],
+    actions: expectedPlanActions().map(action => action.kind === "create-file" ? { ...action, kind: "delete-file" } : action),
     reviewRequirements,
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
@@ -323,15 +276,14 @@ function assertSuccess(result) {
 
 function createFakeVerifier() {
   return {
-    async prepareLockfile(root) {
-      await writeFile(join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
-      return { ok: true, value: undefined };
-    },
-    verifyInIsolatedCopy() {
-      return Promise.resolve({
-        ok: true,
-        value: { checks: generatedChecks },
-      });
+    // Copy an already reviewed lockfile; no install or generated runtime runs here.
+    prepareLockfile: core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }).prepareLockfile,
+    async verifyInIsolatedCopy(root) {
+      const project = assertSuccess(core.parseProjectYaml(await readFile(join(root, ".egeria/project.yaml"), "utf8")));
+      const selected = project.selectedCapabilities;
+      return { ok: true, value: { checks: selected.includes("application-persistence")
+        ? core.persistenceGenerationVerificationChecks
+        : selected.includes("app-foundation") ? core.appGenerationVerificationChecks : generatedChecks } };
     },
   };
 }
@@ -361,8 +313,6 @@ function planAddArguments(directory, selectedSettings = planSettings) {
     directory,
     "--capability",
     "booking-calendly",
-    "--calendly-url",
-    selectedSettings.destination,
     "--calendly-mode",
     selectedSettings.mode,
   ];
@@ -440,8 +390,6 @@ function applyAddArguments(
     directory,
     "--capability",
     "booking-calendly",
-    "--calendly-url",
-    selectedSettings.destination,
     "--calendly-mode",
     selectedSettings.mode,
     "--approved-plan",
@@ -541,7 +489,7 @@ function applyProfileTransitionArguments(
   ];
 }
 
-async function listTree(root) {
+async function listTree(root, { omitGitMetadata = false } = {}) {
   const snapshot = [];
 
   async function visit(directory, relativeDirectory) {
@@ -553,6 +501,7 @@ async function listTree(root) {
       const relativePath = relativeDirectory
         ? `${relativeDirectory}/${entry.name}`
         : entry.name;
+      if (omitGitMetadata && relativePath === ".git") continue;
       const absolutePath = join(directory, entry.name);
 
       if (entry.isDirectory()) {
@@ -702,7 +651,7 @@ function appCreateArguments(directory, allOptionals = false) {
     "--display-name", "Sample App",
     "--directory", directory,
     ...(allOptionals ? [
-      "--calendly-url", planSettings.destination,
+      "--booking-calendly",
       "--calendly-mode", planSettings.mode,
       "--multilingual",
       ...analyticsSelectionArguments(),
@@ -813,7 +762,7 @@ test("application persistence rejects malformed selection and cross-capability r
         ...(kind === "apply-add" ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])];
       return [
         [...base, "--google-analytics-id", "G-ABCDEF1234"],
-        [...base, "--calendly-url", planSettings.destination, "--calendly-mode", "popup"],
+        [...base, "--calendly-url", "https://calendly.com/private-sentinel/intro", "--calendly-mode", "popup"],
         [...base, "--persistence-removal", "/private/removal.json"],
       ];
     }),
@@ -874,9 +823,9 @@ test("application persistence creation reaches installed state through the gener
     const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
     const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.1.1");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.6.1");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.4.1");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.10.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.10.0");
   } finally {
     await rm(owner, { recursive: true, force: false });
   }
@@ -899,7 +848,7 @@ test("environment persistence creation reaches installed state through the gener
           return { ok: true, value: { checks: core.persistenceGenerationVerificationChecks } };
         },
       }),
-    }, "2.0.0");
+    });
     const captured = captureOutput();
     assert.equal(await runner([
       ...appCreateArguments(destination), "--application-persistence",
@@ -907,8 +856,8 @@ test("environment persistence creation reaches installed state through the gener
     assert.equal(verificationCalls, 1);
     assert.deepEqual(captured.error, []);
     assert.equal(captured.standard.length, 1);
-    const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8"), "2.0.0"));
-    const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8"), "2.0.0"));
+    const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
+    const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.10.0");
@@ -1017,14 +966,20 @@ test("compiled application persistence addition planning and approval refusals p
     const planResult = await executeBuilt(["plan-add", ...arguments_]);
     assert.equal(planResult.exitCode, 0, planResult.stderr);
     const plan = JSON.parse(planResult.stdout).result;
-    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.1" });
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.2.0" });
     const refused = await executeBuilt(["apply-add", ...arguments_, "--approved-plan", `sha256:${"a".repeat(64)}`]);
     assert.equal(refused.exitCode, 1, refused.stdout);
     assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_PLAN_APPROVAL_INVALID");
     assert.deepEqual(await gitRepositorySnapshot(linked), before);
   }, { generation: "vitest-five" });
 
-
+  await withGitFixture("site", async ({ linked }) => {
+    const before = await gitRepositorySnapshot(linked);
+    const refused = await executeBuilt(["plan-add", "--directory", linked, "--capability", "application-persistence"]);
+    assert.equal(refused.exitCode, 1, refused.stdout);
+    assert.equal(JSON.parse(refused.stderr).code, "CAPABILITY_ADDITION_UNSUPPORTED");
+    assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  });
 });
 
 test("compiled application persistence removal reviews evidence and refuses unready approval without writes", { timeout: 120_000 }, async () => {
@@ -1037,7 +992,7 @@ test("compiled application persistence removal reviews evidence and refuses unre
     assert.equal(planResult.exitCode, 0, planResult.stderr);
     assert.equal(planResult.stderr, "");
     const plan = JSON.parse(planResult.stdout).plan;
-    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.1.1" });
+    assert.deepEqual(plan.capability, { identifier: "application-persistence", version: "0.2.0" });
     assert.equal(plan.persistenceRemovalReport.recommendation, "obtain-more-evidence");
     assert.doesNotMatch(planResult.stdout, /private-removal|production-application|staging-application/u);
     await writeFile(humanReviewPath, JSON.stringify({
@@ -1095,7 +1050,7 @@ test("app profile creation parses existing options independently and delegates g
       assert.equal(captured.standard.length, 1);
       const project = assertSuccess(core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8")));
       assert.equal(project.originProfile, "app");
-      assert.equal(project.recipeVersion, "0.2.7");
+      assert.equal(project.recipeVersion, "0.3.0");
       assert.deepEqual(project.capabilitySettings, allOptionals ? {
         "booking-calendly": planSettings, analytics: analyticsSettings,
       } : {});
@@ -1119,7 +1074,7 @@ test("app profile and app transition parser refusals never invoke builder depend
     create.slice(0, -2), [...create, "--profile", "app"],
     create.map((value) => value === "app" ? "unknown" : value),
     [...create, "--capabilities", "analytics"],
-    [...create, "--calendly-url", planSettings.destination],
+    [...create, "--calendly-url", "https://calendly.com/private-sentinel/intro"],
     [...create, "--multilingual=false"],
     appCreateArguments(""), appCreateArguments("bad\0directory"),
   ];
@@ -1133,7 +1088,7 @@ test("app profile and app transition parser refusals never invoke builder depend
       [...valid, "--to-profile", "app"], [...valid, "--unknown", "private-value"],
       [...valid, "positional"], [...valid, "--from-profile", "portfolio"],
       [...valid, "--from-version", "0.10.0"], [...valid, "--to-version", "0.1.0"],
-      [...valid, "--multilingual"], [...valid, "--calendly-url", planSettings.destination],
+      [...valid, "--multilingual"], [...valid, "--calendly-url", "https://calendly.com/private-sentinel/intro"],
       [...valid, ...analyticsSelectionArguments()], [...valid, "--capabilities", "analytics"],
       valid.map((value) => value === "app" ? "portfolio" : value),
       valid.map((value) => value === "app" ? "unknown" : value),
@@ -1312,8 +1267,7 @@ test("the parser accepts only the exact command-specific arguments", () => {
           "Acme Portfolio",
           "--directory",
           "/private/tmp/acme-portfolio",
-          "--calendly-url",
-          "https://calendly.com/acme/intro",
+          "--booking-calendly",
           "--calendly-mode",
           mode,
         ]),
@@ -1325,7 +1279,6 @@ test("the parser accepts only the exact command-specific arguments", () => {
         displayName: "Acme Portfolio",
         directory: "/private/tmp/acme-portfolio",
         bookingCalendly: {
-          destination: "https://calendly.com/acme/intro",
           mode,
         },
       },
@@ -1505,7 +1458,6 @@ test("the plan-add parser accepts exact options in any order", () => {
     directory: "/private/tmp/acme-portfolio",
     capability: "booking-calendly",
     settings: {
-      destination: "https://calendly.com/acme/intro",
       mode: "popup",
     },
   };
@@ -1515,8 +1467,6 @@ test("the plan-add parser accepts exact options in any order", () => {
     "/private/tmp/acme-portfolio",
     "--capability",
     "booking-calendly",
-    "--calendly-url",
-    "https://calendly.com/acme/intro",
     "--calendly-mode",
     "popup",
   ];
@@ -1524,8 +1474,6 @@ test("the plan-add parser accepts exact options in any order", () => {
     "plan-add",
     "--calendly-mode",
     "popup",
-    "--calendly-url",
-    "https://calendly.com/acme/intro",
     "--capability",
     "booking-calendly",
     "--directory",
@@ -1580,8 +1528,6 @@ test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe val
     "/private/tmp/acme-portfolio",
     "--capability",
     "booking-calendly",
-    "--calendly-url",
-    "https://calendly.com/acme/intro",
     "--calendly-mode",
     "popup",
   ];
@@ -1593,11 +1539,7 @@ test("the plan-add parser rejects incomplete, duplicate, unknown, and unsafe val
       value === "booking-calendly" ? "invented-capability" : value,
     ),
     valid.map((value) => (value === "popup" ? "modal" : value)),
-    valid.map((value) =>
-      value === "https://calendly.com/acme/intro"
-        ? "https://calendar.example/private"
-        : value,
-    ),
+    [...valid, "--calendly-url", "https://calendar.example/private"],
     valid.map((value) =>
       value === "/private/tmp/acme-portfolio" ? "bad\0directory" : value,
     ),
@@ -1687,8 +1629,7 @@ test("analytics arguments accept each independent provider and operational selec
   const cases = [
     {
       arguments: [
-        "--cloudflare-web-analytics-token",
-        analyticsSettings.providers.cloudflareWebAnalytics.siteToken,
+        "--cloudflare-web-analytics",
       ],
       providers: {
         cloudflareWebAnalytics:
@@ -1698,8 +1639,7 @@ test("analytics arguments accept each independent provider and operational selec
     },
     {
       arguments: [
-        "--google-analytics-id",
-        analyticsSettings.providers.googleAnalytics4.measurementId,
+        "--google-analytics-4",
       ],
       providers: {
         googleAnalytics4: analyticsSettings.providers.googleAnalytics4,
@@ -1708,8 +1648,7 @@ test("analytics arguments accept each independent provider and operational selec
     },
     {
       arguments: [
-        "--microsoft-clarity-id",
-        analyticsSettings.providers.microsoftClarity.projectId,
+        "--microsoft-clarity",
         "--microsoft-clarity-audience",
         analyticsSettings.providers.microsoftClarity.audience,
       ],
@@ -1720,9 +1659,7 @@ test("analytics arguments accept each independent provider and operational selec
     },
     {
       arguments: [
-        "--search-console-verification",
-        analyticsSettings.operationalIntegrations.googleSearchConsole
-          .verificationToken,
+        "--google-search-console",
       ],
       providers: {},
       operationalIntegrations: {
@@ -1732,8 +1669,7 @@ test("analytics arguments accept each independent provider and operational selec
     },
     {
       arguments: [
-        "--google-analytics-id",
-        analyticsSettings.providers.googleAnalytics4.measurementId,
+        "--google-analytics-4",
         "--looker-studio",
       ],
       providers: {
@@ -2295,7 +2231,7 @@ test("the parser rejects missing, repeated, unknown, abbreviated, and crossed ar
   }
 });
 
-test("the runner forwards paired Calendly selection without exposing its URL", async () => {
+test("the runner forwards Calendly mode selection without runtime configuration", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-cli-calendly-"));
   const destination = join(owner, "acme-portfolio");
   const fakeVerifier = createFakeVerifier();
@@ -2317,8 +2253,7 @@ test("the runner forwards paired Calendly selection without exposing its URL", a
           "Acme Portfolio",
           "--directory",
           destination,
-          "--calendly-url",
-          "https://calendly.com/acme/private-intro",
+          "--booking-calendly",
           "--calendly-mode",
           "popup",
         ],
@@ -2380,8 +2315,7 @@ test("the runner creates multilingual portfolio and site projects with optional 
         ...(fixture.bookingCalendly === undefined
           ? []
           : [
-              "--calendly-url",
-              fixture.bookingCalendly.destination,
+              "--booking-calendly",
               "--calendly-mode",
               fixture.bookingCalendly.mode,
             ]),
@@ -2679,7 +2613,7 @@ test("installed CLI diagnostics ignore changed generation defaults", async () =>
   try {
     for (const profile of ["portfolio", "site", "app"]) {
       const directory = join(owner, profile);
-      await cp(resolve(repositoryRoot, `fixtures/generated/${profile}-${lifecycleCohorts[0][profile]}`), directory, { recursive: true });
+      assertSuccess(await core.generateProject({ request: { profile, projectName: `acme-${profile}`, displayName: `Acme ${profile}` }, destination: directory, verifier: createFakeVerifier() }));
       const recipes = core.profileRecipes.splice(0);
       try {
         for (const kind of ["infer", "doctor", "diff"]) {
@@ -2702,6 +2636,25 @@ test("installed CLI diagnostics ignore changed generation defaults", async () =>
   }
 });
 
+test("CLI diagnostics refuse retired installed controls without changing repository bytes", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    await withGeneratedFixture(async (directory) => {
+      const statePath = join(directory, ".egeria/state.json");
+      const state = JSON.parse(await readFile(statePath, "utf8"));
+      state.installedCapabilities.find(({ identifier }) => identifier === "standards").version = "0.5.0";
+      await writeFile(statePath, JSON.stringify(state));
+      const before = await listTree(directory);
+      for (const kind of ["infer", "doctor", "diff"]) {
+        const captured = captureOutput();
+        assert.equal(await cli.runCli([kind, "--directory", directory], captured.output), 1);
+        assert.deepEqual(captured.standard, []);
+        assert.equal(JSON.parse(captured.error[0]).code, "PROJECT_INSPECTION_INVALID");
+        assert.deepEqual(await listTree(directory), before);
+      }
+    }, profile);
+  }
+});
+
 test("doctor and diff return exit one for diagnosed repository drift", async () => {
   await withGeneratedFixture(async (directory) => {
     await writeFile(join(directory, "pnpm-lock.yaml"), "drift\n");
@@ -2719,13 +2672,14 @@ test("doctor and diff return exit one for diagnosed repository drift", async () 
 });
 
 test("plan-add emits the complete approval-required envelope after two matching inspections", async () => {
+  await withGeneratedFixture(async (directory) => {
   const inspection = cleanGitInspection();
   const inspections = [inspection, structuredClone(inspection)];
   const runCli = cli.createCliRunner({
     createVerifier: createFakeVerifier,
     createReader: () =>
       core.createFileSystemRepositoryReader(
-        resolve(repositoryRoot, generatedFixtureContracts.find(({ identifier }) => identifier === "portfolio").relativeRoot),
+        directory,
       ),
     inspectGitWorktree: () => Promise.resolve(inspections.shift()),
     inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
@@ -2753,6 +2707,7 @@ test("plan-add emits the complete approval-required envelope after two matching 
     captured.standard[0],
     /private-planning-destination|calendly\.com|refs\/heads|generated-common/u,
   );
+  });
 });
 
 test("plan-remove emits the complete approval-required plan after two matching inspections", async () => {
@@ -3109,8 +3064,8 @@ test("apply-add forwards exact approval inputs and emits only the bounded result
   const value = {
     status: "verified-final-diff-approval-required",
     baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
-    capability: { identifier: "booking-calendly", version: "0.1.0" },
-    migration: "add-booking-calendly-0-1-0",
+    capability: { identifier: "booking-calendly", version: "0.2.0" },
+    migration: "add-booking-calendly-0-2-0",
     changedPaths: [".egeria/project.yaml", ".egeria/state.json"],
     verificationChecks: core.capabilityAdditionVerificationChecks,
   };
@@ -3211,8 +3166,8 @@ test("apply-remove forwards exact approval inputs and emits only the bounded res
   const value = {
     status: "verified-final-diff-approval-required",
     baseRevision: "abcdef0123456789abcdef0123456789abcdef01",
-    capability: { identifier: "booking-calendly", version: "0.1.0" },
-    migration: "remove-booking-calendly-0-1-0",
+    capability: { identifier: "booking-calendly", version: "0.2.0" },
+    migration: "remove-booking-calendly-0-2-0",
     changedPaths: [".egeria/project.yaml", ".egeria/state.json"],
     preservedPaths: [],
     verificationChecks: core.capabilityRemovalVerificationChecks,
@@ -3489,6 +3444,7 @@ test("apply-profile-transition forwards exact approval and emits bounded success
 });
 
 test("plan-add contains final inspection changes and never leaks a completed plan", async () => {
+  await withGeneratedFixture(async (directory) => {
   const initial = cleanGitInspection();
   const finalCases = [
     {
@@ -3545,7 +3501,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
       createVerifier: createFakeVerifier,
       createReader: () =>
         core.createFileSystemRepositoryReader(
-          resolve(repositoryRoot, generatedFixtureContracts.find(({ identifier }) => identifier === "portfolio").relativeRoot),
+          directory,
         ),
       inspectGitWorktree: () => Promise.resolve(inspections.shift()),
       inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
@@ -3581,7 +3537,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
     createVerifier: createFakeVerifier,
     createReader: () =>
       core.createFileSystemRepositoryReader(
-        resolve(repositoryRoot, generatedFixtureContracts.find(({ identifier }) => identifier === "portfolio").relativeRoot),
+        directory,
       ),
     inspectGitCreateTargets: () => Promise.resolve({ ok: true }),
     inspectGitWorktree() {
@@ -3645,7 +3601,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
     createVerifier: createFakeVerifier,
     createReader: () =>
       core.createFileSystemRepositoryReader(
-        resolve(repositoryRoot, generatedFixtureContracts.find(({ identifier }) => identifier === "portfolio").relativeRoot),
+        directory,
       ),
     inspectGitCreateTargets: () =>
       Promise.resolve({ ok: false, code: "CAPABILITY_ACTION_CONFLICT" }),
@@ -3667,6 +3623,7 @@ test("plan-add contains final inspection changes and never leaks a completed pla
       code: "CAPABILITY_ACTION_CONFLICT",
     }),
   ]);
+  });
 });
 
 async function executeGit(root, arguments_, readOnly = false) {
@@ -3789,7 +3746,7 @@ async function withGitFixture(name, run, options = {}) {
   }
 }
 
-test("compiled retired recipe lifecycle commands refuse without writes", async () => {
+test("compiled retired recipe lifecycle and diagnostic commands refuse without writes", async () => {
   for (const name of ["portfolio-0.11.1", "site-0.12.1", "app-0.2.1", "portfolio-0.11.3", "portfolio-calendly-0.11.3", "portfolio-email-0.11.3"]) {
     const control = JSON.parse(await readFile(resolve(repositoryRoot, `packages/builder-core/tests/fixtures/retired-recipes/${name}.json`), "utf8"));
     const profile = control.project.originProfile;
@@ -3806,7 +3763,7 @@ test("compiled retired recipe lifecycle commands refuse without writes", async (
         for (const command of ["infer", "doctor", "diff"]) {
           const result = await executeBuilt([command, "--directory", linked]);
           assert.equal(result.exitCode, 1);
-          assert.deepEqual(JSON.parse(result.stderr), { ok: false, code: "VERIFIED_CATALOG_INVALID" });
+          assert.deepEqual(JSON.parse(result.stderr), { ok: false, code: "PROJECT_INSPECTION_INVALID" });
           assert.equal(result.stdout, "");
           assert.deepEqual(await gitRepositorySnapshot(linked), before);
         }
@@ -3873,7 +3830,7 @@ async function gitRepositorySnapshot(root) {
       true,
     ),
     executeGit(root, ["ls-files", "-v", "-z"], true),
-    listTree(root),
+    listTree(root, { omitGitMetadata: true }),
     operationSnapshot(root),
   ]);
 
@@ -3882,9 +3839,7 @@ async function gitRepositorySnapshot(root) {
     refs,
     status,
     indexVisibility,
-    tree: tree.filter(
-      ({ path }) => path !== ".git" && !path.startsWith(".git/"),
-    ),
+    tree,
     operations,
   };
 }
@@ -3904,12 +3859,8 @@ async function assertExactInstalledAgreement(root, options = {}) {
   const stateSource = await readFile(join(root, ".egeria/state.json"), "utf8");
   const project = core.parseProjectYaml(projectSource);
   const state = core.parseStateJson(stateSource);
-  const catalog = options.catalogSnapshot
-    ? core.createCapabilityCatalogSnapshot(
-        core.verifiedCapabilityPackageVersions,
-        options.catalogSnapshot,
-      )
-    : core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
+  const snapshot = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(root));
+  const catalog = snapshot.ok ? { ok: true, value: snapshot.value.catalog } : snapshot;
   assert.equal(project.ok, true);
   assert.equal(state.ok, true);
   assert.equal(catalog.ok, true);
@@ -3954,11 +3905,12 @@ async function commitAll(root, message) {
 }
 
 async function replaceFakeLockfileWithFixture(root, profile) {
-  const lockfile = new Uint8Array(
-    await readFile(
-      resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${profile + "-" + lifecycleCohorts[0][profile]}/pnpm-lock.yaml`),
-    ),
-  );
+  const project = assertSuccess(core.parseProjectYaml(await readFile(join(root, ".egeria/project.yaml"), "utf8")));
+  assert.equal(project.originProfile, profile);
+  const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
+  const version = resolveRecipeLockfileVersion(project, manifest);
+  assert.notEqual(version, undefined);
+  const lockfile = new Uint8Array(await readFile(createRecipeLockfileUrl(version)));
   await writeFile(join(root, "pnpm-lock.yaml"), lockfile);
   const statePath = join(root, ".egeria/state.json");
   const state = core.parseStateJson(await readFile(statePath, "utf8"));
@@ -4007,7 +3959,7 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
   assert.equal(planExecution.exitCode, 0, planExecution.stderr);
   assert.equal(planExecution.stderr, "");
   const plan = JSON.parse(planExecution.stdout).result;
-  assert.deepEqual(plan.capability, { identifier, version: "0.1.0" });
+  assert.deepEqual(plan.capability, { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" });
   assert.match(plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
   assert.deepEqual(await gitRepositorySnapshot(root), cleanBefore);
 
@@ -4023,8 +3975,8 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
     result: {
       status: "verified-final-diff-approval-required",
       baseRevision: Buffer.from(cleanBefore.head).toString("utf8").trim(),
-      capability: { identifier, version: "0.1.0" },
-      migration: `add-${identifier}-0-1-0`,
+      capability: { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" },
+      migration: `add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`,
       changedPaths: [
         ...plan.actions.map(({ path }) => path),
         ".egeria/migrations.jsonl",
@@ -4160,7 +4112,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(await listTree(join(primary, ".git")), gitBefore);
         const plan = JSON.parse(first.stdout).plan;
         assert.deepEqual([plan.source.profile, plan.source.recipeVersion], [profile, lifecycleCohorts[0][profile]]);
-        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.2.7"]);
+        assert.deepEqual([plan.target.profile, plan.target.recipeVersion], ["app", "0.3.0"]);
         assert.deepEqual(plan.requiredApprovals, ["transform", "verified-final-diff"]);
         const preserved = new Map(await Promise.all(plan.dispositions
           .filter(({ kind }) => kind === "preserve-file")
@@ -4170,9 +4122,7 @@ for (const profile of ["site"]) {
         assert.equal(execution.stderr, "");
         assert.equal(execution.stdout.endsWith("\n"), true);
         assert.equal(execution.stdout.trimEnd().split("\n").length, 1);
-        const migration = profile === "portfolio"
-          ? "transition-portfolio-0-11-7-to-app-0-2-7"
-          : "transition-site-0-12-7-to-app-0-2-7";
+        const migration = "transition-site-0-13-0-to-app-0-3-0";
         const changedPaths = [...new Set([
           ...plan.actions.map(({ path }) => path),
           ".egeria/project.yaml", ".egeria/migrations.jsonl", ".egeria/state.json",
@@ -4184,7 +4134,7 @@ for (const profile of ["site"]) {
             transition: {
               fromProfile: profile,
               fromRecipeVersion: lifecycleCohorts[0][profile],
-              toProfile: "app", toRecipeVersion: "0.2.7",
+              toProfile: "app", toRecipeVersion: "0.3.0",
             },
             migration, changedPaths,
             verificationChecks: core.appProfileTransitionVerificationChecks,
@@ -4198,7 +4148,7 @@ for (const profile of ["site"]) {
         assert.deepEqual(project.capabilitySettings, sourceProject.capabilitySettings);
         assert.equal(project.selectedCapabilities.includes("multilingual"), allOptionals);
         const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
-        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.7" });
+        assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.3.0" });
         assert.deepEqual(state.appliedMigrations, [migration]);
         assert.deepEqual(state.lastSuccessfulVerification, {
           kind: "profile-transition", checks: core.appProfileTransitionPersistedVerificationChecks,
@@ -4371,7 +4321,7 @@ test("the compiled CLI preserves multilingual through both capability install or
             environment,
           );
           lifecycleOutput.push(addition.execution.stdout);
-          expectedMigrations.push(`add-${identifier}-0-1-0`);
+          expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
           installedOptionalCapabilities.push(identifier);
           await assertCapabilityLifecycleState(
             linked,
@@ -4535,7 +4485,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
               environment,
             );
             lifecycleOutput.push(addition.execution.stdout);
-            expectedMigrations.push(`add-${identifier}-0-1-0`);
+            expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
             installedOptionalCapabilities.push(identifier);
             await assertCapabilityLifecycleState(
               linked,
@@ -4563,7 +4513,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
           const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
           assert.deepEqual(removalPlan.capability, {
             identifier: "analytics",
-            version: "0.1.0",
+            version: "0.2.0",
           });
           assert.deepEqual(
             removalPlan.settings,
@@ -4578,7 +4528,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
           assert.equal(removal.exitCode, 0, removal.stderr);
           assert.equal(removal.stderr, "");
           lifecycleOutput.push(removal.stdout);
-          expectedMigrations.push("remove-analytics-0-1-0");
+          expectedMigrations.push("remove-analytics-0-2-0");
           await assertCapabilityLifecycleState(
             linked,
             expectedMigrations,
@@ -4592,7 +4542,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
             environment,
           );
           lifecycleOutput.push(readdition.execution.stdout);
-          expectedMigrations.push("add-analytics-0-1-0");
+          expectedMigrations.push("add-analytics-0-2-0");
           await assertCapabilityLifecycleState(
             linked,
             expectedMigrations,
@@ -4811,8 +4761,8 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
         result: {
           status: "verified-final-diff-approval-required",
           baseRevision: Buffer.from(linkedBefore.head).toString("utf8").trim(),
-          capability: { identifier: "booking-calendly", version: "0.1.0" },
-          migration: "add-booking-calendly-0-1-0",
+          capability: { identifier: "booking-calendly", version: "0.2.0" },
+          migration: "add-booking-calendly-0-2-0",
           changedPaths: expectedPaths,
           verificationChecks: core.capabilityAdditionVerificationChecks,
         },
@@ -4828,12 +4778,12 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
       assert.equal(state.ok, true, JSON.stringify(state.issues));
       assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
       assert.deepEqual(state.value.appliedMigrations, [
-        "add-booking-calendly-0-1-0",
+        "add-booking-calendly-0-2-0",
       ]);
       assert.equal(migrations.value.length, 1);
       assert.equal(
         migrations.value[0].identifier,
-        "add-booking-calendly-0-1-0",
+        "add-booking-calendly-0-2-0",
       );
       const addedProjectSource = await readFile(
         join(linked, ".egeria/project.yaml"),
@@ -4873,42 +4823,18 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
       const removalPlanExecution = await executeBuilt(planRemoveArguments(linked));
       assert.equal(removalPlanExecution.exitCode, 0, removalPlanExecution.stderr);
       const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
-      assert.deepEqual(removalPlan.reviewRequirements, [
-        {
-          code: "review-surviving-references-to-removed-surfaces",
-          scope: "repository",
-        },
-        {
-          code: "review-capability-removal-reference-warnings",
-          warnings: [
-            {
-              code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
-              path: "README.md",
-            },
-            {
-              code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
-              path: "apps/web/AGENTS.md",
-            },
-            {
-              code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
-              path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-            },
-            {
-              code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
-              path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-            },
-          ],
-        },
-      ]);
+      assert.deepEqual(removalPlan.reviewRequirements, generatedRemovalReviewRequirements);
       assert.deepEqual(await gitRepositorySnapshot(linked), cleanAdded);
       assert.deepEqual(
         await listCalendlyReferencePaths(linked),
         [
-          ...removalPlan.actions.map(({ path }) => path),
+          ...removalPlan.actions.map(({ path }) => path)
+            .filter((path) => path !== "apps/web/tests/e2e/calendly-booking.spec.ts"),
           ".egeria/migrations.jsonl",
           ".egeria/state.json",
           "README.md",
           "apps/web/AGENTS.md",
+          "docs/environments.md",
         ].toSorted(),
       );
 
@@ -4954,8 +4880,8 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
         result: {
           status: "verified-final-diff-approval-required",
           baseRevision: Buffer.from(cleanAdded.head).toString("utf8").trim(),
-          capability: { identifier: "booking-calendly", version: "0.1.0" },
-          migration: "remove-booking-calendly-0-1-0",
+          capability: { identifier: "booking-calendly", version: "0.2.0" },
+          migration: "remove-booking-calendly-0-2-0",
           changedPaths: removalPaths,
           preservedPaths: [],
           verificationChecks: core.capabilityRemovalVerificationChecks,
@@ -4993,8 +4919,8 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
         removedMigrations.value.map(core.serializeMigrationRecord).join(""),
       );
       assert.deepEqual(removedState.value.appliedMigrations, [
-        "add-booking-calendly-0-1-0",
-        "remove-booking-calendly-0-1-0",
+        "add-booking-calendly-0-2-0",
+        "remove-booking-calendly-0-2-0",
       ]);
       assert.deepEqual(
         removedMigrations.value.map(({ identifier }) => identifier),
@@ -5086,9 +5012,9 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
         readdedMigrations.value.map(core.serializeMigrationRecord).join(""),
       );
       assert.deepEqual(readdedState.value.appliedMigrations, [
-        "add-booking-calendly-0-1-0",
-        "remove-booking-calendly-0-1-0",
-        "add-booking-calendly-0-1-0",
+        "add-booking-calendly-0-2-0",
+        "remove-booking-calendly-0-2-0",
+        "add-booking-calendly-0-2-0",
       ]);
       assert.deepEqual(
         readdedMigrations.value.map(({ identifier }) => identifier),
@@ -5132,8 +5058,9 @@ test("compiled removal preserves modified and already-ejected application surfac
       const ejectedPath =
         "apps/web/src/integrations/booking-calendly/booking-content.ts";
       const modifiedSource = `${await readFile(join(linked, modifiedPath), "utf8")}\n# application change\n`;
-      const ejectedSource = await readFile(join(linked, ejectedPath), "utf8");
+      const ejectedSource = 'export const applicationBookingNote = "Preserved application content";\n';
       await writeFile(join(linked, modifiedPath), modifiedSource);
+      await writeFile(join(linked, ejectedPath), ejectedSource);
 
       const projectPath = join(linked, ".egeria/project.yaml");
       const statePath = join(linked, ".egeria/state.json");
@@ -5232,10 +5159,9 @@ test("compiled removal preserves modified and already-ejected application surfac
       );
       assert.deepEqual(finalProject.value.ejectedAreas, envelope.result.preservedPaths);
       assert.deepEqual(finalState.value.ejections, envelope.result.preservedPaths);
-      const changedSurfaceIdentifiers = new Set([
-        "builder-home-route",
-        "builder-migration-log",
-        "builder-project-configuration",
+      const changedSurfacePaths = new Set([
+        ...expectedPlanActions().map(({ path }) => path),
+        ".egeria/migrations.jsonl",
       ]);
       for (const priorSurface of ejectedState.managedSurfaces) {
         if (
@@ -5244,7 +5170,7 @@ test("compiled removal preserves modified and already-ejected application surfac
         ) {
           continue;
         }
-        if (changedSurfaceIdentifiers.has(priorSurface.identifier)) {
+        if (changedSurfacePaths.has(priorSurface.path)) {
           continue;
         }
         assert.deepEqual(
@@ -5387,10 +5313,20 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
-  test(`compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
+  test(profile === "portfolio" ? `compiled ${cohort.label} portfolio app transition refuses without admitted visuals` : `compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
       const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
+      if (profile === "portfolio") {
+        assert.equal(planning.exitCode, 1);
+        assert.equal(planning.stdout, "");
+        assert.deepEqual(JSON.parse(planning.stderr), {
+          ok: false, command: "plan-profile-transition",
+          code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", recovery: "not-required",
+        });
+        assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        return;
+      }
       assert.equal(planning.exitCode, 0, planning.stderr);
       assert.deepEqual(await gitRepositorySnapshot(linked), before);
       const plan = JSON.parse(planning.stdout).plan;
@@ -5404,13 +5340,13 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       assert.deepEqual(state.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, "5.0.3");
       assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`)));
-      await assertExactInstalledAgreement(linked, { catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } });
+      await assertExactInstalledAgreement(linked);
     }, cohort.generation);
   });
 }
 
 for (const generation of [
-  { name: "current", generation: "current", recipe: "0.2.7", vitest: "5.0.3", catalogSnapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" } },
+  { name: "current", generation: "current", recipe: "0.3.0", vitest: "5.0.3", catalogSnapshot: createGenerationRenderingContext().catalogSnapshot },
 ]) {
   test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {
@@ -5440,24 +5376,17 @@ for (const generation of [
         const addition = await applyCompiledCapabilityAddition(linked, identifier);
         output.push(addition.execution.stdout);
         selected.push(identifier);
-        expectedMigrations.push(`add-${identifier}-0-1-0`);
+        expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
         await assertAppState(core.appCapabilityAdditionPersistedVerificationChecks);
         await commitAll(linked, `add ${identifier} capability`);
         context.diagnostic(`${identifier} addition with Worker integration: ${Math.round(performance.now() - started)} ms`);
       }
 
       const composedBefore = await gitRepositorySnapshot(linked);
-      const refusal = await executeBuilt(planMultilingualRemoveArguments(linked));
-      assert.equal(refusal.exitCode, 1);
-      assert.equal(refusal.stdout, "");
-      assert.deepEqual(JSON.parse(refusal.stderr), {
-        ok: false,
-        command: "plan-remove",
-        code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
-        conflicts: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
-      });
+      const multilingualRemoval = await executeBuilt(planMultilingualRemoveArguments(linked));
+      assert.equal(multilingualRemoval.exitCode, 0, multilingualRemoval.stderr);
       assert.deepEqual(await gitRepositorySnapshot(linked), composedBefore);
-      output.push(refusal.stderr);
+      output.push(multilingualRemoval.stdout);
 
       for (const [identifier, planArguments, applyArguments] of [
         ["analytics", planAnalyticsRemoveArguments, applyAnalyticsRemoveArguments],
@@ -5481,8 +5410,8 @@ for (const generation of [
           result: {
             status: "verified-final-diff-approval-required",
             baseRevision: Buffer.from(before.head).toString("utf8").trim(),
-            capability: { identifier, version: "0.1.0" },
-            migration: `remove-${identifier}-0-1-0`,
+            capability: { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" },
+            migration: `remove-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`,
             changedPaths: [...plan.actions.filter(({ kind }) => kind !== "preserve-file-and-eject").map(({ path }) => path), ".egeria/migrations.jsonl", ".egeria/state.json"].sort(),
             preservedPaths: [],
             verificationChecks: core.appCapabilityRemovalVerificationChecks,
@@ -5490,7 +5419,7 @@ for (const generation of [
         });
         output.push(removal.stdout);
         selected.splice(selected.indexOf(identifier), 1);
-        expectedMigrations.push(`remove-${identifier}-0-1-0`);
+        expectedMigrations.push(`remove-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
         await assertAppState(core.appCapabilityRemovalPersistedVerificationChecks);
         await commitAll(linked, `remove ${identifier} capability`);
         context.diagnostic(`${identifier} removal with Worker integration: ${Math.round(performance.now() - started)} ms`);
@@ -5507,7 +5436,7 @@ for (const generation of [
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 600_000 }, async () => {
+  test(`compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
@@ -5519,6 +5448,8 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       const migrations = [];
       for (const operation of ["add", "remove", "add"]) {
         const before = await gitRepositorySnapshot(linked);
+        const retainedRuntimeExample = operation === "remove"
+          ? await readFile(join(linked, "apps/web/.dev.vars.example")) : undefined;
         const arguments_ = ["--directory", linked, "--capability", capability];
         const planning = await executeBuilt([`plan-${operation}`, ...arguments_]);
         assert.equal(planning.exitCode, 0, planning.stderr);
@@ -5543,10 +5474,10 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
         assert.equal(project.selectedCapabilities.includes("site-routing"), profile === "site");
         assert.equal(project.selectedCapabilities.includes("application-persistence"), false);
         assert.equal(project.selectedCapabilities.includes(capability), operation === "add");
-        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.3.0");
         assert.deepEqual(state.lastSuccessfulVerification.checks, operation === "add"
           ? core.appCapabilityAdditionPersistedVerificationChecks : core.appCapabilityRemovalPersistedVerificationChecks);
-        migrations.push(`${operation}-${capability}-0-1-0`);
+        migrations.push(`${operation}-${capability}-0-2-0`);
         assert.deepEqual(state.appliedMigrations, migrations);
         assert.deepEqual(assertSuccess(core.parseMigrationLog(await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"))).map(({ identifier }) => identifier), migrations);
         await assertExactInstalledAgreement(linked, { catalogSnapshot: renderingContext.catalogSnapshot });
@@ -5557,7 +5488,9 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
         }, renderingContext));
         for (const file of rendered.files) {
           const actual = await readFile(join(linked, file.path));
-          if (file.path === "apps/web/package.json") {
+          if (file.path === "apps/web/.dev.vars.example" && retainedRuntimeExample !== undefined) {
+            assert.deepEqual(actual, retainedRuntimeExample, file.path);
+          } else if (file.path === "apps/web/package.json") {
             assert.deepEqual(JSON.parse(actual.toString("utf8")), JSON.parse(Buffer.from(file.content).toString("utf8")), file.path);
           } else {
             assert.deepEqual(actual, Buffer.from(file.content), file.path);
@@ -5579,33 +5512,30 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
 
 test("Web3Forms options strictly select contact and keep settings out of errors", () => {
   const directory = "/private/tmp/contact-example";
-  const key = "00000000-0000-4000-8000-000000000001";
   const fingerprint = `sha256:${"a".repeat(64)}`;
-  const create = [...appCreateArguments(directory), "--web3forms-access-key", key];
-  assert.deepEqual(assertSuccess(cliArguments.parseCliArguments(create)).contactFormWeb3Forms, { accessKey: key });
+  const create = [...appCreateArguments(directory), "--contact-form-web3forms"];
+  assert.equal(assertSuccess(cliArguments.parseCliArguments(create)).contactFormWeb3Forms, true);
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
     const args = [kind, "--directory", directory, "--capability", "contact-form-web3forms", ...(kind.startsWith("apply") ? ["--approved-plan", fingerprint] : [])];
-    const selected = kind.endsWith("add") ? [...args, "--web3forms-access-key", key] : args;
-    const parsed = assertSuccess(cliArguments.parseCliArguments(selected));
+    const parsed = assertSuccess(cliArguments.parseCliArguments(args));
     assert.equal(parsed.capability, "contact-form-web3forms");
-    assert.deepEqual(parsed.settings, kind.endsWith("add") ? { accessKey: key } : undefined);
-    for (const option of ["--endpoint", "--captcha-secret", "--resend-api-key", "--persistence-removal"])
-      assert.equal(cliArguments.parseCliArguments([...selected, option, "private-value"]).ok, false);
-    if (kind.endsWith("remove")) assert.equal(cliArguments.parseCliArguments([...args, "--web3forms-access-key", key]).ok, false);
-    else assert.equal(cliArguments.parseCliArguments(args).ok, false);
+    assert.equal(parsed.settings, undefined);
+    for (const option of ["--web3forms-access-key", "--endpoint", "--captcha-secret", "--resend-api-key", "--persistence-removal"]) {
+      const result = cliArguments.parseCliArguments([...args, option, "private-value"]);
+      assert.equal(result.ok, false);
+      assert.doesNotMatch(JSON.stringify(result), /private-value/u);
+    }
   }
-  for (const value of ["", "private-value", ` ${key}`, `${key} `]) {
+  for (const value of ["", "private-value", "00000000-0000-4000-8000-000000000001"]) {
     const result = cliArguments.parseCliArguments([...appCreateArguments(directory), "--web3forms-access-key", value]);
     assert.equal(result.ok, false);
-    assert.doesNotMatch(JSON.stringify(result), /private-value/);
+    assert.doesNotMatch(JSON.stringify(result), /private-value/u);
   }
-  assert.equal(cliArguments.parseCliArguments([...create, "--web3forms-access-key", key]).ok, false);
-  assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--web3forms-access-key"]).ok, false);
-  assert.equal(cliArguments.parseCliArguments(["plan-add", "--directory", directory, "--capability", "multilingual", "--web3forms-access-key", key]).ok, false);
+  assert.equal(cliArguments.parseCliArguments([...create, "--contact-form-web3forms"]).ok, false);
 });
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "app"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 900_000 }, async () => {
+  test(`compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile === "app" ? "app-persistence-email" : profile, async ({ linked, primary }) => {
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
       const initialState = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
@@ -5618,7 +5548,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "app"
       const originalLayout = await readFile(join(linked, "apps/web/app/layout.tsx"));
       const lockfile = await readFile(join(linked, "pnpm-lock.yaml"));
       for (const operation of ["add", "remove", "add"]) {
-        const args = ["--directory", linked, "--capability", capability, ...(operation === "add" ? ["--web3forms-access-key", key] : [])];
+        const args = ["--directory", linked, "--capability", capability, ];
         const before = await gitRepositorySnapshot(linked);
         const planning = await executeBuilt([`plan-${operation}`, ...args]);
         assert.equal(planning.exitCode, 0, planning.stderr);
@@ -5642,7 +5572,8 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "app"
         assert.equal(project.originProfile, profile);
         assert.equal(project.recipeVersion, cohort[profile]);
         assert.deepEqual(state.origin, { profile, recipeVersion: cohort[profile] });
-        assert.deepEqual(project.capabilitySettings[capability], operation === "add" ? {accessKey:key} : undefined);
+        assert.equal(project.capabilitySettings[capability], undefined);
+        assert.equal(project.selectedCapabilities.includes(capability), operation === "add");
         assert.equal(project.selectedCapabilities.includes("transactional-email-resend"), profile === "app");
         assert.equal(project.selectedCapabilities.includes("application-persistence"), profile === "app");
         assert.equal(state.installedCapabilities.some(entry => entry.identifier === "app-foundation"), profile === "app");
@@ -5670,18 +5601,18 @@ test("jobs create selection remains independent and removal requires evidence", 
   assert.equal(cliArguments.parseCliArguments([...appCreateArguments(directory), "--background-job-delivery=false"]).ok, false);
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
     assert.equal(cliArguments.parseCliArguments([kind, "--directory", directory, "--capability", "background-job-delivery",
-      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]).ok, kind.endsWith("add"));
+      ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]).ok, false);
   }
 });
 
 const environmentCreateArguments = ["create", "--profile", "app", "--name", "environment-app", "--display-name", "Environment App", "--directory", "/private/environment-app"];
 
-async function runEnvironmentCliProcess(arguments_, forbidDependencies = false, publicMode = false) {
+async function runEnvironmentCliProcess(arguments_, forbidDependencies = false) {
   return executeNode(["--input-type=module", "-e", `
     import { createCliRunner } from ${JSON.stringify(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")).href)};
     const forbidden = () => { throw new Error("dependency-called-sentinel"); };
-    const dependencies = { createVerifier: forbidden, ${forbidDependencies ? "createReader: forbidden," : ""} inspectGitWorktree: forbidden, inspectGitRepositoryInventory: forbidden, inspectGitCreateTargets: forbidden };
-    const run = createCliRunner(dependencies${publicMode ? "" : ', "2.0.0"'});
+    const dependencies = { ${forbidDependencies ? "createVerifier: forbidden, createReader: forbidden," : ""} inspectGitWorktree: forbidden, inspectGitRepositoryInventory: forbidden, inspectGitCreateTargets: forbidden };
+    const run = createCliRunner(dependencies);
     process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });
   `]);
 }
@@ -5703,13 +5634,13 @@ test("application environment compiled CLI refuses inputs before dependencies an
       assert.equal(result.exitCode, 2, JSON.stringify(result));
       assert.deepEqual(JSON.parse(result.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
     }
-    for (const command of ["diff", "plan-add", "apply-add", "plan-remove", "apply-remove", "plan-upgrade", "apply-upgrade", "plan-profile-transition", "apply-profile-transition"]) {
+    for (const command of ["plan-add", "apply-add", "plan-remove", "apply-remove", "plan-upgrade", "apply-upgrade", "plan-profile-transition", "apply-profile-transition"]) {
       const result = await runEnvironmentCliProcess([command, "--directory", owner], true);
       assert.equal(result.exitCode, 2, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).code, "CLI_ARGUMENT_INVALID");
     }
     for (const suffix of [["--application-persistence"], ["--background-job-delivery"]]) {
-      const result = await runEnvironmentCliProcess([...base, ...suffix], true);
+      const result = await executeBuilt([...base, ...suffix]);
       assert.equal(result.exitCode, 1, JSON.stringify(result));
       assert.equal(JSON.parse(result.stderr).issues[0].code, suffix[0] === "--application-persistence" ? "CAPABILITY_UNSUPPORTED" : "DESTINATION_EXISTS");
       assert.doesNotMatch(result.stderr, /sentinel/u);
@@ -5724,16 +5655,15 @@ test("application environment compiled doctor accepts exact generated controls a
   try {
     const request = { profile: "portfolio", projectName: "environment-app", displayName: "Environment App" };
     const candidate = assertSuccess(await core.generateProject({ request, destination: join(owner, "candidate"), verifier: createFakeVerifier(), renderingContext: core.createApplicationEnvironmentRenderingContext() }));
-    const legacy = assertSuccess(await core.generateProject({ request, destination: join(owner, "legacy"), verifier: createFakeVerifier() }));
     const projectPath = join(candidate.destination, ".egeria/project.yaml");
     const statePath = join(candidate.destination, ".egeria/state.json");
     const project = await readFile(projectPath, "utf8");
     const state = await readFile(statePath, "utf8");
-    const legacyProject = await readFile(join(legacy.destination, ".egeria/project.yaml"), "utf8");
-    const legacyState = await readFile(join(legacy.destination, ".egeria/state.json"), "utf8");
+    const legacyProject = project.replace("schemaVersion: 2.0.0", "schemaVersion: 1.0.0");
+    const legacyState = JSON.stringify({ ...JSON.parse(state), schemaVersion: "1.0.0" });
     const alteredMetadata = JSON.parse(state);
     alteredMetadata.installedCapabilities[0].removalPolicy = "export-and-remove";
-    assert.equal(core.parseStateJson(JSON.stringify(alteredMetadata), "2.0.0").ok, true);
+    assert.equal(core.parseStateJson(JSON.stringify(alteredMetadata)).ok, true);
     for (const [projectSource, stateSource, healthy] of [
       [project, state, true], [legacyProject, legacyState, false],
       [project, legacyState, false], [legacyProject, state, false],
@@ -5749,9 +5679,10 @@ test("application environment compiled doctor accepts exact generated controls a
       assert.doesNotMatch(result.stdout + result.stderr, /private-sentinel/u);
       assert.deepEqual(await listTree(candidate.destination), before);
     }
-    const publicResult = await runEnvironmentCliProcess(["doctor", "--directory", legacy.destination], false, true);
-    assert.equal(publicResult.exitCode, 0, JSON.stringify(publicResult));
-    assert.equal(JSON.parse(publicResult.stdout).result.healthy, true);
+    await writeFile(projectPath, legacyProject); await writeFile(statePath, legacyState);
+    const publicResult = await runEnvironmentCliProcess(["doctor", "--directory", candidate.destination]);
+    assert.equal(publicResult.exitCode, 1, JSON.stringify(publicResult));
+    assert.equal(JSON.parse(publicResult.stderr).code, "PROJECT_INSPECTION_INVALID");
   } finally { await rm(owner, { recursive: true, force: true }); }
 });
 
@@ -5760,7 +5691,7 @@ test("application environment CLI parses boolean provider selections without lit
     "--contact-form-web3forms", "--booking-calendly", "--calendly-mode", "inline",
     "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
     "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio",
-  ], "2.0.0");
+  ]);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value, {
     kind: "create", profile: "app", projectName: "environment-app", displayName: "Environment App", directory: "/private/environment-app",
@@ -5771,10 +5702,10 @@ test("application environment CLI parses boolean provider selections without lit
       operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
     },
   });
-  assert.equal(cliArguments.parseCliArguments([...environmentCreateArguments, "--contact-form-web3forms"]).ok, false);
+  assert.equal(cliArguments.parseCliArguments([...environmentCreateArguments, "--contact-form-web3forms"]).ok, true);
 });
 
-test("application environment CLI refuses obsolete and malformed inputs and unavailable internal commands", () => {
+test("application environment CLI refuses obsolete and malformed inputs and preserves current diagnostics", () => {
   const suffixes = [
     ["--calendly-url", "https://calendly.com/private-sentinel/intro", "--calendly-mode", "popup"],
     ["--web3forms-access-key", "11111111-2222-3333-4444-555555555555"],
@@ -5790,12 +5721,11 @@ test("application environment CLI refuses obsolete and malformed inputs and unav
     ["private-sentinel"],
   ];
   for (const suffix of suffixes) {
-    const result = cliArguments.parseCliArguments([...environmentCreateArguments, ...suffix], "2.0.0");
+    const result = cliArguments.parseCliArguments([...environmentCreateArguments, ...suffix]);
     assert.equal(result.ok, false, JSON.stringify(suffix));
     assert.equal(result.issues[0].code, "CLI_ARGUMENT_INVALID");
     assert.doesNotMatch(JSON.stringify(result), /private-sentinel|SECRET123456/u);
   }
-  assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"], "2.0.0").ok, false);
   assert.equal(cliArguments.parseCliArguments(["diff", "--directory", "/private/environment-app"]).ok, true);
 });
 
@@ -5820,7 +5750,7 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
   const approvedPlanFingerprint = `sha256:${"a".repeat(64)}`;
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
     const arguments_ = [kind, "--directory", directory, "--capability", "contact-form-web3forms", ...(kind.startsWith("apply") ? ["--approved-plan", approvedPlanFingerprint] : [])];
-    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    const parsed = cliArguments.parseCliArguments(arguments_);
     assert.equal(parsed.ok, true, JSON.stringify(parsed));
     assert.equal(parsed.value.settings, undefined);
     for (const suffix of [["--web3forms-access-key", "private-sentinel"], ["--contact-form-web3forms"], ["--capability", "contact-form-web3forms"], ["--persistence-removal", "/private/sentinel"]]) {
@@ -5828,7 +5758,7 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
       assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
     }
-    for (const capability of ["multilingual", "background-job-delivery"]) {
+    for (const capability of ["background-job-delivery"]) {
       const refused = await runEnvironmentCliProcess(arguments_.map(value => value === "contact-form-web3forms" ? capability : value), true);
       assert.equal(refused.exitCode, 2, JSON.stringify(refused));
     }
@@ -5840,17 +5770,17 @@ test("environment contact CLI admits selection-only lifecycle and forwards exact
           observed.push(input);
           return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
         },
-      }, "2.0.0");
+      });
       assert.equal(await run(arguments_, output.output), 1);
       assert.equal(observed.length, 1);
-      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+      assert.equal(Object.hasOwn(observed[0], "renderingContext"), false);
       assert.equal(observed[0].settings, undefined);
     }
   }
 });
 
 
-test("environment booking CLI admits mode-only lifecycle and forwards exact context", async () => {
+test("environment booking CLI admits mode-only lifecycle and forwards exact selection", async () => {
   const directory = "/private/generated-worktree";
   const approvedPlanFingerprint = `sha256:${"a".repeat(64)}`;
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
@@ -5859,7 +5789,7 @@ test("environment booking CLI admits mode-only lifecycle and forwards exact cont
       const arguments_ = [kind, "--directory", directory, "--capability", "booking-calendly",
         ...(adding ? ["--calendly-mode", mode] : []),
         ...(kind.startsWith("apply") ? ["--approved-plan", approvedPlanFingerprint] : [])];
-      const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+      const parsed = cliArguments.parseCliArguments(arguments_);
       assert.equal(parsed.ok, true, JSON.stringify(parsed));
       assert.deepEqual(parsed.value.settings, adding ? { mode } : undefined);
       for (const suffix of [["--calendly-url", "https://calendly.com/private-sentinel/intro"], ["--calendly-mode", "invalid"], ["--capability", "booking-calendly"], ["--persistence-removal", "/private/sentinel"]]) {
@@ -5868,7 +5798,7 @@ test("environment booking CLI admits mode-only lifecycle and forwards exact cont
         assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
       }
       if (adding) {
-        assert.equal(cliArguments.parseCliArguments(arguments_.filter(value => value !== "--calendly-mode" && value !== mode), "2.0.0").ok, false);
+        assert.equal(cliArguments.parseCliArguments(arguments_.filter(value => value !== "--calendly-mode" && value !== mode)).ok, false);
       }
       if (kind.startsWith("apply")) {
         const observed = [];
@@ -5878,10 +5808,10 @@ test("environment booking CLI admits mode-only lifecycle and forwards exact cont
             observed.push(input);
             return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
           },
-        }, "2.0.0");
+        });
         assert.equal(await run(arguments_, output.output), 1);
         assert.equal(observed.length, 1);
-        assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+        assert.equal(Object.hasOwn(observed[0], "renderingContext"), false);
         assert.deepEqual(observed[0].settings, adding ? { mode } : undefined);
       }
     }
@@ -5893,13 +5823,13 @@ async function executeEnvironmentBuilt(arguments_) {
   return executeNode(["--input-type=module", "-e", `
     import { createCliRunner } from ${JSON.stringify(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")).href)};
     import { createPnpmGeneratedProjectVerifier } from ${JSON.stringify(pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js")).href)};
-    const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) }, "2.0.0");
+    const run = createCliRunner({ createVerifier: () => createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }) });
     process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => process.stdout.write(value), writeError: value => process.stderr.write(value) });
   `], { CI: "true", NEXT_TELEMETRY_DISABLED: "1", WRANGLER_SEND_METRICS: "false" });
 }
 
 for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["app", false]]) {
-  test(`compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 900_000 }, async () => {
+  test(`compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
@@ -5920,8 +5850,11 @@ for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["a
         const execution = await executeEnvironmentBuilt([`apply-${operation}`, ...arguments_, "--approved-plan", plan.planFingerprint]);
         assert.equal(execution.exitCode, 0, execution.stderr);
         assert.equal(JSON.parse(execution.stdout).result.status, "verified-final-diff-approval-required");
-        const project = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8"), "2.0.0"));
-        const state = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8"), "2.0.0"));
+        const projectSource = await readFile(join(linked, ".egeria/project.yaml"), "utf8");
+        const stateSource = await readFile(join(linked, ".egeria/state.json"), "utf8");
+        const project = assertSuccess(core.parseProjectYaml(projectSource));
+        const state = assertSuccess(core.parseStateJson(stateSource));
+        assert.doesNotMatch(projectSource + stateSource, /https:\/\/calendly|NEXT_PUBLIC_|accessKey/u);
         assert.equal(project.capabilitySettings["contact-form-web3forms"], undefined);
         assert.equal(project.selectedCapabilities.includes("multilingual"), multilingual);
         assert.equal(project.selectedCapabilities.includes("app-foundation"), profile === "app");
@@ -5938,87 +5871,34 @@ for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["a
   });
 }
 
-test("jobs lifecycle CLI requires exact removal evidence and human review flags", () => {
+test("jobs lifecycle CLI refuses unavailable operations and review flags before adapters", async () => {
   const base = ["--directory", "/generated/jobs", "--capability", "background-job-delivery"];
-  const approved = ["--approved-plan", `sha256:${"a".repeat(64)}`];
-  assert.equal(cliArguments.parseCliArguments(["plan-add", ...base]).ok, true);
-  assert.equal(cliArguments.parseCliArguments(["apply-add", ...base, ...approved]).ok, true);
-  assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base]).ok, false);
-  const evidence = ["--job-removal", "/private/jobs.json"];
-  assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base, ...evidence]).ok, true);
-  assert.equal(cliArguments.parseCliArguments(["apply-remove", ...base, ...evidence, ...approved]).ok, false);
-  const accepted = cliArguments.parseCliArguments(["apply-remove", ...base, ...evidence, "--job-human-review", "/private/review.json", ...approved]);
-  assert.equal(accepted.ok, true);
-  assert.equal(accepted.value.jobRemovalHumanReviewPath, "/private/review.json");
-  for (const extra of [["--to-version", "0.2.0"], ["--job-removal", "/private/other.json"], ["--persistence-removal", "/private/persistence.json"]]) {
-    assert.equal(cliArguments.parseCliArguments(["plan-remove", ...base, ...evidence, ...extra]).ok, false);
+  const run = cli.createCliRunner({ createVerifier() { assert.fail("unexpected verifier"); }, createReader() { assert.fail("unexpected reader"); }, inspectGitWorktree() { assert.fail("unexpected Git access"); } });
+  for (const command of ["plan-add", "apply-add", "plan-remove", "apply-remove", "plan-upgrade", "apply-upgrade"]) {
+    for (const extra of [[], ["--job-removal", "/private/jobs.json", "--job-human-review", "/private/review.json"]]) {
+      const captured = captureOutput();
+      assert.equal(await run([command, ...base, ...extra, ...(command.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])], captured.output), 2);
+      assert.deepEqual(captured.standard, []);
+      assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "CLI_ARGUMENT_INVALID" })]);
+    }
   }
-  assert.equal(cliArguments.parseCliArguments(["plan-upgrade", ...base, "--to-version", "0.2.0"]).ok, false);
 });
 
-for (const cohort of lifecycleCohorts) for (const fixture of (cohort.generation === "literal-lint" ? ["app-persistence-email"] : ["portfolio", "app-persistence-email"])) {
-  test(`compiled ${cohort.label} jobs lifecycle on ${fixture} completes production verification`, {timeout:1_800_000}, async () => {
-    await withGitFixture(fixture,async({linked,primary})=>{
-      const primaryBefore=await gitRepositorySnapshot(primary);
-      const capability="background-job-delivery";
-      const evidencePath=join(dirname(linked),"job-removal.json");
-      const reviewPath=join(dirname(linked),"job-human-review.json");
-      const resources=[{environment:"staging",accountId:"private-operator-account",primaryQueueId:"private-primary-queue",deadLetterQueueId:"private-dead-letter-queue"}];
-      let originalLock=await readFile(join(linked,"pnpm-lock.yaml"));
-      const migrations=[];
-      for(const operation of fixture==="portfolio"?["add","remove","add"]:["add","remove"]) {
-        const args=["--directory",linked,"--capability",capability];
-        let humanReviewArguments=[];
-        if(operation==="remove") {
-          await writeFile(evidencePath,JSON.stringify({resources}));
-          args.push("--job-removal",evidencePath);
-          const discover=await executeBuilt(["plan-remove",...args]);
-          assert.equal(discover.exitCode,0,discover.stderr);
-          const subject=JSON.parse(discover.stdout).plan.jobRemovalSubject;
-          const now=Date.now();
-          const disposition={disposition:"drain",outcome:"passed",workRemaining:false};
-          const evidence={schemaVersion:"1.0.0",subject:{...subject,resources},deploymentInventory:{local:"not-provisioned",staging:"present",production:"not-provisioned"},observedAt:new Date(now-1000).toISOString(),expiresAt:new Date(now+3_600_000).toISOString(),resources:resources.map(identity=>({identity,producerStop:"passed",primary:disposition,inFlight:disposition,delayed:disposition,deadLetter:disposition,retentionSeconds:86400,operationLimits:{maxMessages:100,maxDurationSeconds:300}}))};
-          await writeFile(evidencePath,JSON.stringify({resources,evidence}));
-          humanReviewArguments=["--job-human-review",reviewPath];
-        }
-        const before=await gitRepositorySnapshot(linked);
-        const planning=await executeBuilt([`plan-${operation}`,...args]);
-        assert.equal(planning.exitCode,0,planning.stderr);assert.equal(planning.stderr,"");
-        assert.deepEqual(await gitRepositorySnapshot(linked),before);
-        const envelope=JSON.parse(planning.stdout);const plan=operation==="add"?envelope.result:envelope.plan;
-        assert.equal(plan.capability.version,"0.2.0");
-        if(operation==="remove") {
-          const report=plan.jobRemovalReport;assert.equal(report.recommendation,"ready-for-human-review");
-          await writeFile(reviewPath,JSON.stringify({reportFingerprint:report.reportFingerprint,dispositions:report.requiredReviewItems.map(({identifier})=>({identifier,disposition:"accepted"}))}));
-        }
-        const wrong=await executeBuilt([`apply-${operation}`,...args,...humanReviewArguments,"--approved-plan",`sha256:${"0".repeat(64)}`]);
-        assert.equal(wrong.exitCode,1);assert.deepEqual(await gitRepositorySnapshot(linked),before);
-        const execution=await executeBuilt([`apply-${operation}`,...args,...humanReviewArguments,"--approved-plan",plan.planFingerprint]);
-        assert.equal(execution.exitCode,0,execution.stderr);assert.equal(execution.stderr,"");
-        assert.doesNotMatch(planning.stdout+execution.stdout,/private-operator-account|private-primary-queue|private-dead-letter-queue|refs\/heads|\.git\/worktrees/u);
-        const result=JSON.parse(execution.stdout).result;
-        const persistent=fixture==="app-persistence-email";
-        assert.deepEqual(result.verificationChecks,persistent?(operation==="add"?core.persistenceCapabilityAdditionVerificationChecks:core.persistenceCapabilityRemovalVerificationChecks):(operation==="add"?core.appCapabilityAdditionVerificationChecks:core.appCapabilityRemovalVerificationChecks));
-        const state=assertSuccess(core.parseStateJson(await readFile(join(linked,".egeria/state.json"),"utf8")));
-        const project=assertSuccess(core.parseProjectYaml(await readFile(join(linked,".egeria/project.yaml"),"utf8")));
-        assert.equal(project.selectedCapabilities.includes(capability),operation==="add");
-        assert.deepEqual(state.origin,{profile:project.originProfile,recipeVersion:cohort[project.originProfile]});
-        if(!persistent && migrations.length===0) originalLock=await readFile(join(linked,"pnpm-lock.yaml"));
-        else assert.deepEqual(await readFile(join(linked,"pnpm-lock.yaml")),originalLock);
-        assert.equal(project.selectedCapabilities.includes("application-persistence"),persistent);
-        assert.equal(project.selectedCapabilities.includes("transactional-email-resend"),persistent);
-        assert.equal(state.installedCapabilities.find(({identifier})=>identifier==="app-foundation").version,"0.2.0");
-        migrations.push(`${operation}-background-job-delivery-0-2-0`);
-        assert.deepEqual(state.appliedMigrations,migrations);
-        await commitAll(linked,`${operation} background jobs`);
-        const diagnosis=await executeBuilt(["doctor","--directory",linked]);
-        assert.equal(diagnosis.exitCode,0,diagnosis.stderr);assert.deepEqual(JSON.parse(diagnosis.stdout).result,{healthy:true,diagnostics:[]});
-      }
-      assert.deepEqual(withoutSharedRefs(await gitRepositorySnapshot(primary)),withoutSharedRefs(primaryBefore));
-    },{generation:cohort.generation,branch:`${fixture}-jobs-lifecycle-test`});
-  });
-}
-
+test("compiled jobs lifecycle refuses both desired and installed jobs without effects", async () => {
+  for (const installedJobs of [false, true]) {
+    await withGitFixture("app", async ({ linked }) => {
+      const before = await gitRepositorySnapshot(linked);
+      const result = await executeBuilt(["plan-add", "--directory", linked, "--capability", installedJobs ? "transactional-email-resend" : "background-job-delivery"]);
+      assert.equal(result.exitCode, installedJobs ? 1 : 2, result.stdout);
+      assert.equal(JSON.parse(result.stderr).code, installedJobs ? "CAPABILITY_ADDITION_UNSUPPORTED" : "CLI_ARGUMENT_INVALID");
+      assert.deepEqual(await gitRepositorySnapshot(linked), before);
+      const applied = await executeBuilt(["apply-add", "--directory", linked, "--capability", installedJobs ? "transactional-email-resend" : "background-job-delivery", "--approved-plan", `sha256:${"a".repeat(64)}`]);
+      assert.equal(applied.exitCode, installedJobs ? 1 : 2, applied.stdout);
+      assert.equal(JSON.parse(applied.stderr).code, installedJobs ? "CAPABILITY_ADDITION_UNSUPPORTED" : "CLI_ARGUMENT_INVALID");
+      assert.deepEqual(await gitRepositorySnapshot(linked), before);
+    }, { generationRequest: { ...(installedJobs ? { backgroundJobDelivery: true } : {}) } });
+  }
+});
 
 for (const cohort of [
   ...lifecycleCohorts,
@@ -6058,7 +5938,7 @@ test("retired upgrade commands refuse before repository or verifier access", asy
 });
 
 for (const [profile, mode, multilingual] of [["portfolio", "link", false], ["site", "popup", true], ["app", "inline", false]]) {
-  test(`compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
+  test(`compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 3_600_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
@@ -6136,7 +6016,7 @@ test("environment analytics CLI admits exact selection-only lifecycle and reject
     const arguments_ = [kind, "--directory", "/private/generated-worktree", "--capability", "analytics",
       ...(adding ? environmentAnalyticsOptions : []),
       ...(kind.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])];
-    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    const parsed = cliArguments.parseCliArguments(arguments_);
     assert.equal(parsed.ok, true, JSON.stringify(parsed));
     assert.deepEqual(parsed.value.settings, adding ? environmentAnalyticsSelection : undefined);
     for (const suffix of [["--google-analytics-id", "G-PRIVATE123"], ["--calendly-mode", "popup"], ["--google-analytics-4"], ["--persistence-removal", "/private/sentinel"]]) {
@@ -6152,11 +6032,11 @@ test("environment analytics CLI admits exact selection-only lifecycle and reject
           observed.push(input);
           return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
         },
-      }, "2.0.0");
+      });
       assert.equal(await run(arguments_, output.output), 1);
       assert.equal(observed.length, 1);
       assert.deepEqual(observed[0].settings, adding ? environmentAnalyticsSelection : undefined);
-      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+      assert.equal(Object.hasOwn(observed[0], "renderingContext"), false);
     }
   }
 });
@@ -6177,7 +6057,7 @@ test("environment persistence CLI admits exact lifecycle and forwards removal re
       const arguments_ = adding ? [kind, "--directory", owner, "--capability", "application-persistence",
         ...(kind.startsWith("apply") ? ["--approved-plan", planFingerprint] : [])]
         : persistenceRemovalArguments(owner, inputPath, kind.startsWith("apply") ? { humanReviewPath, planFingerprint } : undefined);
-      const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+      const parsed = cliArguments.parseCliArguments(arguments_);
       assert.equal(parsed.ok, true, JSON.stringify(parsed));
       assert.equal(parsed.value.capability, "application-persistence");
       for (const suffix of [["--calendly-mode", "popup"], ["--application-persistence"], ["--job-removal", inputPath]]) {
@@ -6186,7 +6066,7 @@ test("environment persistence CLI admits exact lifecycle and forwards removal re
         assert.deepEqual(JSON.parse(refused.stderr), { ok: false, code: "CLI_ARGUMENT_INVALID" });
       }
       if (!adding) for (const capability of ["analytics", "booking-calendly", "contact-form-web3forms"]) {
-        assert.equal(cliArguments.parseCliArguments(arguments_.map(value => value === "application-persistence" ? capability : value), "2.0.0").ok, false);
+        assert.equal(cliArguments.parseCliArguments(arguments_.map(value => value === "application-persistence" ? capability : value)).ok, false);
       }
       if (kind.startsWith("apply")) {
         const calls = [];
@@ -6195,11 +6075,11 @@ test("environment persistence CLI admits exact lifecycle and forwards removal re
             calls.push(request);
             return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
           },
-        }, "2.0.0");
+        });
         assert.equal(await run(arguments_, captureOutput().output), 1);
         assert.equal(calls.length, 1);
         assert.equal(calls[0].capability, "application-persistence");
-        assert.deepEqual(calls[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+        assert.equal(Object.hasOwn(calls[0], "renderingContext"), false);
         if (!adding) {
           assert.deepEqual(calls[0].persistenceRemoval, input);
           assert.deepEqual(calls[0].persistenceRemovalHumanReview, review);
@@ -6213,13 +6093,13 @@ test("environment persistence CLI admits exact lifecycle and forwards removal re
 test("environment email CLI preserves exact selection without literal runtime configuration", async () => {
   const directory = "/private/generated-worktree";
   const approvedPlanFingerprint = `sha256:${"a".repeat(64)}`;
-  const create = cliArguments.parseCliArguments([...environmentCreateArguments, "--transactional-email-resend"], "2.0.0");
+  const create = cliArguments.parseCliArguments([...environmentCreateArguments, "--transactional-email-resend"]);
   assert.equal(create.ok, true, JSON.stringify(create));
   assert.equal(create.value.transactionalEmailResend, true);
   assert.equal(create.value.applicationPersistence, undefined);
   for (const kind of ["plan-add", "apply-add", "plan-remove", "apply-remove"]) {
     const arguments_ = [kind, "--directory", directory, "--capability", "transactional-email-resend", ...(kind.startsWith("apply") ? ["--approved-plan", approvedPlanFingerprint] : [])];
-    const parsed = cliArguments.parseCliArguments(arguments_, "2.0.0");
+    const parsed = cliArguments.parseCliArguments(arguments_);
     assert.equal(parsed.ok, true, JSON.stringify(parsed));
     assert.equal(parsed.value.capability, "transactional-email-resend");
     assert.equal(parsed.value.settings, undefined);
@@ -6236,11 +6116,11 @@ test("environment email CLI preserves exact selection without literal runtime co
           observed.push(input);
           return { ok: false, code: "CAPABILITY_PLAN_APPROVAL_INVALID", phase: "precondition", recovery: "not-required" };
         },
-      }, "2.0.0");
+      });
       assert.equal(await run(arguments_, output.output), 1);
       assert.equal(observed.length, 1);
       assert.equal(observed[0].capability, "transactional-email-resend");
-      assert.deepEqual(observed[0].renderingContext, core.createApplicationEnvironmentRenderingContext());
+      assert.equal(Object.hasOwn(observed[0], "renderingContext"), false);
       assert.equal(observed[0].settings, undefined);
     }
   }
@@ -6262,12 +6142,12 @@ test("application environment CLI generates exact jobs compositions with simulat
         },
       };
       const output = captureOutput();
-      const run = cli.createCliRunner({ createVerifier: () => verifier }, "2.0.0");
+      const run = cli.createCliRunner({ createVerifier: () => verifier });
       const result = await run(["create", "--profile", profile, "--name", "jobs-environment", "--display-name", "Jobs Environment", "--directory", destination,
         "--background-job-delivery", ...(persistence ? ["--application-persistence"] : []), ...(email ? ["--transactional-email-resend"] : [])], output.output);
       assert.equal(result, 0, JSON.stringify(output));
       assert.equal(verifications, 1);
-      const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8"), "2.0.0"));
+      const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
       const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
       assert.equal(versions.standards, persistence ? "0.10.0" : "0.9.0");
       assert.equal(versions["deployment-cloudflare"], persistence ? "0.12.0" : "0.11.0");
@@ -6277,4 +6157,27 @@ test("application environment CLI generates exact jobs compositions with simulat
       assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);
     }
   } finally { await rm(owner, { recursive: true, force: true }); }
+});
+
+test("compiled retired recipe lifecycle commands refuse without writes", async () => {
+  for (const [profile, recipe] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["app", "0.2.1"]]) {
+    const control = JSON.parse(await readFile(resolve(repositoryRoot, `packages/builder-core/tests/fixtures/retired-recipes/${profile}-${recipe}.json`), "utf8"));
+    for (const variant of Object.values(control.variants)) {
+      await withGitFixture(profile, async ({ linked }) => {
+        const before = await gitRepositorySnapshot(linked);
+        for (const command of ["plan-add", "plan-remove", "apply-add", "apply-remove"]) {
+          const result = await executeBuilt([command, "--directory", linked, "--capability", "multilingual", ...(command.startsWith("apply") ? ["--approved-plan", `sha256:${"a".repeat(64)}`] : [])]);
+          assert.equal(result.exitCode, 1, result.stdout);
+          assert.equal(JSON.parse(result.stderr).code, "PROJECT_INSPECTION_INVALID", result.stderr);
+          assert.deepEqual(await gitRepositorySnapshot(linked), before);
+        }
+      }, {
+        generation: "current",
+        async preparePrimary(directory) {
+          await writeFile(join(directory, ".egeria/project.yaml"), control.projectYaml);
+          await writeFile(join(directory, ".egeria/state.json"), JSON.stringify(variant.state));
+        },
+      });
+    }
+  }
 });

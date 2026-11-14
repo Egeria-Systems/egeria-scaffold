@@ -1,11 +1,13 @@
 import { writeFileSync } from "node:fs";
+import { createServer } from "node:http";
 
-import { expect, test, type Page, type Request } from "@playwright/test";
+import { test as browserTest, type APIResponse, type Page, type Request, type Route } from "@playwright/test";
+import { expect, test } from "./application-test";
 
 const receiptPath = process.env.ANALYTICS_PROVIDER_BROWSER_RECEIPT_PATH;
-const deployedUrl = process.env.PLAYWRIGHT_DEPLOYED_URL;
+const deployedUrl = process.env.DEPLOY_URL;
 const requestEnvelopeLimit = 64;
-const analyticsConsentStorageKey = "egeria.analytics.consent.v2";
+const analyticsConsentStorageKey = "egeria.analytics.consent.v3";
 const partialGrantPurpose = "aggregate-traffic-and-performance";
 const providerIdentifiers = [
   "cloudflareWebAnalytics",
@@ -19,9 +21,13 @@ type ProviderRequest = {
 };
 type ExternalRequest = ProviderRequest | { provider: "unexpected"; kind: "external" };
 
-function classifyUrl(url: string, applicationHostname: string): ExternalRequest | undefined {
-  const hostname = new URL(url).hostname;
-  if (hostname === applicationHostname) return undefined;
+function classifyUrl(url: string, applicationOrigin: string): ExternalRequest | undefined {
+  const target = new URL(url);
+  if (target.origin === applicationOrigin) return undefined;
+  if (target.protocol !== "https:" || target.username || target.password || target.port) {
+    return { provider: "unexpected", kind: "external" };
+  }
+  const hostname = target.hostname;
   if (hostname === "static.cloudflareinsights.com") {
     return { provider: "cloudflareWebAnalytics", kind: "script" };
   }
@@ -52,8 +58,8 @@ function classifyUrl(url: string, applicationHostname: string): ExternalRequest 
   return { provider: "unexpected", kind: "external" };
 }
 
-function classifyRequest(request: Request, applicationHostname: string): ExternalRequest | undefined {
-  return classifyUrl(request.url(), applicationHostname);
+function classifyRequest(request: Request, applicationOrigin: string): ExternalRequest | undefined {
+  return classifyUrl(request.url(), applicationOrigin);
 }
 
 function action(page: Page, identifier: "allow" | "decline" | "manage") {
@@ -97,6 +103,10 @@ async function providerCookieCount(page: Page): Promise<number> {
       .map((cookie) => cookie.split("=", 1)[0]?.trim())
       .filter(
         (name) =>
+          name === "egeria_production_ga" ||
+          name?.startsWith("egeria_production_ga_") === true ||
+          name === "egeria_nonproduction_ga" ||
+          name?.startsWith("egeria_nonproduction_ga_") === true ||
           name === "_ga" ||
           name?.startsWith("_ga_") === true ||
           name === "_clck" ||
@@ -121,8 +131,69 @@ function deniedPurposeCount(
   return record.purposes.filter(({ decision }) => decision === "denied").length;
 }
 
+async function relayProviderRequest(route: Route): Promise<void> {
+  // Access credentials remain exclusively in the shared same-origin transport.
+  const headers = Object.fromEntries(Object.entries(route.request().headers()).filter(([name]) =>
+    !["cf-access-client-id", "cf-access-client-secret", "authorization", "proxy-authorization"].includes(name.toLowerCase()),
+  ));
+  let response: APIResponse | undefined;
+  try {
+    response = await route.fetch({ headers, maxRedirects: 0, maxRetries: 0, timeout: 10000 });
+    if ([301, 302, 303, 307, 308].includes(response.status())) {
+      await route.abort("blockedbyclient");
+      return;
+    }
+    await route.fulfill({ response });
+  } catch {
+    await route.abort("blockedbyclient").catch(() => {});
+  } finally {
+    await response?.dispose();
+  }
+}
+
+browserTest("provider transport rejects redirects before contacting another origin", async ({ page }) => {
+  let allowedRequests = 0;
+  let redirectedRequests = 0;
+  let redirectDestination = "";
+  const allowed = createServer((_request, response) => {
+    allowedRequests += 1;
+    response.writeHead(302, { location: redirectDestination });
+    response.end();
+  });
+  const forbidden = createServer((_request, response) => {
+    redirectedRequests += 1;
+    response.end("unexpected destination");
+  });
+  const servers = [allowed, forbidden];
+  try {
+    for (const server of servers) {
+      await new Promise<void>((resolve, reject) => {
+        server.once("error", reject);
+        server.listen(0, "127.0.0.1", resolve);
+      });
+    }
+    const [allowedOrigin, forbiddenOrigin] = servers.map(server => {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("CONTROLLED_SERVER_ADDRESS_INVALID");
+      return `http://127.0.0.1:${address.port}`;
+    });
+    redirectDestination = `${forbiddenOrigin}/redirected`;
+    const requestURL = `${allowedOrigin}/provider`;
+    await page.route(requestURL, relayProviderRequest);
+    await expect(page.goto(requestURL)).rejects.toThrow();
+    expect(allowedRequests).toBe(1);
+    expect(redirectedRequests).toBe(0);
+  } finally {
+    for (const server of servers) {
+      server.closeAllConnections();
+      if (server.listening) await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  }
+});
+
 test("bounded synthetic consent journey reaches each provider collection only after grant", async ({
   page,
+  openApplicationPage,
 }) => {
   test.skip(
     receiptPath === undefined || deployedUrl === undefined,
@@ -132,13 +203,25 @@ test("bounded synthetic consent journey reaches each provider collection only af
 
   const applicationRoot = new URL(deployedUrl);
   expect(applicationRoot.pathname).toBe("/");
+  const target = process.env.APPLICATION_ENVIRONMENT;
+  expect(["staging", "production"]).toContain(target);
+  const googleCookiePrefix = target === "production" ? "egeria_production" : "egeria_nonproduction";
   const requests: ExternalRequest[] = [];
   page.on("request", (request) => {
-    const captured = classifyRequest(request, applicationRoot.hostname);
+    const captured = classifyRequest(request, applicationRoot.origin);
     if (captured !== undefined) requests.push(captured);
   });
+  await page.route("**/*", async (route) => {
+    const request = route.request();
+    const external = classifyRequest(request, applicationRoot.origin);
+    if (external === undefined) return route.fallback();
+    if (external.provider === "unexpected" || request.isNavigationRequest() || requests.length > requestEnvelopeLimit) {
+      return route.abort("blockedbyclient");
+    }
+    await relayProviderRequest(route);
+  });
 
-  await page.goto("/en-CA");
+  await openApplicationPage(page, "/en-CA");
   await expect(page.getByRole("complementary")).toBeVisible();
   await page.waitForLoadState("networkidle");
   expect(requests).toEqual([]);
@@ -162,7 +245,7 @@ test("bounded synthetic consent journey reaches each provider collection only af
   const persistedDenialRecord = await readConsentRecord(page);
   expect(persistedDenialRecord).not.toBeNull();
   if (persistedDenialRecord === null) return;
-  expect(persistedDenialRecord.schemaVersion).toBe(2);
+  expect(persistedDenialRecord.schemaVersion).toBe(3);
   expect(deniedPurposeCount(persistedDenialRecord)).toBe(3);
   const persistedDenialReload = {
     providerRequests: 0,
@@ -235,10 +318,10 @@ test("bounded synthetic consent journey reaches each provider collection only af
   }
   expect(unexpectedRequestCount(requests)).toBe(0);
   expect(requests.length).toBeLessThanOrEqual(requestEnvelopeLimit);
-  await page.evaluate(() => {
-    document.cookie = "_ga=synthetic-certification; Path=/; SameSite=Lax";
+  await page.evaluate((prefix) => {
+    document.cookie = `${prefix}_ga=synthetic-certification; Path=/; SameSite=Lax; Secure`;
     document.cookie = "_clck=synthetic-certification; Path=/; SameSite=Lax";
-  });
+  }, googleCookiePrefix);
   const providerCookiesBeforeWithdrawal = await providerCookieCount(page);
   expect(providerCookiesBeforeWithdrawal).toBeGreaterThanOrEqual(2);
 
@@ -262,7 +345,7 @@ test("bounded synthetic consent journey reaches each provider collection only af
     performance.getEntriesByType("resource").map(({ name }) => name),
   );
   for (const url of reloadedDocumentResources) {
-    const captured = classifyUrl(url, applicationRoot.hostname);
+    const captured = classifyUrl(url, applicationRoot.origin);
     if (captured !== undefined) withdrawalRequests.push(captured);
   }
   expect(providerRequests(withdrawalRequests)).toEqual([]);

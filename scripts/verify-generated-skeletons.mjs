@@ -63,6 +63,8 @@ const portfolioFiles = Object.freeze([
   ".nvmrc",
   "AGENTS.md",
   "README.md",
+  "apps/web/.dev.vars.example",
+  "apps/web/.env.example",
   "apps/web/AGENTS.md",
   "apps/web/app/api/observability/route.ts",
   "apps/web/app/error.tsx",
@@ -84,8 +86,17 @@ const portfolioFiles = Object.freeze([
   "apps/web/playwright.deployed.config.ts",
   "apps/web/playwright.dev.config.ts",
   "apps/web/playwright.preview.config.ts",
+  "apps/web/playwright.transport.config.ts",
   "apps/web/playwright.visual.config.ts",
   "apps/web/postcss.config.mjs",
+  "apps/web/scripts/check-application-environment.mjs",
+  "apps/web/scripts/browser-development-server.ts",
+  "apps/web/scripts/check-deployment-protection.mjs",
+  "apps/web/scripts/check-prepared-artifact.mjs",
+  "apps/web/scripts/prepare-ci-git.sh",
+  "apps/web/src/configuration/application-build.ts",
+  "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/site-origin.ts",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
   "apps/web/src/content/read-content.ts",
@@ -98,16 +109,27 @@ const portfolioFiles = Object.freeze([
   "apps/web/src/presentation/content-page.tsx",
   "apps/web/src/presentation/error-fallback.tsx",
   "apps/web/src/sections/section-registry.tsx",
-  "apps/web/tests/e2e/site-quality.spec.ts",
   "apps/web/tests/component/content-page.test.tsx",
+  "apps/web/tests/e2e/application-test.ts",
+  "apps/web/tests/e2e/application-transport.ts",
+  "apps/web/tests/e2e/site-quality.spec.ts",
+  "apps/web/tests/scripts/deployment-protection.test.mjs",
+  "apps/web/tests/scripts/prepared-artifact.test.mjs",
   "apps/web/tests/setup/component.ts",
+  "apps/web/tests/transport/application-transport.spec.ts",
+  "apps/web/tests/unit/application-build.test.ts",
+  "apps/web/tests/unit/application-environment.test.ts",
   "apps/web/tests/unit/content-schema.test.ts",
+  "apps/web/tests/unit/observability-environment.test.ts",
+  "apps/web/tests/unit/site-origin.test.ts",
   "apps/web/tests/visual/home-visual.spec.ts",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
   "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
   "apps/web/tsconfig.json",
   "apps/web/vitest.config.ts",
   "apps/web/wrangler.jsonc",
+  "docs/environments.md",
+  "docs/observability.md",
   "package.json",
   "patches/next-eslint-plugin-next.patch",
   "pnpm-lock.yaml",
@@ -117,10 +139,14 @@ const portfolioFiles = Object.freeze([
 const bookingCalendlyFiles = Object.freeze([
   "apps/web/app/page.tsx",
   "apps/web/content/en-CA/booking-calendly.yaml",
+  "apps/web/content/fr-CA/booking-calendly.yaml",
   "apps/web/src/integrations/booking-calendly/booking-content.ts",
   "apps/web/src/integrations/booking-calendly/booking-settings.ts",
   "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+  "apps/web/tests/component/booking-availability.test.tsx",
   "apps/web/tests/e2e/calendly-booking.spec.ts",
+  "apps/web/tests/unit/booking-configuration.test.ts",
+  "docs/booking-calendly.md",
 ].sort(codePointCompare));
 
 const siteRoutingFiles = Object.freeze([
@@ -133,7 +159,6 @@ const siteRoutingFiles = Object.freeze([
   "apps/web/app/work/page.tsx",
   "apps/web/content/en-CA/about.yaml",
   "apps/web/content/en-CA/not-found.yaml",
-  "apps/web/content/en-CA/routing.yaml",
   "apps/web/content/en-CA/work-featured.yaml",
   "apps/web/src/routing/read-routing-content.ts",
   "apps/web/src/routing/routing-content-schema.ts",
@@ -145,21 +170,22 @@ const siteRoutingFiles = Object.freeze([
 
 const appFoundationFiles = Object.freeze([
   "apps/web/app/api/health/route.ts",
-  "apps/web/src/domain/build-information.ts",
+  "apps/web/docs/application-boundaries.md",
   "apps/web/src/application/build-information-reader.ts",
-  "apps/web/src/application/request-context.ts",
   "apps/web/src/application/health.ts",
-  "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
-  "apps/web/src/infrastructure/memory/build-information-reader.ts",
+  "apps/web/src/application/request-context.ts",
   "apps/web/src/composition/server-health.ts",
   "apps/web/src/delivery/health-route.ts",
-  "apps/web/docs/application-boundaries.md",
-  "apps/web/tests/unit/request-context.test.ts",
+  "apps/web/src/domain/build-information.ts",
+  "apps/web/src/infrastructure/cloudflare/application-environment.ts",
+  "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+  "apps/web/src/infrastructure/memory/build-information-reader.ts",
+  "apps/web/tests/integration/health-worker.test.ts",
   "apps/web/tests/unit/build-information.test.ts",
-  "apps/web/tests/unit/health.test.ts",
   "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
   "apps/web/tests/unit/health-route.test.ts",
-  "apps/web/tests/integration/health-worker.test.ts",
+  "apps/web/tests/unit/health.test.ts",
+  "apps/web/tests/unit/request-context.test.ts",
   "apps/web/vitest.cloudflare.config.ts",
 ].sort(codePointCompare));
 
@@ -179,14 +205,30 @@ const applicationPersistenceFiles = Object.freeze([
   ".github/workflows/migrate-application-database.yml",
   "apps/web/drizzle.config.ts",
   "apps/web/scripts/check-application-database.mjs",
+  "apps/web/src/configuration/application-database.ts",
   "apps/web/src/infrastructure/persistence/schema.ts",
   "apps/web/tests/bindings/application-persistence.test.ts",
   "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
   "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
   "apps/web/tests/bindings/fixtures/schema.ts",
   "apps/web/tests/bindings/fixtures/worker.ts",
+  "apps/web/tests/unit/application-database-environment.test.ts",
   "apps/web/vitest.bindings.config.ts",
   "docs/application-persistence.md",
+].sort(codePointCompare));
+
+const backgroundJobFiles = Object.freeze([
+  "apps/web/scripts/check-job-delivery.mjs",
+  "apps/web/src/application/job-delivery.ts",
+  "apps/web/src/application/job-handlers.ts",
+  "apps/web/src/composition/server-jobs.ts",
+  "apps/web/src/infrastructure/cloudflare/job-delivery.ts",
+  "apps/web/src/infrastructure/memory/job-delivery.ts",
+  "apps/web/tests/integration/fixtures/job-worker.mjs",
+  "apps/web/tests/integration/job-worker.test.ts",
+  "apps/web/tests/unit/job-delivery.test.ts",
+  "apps/web/worker.mjs",
+  "docs/background-job-delivery.md",
 ].sort(codePointCompare));
 
 const multilingualFiles = Object.freeze([
@@ -211,6 +253,7 @@ const multilingualFiles = Object.freeze([
 const analyticsFiles = Object.freeze([
   "apps/web/content/en-CA/analytics.yaml",
   "apps/web/content/fr-CA/analytics.yaml",
+  "apps/web/src/integrations/analytics/analytics-configuration.ts",
   "apps/web/src/integrations/analytics/analytics-consent-state.ts",
   "apps/web/src/integrations/analytics/analytics-consent.tsx",
   "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
@@ -220,6 +263,7 @@ const analyticsFiles = Object.freeze([
   "apps/web/src/integrations/analytics/analytics-settings.ts",
   "apps/web/tests/component/analytics-consent.test.tsx",
   "apps/web/tests/e2e/analytics-consent.spec.ts",
+  "apps/web/tests/unit/analytics-configuration.test.ts",
   "apps/web/tests/unit/analytics-consent-state.test.ts",
   "apps/web/tests/unit/analytics-provider-contract.test.ts",
   "apps/web/tests/unit/analytics-runtime.test.ts",
@@ -298,6 +342,7 @@ const createArguments = ({
   applicationPersistence,
   transactionalEmailResend,
   contactFormWeb3Forms,
+  backgroundJobDelivery,
 }) =>
   Object.freeze([
     "--profile",
@@ -309,34 +354,28 @@ const createArguments = ({
     ...(bookingCalendly === undefined
       ? []
       : [
-          "--calendly-url",
-          bookingCalendly.destination,
+          "--booking-calendly",
           "--calendly-mode",
           bookingCalendly.mode,
         ]),
     ...(multilingual === true ? ["--multilingual"] : []),
     ...(applicationPersistence === true ? ["--application-persistence"] : []),
     ...(transactionalEmailResend === true ? ["--transactional-email-resend"] : []),
-    ...(contactFormWeb3Forms === undefined ? [] : ["--web3forms-access-key", contactFormWeb3Forms.accessKey]),
+    ...(contactFormWeb3Forms === true ? ["--contact-form-web3forms"] : []),
+    ...(backgroundJobDelivery === true ? ["--background-job-delivery"] : []),
     ...(analytics === undefined
       ? []
       : [
-          "--cloudflare-web-analytics-token",
-          analytics.providers.cloudflareWebAnalytics.siteToken,
-          "--google-analytics-id",
-          analytics.providers.googleAnalytics4.measurementId,
-          "--microsoft-clarity-id",
-          analytics.providers.microsoftClarity.projectId,
+          "--cloudflare-web-analytics",
+          "--google-analytics-4",
+          "--microsoft-clarity",
           "--microsoft-clarity-audience",
           analytics.providers.microsoftClarity.audience,
-          "--search-console-verification",
-          analytics.operationalIntegrations.googleSearchConsole
-            .verificationToken,
+          "--google-search-console",
           "--looker-studio",
         ]),
   ]);
 
-const contactSettings = Object.freeze({ accessKey: "00000000-0000-4000-8000-000000000001" });
 const contactFiles = Object.freeze([
   "apps/web/content/en-CA/contact-form-web3forms.yaml",
   "apps/web/content/fr-CA/contact-form-web3forms.yaml",
@@ -348,8 +387,10 @@ const contactFiles = Object.freeze([
   "apps/web/src/integrations/contact-form-web3forms/hcaptcha.tsx",
   "apps/web/src/integrations/contact-form-web3forms/submit-contact.ts",
   "apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+  "apps/web/tests/component/contact-availability.test.tsx",
   "apps/web/tests/component/web3forms-contact.test.tsx",
   "apps/web/tests/e2e/web3forms-contact.spec.ts",
+  "apps/web/tests/unit/contact-configuration.test.ts",
   "apps/web/tests/unit/web3forms-contact.test.ts",
   "docs/contact-form-web3forms.md",
 ].sort(codePointCompare));
@@ -357,7 +398,6 @@ const contactFiles = Object.freeze([
 const noCapabilitySettings = Object.freeze({});
 const portfolioCalendlySettings = Object.freeze({
   "booking-calendly": Object.freeze({
-    destination: "https://calendly.com/example/intro",
     mode: "popup",
   }),
 });
@@ -365,19 +405,14 @@ const siteAnalyticsSettings = Object.freeze({
   analytics: Object.freeze({
     consent: Object.freeze({ policy: "explicit-opt-in" }),
     providers: Object.freeze({
-      cloudflareWebAnalytics: Object.freeze({
-        siteToken: "0123456789abcdef0123456789abcdef",
-      }),
-      googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
+      cloudflareWebAnalytics: true,
+      googleAnalytics4: true,
       microsoftClarity: Object.freeze({
-        projectId: "clarity123",
         audience: "not-directed-to-minors",
       }),
     }),
     operationalIntegrations: Object.freeze({
-      googleSearchConsole: Object.freeze({
-        verificationToken: "search-console-verification-token",
-      }),
+      googleSearchConsole: true,
       lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
     }),
   }),
@@ -395,7 +430,7 @@ export const generatedFixtureContracts = Object.freeze([
       displayName: "Acme Portfolio",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/portfolio-0.11.7",
+    relativeRoot: "fixtures/generated/portfolio-0.12.0",
     expectedFiles: portfolioFiles,
     expectedCapabilities: Object.freeze([
       "standards",
@@ -404,32 +439,32 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
     ]),
-    expectedRecipeVersion: "0.11.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
+    expectedDeploymentCloudflareVersion: "0.9.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 107,
+    expectedSurfaces: 134,
     visualRegression: true,
   }),
   Object.freeze({
     identifier: "portfolio-calendly",
     profile: "portfolio",
     projectName: "acme-portfolio-calendly",
-    displayName: "Acme Portfolio Booking",
+    displayName: "Acme Portfolio Calendly",
     createArguments: createArguments({
       profile: "portfolio",
       projectName: "acme-portfolio-calendly",
-      displayName: "Acme Portfolio Booking",
+      displayName: "Acme Portfolio Calendly",
       bookingCalendly: portfolioCalendlySettings["booking-calendly"],
     }),
     expectedCapabilitySettings: portfolioCalendlySettings,
-    relativeRoot: "fixtures/generated/portfolio-calendly-0.11.7",
+    relativeRoot: "fixtures/generated/portfolio-calendly-0.12.0",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter(
         (path) => path !== "apps/web/app/page.tsx",
@@ -444,17 +479,17 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "booking-calendly",
     ]),
-    expectedRecipeVersion: "0.11.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.12.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
+    expectedDeploymentCloudflareVersion: "0.9.0",
     expectedSiteRoutingVersion: null,
-    expectedBookingCalendlyVersion: "0.1.0",
+    expectedBookingCalendlyVersion: "0.2.0",
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 112,
+    expectedSurfaces: 143,
     visualRegression: true,
   }),
   Object.freeze({
@@ -468,7 +503,7 @@ export const generatedFixtureContracts = Object.freeze([
       displayName: "Acme Site",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/site-0.12.7",
+    relativeRoot: "fixtures/generated/site-0.13.0",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -481,17 +516,17 @@ export const generatedFixtureContracts = Object.freeze([
       "observability",
       "site-routing",
     ]),
-    expectedRecipeVersion: "0.12.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.13.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedSiteRoutingVersion: "0.4.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 124,
+    expectedSurfaces: 150,
     visualRegression: true,
   }),
   Object.freeze({
@@ -506,7 +541,7 @@ export const generatedFixtureContracts = Object.freeze([
       multilingual: true,
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/site-multilingual-0.12.7",
+    relativeRoot: "fixtures/generated/site-multilingual-0.13.0",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -521,35 +556,39 @@ export const generatedFixtureContracts = Object.freeze([
       "site-routing",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.12.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.13.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedSiteRoutingVersion: "0.4.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 140,
+    expectedSurfaces: 166,
     visualRegression: false,
   }),
   Object.freeze({
-    identifier: "site-multilingual-analytics",
+    identifier: "site-public-integrations",
     profile: "site",
-    projectName: "acme-site-multilingual-analytics",
-    displayName: "Acme Site Multilingual Analytics",
+    projectName: "acme-site-public-integrations",
+    displayName: "Acme Site Public Integrations",
     createArguments: createArguments({
       profile: "site",
-      projectName: "acme-site-multilingual-analytics",
-      displayName: "Acme Site Multilingual Analytics",
+      projectName: "acme-site-public-integrations",
+      displayName: "Acme Site Public Integrations",
       analytics: siteAnalyticsSettings.analytics,
+      bookingCalendly: portfolioCalendlySettings["booking-calendly"],
+      contactFormWeb3Forms: true,
       multilingual: true,
     }),
-    expectedCapabilitySettings: siteAnalyticsSettings,
-    relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.7",
+    expectedCapabilitySettings: Object.freeze({ ...siteAnalyticsSettings, ...portfolioCalendlySettings }),
+    relativeRoot: "fixtures/generated/site-public-integrations-0.13.0",
     expectedFiles: Object.freeze([
-      ...portfolioFiles,
+      ...portfolioFiles.filter(path => !bookingCalendlyFiles.includes(path)),
+      ...bookingCalendlyFiles,
+      ...contactFiles,
       ...siteRoutingFiles,
       ...multilingualFiles,
       ...analyticsFiles,
@@ -561,20 +600,23 @@ export const generatedFixtureContracts = Object.freeze([
       "deployment-cloudflare",
       "observability",
       "site-routing",
+      "contact-form-web3forms",
       "analytics",
+      "booking-calendly",
       "multilingual",
     ]),
-    expectedRecipeVersion: "0.12.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.13.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedSiteRoutingVersion: "0.4.0",
-    expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: "0.1.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedSiteRoutingVersion: "0.5.0",
+    expectedBookingCalendlyVersion: "0.2.0",
+    expectedContactFormVersion: "0.2.0",
+    expectedAnalyticsVersion: "0.2.0",
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 155,
+    expectedSurfaces: 208,
     visualRegression: false,
   }),
   Object.freeze({
@@ -586,7 +628,7 @@ export const generatedFixtureContracts = Object.freeze([
       profile: "app", projectName: "acme-app", displayName: "Acme App",
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-0.2.7",
+    relativeRoot: "fixtures/generated/app-0.3.0",
     expectedFiles: Object.freeze([
       ...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles,
     ].sort(codePointCompare)),
@@ -594,18 +636,18 @@ export const generatedFixtureContracts = Object.freeze([
       "standards", "deployment-cloudflare", "content-files", "section-composition",
       "observability", "app-foundation", "site-routing",
     ]),
-    expectedRecipeVersion: "0.2.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.3.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedAppFoundationVersion: "0.1.0",
-    expectedSiteRoutingVersion: "0.4.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedAppFoundationVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 143,
+    expectedSurfaces: 170,
     visualRegression: true,
   }),
   Object.freeze({
@@ -624,7 +666,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilitySettings: Object.freeze({
       ...siteAnalyticsSettings, ...portfolioCalendlySettings,
     }),
-    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.7",
+    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter((path) => !bookingCalendlyFiles.includes(path)),
       ...siteRoutingFiles, ...appFoundationFiles, ...bookingCalendlyFiles,
@@ -635,18 +677,18 @@ export const generatedFixtureContracts = Object.freeze([
       "observability", "app-foundation", "site-routing", "analytics",
       "booking-calendly", "multilingual",
     ]),
-    expectedRecipeVersion: "0.2.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.3.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedAppFoundationVersion: "0.1.0",
-    expectedSiteRoutingVersion: "0.4.0",
-    expectedBookingCalendlyVersion: "0.1.0",
-    expectedAnalyticsVersion: "0.1.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedAppFoundationVersion: "0.3.0",
+    expectedSiteRoutingVersion: "0.5.0",
+    expectedBookingCalendlyVersion: "0.2.0",
+    expectedAnalyticsVersion: "0.2.0",
     expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 179,
+    expectedSurfaces: 212,
     visualRegression: false,
   }),
   Object.freeze({
@@ -656,78 +698,106 @@ export const generatedFixtureContracts = Object.freeze([
     displayName: "Acme App Persistence",
     createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence", displayName: "Acme App Persistence", applicationPersistence: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-persistence-0.2.7",
+    relativeRoot: "fixtures/generated/app-persistence-0.3.0",
     expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles, ...applicationPersistenceFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([
       "standards", "deployment-cloudflare", "content-files", "section-composition",
       "observability", "app-foundation", "site-routing", "application-persistence",
     ]),
-    expectedRecipeVersion: "0.2.7",
-    expectedStandardsVersion: "0.6.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.3.0",
+    expectedStandardsVersion: "0.10.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.4.1",
-    expectedAppFoundationVersion: "0.1.0",
-    expectedApplicationPersistenceVersion: "0.1.1",
-    expectedSiteRoutingVersion: "0.4.0",
+    expectedDeploymentCloudflareVersion: "0.10.0",
+    expectedAppFoundationVersion: "0.3.0",
+    expectedApplicationPersistenceVersion: "0.2.0",
+    expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 162,
+    expectedSurfaces: 191,
     visualRegression: false,
   }),
   Object.freeze({
     identifier: "portfolio-email", profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email",
     createArguments: createArguments({ profile: "portfolio", projectName: "acme-portfolio-email", displayName: "Acme Portfolio Email", transactionalEmailResend: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/portfolio-email-0.11.7",
+    relativeRoot: "fixtures/generated/portfolio-email-0.12.0",
     expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...transactionalEmailFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "app-foundation", "transactional-email-resend"]),
-    expectedRecipeVersion: "0.11.7", expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1", expectedAppFoundationVersion: "0.2.0",
-    expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: null,
+    expectedRecipeVersion: "0.12.0", expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.9.0", expectedAppFoundationVersion: "0.3.0",
+    expectedTransactionalEmailVersion: "0.2.0", expectedApplicationPersistenceVersion: null,
     expectedSiteRoutingVersion: null, expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 135, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 163, visualRegression: false,
   }),
   Object.freeze({
     identifier: "app-persistence-email", profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email",
     createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email", transactionalEmailResend: true, applicationPersistence: true }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/app-persistence-email-0.2.7",
+    relativeRoot: "fixtures/generated/app-persistence-email-0.3.0",
     expectedFiles: Object.freeze([...portfolioFiles, ...appFoundationFiles, ...siteRoutingFiles, ...applicationPersistenceFiles, ...transactionalEmailFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend"]),
-    expectedRecipeVersion: "0.2.7", expectedStandardsVersion: "0.6.1",
-    expectedObservabilityVersion: "0.3.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.4.1", expectedAppFoundationVersion: "0.2.0",
-    expectedTransactionalEmailVersion: "0.1.0", expectedApplicationPersistenceVersion: "0.1.1",
-    expectedSiteRoutingVersion: "0.4.0", expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 171, visualRegression: false,
+    expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.10.0",
+    expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.10.0", expectedAppFoundationVersion: "0.3.0",
+    expectedTransactionalEmailVersion: "0.2.0", expectedApplicationPersistenceVersion: "0.2.0",
+    expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 200, visualRegression: false,
   }),
   Object.freeze({
     identifier: "site-contact-form",
     profile: "site",
     projectName: "acme-site-contact-form",
-    displayName: "Acme Site Contact",
-    createArguments: createArguments({ profile: "site", projectName: "acme-site-contact-form", displayName: "Acme Site Contact", contactFormWeb3Forms: contactSettings }),
-    expectedCapabilitySettings: Object.freeze({ "contact-form-web3forms": contactSettings }),
-    relativeRoot: "fixtures/generated/site-contact-form-0.12.7",
+    displayName: "Acme Site Contact Form",
+    createArguments: createArguments({ profile: "site", projectName: "acme-site-contact-form", displayName: "Acme Site Contact Form", contactFormWeb3Forms: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/site-contact-form-0.13.0",
     expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...contactFiles].sort(codePointCompare)),
     expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing", "contact-form-web3forms"]),
-    expectedRecipeVersion: "0.12.7",
-    expectedStandardsVersion: "0.5.1",
-    expectedObservabilityVersion: "0.3.0",
+    expectedRecipeVersion: "0.13.0",
+    expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.3.1",
-    expectedSiteRoutingVersion: "0.4.0",
+    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedContactFormVersion: "0.1.0",
-    expectedSurfaces: 138,
+    expectedContactFormVersion: "0.2.0",
+    expectedSurfaces: 166,
     visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "app-jobs", profile: "app", projectName: "acme-app-jobs", displayName: "Acme App Jobs",
+    createArguments: createArguments({ profile: "app", projectName: "acme-app-jobs", displayName: "Acme App Jobs", backgroundJobDelivery: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/app-jobs-0.3.0",
+    expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles, ...backgroundJobFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "background-job-delivery"]),
+    expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.9.0",
+    expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.11.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.3.0",
+    expectedApplicationPersistenceVersion: null, expectedTransactionalEmailVersion: null,
+    expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 181, visualRegression: false,
+  }),
+  Object.freeze({
+    identifier: "app-persistence-jobs-email", profile: "app", projectName: "acme-app-persistence-jobs-email", displayName: "Acme App Persistence Jobs Email",
+    createArguments: createArguments({ profile: "app", projectName: "acme-app-persistence-jobs-email", displayName: "Acme App Persistence Jobs Email", backgroundJobDelivery: true, applicationPersistence: true, transactionalEmailResend: true }),
+    expectedCapabilitySettings: noCapabilitySettings,
+    relativeRoot: "fixtures/generated/app-persistence-jobs-email-0.3.0",
+    expectedFiles: Object.freeze([...portfolioFiles, ...siteRoutingFiles, ...appFoundationFiles, ...backgroundJobFiles, ...applicationPersistenceFiles, ...transactionalEmailFiles].sort(codePointCompare)),
+    expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend", "background-job-delivery"]),
+    expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.10.0",
+    expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.12.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.3.0",
+    expectedApplicationPersistenceVersion: "0.2.0", expectedTransactionalEmailVersion: "0.2.0",
+    expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 211, visualRegression: false,
   }),
 ]);
 
@@ -742,8 +812,12 @@ const verificationChecks = [
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -944,6 +1018,11 @@ function expectedWebManifest(projectName, eslintConfigNextVersion, appFoundation
     name: `${projectName}-web`,
     private: true,
     scripts: {
+      "check:environment": "node scripts/check-application-environment.mjs --local",
+      "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
+      "check:prepared-artifact": "node --experimental-strip-types scripts/check-prepared-artifact.mjs",
+      "test:deployment-contracts": "node --experimental-strip-types --test tests/scripts/prepared-artifact.test.mjs tests/scripts/deployment-protection.test.mjs",
+      "test:transport": "playwright test --config playwright.transport.config.ts",
       "browser:install": "playwright install chromium",
       "browser:install:ci": "playwright install --with-deps chromium",
       build: "next build",
@@ -995,17 +1074,31 @@ function fail(code) {
   throw new GeneratedFixtureVerificationError(code);
 }
 
+function fixedFixtureIndex(identifier, failureCode) {
+  const index = generatedFixtureContracts.findIndex(contract => contract.identifier === identifier);
+  if (index === -1) fail(failureCode);
+  return index;
+}
+
 export function parseVerificationArguments(arguments_) {
   if (!Array.isArray(arguments_)) {
     fail("VERIFICATION_ARGUMENT_INVALID");
   }
-  if (arguments_.length === 0) {
-    return defaultVerificationOptions;
+  const prefix = "--from-fixture=";
+  let includeVisual = false;
+  let fromFixture;
+  for (const argument of arguments_) {
+    if (argument === "--visual" && !includeVisual) {
+      includeVisual = true;
+    } else if (typeof argument === "string" && argument.startsWith(prefix) && fromFixture === undefined) {
+      fromFixture = argument.slice(prefix.length);
+      fixedFixtureIndex(fromFixture, "VERIFICATION_ARGUMENT_INVALID");
+    } else {
+      fail("VERIFICATION_ARGUMENT_INVALID");
+    }
   }
-  if (arguments_.length === 1 && arguments_[0] === "--visual") {
-    return visualVerificationOptions;
-  }
-  fail("VERIFICATION_ARGUMENT_INVALID");
+  if (fromFixture !== undefined) return Object.freeze({ includeVisual, fromFixture });
+  return includeVisual ? visualVerificationOptions : defaultVerificationOptions;
 }
 
 function requireVerificationOptions(options) {
@@ -1035,6 +1128,36 @@ function createChildEnvironment(support) {
     PLAYWRIGHT_BROWSERS_PATH: support.browsers,
     XDG_CACHE_HOME: support.cache,
   });
+}
+
+export function syntheticApplicationEnvironment(selected, settings, target, siteOrigin) {
+  const environment = {
+    APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteOrigin,
+    BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false",
+    ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }),
+  };
+  if (selected.includes("contact-form-web3forms")) Object.assign(environment, {
+    NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001",
+    CONTACT_TEST_EXPECTED_ACCESS_KEY: "00000000-0000-4000-8000-000000000001",
+  });
+  if (selected.includes("booking-calendly")) Object.assign(environment, {
+    NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro",
+    BOOKING_TEST_EXPECTED_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro",
+    BOOKING_TEST_MODE: settings["booking-calendly"].mode,
+    BOOKING_TEST_MULTILINGUAL: String(selected.includes("multilingual")),
+  });
+  if (selected.includes("analytics")) {
+    Object.assign(environment, {
+      NEXT_PUBLIC_ANALYTICS_ENABLED: "false", ANALYTICS_TEST_BUILD_FLAG: "false", ANALYTICS_TEST_TARGET: target,
+      ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: siteOrigin, ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: "",
+      ANALYTICS_TEST_EXPECTED_GA4_ID: "", ANALYTICS_TEST_EXPECTED_CLARITY_ID: "", ANALYTICS_TEST_EXPECTED_VERIFICATION: "",
+    });
+    if (settings.analytics.operationalIntegrations.googleSearchConsole !== undefined) {
+      environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION = "synthetic-verification-not-a-provider-token";
+      environment.ANALYTICS_TEST_EXPECTED_VERIFICATION = target === "production" ? environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION : "";
+    }
+  }
+  return environment;
 }
 
 async function createGeneratedFixtureOwner() {
@@ -1201,7 +1324,7 @@ async function inspectFixture(root, contract) {
         contract.projectName,
         contract.profile === "portfolio" ? "16.3.0" : "16.3.3",
         contract.expectedAppFoundationVersion !== undefined,
-        contract.expectedApplicationPersistenceVersion === "0.1.1",
+        contract.expectedApplicationPersistenceVersion === "0.2.0",
       ),
     )
   ) {
@@ -1225,7 +1348,7 @@ async function inspectFixture(root, contract) {
   } catch {
     fail("FIXTURE_WORKSPACE_POLICY_INVALID");
   }
-  const persistence = contract.expectedApplicationPersistenceVersion === "0.1.1";
+  const persistence = contract.expectedApplicationPersistenceVersion === "0.2.0";
   const pluginVersion = contract.profile === "portfolio" ? "16.3.0" : "16.3.3";
   const workspacePolicyTemplate = expectedWorkspacePolicy(pluginVersion);
   const workspacePolicyBase = persistence
@@ -1320,8 +1443,8 @@ export function contractForGeneratedProject(identifier, expectedProjectName) {
     ].sort(codePointCompare)),
     expectedCapabilities: Object.freeze([...app.expectedCapabilities, "booking-calendly"]),
     expectedCapabilitySettings: portfolioCalendlySettings,
-    expectedBookingCalendlyVersion: "0.1.0",
-    expectedSurfaces: app.expectedSurfaces + 5,
+    expectedBookingCalendlyVersion: "0.2.0",
+    expectedSurfaces: app.expectedSurfaces + 9,
     visualRegression: false,
   });
   if (expectedProjectName === undefined) return contract;
@@ -1809,8 +1932,9 @@ async function verifySourcesWithAdapters(
   sourcesBefore,
   options = defaultVerificationOptions,
   admittedAudit,
+  firstFixture = 0,
 ) {
-  requireVerificationOptions(options);
+  const selectedSources = sourcesBefore.slice(firstFixture);
   let owner;
   try {
     owner = await adapters.createOwner();
@@ -1827,7 +1951,7 @@ async function verifySourcesWithAdapters(
   const appBuildEvidence = [];
   const auditDispositions = [];
   try {
-    for (const source of sourcesBefore) {
+    for (const source of selectedSources) {
       const validationRoot = join(
         owner.path,
         `${source.contract.identifier}-project`,
@@ -1850,12 +1974,17 @@ async function verifySourcesWithAdapters(
       } catch {
         fail("VERIFICATION_SETUP_FAILED");
       }
-      const environment = createChildEnvironment(support);
+      const environment = {
+        ...createChildEnvironment(support),
+        ...syntheticApplicationEnvironment(source.contract.expectedCapabilities,
+          source.contract.expectedCapabilitySettings, "development", "http://localhost:3000"),
+      };
       const webManifest = await readJson(
         join(validationRoot, "apps/web/package.json"), "FIXTURE_MANIFEST_INVALID",
       );
       const hasWorkerIntegration = Object.hasOwn(webManifest.scripts, "test:integration:cloudflare");
-      const hasBindingIntegration = source.contract.expectedApplicationPersistenceVersion === "0.1.1";
+      const hasBindingIntegration = source.contract.expectedApplicationPersistenceVersion === "0.2.0";
+      const hasJobs = source.contract.expectedBackgroundJobVersion === "0.3.0";
       if (!hasBindingIntegration) bindingIntegration.skipped.push(source.contract.identifier);
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",
@@ -1917,6 +2046,9 @@ async function verifySourcesWithAdapters(
           arguments: ["run", "test:component"],
           failureCode: "COMPONENT_TESTS_FAILED",
         },
+        { arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], failureCode: "DEPLOYMENT_CONTRACTS_FAILED" },
+        { arguments: ["--dir", "apps/web", "run", "check:environment"], failureCode: "APPLICATION_ENVIRONMENT_INVALID" },
+        ...(hasJobs ? [{ arguments: ["--dir", "apps/web", "exec", "node", "scripts/check-job-delivery.mjs", "local"], failureCode: "JOB_CONFIGURATION_FAILED" }] : []),
         { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
         {
           arguments: [
@@ -1929,6 +2061,8 @@ async function verifySourcesWithAdapters(
           ],
           failureCode: "OPENNEXT_BUILD_FAILED",
         },
+        ...(hasJobs ? [{ arguments: ["--dir", "apps/web", "exec", "wrangler", "deploy", "--dry-run", "--outdir", ".open-next/jobs-bundle", "--metafile", ".open-next/jobs-inputs.json", "--x-provision=false", "--x-auto-create=false"], failureCode: "JOB_BUNDLE_FAILED" }] : []),
+        { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", environment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
         {
           arguments: ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
           failureCode: "WORKER_INTEGRATION_FAILED",
@@ -1937,14 +2071,10 @@ async function verifySourcesWithAdapters(
           arguments: ["--dir", "apps/web", "run", "test:integration:bindings"],
           failureCode: "BINDING_INTEGRATION_FAILED",
         }] : []),
-        {
-          arguments: ["--dir", "apps/web", "run", "browser:install"],
-          failureCode: "BROWSER_INSTALL_FAILED",
-        },
-        {
-          arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
-          failureCode: "BROWSER_DEVELOPMENT_FAILED",
-        },
+        { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", environment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
+        { arguments: ["--dir", "apps/web", "run", "browser:install"], failureCode: "BROWSER_INSTALL_FAILED" },
+        { arguments: ["--dir", "apps/web", "run", "test:transport"], failureCode: "TRANSPORT_CONTRACTS_FAILED" },
+        { arguments: ["--dir", "apps/web", "run", "test:e2e:dev"], failureCode: "BROWSER_DEVELOPMENT_FAILED" },
         {
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           failureCode: "BROWSER_PREVIEW_FAILED",
@@ -1957,6 +2087,7 @@ async function verifySourcesWithAdapters(
               },
             ]
           : []),
+        { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", environment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
       ];
 
       for (const command of commands) {
@@ -2051,18 +2182,18 @@ async function verifySourcesWithAdapters(
 
   const visualVerificationExecuted =
     options.includeVisual &&
-    sourcesBefore.some(({ contract }) => contract.visualRegression);
+    selectedSources.some(({ contract }) => contract.visualRegression);
 
   return {
     ok: true,
-    fixtures: sourcesBefore.map(({ contract }) => contract.identifier),
+    fixtures: selectedSources.map(({ contract }) => contract.identifier),
     ...(admittedAudit ? { auditDispositions, status: auditDispositions.some(audit => audit.status === "accepted-with-security-exception")
       ? "completed-with-security-exception" : "completed" } : {}),
     workerIntegration,
     bindingIntegration,
     appBuildEvidence,
     profiles: [
-      ...new Set(sourcesBefore.map(({ contract }) => contract.profile)),
+      ...new Set(selectedSources.map(({ contract }) => contract.profile)),
     ],
     checks: visualVerificationExecuted
       ? [...verificationChecks, visualVerificationCheck]
@@ -2107,15 +2238,21 @@ async function sourceForRoot(root, contract) {
 export async function verifyGeneratedSkeletonsForTesting(
   adapters,
   options = defaultVerificationOptions,
+  fixtureRepositoryRoot = repositoryRoot,
 ) {
   requireAdapters(adapters);
   if (typeof adapters.runAudit !== "function") fail("VERIFICATION_ADAPTER_INVALID");
+  const { fromFixture, ...commandOptions } = options ?? {};
+  requireVerificationOptions(commandOptions);
+  const firstFixture = Object.hasOwn(options, "fromFixture")
+    ? fixedFixtureIndex(fromFixture, "VERIFICATION_OPTION_INVALID")
+    : 0;
   const sources = await Promise.all(
     generatedFixtureContracts.map((contract) =>
-      sourceForRoot(resolve(repositoryRoot, contract.relativeRoot), contract),
+      sourceForRoot(resolve(fixtureRepositoryRoot, contract.relativeRoot), contract),
     ),
   );
-  return verifySourcesWithAdapters(adapters, sources, options, adapters.runAudit);
+  return verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture);
 }
 
 export function verifyGeneratedProject(
@@ -2145,6 +2282,7 @@ export async function verifyGeneratedProjectForTesting(
   options = defaultVerificationOptions,
 ) {
   requireAdapters(adapters);
+  requireVerificationOptions(options);
   const contract = contractForGeneratedProject(
     identifier,
     expectedProjectName,
@@ -2187,8 +2325,8 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
   const toolEnvironment = await (adapters.derivePnpmToolEnvironment ?? derivePnpmToolEnvironment)("pnpm");
   const fixedRoot = resolve(root);
   const sourceBefore = await snapshotTree(fixedRoot);
-  const snapshot = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fixedRoot), core.createApplicationEnvironmentRenderingContext());
-  const project = core.parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"), "2.0.0");
+  const snapshot = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fixedRoot));
+  const project = core.parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"));
   if (!snapshot.ok || !project.ok) fail("FIXTURE_STATE_INVALID");
   const selected = project.value.selectedCapabilities;
   const profile = project.value.originProfile;
@@ -2214,19 +2352,8 @@ export async function verifyApplicationEnvironmentProjectForTesting(root, adapte
       const support = await createSupportPaths(supportRoot);
       const revision = "a".repeat(40); // Explicit synthetic source identity, never a reviewed commit assertion.
       const siteOrigin = `https://${target}.application-test.invalid`;
-      const environment = { ...createChildEnvironment(support), ...toolEnvironment, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: siteOrigin,
-        BUILD_SOURCE_REVISION: revision, WRANGLER_SEND_METRICS: "false", ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) };
-      if (selected.includes("contact-form-web3forms")) Object.assign(environment, { NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000001", CONTACT_TEST_EXPECTED_ACCESS_KEY: "00000000-0000-4000-8000-000000000001" });
-      if (selected.includes("booking-calendly")) Object.assign(environment, { NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_EXPECTED_URL: "https://calendly.com/egeria-synthetic-nonproduction/intro", BOOKING_TEST_MODE: project.value.capabilitySettings["booking-calendly"].mode, BOOKING_TEST_MULTILINGUAL: String(selected.includes("multilingual")) });
-      if (selected.includes("analytics")) {
-        const settings = project.value.capabilitySettings.analytics;
-        Object.assign(environment, { NEXT_PUBLIC_ANALYTICS_ENABLED: "false", ANALYTICS_TEST_BUILD_FLAG: "false", ANALYTICS_TEST_TARGET: target,
-          ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: siteOrigin, ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: "", ANALYTICS_TEST_EXPECTED_GA4_ID: "", ANALYTICS_TEST_EXPECTED_CLARITY_ID: "", ANALYTICS_TEST_EXPECTED_VERIFICATION: "" });
-        if (settings.operationalIntegrations.googleSearchConsole !== undefined) {
-          environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION = "synthetic-verification-not-a-provider-token";
-          environment.ANALYTICS_TEST_EXPECTED_VERIFICATION = target === "production" ? environment.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION : "";
-        }
-      }
+      const environment = { ...createChildEnvironment(support), ...toolEnvironment,
+        ...syntheticApplicationEnvironment(selected, project.value.capabilitySettings, target, siteOrigin) };
       const commands = [];
       const run = async (arguments_, failureCode, commandEnvironment = environment) => {
         const result = await runExpectedCommand(adapters.runCommand, { executable: "pnpm", arguments: arguments_, cwd: validationRoot, environment: commandEnvironment, timeout: commandTimeoutMilliseconds }, failureCode);

@@ -148,6 +148,7 @@ function createChildEnvironment(
     TEMP: support.temporary,
     NPM_CONFIG_REGISTRY: publicRegistry,
     NPM_CONFIG_USERCONFIG: support.userConfiguration,
+    pnpm_config_verify_deps_before_run: "error",
   };
 }
 
@@ -478,25 +479,16 @@ async function verifyInIsolatedCopy(
 
   let workerIntegrationPresent: boolean;
   let bindingIntegrationPresent: boolean;
-  let applicationEnvironments: boolean;
-  let backgroundJobs = false;
+  let backgroundJobs: boolean;
   try {
     const manifest = JSON.parse(
       await readFile(join(fixedRoot, "apps/web/package.json"), "utf8"),
     ) as { scripts?: Record<string, unknown>; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
-    const projectSource = await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8");
-    const publicProject = parseProjectYaml(projectSource);
-    const project = publicProject.ok ? publicProject : parseProjectYaml(projectSource, "2.0.0");
-    if (!project.ok) {
+    const project = parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"));
+    if (!project.ok || !Object.entries(applicationEnvironmentVerificationScripts).every(([name, value]) => manifest.scripts?.[name] === value)) {
       return issue("WORKER_INTEGRATION_INVALID", "environment-contract-mismatch");
     }
-    applicationEnvironments = project.value.schemaVersion === "2.0.0";
-    if (applicationEnvironments) {
-      if (!Object.entries(applicationEnvironmentVerificationScripts).every(([name, value]) => manifest.scripts?.[name] === value)) {
-        return issue("WORKER_INTEGRATION_INVALID", "environment-contract-mismatch");
-      }
-      backgroundJobs = project.value.selectedCapabilities.includes("background-job-delivery");
-    }
+    backgroundJobs = project.value.selectedCapabilities.includes("background-job-delivery");
     const script = manifest.scripts?.["test:integration:cloudflare"];
     if (
       script !== undefined &&
@@ -549,7 +541,7 @@ async function verifyInIsolatedCopy(
     } else {
       const environment = {
         ...createChildEnvironment(support.value, await derivePnpmToolEnvironment(executable)),
-        ...(applicationEnvironments ? { APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_SITE_URL: "http://localhost:3000", BUILD_SOURCE_REVISION: "a".repeat(40) } : {}),
+        APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_SITE_URL: "http://localhost:3000", BUILD_SOURCE_REVISION: "a".repeat(40),
       };
       const version = await requirePnpmVersion({
         executable,
@@ -587,7 +579,7 @@ async function verifyInIsolatedCopy(
             arguments: ["run", "test:component"],
             failureCode: "COMPONENT_TESTS_FAILED",
           },
-          ...(applicationEnvironments ? [{ arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], failureCode: "DEPLOYMENT_CONTRACTS_FAILED" }] : []),
+          ...[{ arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], failureCode: "DEPLOYMENT_CONTRACTS_FAILED" }],
           ...(backgroundJobs ? [{ arguments: ["--dir", "apps/web", "exec", "node", "scripts/check-job-delivery.mjs", "local"], failureCode: "JOB_CONFIGURATION_FAILED" }] : []),
           { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
           {
@@ -602,7 +594,7 @@ async function verifyInIsolatedCopy(
             failureCode: "OPENNEXT_BUILD_FAILED",
           },
           ...(backgroundJobs ? [{ arguments: ["--dir", "apps/web", "exec", "wrangler", "deploy", "--dry-run", "--outdir", ".open-next/jobs-bundle", "--metafile", ".open-next/jobs-inputs.json", "--x-provision=false", "--x-auto-create=false"], failureCode: "JOB_BUNDLE_FAILED" }] : []),
-          ...(applicationEnvironments ? [{ arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" }] : []),
+          ...[{ arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" }],
           {
             arguments: [
               "--dir",
@@ -617,7 +609,7 @@ async function verifyInIsolatedCopy(
             arguments: ["--dir", "apps/web", "run", "test:integration:bindings"],
             failureCode: "BINDING_INTEGRATION_FAILED",
           }] : []),
-          ...(applicationEnvironments ? [{ arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" }] : []),
+          ...[{ arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" }],
         ] as const;
         result = {
           ok: true,

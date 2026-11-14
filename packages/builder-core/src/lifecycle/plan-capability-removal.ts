@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 
-import { applicationPersistenceCatalogSnapshot, createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
 import {
   createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext,
   readVerifiedProjectSnapshot,
@@ -16,10 +16,10 @@ import {
   type PersistenceRemovalMachineReport,
   type PersistenceRemovalSubject,
 } from "../contracts/persistence-removal-evidence.js";
-import type { ProjectConfiguration, ApplicationEnvironmentProjectConfiguration } from "../contracts/project.js";
+import type { ProjectConfiguration} from "../contracts/project.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
-import type { InstalledState, ApplicationEnvironmentInstalledState, InstalledSurface } from "../contracts/state.js";
+import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
   deriveProjectDiscrepancies,
   inspectProject,
@@ -50,8 +50,7 @@ import {
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { reviewPersistenceRemovalEvidence } from "./review-persistence-removal-evidence.js";
 
-import { jobRemovalInputSchema, type JobRemovalInput, type JobRemovalMachineReport, type JobRemovalSubject } from "../contracts/job-removal-evidence.js";
-import { reviewJobRemovalEvidence } from "./review-job-removal-evidence.js";
+import { type JobRemovalInput, type JobRemovalMachineReport, type JobRemovalSubject } from "../contracts/job-removal-evidence.js";
 
 type RemovableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
@@ -160,9 +159,9 @@ type PlanningResult<T> =
   | Readonly<{ ok: true; value: T }>
   | Readonly<{ ok: false; issues: readonly PlanningIssue[] }>;
 
-type LifecycleProject = ProjectConfiguration | ApplicationEnvironmentProjectConfiguration;
-type LifecycleState = InstalledState | ApplicationEnvironmentInstalledState;
-type LifecycleInspection = ProjectInspection<LifecycleProject, LifecycleState>;
+type LifecycleProject = ProjectConfiguration;
+type LifecycleState = InstalledState;
+type LifecycleInspection = ProjectInspection;
 
 type ValidInspection = LifecycleInspection &
   Readonly<{
@@ -415,7 +414,7 @@ function isValidRemovedCapabilityState(input: Readonly<{
 
 async function hasUnavailableApplicationOwnedSurface(input: Readonly<{
   reader: RepositoryReader;
-  rendered: RenderedSkeleton<LifecycleProject>;
+  rendered: RenderedSkeleton;
   state: LifecycleState;
 }>): Promise<boolean> {
   const installedByIdentifier = new Map(
@@ -493,7 +492,7 @@ function actionOwner(
 }
 
 function fileSurfaceForPath(
-  rendered: RenderedSkeleton<LifecycleProject>,
+  rendered: RenderedSkeleton,
   path: string,
 ): ManagedSurfaceDescriptor | undefined {
   const candidates = [...rendered.surfaces, ...createBuilderStateSurfaces()].filter(
@@ -514,8 +513,8 @@ function installedSurfaceForDescriptor(
 }
 
 function changedFiles(
-  current: RenderedSkeleton<LifecycleProject>,
-  desired: RenderedSkeleton<LifecycleProject>,
+  current: RenderedSkeleton,
+  desired: RenderedSkeleton,
 ): Readonly<{
   removed: readonly GeneratedFile[];
   replaced: readonly Readonly<{
@@ -562,8 +561,8 @@ function renderedText(file: GeneratedFile): string | undefined {
 
 async function deriveActions(input: Readonly<{
   reader: RepositoryReader;
-  current: RenderedSkeleton<LifecycleProject>;
-  desired: RenderedSkeleton<LifecycleProject>;
+  current: RenderedSkeleton;
+  desired: RenderedSkeleton;
   state: LifecycleState;
   capability: RemovableCapability;
 }>): Promise<PlanningResult<readonly CapabilityRemovalAction[]>> {
@@ -583,7 +582,7 @@ async function deriveActions(input: Readonly<{
   ];
 
   for (const pair of differences.replaced) {
-    if (input.current.project.schemaVersion === "2.0.0" && pair.current.path === "apps/web/.dev.vars.example") continue;
+    if ((pair.current.path === "apps/web/.dev.vars.example")) continue;
     if (input.capability === "application-persistence" && pair.current.path === "apps/web/package.json") {
       actions.push({ kind: "replace-file", path: pair.current.path, ownership: "managed", owner: "builder-kernel" });
       continue;
@@ -807,45 +806,10 @@ async function preparePersistenceReview(input: Readonly<{
   }) } };
 }
 
-async function prepareJobReview(input: Readonly<{
-  reader: RepositoryReader;
-  descriptor: CapabilityDescriptor;
-  inventory: Extract<GitRepositoryInventoryInspection, {ok: true}>["value"];
-  input: JobRemovalInput;
-  revision: string;
-  now?: () => string;
-}>): Promise<PlanningResult<Readonly<{report: JobRemovalMachineReport; subject: Omit<JobRemovalSubject, "resources">}>>> {
-  const configurationPaths = ["apps/web/wrangler.jsonc", "apps/web/worker.mjs"];
-  const handlerPaths = [...new Set(["apps/web/src/application/job-handlers.ts", "apps/web/src/application/job-delivery.ts", "apps/web/src/composition/server-jobs.ts",
-    ...input.inventory.entries.filter(({path}) => path.startsWith("apps/web/src/application/")).map(({path}) => path),
-  ])].sort(compareText);
-  const selectedPaths = [...configurationPaths, ...handlerPaths];
-  if (input.inventory.truncated || input.inventory.entries.some(({path,kind}) => selectedPaths.includes(path) && kind !== "file")) return planningFailure("JOB_REMOVAL_SUBJECT_UNAVAILABLE");
-  const files: {path: string; fingerprint: string}[] = [];
-  for (const path of selectedPaths) {
-    const result = input.reader.readBytes === undefined ? await input.reader.readText(path) : await input.reader.readBytes(path);
-    if (result.kind !== "file") return planningFailure("JOB_REMOVAL_SUBJECT_UNAVAILABLE");
-    files.push({path, fingerprint:fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content)});
-  }
-  const localArtifactDigests: {reference:string; digest:string}[] = [];
-  for (const {reference,path} of input.input.localArtifacts ?? []) {
-    const result = input.reader.readBytes === undefined ? await input.reader.readText(path) : await input.reader.readBytes(path);
-    if (result.kind === "file") localArtifactDigests.push({reference, digest:fingerprintFileContent(typeof result.content === "string" ? encoder.encode(result.content) : result.content)});
-  }
-  const subject = {
-    descriptorVersion:input.descriptor.version as "0.1.0" | "0.2.0",
-    descriptorFingerprint:fingerprintValue(input.descriptor),
-    configurationFingerprint:fingerprintValue(files.filter(({path}) => configurationPaths.includes(path))),
-    handlerFingerprint:fingerprintValue(files.filter(({path}) => handlerPaths.includes(path))),
-    sourceRevision:input.revision,
-  };
-  return {ok:true,value:{subject,report:reviewJobRemovalEvidence({expectedSubject:{...subject,resources:input.input.resources}, ...(input.input.evidence === undefined ? {} : {evidence:input.input.evidence}), localArtifactDigests, requiredLocalArtifactReferences:(input.input.localArtifacts ?? []).map(({reference}) => reference)}, input.now)}};
-}
-
 async function readRemovalPlanBindings(
   reader: RepositoryReader,
-  current: RenderedSkeleton<LifecycleProject>,
-  desired: RenderedSkeleton<LifecycleProject>,
+  current: RenderedSkeleton,
+  desired: RenderedSkeleton,
   actions: readonly CapabilityRemovalAction[],
   persistenceRemoval: PersistenceRemovalInput | JobRemovalInput | undefined,
   referenceWarnings: readonly CapabilityRemovalReferenceWarning[],
@@ -908,24 +872,13 @@ export async function planCapabilityRemoval(input: Readonly<{
   now?: () => string;
   inspectRepositoryInventory?: typeof inspectGitRepositoryInventory;
 }>): Promise<PlanningResult<CapabilityRemovalPlan>> {
+  input = { ...input, renderingContext: input.renderingContext ?? createApplicationEnvironmentRenderingContext() };
   const capabilityValue: unknown = Reflect.get(input, "capability");
-  if (input.renderingContext !== undefined && (
+  if (((
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence" && capabilityValue !== "transactional-email-resend") ||
+    (capabilityValue !== "contact-form-web3forms" && capabilityValue !== "booking-calendly" && capabilityValue !== "analytics" && capabilityValue !== "application-persistence" && capabilityValue !== "transactional-email-resend" && capabilityValue !== "multilingual") ||
     (capabilityValue !== "application-persistence" && input.persistenceRemoval !== undefined)
-  )) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
-
-  if (
-    capabilityValue !== "analytics" &&
-    capabilityValue !== "booking-calendly" &&
-    capabilityValue !== "multilingual" &&
-    capabilityValue !== "application-persistence" &&
-    capabilityValue !== "transactional-email-resend" &&
-    capabilityValue !== "contact-form-web3forms" &&
-    capabilityValue !== "background-job-delivery"
-  ) {
-    return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
-  }
+  ))) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
 
   const persistenceInput = input.persistenceRemoval === undefined
     ? undefined : persistenceRemovalInputSchema.safeParse(input.persistenceRemoval);
@@ -934,22 +887,18 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("PERSISTENCE_REMOVAL_INPUT_INVALID");
   }
 
-  const jobInput = input.jobRemoval === undefined ? undefined : jobRemovalInputSchema.safeParse(input.jobRemoval);
-  if ((capabilityValue === "background-job-delivery" && jobInput?.success !== true) ||
-      (capabilityValue !== "background-job-delivery" && input.jobRemoval !== undefined)) return planningFailure("JOB_REMOVAL_INPUT_INVALID");
+  if (input.jobRemoval !== undefined) return planningFailure("JOB_REMOVAL_INPUT_INVALID");
 
-  const snapshot = input.renderingContext === undefined
-    ? await readVerifiedProjectSnapshot(input.reader)
-    : await readVerifiedProjectSnapshot(input.reader, input.renderingContext);
+  const snapshot = await readVerifiedProjectSnapshot(input.reader, input.renderingContext);
 
   if (!snapshot.ok) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
-  const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
+  const environmentContext = snapshot.value.renderingContext;
   let inspectionCatalog = snapshot.value.catalog;
-  if ((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend" || capabilityValue === "background-job-delivery") && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
-    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? (environmentContext === undefined ? applicationPersistenceCatalogSnapshot : createApplicationEnvironmentRenderingContext(true).catalogSnapshot) : createGenerationRenderingContext(false, true, capabilityValue === "background-job-delivery").catalogSnapshot);
+  if (((capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend")) && !inspectionCatalog.some(({ identifier }) => identifier === capabilityValue)) {
+    const persistenceCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, capabilityValue === "application-persistence" ? createApplicationEnvironmentRenderingContext(true).catalogSnapshot : createGenerationRenderingContext(false, true, false).catalogSnapshot);
     const removedDescriptor = persistenceCatalog.ok
       ? persistenceCatalog.value.find(({ identifier }) => identifier === capabilityValue) : undefined;
     if (removedDescriptor === undefined) return planningFailure("PROJECT_INSPECTION_INVALID");
@@ -957,9 +906,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const inspection = validatedInspection(
-    await (input.renderingContext === undefined
-      ? inspectProject({ reader: snapshot.value.reader, catalog: inspectionCatalog, profiles: snapshot.value.profiles })
-      : inspectProject({ reader: snapshot.value.reader, catalog: inspectionCatalog, profiles: snapshot.value.profiles, projectSchemaVersion: "2.0.0" })),
+    await (inspectProject({ reader: snapshot.value.reader, catalog: inspectionCatalog, profiles: snapshot.value.profiles, })),
     snapshot.value.profiles,
   );
 
@@ -968,7 +915,7 @@ export async function planCapabilityRemoval(input: Readonly<{
   }
 
   const project = inspection.project.value;
-  if (project.selectedCapabilities.includes("background-job-delivery") && capabilityValue !== "background-job-delivery") return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
+  if ((project.selectedCapabilities.includes("background-job-delivery"))) return planningFailure("CAPABILITY_REMOVAL_UNSUPPORTED");
   const state = inspection.inference.state.value;
   const desired = project.selectedCapabilities.includes(capabilityValue);
   const installedCapability = state.installedCapabilities.find(
@@ -981,9 +928,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor === undefined || (capabilityValue === "background-job-delivery"
-    ? !["0.1.0", "0.2.0"].includes(descriptor.version)
-    : descriptor.version !== (input.renderingContext !== undefined ? "0.2.0" : capabilityValue === "application-persistence" ? "0.1.1" : "0.1.0"))) {
+  if (descriptor?.version !== (capabilityValue === "multilingual" ? "0.1.0" : "0.2.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -1015,86 +960,27 @@ export async function planCapabilityRemoval(input: Readonly<{
     return planningFailure("PROJECT_DRIFT_DETECTED");
   }
 
-  const legacyProject = project.schemaVersion === "1.0.0" ? project : undefined;
-  const bookingSettings = legacyProject?.capabilitySettings["booking-calendly"];
-  const analyticsSettings = legacyProject?.capabilitySettings.analytics;
-  if (capabilityValue === "booking-calendly" && project.capabilitySettings["booking-calendly"] === undefined) {
-    return planningFailure("PROJECT_INSPECTION_INVALID");
-  }
-  if (capabilityValue === "analytics" && project.capabilitySettings.analytics === undefined) {
-    return planningFailure("PROJECT_INSPECTION_INVALID");
-  }
-
   const commonRenderRequest = {
     profile: project.originProfile,
     projectName: project.project.name,
     displayName: project.project.displayName,
-    ...(project.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   };
-  const renderRequest = {
-    profile: project.originProfile,
-    projectName: project.project.name,
-    displayName: project.project.displayName,
-    ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
-    ...(project.selectedCapabilities.includes("multilingual")
-      ? { multilingual: true as const }
-      : {}),
-    ...(analyticsSettings === undefined ? {} : { analytics: analyticsSettings }),
-    ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
-    ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-    ...(project.selectedCapabilities.includes("background-job-delivery") ? { backgroundJobDelivery: true as const } : {}),
-    ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
-    packageVersions: verifiedCapabilityPackageVersions,
-  } as const;
-  let desiredContext = snapshot.value.renderingContext;
-  if (desiredContext !== undefined &&
-      (capabilityValue === "background-job-delivery" || capabilityValue === "application-persistence")) {
-    const catalogSnapshot = { ...desiredContext.catalogSnapshot };
-    if (capabilityValue === "background-job-delivery") {
-      delete catalogSnapshot.backgroundJobDelivery;
-      catalogSnapshot.deploymentCloudflare = project.selectedCapabilities.includes("application-persistence") ? "0.4.1" : "0.3.1";
-    } else {
-      delete catalogSnapshot.applicationPersistence;
-      catalogSnapshot.standards = "0.5.1";
-      catalogSnapshot.deploymentCloudflare = catalogSnapshot.backgroundJobDelivery === undefined ? "0.3.1" : "0.5.1";
-    }
-    desiredContext = { ...desiredContext, catalogSnapshot };
-  }
-  const environmentAnalyticsSettings = project.schemaVersion === "2.0.0" ? project.capabilitySettings.analytics : undefined;
-  const environmentBookingSettings = project.schemaVersion === "2.0.0" ? project.capabilitySettings["booking-calendly"] : undefined;
+  const environmentAnalyticsSettings = project.capabilitySettings.analytics;
+  const environmentBookingSettings = project.capabilitySettings["booking-calendly"];
   const [currentRender, desiredRender] = await Promise.all([
-    environmentContext === undefined
-      ? renderSkeleton(renderRequest, snapshot.value.renderingContext)
-      : renderSkeleton({
+    renderSkeleton({
         ...commonRenderRequest,
+        ...(project.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
         ...(project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
         ...(project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
         ...(environmentAnalyticsSettings === undefined ? {} : { analytics: environmentAnalyticsSettings }),
         ...(environmentBookingSettings === undefined ? {} : { bookingCalendly: environmentBookingSettings }),
         ...(project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
       }, environmentContext),
-    input.renderingContext === undefined ? renderSkeleton({
-      profile: renderRequest.profile,
-      projectName: renderRequest.projectName,
-      displayName: renderRequest.displayName,
-      ...(capabilityValue === "booking-calendly" || bookingSettings === undefined
-        ? {}
-        : { bookingCalendly: bookingSettings }),
-      ...(capabilityValue === "multilingual"
-        ? {}
-        : project.selectedCapabilities.includes("multilingual")
-          ? { multilingual: true as const }
-          : {}),
-      ...(capabilityValue === "analytics" || analyticsSettings === undefined
-        ? {}
-        : { analytics: analyticsSettings }),
-      ...(capabilityValue !== "application-persistence" && renderRequest.applicationPersistence === true ? { applicationPersistence: true as const } : {}),
-      ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
-      ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
-      packageVersions: verifiedCapabilityPackageVersions,
-    }, desiredContext) : renderSkeleton({
+    renderSkeleton({
       ...commonRenderRequest,
+      ...(capabilityValue !== "multilingual" && project.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
       ...(capabilityValue !== "transactional-email-resend" && project.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
       ...(capabilityValue !== "application-persistence" && project.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
       ...(capabilityValue !== "analytics" && environmentAnalyticsSettings !== undefined ? { analytics: environmentAnalyticsSettings } : {}),
@@ -1192,19 +1078,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       return referenceConflict(guard.conflicts);
     }
 
-    if (capabilityValue === "background-job-delivery") {
-      const unresolved: string[] = [];
-      for (const warning of guard.warnings) {
-        if (warning.path === undefined) return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
-        // Exact retained PNG visual baselines are passive binary assets, not unscanned code.
-        const image = warning.code === "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE" && warning.path.endsWith(".png")
-          ? current.value.files.find(({path}) => path === warning.path) : undefined;
-        const actual = image === undefined ? undefined : await input.reader.readBytes?.(warning.path);
-        if (image !== undefined && actual?.kind === "file" && fingerprintFileContent(actual.content) === fingerprintFileContent(image.content)) continue;
-        unresolved.push(warning.path);
-      }
-      if (unresolved.length > 0) return referenceConflict([...new Set(unresolved)].sort(compareText));
-    }
+
     referenceWarnings = guard.warnings;
   } catch {
     return planningFailure("CAPABILITY_REMOVAL_INVENTORY_INVALID");
@@ -1216,13 +1090,8 @@ export async function planCapabilityRemoval(input: Readonly<{
   if (persistenceReview !== undefined && !persistenceReview.ok) {
     return persistenceReview;
   }
-  const jobReview = jobInput?.success === true
-    ? await prepareJobReview({reader: input.reader, descriptor, inventory: inventory.value, input: jobInput.data, revision: input.git.identity.revision, ...(input.now === undefined ? {} : {now: input.now})}) : undefined;
-  if (jobReview !== undefined && !jobReview.ok) return jobReview;
-  const persistenceBindings = input.renderingContext !== undefined || project.selectedCapabilities.includes("application-persistence") || project.selectedCapabilities.includes("transactional-email-resend") || capabilityValue === "background-job-delivery"
-    ? await readRemovalPlanBindings(input.reader, current.value, targetRender, actions.value,
-        persistenceInput?.success === true ? persistenceInput.data : jobInput?.success === true ? jobInput.data : undefined, referenceWarnings, inventory.value)
-    : undefined;
+  const persistenceBindings = await readRemovalPlanBindings(input.reader, current.value, targetRender, actions.value,
+        persistenceInput?.success === true ? persistenceInput.data : undefined, referenceWarnings, inventory.value);
 
   const currentCapabilities = current.value.resolved.capabilities
     .map(({ identifier }) => identifier)
@@ -1235,14 +1104,9 @@ export async function planCapabilityRemoval(input: Readonly<{
     status: "approval-required",
     baseRevision: input.git.identity.revision,
     profile: project.originProfile,
-    capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "transactional-email-resend"
-      ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.0" : "0.2.0" }
-      : capabilityValue === "background-job-delivery"
-        ? { identifier: capabilityValue, version: descriptor.version as "0.1.0" | "0.2.0" }
-        : capabilityValue === "application-persistence"
-          ? { identifier: capabilityValue, version: input.renderingContext === undefined ? "0.1.1" : "0.2.0" }
-          : { identifier: capabilityValue, version: "0.1.0" },
-    ...(jobReview?.ok === true ? {jobRemovalReport: jobReview.value.report, jobRemovalSubject: jobReview.value.subject} : {}),
+    capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend"
+      ? { identifier: capabilityValue, version: "0.2.0" }
+      : { identifier: capabilityValue, version: "0.1.0" },
     ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),
     currentCapabilities,
     desiredCapabilities,
@@ -1272,8 +1136,7 @@ export async function planCapabilityRemoval(input: Readonly<{
         project,
         state,
         git: input.git,
-        ...(persistenceBindings === undefined ? {} : { persistenceBindings: input.renderingContext === undefined
-          ? persistenceBindings : { bindings: persistenceBindings, renderingContext: environmentContext, catalog: snapshot.value.catalog } }),
+        ...(persistenceBindings === undefined ? {} : { persistenceBindings: { bindings: persistenceBindings, renderingContext: environmentContext, catalog: snapshot.value.catalog } }),
       }),
     },
   };

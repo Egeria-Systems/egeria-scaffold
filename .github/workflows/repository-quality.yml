@@ -181,7 +181,7 @@ jobs:
 
       - name: Test CLI excluding dedicated lifecycle jobs
         env:
-          CLI_TEST_SKIP_PATTERN: (?:^compiled current jobs lifecycle on portfolio completes production verification$)|(?:^compiled current jobs lifecycle on app-persistence-email completes production verification$)|(?:^compiled current app optional lifecycle completes production verification$)|(?:^compiled current email lifecycle on portfolio verifies and retains its foundation$)|(?:^compiled current email lifecycle on site verifies and retains its foundation$)|(?:^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$)|(?:^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$)
+          CLI_TEST_SKIP_PATTERN: (?:^compiled current app optional lifecycle completes production verification$)|(?:^compiled current email lifecycle on portfolio verifies and retains its foundation$)|(?:^compiled current email lifecycle on site verifies and retains its foundation$)|(?:^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$)|(?:^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$)
         run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
 
       - name: Test public packages
@@ -201,44 +201,6 @@ jobs:
 
       - name: Check release intent
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
-
-  cli-jobs:
-    name: CLI jobs (${{ matrix.fixture }})
-    runs-on: ubuntu-24.04
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - fixture: portfolio
-            test-pattern: ^compiled current jobs lifecycle on portfolio completes production verification$
-          - fixture: app-persistence-email
-            test-pattern: ^compiled current jobs lifecycle on app-persistence-email completes production verification$
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Set up pnpm and Node.js
-        uses: pnpm/setup@fbda4c85fc2e1e08721cd8763afea8f48d60f024
-        with:
-          version: 11.28.1
-          runtime: node@22.23.2
-          cache: false
-          install: false
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build builder and packages
-        run: pnpm run build:builder
-
-      - name: Test CLI jobs lifecycle
-        env:
-          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
-        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
 
   cli-lifecycle:
     name: CLI lifecycle (${{ matrix.group }})
@@ -313,7 +275,7 @@ jobs:
         run: pnpm run build:builder
 
       - name: Verify generated visual regressions
-        run: pnpm run verify:generated-visuals
+        run: sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh pnpm run verify:generated-visuals
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()
@@ -470,7 +432,7 @@ jobs:
           GIT_CONFIG_COUNT: "1"
           GIT_CONFIG_KEY_0: safe.directory
           GIT_CONFIG_VALUE_0: ${{ github.workspace }}
-        run: pnpm run test:generated-fixtures
+        run: sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh pnpm run test:generated-fixtures
 
       - name: Retain native Git prerequisite evidence
         if: always() && steps.git_prerequisite.outputs.directory != ''
@@ -543,7 +505,7 @@ jobs:
       - name: Verify fresh jobs runtime generation
         env:
           GENERATED_JOBS_TEST_PATTERN: ${{ matrix.test-pattern }}
-        run: node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs
+        run: sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs
 
       - name: Upload generated jobs failure reports
         if: failure()
@@ -610,12 +572,12 @@ jobs:
       - name: Generate draft app transition visual review candidates
         id: visual_candidates
         if: github.event_name == 'pull_request' && github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7
+        run: sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh pnpm run verify:app-transition-visuals -- --candidates
 
       - name: Compare all app transition visual subsets
         id: visual_comparison
         if: github.event_name != 'pull_request' || !github.event.pull_request.draft
-        run: pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7
+        run: sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh pnpm run verify:app-transition-visuals
 
       - name: Retain raw dependency audits and security exception dispositions
         if: always()

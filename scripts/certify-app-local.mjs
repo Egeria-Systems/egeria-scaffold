@@ -8,12 +8,13 @@ import {
   createCertificationSubject,
   createInstalledManifest,
   createCapabilityCatalogSnapshot,
+  createVerifiedCapabilityCatalog,
   profileRecipes,
   resolveCapabilities,
   validateCertificationAdmission,
   validateContract,
   verifiedCapabilityPackageVersions,
-  vitestFiveCapabilityCatalogSnapshot,
+  applicationEnvironmentCatalogSnapshot,
 } from "../packages/builder-core/dist/index.js";
 import { generatedFixtureContracts } from "./verify-generated-skeletons.mjs";
 import { certifyFreshScaffold, certifyFreshScaffoldForTesting } from "./lib/certify-fresh-scaffold.mjs";
@@ -30,7 +31,8 @@ const fixtureIdentifiers = Object.freeze(["app", "app-all-optional-integrations"
 const generatedChecks = Object.freeze([
   "pnpm-version", "frozen-install", "peer-dependencies", "dependency-audit",
   "registry-signatures", "lint", "cloudflare-types", "typecheck", "unit-tests",
-  "component-tests", "next-build", "opennext-build", "browser-install",
+  "component-tests", "deployment-contracts", "transport-contracts", "application-environment",
+  "next-build", "opennext-build", "prepared-artifact", "browser-install",
   "browser-development", "browser-preview",
 ]);
 
@@ -68,22 +70,20 @@ async function readSubjects(adapters) {
   try {
     const registry = validateContract(certificationRegistrySchema, await adapters.readRegistry());
     const catalog = createCapabilityCatalogSnapshot(
-      verifiedCapabilityPackageVersions, vitestFiveCapabilityCatalogSnapshot,
+      verifiedCapabilityPackageVersions, applicationEnvironmentCatalogSnapshot,
     );
-    // This historical executor cannot certify the separately introduced contact subject.
-    const retainedCatalog = catalog.ok ? catalog.value.filter(({ identifier }) => identifier !== "contact-form-web3forms") : undefined;
-    if (!registry.ok || retainedCatalog === undefined ||
-      !isDeepStrictEqual(Object.keys(registry.value.records).sort(), capabilityIdentifiers) ||
-      !isDeepStrictEqual(retainedCatalog.map(({ identifier }) => identifier).sort(), capabilityIdentifiers) ||
-      !validateCertificationAdmission({ catalog: retainedCatalog, registry: registry.value }).ok) {
+    const completeCatalog = createVerifiedCapabilityCatalog();
+    if (!registry.ok || !catalog.ok || !completeCatalog.ok ||
+      !validateCertificationAdmission({ catalog: completeCatalog.value, registry: registry.value }).ok ||
+      capabilityIdentifiers.some(identifier => !catalog.value.some(capability => capability.identifier === identifier))) {
       throw createError("CERTIFICATION_SUBJECT_INVALID");
     }
     return {
-      catalog: retainedCatalog,
+      catalog: catalog.value,
       subjects: capabilityIdentifiers.map(capability => ({
         capability,
         subject: createCertificationSubject(
-          retainedCatalog.find(({ identifier }) => identifier === capability),
+          catalog.value.find(({ identifier }) => identifier === capability),
           registry.value.records[capability].requiredEvidence,
         ),
       })),
@@ -99,7 +99,7 @@ function configurationFor(identifier, catalog) {
     profile: "app",
     requestedCapabilities: identifier === "app" ? [] : ["analytics", "booking-calendly", "multilingual"],
   }, catalog, profileRecipes);
-  if (!fixture || !resolved.ok || resolved.value.recipeVersion !== "0.2.7") {
+  if (!fixture || !resolved.ok || resolved.value.recipeVersion !== "0.3.0") {
     throw createError("CERTIFICATION_SUBJECT_INVALID");
   }
   const installed = createInstalledManifest(resolved.value);
@@ -110,14 +110,14 @@ function configurationFor(identifier, catalog) {
     profile: "app", projectName: fixture.projectName, displayName: fixture.displayName,
     // The fixture owns the exact synthetic settings and conventional create prefix.
     createArguments: fixture.createArguments.slice(6),
-    capabilityIdentifier: "app-foundation", capabilityVersion: "0.1.0",
+    capabilityIdentifier: "app-foundation", capabilityVersion: "0.3.0",
     expectedCapabilities: fixture.expectedCapabilities,
     expectedInstalledCapabilities: installed,
     expectedCapabilitySettings: fixture.expectedCapabilitySettings,
-    expectedRecipeVersion: "0.2.7", verifierIdentifier: identifier,
+    expectedRecipeVersion: "0.3.0", verifierIdentifier: identifier,
     expectedVerificationChecks: generatedChecks,
     verificationOptions: { includeVisual: false },
-    receipt: { identifier, recipeVersion: "0.2.7" },
+    receipt: { identifier, recipeVersion: "0.3.0" },
     createError, isCertificationError,
   };
 }

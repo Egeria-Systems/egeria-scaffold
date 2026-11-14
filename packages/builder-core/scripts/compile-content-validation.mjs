@@ -9,10 +9,10 @@ const modules = [
   ["site/apps/web/src/routing/routing-content-schema.ts", "routing-content-schema.js", [
     ['"../content/content-schema"', '"./content-schema.js"'],
   ]],
-  ["booking-calendly/apps/web/src/integrations/booking-calendly/booking-content.ts", "booking-content.js", [
+  ["booking-calendly/application-environments/apps/web/src/integrations/booking-calendly/booking-content.ts", "booking-content.js", [
     ['"../../content/content-schema"', '"./content-schema.js"'],
-  ], ["bookingContentSource", "readBookingContent"]],
-  ["analytics/apps/web/src/integrations/analytics/analytics-content.ts", "analytics-content.js", [
+  ], ["frenchBookingContentSource", "bookingContentSource", "readBookingContent"]],
+  ["analytics/application-environments/apps/web/src/integrations/analytics/analytics-content.ts", "analytics-content.js", [
     ['"../../content/content-schema"', '"./content-schema.js"'],
   ], ["englishAnalyticsContentSource", "frenchAnalyticsContentSource", "contentByLocale", "readAnalyticsContent"]],
   ["common/apps/web/src/infrastructure/observability/error-copy.ts", "error-copy.js", [

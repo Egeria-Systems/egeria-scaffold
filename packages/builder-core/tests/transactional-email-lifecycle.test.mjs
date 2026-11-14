@@ -7,7 +7,7 @@ import * as core from "../dist/index.js";
 import { inspectProject } from "../dist/diagnostics/project-inspection.js";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createApplicationEnvironmentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, readVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 
 const encoder = new TextEncoder();
@@ -17,7 +17,7 @@ const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.7-foundation", site: "web-recipe-app-0.2.7", app: "web-recipe-app-0.2.7" }, persistenceLock: "web-recipe-app-0.2.7-persistence" },
+  { profiles: createApplicationEnvironmentProfileRecipes(), versions: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.7-foundation", site: "web-recipe-app-0.2.7", app: "web-recipe-app-0.3.0" }, persistenceLock: "web-recipe-app-0.2.7-persistence" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -30,7 +30,7 @@ async function assertCohort(repo, cohort, profile, persistent = false) {
 }
 
 async function repository(profile = "portfolio", options = {}) {
-  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createCurrentProfileRecipes() };
+  const context = options.context ?? { ...createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true || options.backgroundJobDelivery === true, options.backgroundJobDelivery === true), profiles: options.profiles ?? createApplicationEnvironmentProfileRecipes() };
   const rendered = await core.renderSkeleton({ profile, projectName: "email-lifecycle", displayName: "Email lifecycle", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, context);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, content]));
@@ -84,10 +84,33 @@ test("current profiles add email with explicit dependencies and persist state on
     assert.equal(state.ok, true, JSON.stringify(state));
     assert.equal(state.value.origin.profile, profile);
     await assertCohort(repo, cohort, profile);
-    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.3.0");
   }
 });
 
+test("email lifecycle preserves current declarations and custom metadata", async () => {
+    for (const [profile, persistent] of [["portfolio", false], ["site", false], ["app", false], ["app", true]]) {
+      const context = createGenerationRenderingContext(persistent);
+      const repo = await repository(profile, { applicationPersistence: persistent, context });
+      const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+      manifest.description = "Custom email project";
+      repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
+      const checks = persistent ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
+      const expectedNext = "16.4.1";
+      for (const operation of ["add", "remove"]) {
+        const { result } = await contactOperation(repo, operation, capability, undefined, checks);
+        assert.equal(result.ok, true, JSON.stringify(result));
+        const actual = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
+        assert.equal(actual.dependencies.next, expectedNext);
+        assert.equal(actual.description, manifest.description);
+        await assertCohort(repo, cohorts[0], profile, persistent);
+        const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
+        assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(expectedNext));
+        assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === capability), operation === "add");
+        assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+      }
+    }
+});
 
 test("failed verification retains the source prefix without recording successful email installation", async () => {
   const repo = await repository();
@@ -120,7 +143,7 @@ test("email removal declares separate operator review and retains foundation on 
     const readded = await addition(repo);
     assert.equal(readded.result.ok, true, JSON.stringify(readded.result));
     await assertCohort(repo, cohort, profile);
-    assert.deepEqual(core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value.appliedMigrations, ["remove-transactional-email-resend-0-1-0", "add-transactional-email-resend-0-1-0"]);
+    assert.deepEqual(core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value.appliedMigrations, ["remove-transactional-email-resend-0-2-0", "add-transactional-email-resend-0-2-0"]);
   }
 });
 
@@ -131,11 +154,12 @@ test("email addition refuses historical recipes and modified dependency locks be
   assert.equal(planned.ok, false);
   assert.equal(planned.issues[0].code, "PROJECT_DRIFT_DETECTED");
   assert.deepEqual(repo.writes, []);
-  const historical = await repository("portfolio");
-  const source = decoder.decode(historical.files.get(".egeria/project.yaml"));
-  historical.files.set(".egeria/project.yaml", encoder.encode(source.replace("0.11.7", "0.10.0")));
+  const historical = await repository();
+  const project = JSON.parse(JSON.stringify(core.parseProjectYaml(decoder.decode(historical.files.get(".egeria/project.yaml"))).value));
+  historical.files.set(".egeria/project.yaml", encoder.encode(JSON.stringify({ ...project, schemaVersion: "1.0.0", recipeVersion: "0.11.2" })));
   const result = await core.planCapabilityAddition({ reader: historical.reader, git, capability });
   assert.equal(result.ok, false);
+  assert.equal(result.issues[0].code, "PROJECT_INSPECTION_INVALID");
   assert.deepEqual(historical.writes, []);
 });
 
@@ -169,7 +193,7 @@ test("email and persistence compose in either addition order", async () => {
     assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === capability));
     assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"));
     await assertCohort(repo, cohort, "app", true);
-    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.2.0");
+    assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.3.0");
   }
 });
 
@@ -204,7 +228,7 @@ test("surviving email imports and changed reviewed guide bytes refuse removal be
 });
 
 const contactCapability = "contact-form-web3forms";
-const contactSettings = { accessKey: "00000000-0000-4000-8000-000000000001" };
+const contactSettings = undefined;
 async function contactOperation(repo, operation, subject = contactCapability, settings, checks = core.appGenerationVerificationChecks, overrides = {}) {
   const input = { reader: repo.reader, git, ...(repo.renderingContext === undefined ? {} : { renderingContext: repo.renderingContext }), capability: subject, ...(settings === undefined ? {} : {settings}), inspectRepositoryInventory: repo.inventory };
   const planned = await (operation === "add" ? core.planCapabilityAddition(input) : core.planCapabilityRemoval(input));
@@ -219,7 +243,7 @@ async function contactOperation(repo, operation, subject = contactCapability, se
 
 test("contact and email preserve both selections and retained foundation in either lifecycle order", async () => {
   for (const profile of ["portfolio", "site", "app"]) for (const emailFirst of [false,true]) {
-    const repo = await repository(profile, emailFirst ? {transactionalEmailResend:true} : {contactFormWeb3Forms:contactSettings});
+    const repo = await repository(profile, emailFirst ? {transactionalEmailResend:true} : {contactFormWeb3Forms:true});
     let outcome = await contactOperation(repo,"add",emailFirst?contactCapability:capability,emailFirst?contactSettings:undefined);
     assert.equal(outcome.result.ok,true,JSON.stringify(outcome));
     let project=core.parseProjectYaml(decoder.decode(repo.files.get(".egeria/project.yaml"))).value;
@@ -237,12 +261,12 @@ test("contact and email preserve both selections and retained foundation in eith
     outcome=await contactOperation(repo,"remove");
     assert.equal(outcome.result.ok,true,JSON.stringify(outcome));
     const state=core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value;
-    assert.equal(state.installedCapabilities.find(c=>c.identifier==="app-foundation").version,"0.2.0");
+    assert.equal(state.installedCapabilities.find(c=>c.identifier==="app-foundation").version,"0.3.0");
     assert.equal(state.installedCapabilities.some(c=>c.identifier===capability),false);
   }
 });
 
-test("contact without foundation uses ordinary verification and binds settings before mutation", async()=>{
+test("contact without foundation uses ordinary verification and refuses literal settings before mutation", async()=>{
   const repo=await repository();
   const planned=await core.planCapabilityAddition({reader:repo.reader,git,capability:contactCapability,settings:contactSettings});
   assert.equal(planned.ok,true,JSON.stringify(planned));
@@ -262,12 +286,12 @@ test("contact without foundation uses ordinary verification and binds settings b
 
 test("contact composes with each public integration and restores the exact layout", async () => {
   const integrations = [
-    { capability: "booking-calendly", settings: { destination: "https://calendly.com/example/intro", mode: "popup" }, request: "bookingCalendly" },
+    { capability: "booking-calendly", settings: { mode: "popup" }, request: "bookingCalendly" },
     { capability: "multilingual", settings: undefined, request: "multilingual" },
-    { capability: "analytics", settings: { consent: {policy:"explicit-opt-in"}, providers:{cloudflareWebAnalytics:{siteToken:"0123456789abcdef0123456789abcdef"}}, operationalIntegrations:{} }, request: "analytics" },
+    { capability: "analytics", settings: { consent: {policy:"explicit-opt-in"}, providers:{cloudflareWebAnalytics:true}, operationalIntegrations:{} }, request: "analytics" },
   ];
   for (const integration of integrations) for (const contactFirst of [false, true]) {
-    const repo = await repository("site", contactFirst ? {contactFormWeb3Forms:contactSettings} : {[integration.request]:integration.settings ?? true});
+    const repo = await repository("site", contactFirst ? {contactFormWeb3Forms:true} : {[integration.request]:integration.settings ?? true});
     const layout = repo.files.get("apps/web/app/layout.tsx");
     const subject = contactFirst ? integration.capability : contactCapability;
     const settings = contactFirst ? integration.settings : contactSettings;
@@ -299,7 +323,7 @@ test("contact preserves persistence binding verification and rejects a missing b
 });
 
 test("contact removal preserves edited copy and refuses surviving imports", async()=>{
-  const repo=await repository("portfolio",{contactFormWeb3Forms:contactSettings});
+  const repo=await repository("portfolio",{contactFormWeb3Forms:true});
   const consumer="apps/web/src/contact-consumer.ts";
   repo.files.set(consumer,encoder.encode('import { submitContact } from "./integrations/contact-form-web3forms/submit-contact";\n'));
   const refused=await core.planCapabilityRemoval({reader:repo.reader,git,capability:contactCapability,inspectRepositoryInventory:repo.inventory});
@@ -317,7 +341,7 @@ test("contact removal preserves edited copy and refuses surviving imports", asyn
 
 
 test("contact refuses transitions and preserves controls after an interrupted write",async()=>{
-  const installed=await repository("portfolio",{contactFormWeb3Forms:contactSettings});
+  const installed=await repository("portfolio",{contactFormWeb3Forms:true});
   for(const toProfile of ["site","app"]) {
     const result=await core.planProfileTransition({reader:installed.reader,git,toProfile});
     assert.equal(result.ok,false);assert.equal(result.issues[0].code,"PROFILE_TRANSITION_UNSUPPORTED");

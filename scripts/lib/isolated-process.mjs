@@ -41,6 +41,7 @@ export function createIsolatedProcessEnvironment(additions = {}) {
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
     ...additions,
+    pnpm_config_verify_deps_before_run: "error",
   };
 }
 

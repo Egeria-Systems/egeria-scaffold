@@ -1,12 +1,12 @@
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { MigrationRecord } from "../contracts/migration.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
-import type { ApplicationEnvironmentProjectConfiguration, ProjectConfiguration } from "../contracts/project.js";
+import type { ProjectConfiguration } from "../contracts/project.js";
 import type {
   ContractIssue,
   ValidationResult,
 } from "../contracts/result.js";
-import type { ApplicationEnvironmentInstalledState, InstalledState, InstalledSurface } from "../contracts/state.js";
+import type { InstalledState, InstalledSurface } from "../contracts/state.js";
 import {
   inferRepository,
   type EvidenceCategory,
@@ -83,7 +83,7 @@ function capabilityOwner(surface?: InstalledSurface): string | undefined {
 }
 
 export function deriveProjectDiscrepancies(
-  inspection: ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>,
+  inspection: ProjectInspection<ProjectConfiguration | InstalledState>,
 ): ProjectDiscrepancies {
   if (
     inspection.resolution?.ok !== true ||
@@ -204,28 +204,24 @@ type ProjectInspectionRequest = Readonly<{
   profiles: readonly ProfileRecipe[];
 }>;
 
-export function inspectProject(input: ProjectInspectionRequest & Readonly<{ projectSchemaVersion: "2.0.0" }>): Promise<ProjectInspection<ApplicationEnvironmentProjectConfiguration, ApplicationEnvironmentInstalledState>>;
-export function inspectProject(input: ProjectInspectionRequest): Promise<ProjectInspection>;
-export async function inspectProject(input: ProjectInspectionRequest & Readonly<{ projectSchemaVersion?: "2.0.0" }>): Promise<ProjectInspection<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration, InstalledState | ApplicationEnvironmentInstalledState>> {
+export async function inspectProject(input: ProjectInspectionRequest): Promise<ProjectInspection> {
   const reader = createCachingRepositoryReader(input.reader);
-  const project = await readControlFile<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>(
+  const project = await readControlFile<ProjectConfiguration>(
     reader,
     projectConfigurationPath,
-    (source) => input.projectSchemaVersion === "2.0.0"
-      ? parseProjectYaml(source, "2.0.0") : parseProjectYaml(source),
+    parseProjectYaml,
   );
-  const state = await readControlFile<InstalledState | ApplicationEnvironmentInstalledState>(
+  const state = await readControlFile<InstalledState>(
     reader,
     statePath,
-    (source) => input.projectSchemaVersion === "2.0.0"
-      ? parseStateJson(source, "2.0.0") : parseStateJson(source),
+    parseStateJson,
   );
   const migrations = await readControlFile(
     reader,
     migrationLogPath,
     parseMigrationLog,
   );
-  const controlInference: RepositoryInference<InstalledState | ApplicationEnvironmentInstalledState> = {
+  const controlInference: RepositoryInference = {
     state,
     capabilities: [],
     surfaces: [],
@@ -257,9 +253,7 @@ export async function inspectProject(input: ProjectInspectionRequest & Readonly<
     };
   }
 
-  const inference = input.projectSchemaVersion === "2.0.0"
-    ? await inferRepository({ reader, catalog: input.catalog, projectSchemaVersion: "2.0.0" })
-    : await inferRepository({ reader, catalog: input.catalog });
+  const inference = await inferRepository({ reader, catalog: input.catalog });
 
   return { project, migrations, inference, resolution };
 }

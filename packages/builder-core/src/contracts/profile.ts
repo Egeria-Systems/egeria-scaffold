@@ -3,11 +3,7 @@ import { z } from "zod";
 import { stableIdentifierSchema } from "./identifiers.js";
 
 export const profileIdentifierSchema = z.enum(["portfolio", "site", "app"]);
-export const publicRecipeVersions = Object.freeze({ portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" } as const);
-
-export const profileRecipeVersionSchema = z.enum([
-  "0.11.7", "0.12.7", "0.2.7", "0.12.0", "0.13.0", "0.3.0",
-]);
+export const profileRecipeVersionSchema = z.enum(["0.12.0", "0.13.0", "0.3.0"]);
 
 export const profileRecipeSchema = z
   .strictObject({
@@ -17,6 +13,10 @@ export const profileRecipeSchema = z
     defaultCapabilities: z.array(stableIdentifierSchema).min(1).readonly(),
   })
   .superRefine((profile, context) => {
+    if (profile.recipeVersion !== applicationEnvironmentRecipeVersions[profile.identifier]) {
+      context.addIssue({ code: "custom", message: "recipe version must match profile", path: ["recipeVersion"] });
+    }
+
     if (new Set(profile.defaultCapabilities).size !== profile.defaultCapabilities.length) {
       context.addIssue({
         code: "custom",

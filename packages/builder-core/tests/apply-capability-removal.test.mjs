@@ -4,9 +4,9 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
+const currentRenderingContext = createGenerationRenderingContext();
 const currentCohorts = [
-  { label: "Current", generation: "current", profiles: createCurrentProfileRecipes(), versions: { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" } },
+  { label: "Current environment", generation: "environments", profiles: currentRenderingContext.profiles, versions: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" } },
 ];
 
 
@@ -22,28 +22,11 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
 const root = "/generated/project";
 const completedAt = "2026-08-22T15:00:00.000Z";
-const settings = Object.freeze({
-  destination: "https://calendly.com/private/discovery",
-  mode: "popup",
-});
+const settings = Object.freeze({ mode: "popup" });
 const analyticsSettings = Object.freeze({
-  consent: Object.freeze({ policy: "explicit-opt-in" }),
-  providers: Object.freeze({
-    cloudflareWebAnalytics: Object.freeze({
-      siteToken: "0123456789abcdef0123456789abcdef",
-    }),
-    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
-    microsoftClarity: Object.freeze({
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    }),
-  }),
-  operationalIntegrations: Object.freeze({
-    googleSearchConsole: Object.freeze({
-      verificationToken: "search-console-verification-token",
-    }),
-    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
-  }),
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 });
 const persistedVerificationChecks = [
   "contracts",
@@ -104,7 +87,7 @@ async function installedEntries(profile, options = {}) {
     ...(includeBooking ? { bookingCalendly: settings } : {}),
     ...(includeMultilingual ? { multilingual: true } : {}),
     ...(includeAnalytics ? { analytics: analyticsSettings } : {}),
-  }, { ...createGenerationRenderingContext(), profiles: cohort.profiles });
+  }, cohort === undefined ? currentRenderingContext : { ...createGenerationRenderingContext(), profiles: cohort.profiles });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -128,9 +111,9 @@ async function installedEntries(profile, options = {}) {
     encoder.encode(core.serializeProjectYaml(rendered.value.project)),
   );
   const defaultMigrations = [
-    ...(includeBooking ? ["add-booking-calendly-0-1-0"] : []),
+    ...(includeBooking ? ["add-booking-calendly-0-2-0"] : []),
     ...(includeMultilingual ? ["add-multilingual-0-1-0"] : []),
-    ...(includeAnalytics ? ["add-analytics-0-1-0"] : []),
+    ...(includeAnalytics ? ["add-analytics-0-2-0"] : []),
   ];
   const appliedMigrations = options.appliedMigrations ?? defaultMigrations;
   const additionMigrations = appliedMigrations.map((identifier, index) => ({
@@ -164,9 +147,9 @@ async function installedEntries(profile, options = {}) {
   });
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces.issues));
   const state = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderVersion: "0.0.0",
-    projectSchemaVersion: "1.0.0",
+    projectSchemaVersion: "2.0.0",
     origin: { profile, recipeVersion: rendered.value.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
     appliedMigrations,
@@ -437,8 +420,8 @@ test("installed optional lifecycle ignores changed generation defaults", async (
           assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
           const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
           assert.equal(state.ok, true);
-          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }[profile] });
-          assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
+          assert.deepEqual(state.value.origin, { profile, recipeVersion: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile] });
+          assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
         } finally {
           core.profileRecipes.push(...recipes);
         }
@@ -450,12 +433,18 @@ test("installed optional lifecycle ignores changed generation defaults", async (
 test("app optional lifecycle refuses retired Vitest declarations without writes", async () => {
   for (const vitestDeclaration of ["4.1.10", "4.1.11", "5.0.0"]) {
     for (const operation of appOperations.filter(({ capability }) => capability === "booking-calendly")) {
-      const entries = await installedEntries("app", { booking: operation.kind === "removal", vitestDeclaration });
-      const repository = createRepository(entries);
-      const before = new Map(repository.files);
+      const repository = createRepository(await installedEntries("app", {
+        booking: operation.kind === "removal", vitestDeclaration,
+      }));
+      const before = snapshot(repository.files);
       const planned = await planAppOperation(repository, operation);
       assert.equal(planned.ok, false);
-      assert.deepEqual(repository.files, before);
+      const applied = await applyAppOperation(repository, operation, {
+        planFingerprint: `sha256:${"a".repeat(64)}`,
+      });
+      assert.equal(applied.ok, false);
+      assert.equal(snapshot(repository.files), before);
+      assert.deepEqual(repository.writes, []);
     }
   }
 });
@@ -485,26 +474,6 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         const repository = createRepository(entries);
         const beforePlanning = snapshot(repository.files);
         const planned = await planAppOperation(repository, operation);
-        if (operation.kind === "removal" && operation.capability === "multilingual" && options.analytics) {
-          assert.equal(planned.ok, false);
-          assert.deepEqual(planned.issues.map(({ code, path }) => ({ code, path })), [{
-            code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
-            path: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
-          }]);
-          const refused = await applyAppOperation(repository, operation, {
-            planFingerprint: `sha256:${"a".repeat(64)}`,
-          });
-          assert.deepEqual(refused, {
-            ok: false,
-            code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
-            conflicts: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
-            phase: "precondition",
-            recovery: "not-required",
-          });
-          assert.equal(snapshot(repository.files), beforePlanning);
-          assert.deepEqual(repository.writes, []);
-          continue;
-        }
         assert.equal(planned.ok, true, JSON.stringify(planned));
         assert.equal(planned.value.profile, "app");
         const repeated = await planAppOperation(repository, operation);
@@ -518,10 +487,10 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         assert.equal(result.value.status, "verified-final-diff-approval-required");
         assert.deepEqual(result.value.capability, {
           identifier: operation.capability,
-          version: "0.1.0",
+          version: operation.capability === "multilingual" ? "0.1.0" : "0.2.0",
         });
         assert.equal(result.value.migration,
-          `${operation.kind === "addition" ? "add" : "remove"}-${operation.capability}-0-1-0`);
+          `${operation.kind === "addition" ? "add" : "remove"}-${operation.capability}-${operation.capability === "multilingual" ? "0-1-0" : "0-2-0"}`);
         assert.deepEqual(result.value.verificationChecks, [
           "contracts", "plan-approval", "pre-state-inference", ...appVerifierChecks,
           "post-change-inference", "migration-record", "post-state-inference",
@@ -538,7 +507,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         const oldState = core.parseStateJson(entries.get(".egeria/state.json"));
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true, JSON.stringify(state));
-        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.2.7" });
+        assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.3.0" });
         for (const identifier of ["app-foundation", "site-routing"]) {
           assert.deepEqual(
             state.value.installedCapabilities.find((item) => item.identifier === identifier),
@@ -578,7 +547,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         assert.equal(repository.files.has("apps/web/content/fr-CA/localized-content.yaml"),
           desiredOptions.multilingual);
         assert.ok(repository.files.has("apps/web/content/en-CA/about.yaml"));
-        const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
+        const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, currentRenderingContext.catalogSnapshot);
         assert.equal(catalog.ok, true);
         const inference = await core.inferRepository({ reader: repository.reader, catalog: catalog.value });
         assert.deepEqual(
@@ -619,11 +588,13 @@ test("app multilingual removal retains a modified locale catalog as an explicit 
   assert.equal(state.value.managedSurfaces.find((surface) => surface.path === path)?.ownership, "ejected");
 });
 
-test("multilingual removal preserves the existing analytics reference refusal on public profiles", async () => {
+test("multilingual removal refuses a surviving custom analytics locale reference", async () => {
   for (const profile of ["portfolio", "site"]) {
     const repository = createRepository(await installedEntries(profile, {
       booking: false, multilingual: true, analytics: true,
     }));
+    repository.files.set("apps/web/src/custom-analytics-locale.ts",
+      'import { resolveLocale } from "./i18n/locale";\n');
     const before = snapshot(repository.files);
     const planned = await core.planCapabilityRemoval({
       reader: repository.reader, git, capability: "multilingual",
@@ -632,7 +603,7 @@ test("multilingual removal preserves the existing analytics reference refusal on
     assert.equal(planned.ok, false);
     assert.deepEqual(planned.issues.map(({ code, path }) => ({ code, path })), [{
       code: "CAPABILITY_REMOVAL_REFERENCE_CONFLICT",
-      path: ["apps/web/tests/e2e/analytics-consent.spec.ts"],
+      path: ["apps/web/src/custom-analytics-locale.ts"],
     }]);
     assert.equal(snapshot(repository.files), before);
     assert.deepEqual(repository.writes, []);
@@ -943,7 +914,7 @@ async function expectedSuccessfulArtifacts(
     projectName: currentProject.value.project.name,
     displayName: currentProject.value.project.displayName,
     packageVersions: core.verifiedCapabilityPackageVersions,
-  }, createGenerationRenderingContext());
+  }, currentRenderingContext);
   assert.equal(desired.ok, true);
   const expectedFiles = new Map(entries);
   const desiredText = new Map(
@@ -966,7 +937,7 @@ async function expectedSuccessfulArtifacts(
   expectedFiles.set(".egeria/project.yaml", projectSource);
   const removalMigration = {
     schemaVersion: "1.0.0",
-    identifier: `remove-${capability}-0-1-0`,
+    identifier: `remove-${capability}-${capability === "multilingual" ? "0-1-0" : "0-2-0"}`,
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -1026,7 +997,7 @@ async function expectedSuccessfulArtifacts(
     installedCapabilities: core.createInstalledManifest(desired.value.resolved),
     appliedMigrations: [
       ...currentState.value.appliedMigrations,
-      `remove-${capability}-0-1-0`,
+      `remove-${capability}-${capability === "multilingual" ? "0-1-0" : "0-2-0"}`,
     ],
     managedSurfaces: nextSurfaces,
     ejections: nextProject.ejectedAreas,
@@ -1054,7 +1025,7 @@ test("capability removal executes the approved plan once and persists migration 
       worktreeInspections,
     } = await runApply(repository);
 
-    const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
+    const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, currentRenderingContext.catalogSnapshot);
     assert.equal(catalog.ok, true);
     const finalInference = await core.inferRepository({
       reader: repository.reader,
@@ -1077,8 +1048,8 @@ test("capability removal executes the approved plan once and persists migration 
     assert.deepEqual(result.value, {
       status: "verified-final-diff-approval-required",
       baseRevision: git.identity.revision,
-      capability: { identifier: "booking-calendly", version: "0.1.0" },
-      migration: "remove-booking-calendly-0-1-0",
+      capability: { identifier: "booking-calendly", version: "0.2.0" },
+      migration: "remove-booking-calendly-0-2-0",
       changedPaths: [
         ...plan.actions.flatMap((action) =>
           action.kind === "preserve-file-and-eject" ? [] : [action.path],
@@ -1118,8 +1089,8 @@ test("capability removal executes the approved plan once and persists migration 
 
 test("multilingual and Calendly removal preserve the other capability in both install orders", async () => {
   const installOrders = [
-    ["add-booking-calendly-0-1-0", "add-multilingual-0-1-0"],
-    ["add-multilingual-0-1-0", "add-booking-calendly-0-1-0"],
+    ["add-booking-calendly-0-2-0", "add-multilingual-0-1-0"],
+    ["add-multilingual-0-1-0", "add-booking-calendly-0-2-0"],
   ];
 
   for (const appliedMigrations of installOrders) {
@@ -1132,7 +1103,7 @@ test("multilingual and Calendly removal preserve the other capability in both in
         }),
       );
       const { result } = await runApply(repository, { capability });
-      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
+      const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, currentRenderingContext.catalogSnapshot);
       const failedInference = result.ok || !catalog.ok
         ? undefined
         : await core.inferRepository({
@@ -1160,7 +1131,7 @@ test("multilingual and Calendly removal preserve the other capability in both in
       assert.equal(
         result.value.migration,
         capability === "booking-calendly"
-          ? "remove-booking-calendly-0-1-0"
+          ? "remove-booking-calendly-0-2-0"
           : "remove-multilingual-0-1-0",
       );
       assert.equal(repository.writes.length, 3);
@@ -1218,7 +1189,7 @@ test("analytics removal restores the multilingual layout and persists fresh disc
       analytics: true,
       appliedMigrations: [
         "add-multilingual-0-1-0",
-        "add-analytics-0-1-0",
+        "add-analytics-0-2-0",
       ],
     }),
   );
@@ -1229,9 +1200,9 @@ test("analytics removal restores the multilingual layout and persists fresh disc
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value.capability, {
     identifier: "analytics",
-    version: "0.1.0",
+    version: "0.2.0",
   });
-  assert.equal(result.value.migration, "remove-analytics-0-1-0");
+  assert.equal(result.value.migration, "remove-analytics-0-2-0");
   assert.deepEqual(verifierCalls, [root]);
   assert.deepEqual(
     result.value.changedPaths,
@@ -1265,7 +1236,7 @@ test("analytics removal restores the multilingual layout and persists fresh disc
     ),
     true,
   );
-  assert.equal(state.value.appliedMigrations.at(-1), "remove-analytics-0-1-0");
+  assert.equal(state.value.appliedMigrations.at(-1), "remove-analytics-0-2-0");
   assert.equal(
     repository.files.has(
       "apps/web/src/integrations/analytics/analytics-runtime.ts",
@@ -1290,7 +1261,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     analytics: true,
     appliedMigrations: [
       "add-multilingual-0-1-0",
-      "add-analytics-0-1-0",
+      "add-analytics-0-2-0",
     ],
   });
   const initialState = core.parseStateJson(initialEntries.get(".egeria/state.json"));
@@ -1305,8 +1276,8 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
   assert.equal(removedState.ok, true, JSON.stringify(removedState.issues));
   assert.deepEqual(removedState.value.appliedMigrations, [
     "add-multilingual-0-1-0",
-    "add-analytics-0-1-0",
-    "remove-analytics-0-1-0",
+    "add-analytics-0-2-0",
+    "remove-analytics-0-2-0",
   ]);
   assert.equal(
     removedState.value.installedCapabilities.some(
@@ -1349,9 +1320,9 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
   );
   const expectedMigrationHistory = [
     "add-multilingual-0-1-0",
-    "add-analytics-0-1-0",
-    "remove-analytics-0-1-0",
-    "add-analytics-0-1-0",
+    "add-analytics-0-2-0",
+    "remove-analytics-0-2-0",
+    "add-analytics-0-2-0",
   ];
   assert.deepEqual(readdedState.value.appliedMigrations, expectedMigrationHistory);
   assert.deepEqual(
@@ -1373,7 +1344,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     ),
   );
 
-  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot);
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, currentRenderingContext.catalogSnapshot);
   assert.equal(catalog.ok, true, JSON.stringify(catalog.issues));
   const inference = await core.inferRepository({
     reader: repository.reader,
@@ -2391,13 +2362,6 @@ for (const cohort of currentCohorts) test(`${cohort.label} optional lifecycle pr
         const repository = createRepository(entries);
         const before = snapshot(repository.files);
         const planned = await planAppOperation(repository, operation);
-        if (operation.kind === "removal" && operation.capability === "multilingual" && options.analytics) {
-          assert.equal(planned.ok, false);
-          assert.equal(planned.issues[0].code, "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
-          assert.equal(snapshot(repository.files), before);
-          assert.deepEqual(repository.writes, []);
-          continue;
-        }
         assert.equal(planned.ok, true, `${profile}/${selection}: ${JSON.stringify(planned)}`);
         const applied = await applyAppOperation(repository, operation, planned.value, {
           verifier: successfulVerifier([], profile === "app" ? appVerifierChecks : core.ordinaryGenerationVerificationChecks),
@@ -2409,7 +2373,7 @@ for (const cohort of currentCohorts) test(`${cohort.label} optional lifecycle pr
         const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
         assert.equal(state.ok, true);
         assert.deepEqual(state.value.origin, { profile, recipeVersion: cohort.versions[profile] });
-        assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.5.1");
+        assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
         assert.equal(state.value.lastSuccessfulVerification.checks.includes("worker-integration"), profile === "app");
         const expected = await installedEntries(profile, { ...options, [operation.option]: operation.kind === "addition" });
         for (const [path, content] of expected) if (!path.startsWith(".egeria/")) assert.deepEqual(repository.files.get(path), content, path);
@@ -2654,4 +2618,57 @@ test("environment analytics removal preserves edited guide and refuses re-add ov
   const readd = await core.planCapabilityAddition({ ...common, settings: environmentAnalyticsSelection });
   assert.equal(readd.ok, false);
   assert.equal(readd.issues[0].code, "PROJECT_EJECTION_UNSUPPORTED");
+});
+
+
+test("current multilingual lifecycle preserves provider neighbors across removal and re-add", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    const repository = createRepository(await environmentContactEntries(profile, { contact: true, booking: "popup" }));
+    const initialLock = repository.files.get("pnpm-lock.yaml");
+    const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
+    for (const operation of ["add", "remove", "add"]) {
+      const common = { reader: repository.reader, git, capability: "multilingual", inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+      const planned = await (operation === "remove" ? core.planCapabilityRemoval(common) : core.planCapabilityAddition(common));
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      const calls = [];
+      const input = { ...common, root, writer: repository.writer, approvedPlanFingerprint: planned.value.planFingerprint,
+        verifier: successfulVerifier(calls, checks), inspectWorktree: async () => git,
+        inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }) };
+      const result = await (operation === "remove" ? core.applyCapabilityRemoval(input) : core.applyCapabilityAddition(input));
+      assert.equal(result.ok, true, JSON.stringify(result));
+      assert.equal(calls.length, 1);
+      assert.equal(repository.files.get("pnpm-lock.yaml"), initialLock);
+      const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"));
+      assert.equal(project.ok, true);
+      assert.deepEqual(project.value.capabilitySettings, { "booking-calendly": { mode: "popup" } });
+      assert.ok(project.value.selectedCapabilities.includes("contact-form-web3forms"));
+      assert.equal(project.value.selectedCapabilities.includes("multilingual"), operation !== "remove");
+      const snapshot = await core.readVerifiedProjectSnapshot(repository.reader);
+      assert.equal(snapshot.ok, true);
+      assert.deepEqual(await core.doctorRepository({ reader: repository.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles }), { healthy: true, diagnostics: [] });
+    }
+  }
+});
+
+test("current multilingual and analytics compose in both installation orders with conservative reference refusal", async () => {
+  for (const order of [["multilingual", "analytics"], ["analytics", "multilingual"]]) {
+    const repository = createRepository(await environmentContactEntries("site"));
+    for (const capability of order) {
+      const common = { reader: repository.reader, git, capability, ...(capability === "analytics" ? { settings: environmentAnalyticsSelection } : {}) };
+      const planned = await core.planCapabilityAddition(common);
+      assert.equal(planned.ok, true, JSON.stringify(planned));
+      const result = await core.applyCapabilityAddition({ ...common, root, writer: repository.writer,
+        approvedPlanFingerprint: planned.value.planFingerprint, verifier: successfulVerifier([]),
+        inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }) });
+      assert.equal(result.ok, true, JSON.stringify(result));
+    }
+    const removable = await core.planCapabilityRemoval({ reader: repository.reader, git, capability: "multilingual", inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) });
+    assert.equal(removable.ok, true, JSON.stringify(removable));
+    repository.files.set("apps/web/tests/e2e/custom-locale.spec.ts", 'import { supportedLocales } from "../../src/i18n/locale";\nvoid supportedLocales;\n');
+    const before = [...repository.files];
+    const refused = await core.planCapabilityRemoval({ reader: repository.reader, git, capability: "multilingual", inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) });
+    assert.equal(refused.ok, false);
+    assert.equal(refused.issues[0].code, "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+    assert.deepEqual([...repository.files], before);
+  }
 });

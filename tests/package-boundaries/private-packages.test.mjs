@@ -474,6 +474,7 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "common/application-environments/apps/web/scripts/browser-development-server.ts",
       "common/application-environments/apps/web/scripts/check-deployment-protection.mjs",
       "common/application-environments/apps/web/scripts/check-prepared-artifact.mjs",
+      "common/application-environments/apps/web/scripts/prepare-ci-git.sh",
       "common/application-environments/apps/web/src/configuration/application-build.ts",
       "common/application-environments/apps/web/src/configuration/site-origin.ts",
       "common/application-environments/apps/web/src/infrastructure/cloudflare/observability-context.ts",
@@ -712,26 +713,25 @@ test("builder-core direct consumers describe the private generation boundary", a
     "utf8",
   );
 
-  assert.match(builderInstructions, /fixed-root read-only repository access/);
+  assert.match(builderInstructions, /Keep reads fixed to explicitly declared/);
   assert.match(builderInstructions, /does not enumerate or write/);
-  assert.match(builderInstructions, /content-safe read-only diagnostics/);
+  assert.match(builderInstructions, /Read-only diagnostics compose existing codecs, resolution, and inference/);
   assert.match(builderInstructions, /neither authorize nor perform a repository change/);
-  assert.match(builderInstructions, /deterministic in-memory rendering/);
-  assert.match(builderInstructions, /explicit allowlisted[^\n]+templates/);
-  assert.match(builderInstructions, /YAML 1.2/);
-  assert.match(builderInstructions, /Markdown with validated YAML front matter/);
-  assert.match(builderInstructions, /portfolio@0.11.7/);
-  assert.match(builderInstructions, /source-owned typed section registry/);
+  assert.match(builderInstructions, /deterministic resolution\/rendering/);
+  assert.match(builderInstructions, /Catalog entries are explicit; do not enumerate or accept a caller-supplied template root/);
+  assert.match(builderInstructions, /validated externalized YAML\/Markdown copy/);
+  assert.match(builderInstructions, /default generated app selects exact `app-foundation@0\.3\.0` plus `site-routing@0\.5\.0`/);
+  assert.match(builderInstructions, /semantic design tokens[^\n]+owned by `section-composition`/);
   assert.match(builderInstructions, /Tailwind CSS and PostCSS/);
   assert.match(builderInstructions, /Vitest Node\/jsdom/);
   assert.match(builderInstructions, /Playwright\/axe/);
-  assert.match(builderInstructions, /verify:generated-visuals/);
-  assert.match(builderInstructions, /state-last generation/);
-  assert.match(builderInstructions, /exact verified public package versions/);
-  assert.match(builderInstructions, /identity-recorded sibling temporary directory/);
+  assert.match(builderInstructions, /CI runs `test:visual`[^\n]+never updates snapshots/);
+  assert.match(builderInstructions, /Generation writes through an identity-recorded sibling temporary directory[\s\S]+writes state last/);
+  assert.match(builderInstructions, /generation package versions builder-owned, immutable, exact/);
+  assert.match(builderInstructions, /revalidates fixed-root expected content and identities before guarded replacement, exclusive installation, or deletion/);
   assert.match(builderInstructions, /portable rename/);
-  assert.match(builderInstructions, /disabled Next telemetry/);
-  assert.match(builderInstructions, /argument-array `execFile`/);
+  assert.match(builderInstructions, /Never inherit arbitrary environment values or return child output/);
+  assert.match(builderInstructions, /argument-array `execFile` calls[^\n]+bounded output\/time/);
   assert.match(builderInstructions, /clean attached linked worktree/);
   assert.match(builderInstructions, /all non-ignored untracked files/);
   assert.match(builderInstructions, /`assume-unchanged` and `skip-worktree`/);
@@ -740,7 +740,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderInstructions, /canonical managed-surface inventory/);
   assert.match(
     builderInstructions,
-    /Git preflight, deterministic addition, removal, exact incoming app profile-transition planning under the capability model, exact-diff inspection/,
+    /Git preflight and operation-specific current transactions/,
   );
   assert.match(builderInstructions, /`applyCapabilityAddition`/);
   assert.match(builderInstructions, /`applyCapabilityRemoval`/);
@@ -755,7 +755,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /explicit allowlisted[^\n]+templates/);
   assert.match(builderReadme, /YAML 1.2/);
   assert.match(builderReadme, /Markdown with validated YAML front matter/);
-  assert.match(builderReadme, /portfolio@0.11.7/);
+  assert.match(builderReadme, /portfolio@0\.12\.0/);
   assert.match(builderReadme, /four source-registered typed section shapes/);
   assert.match(builderReadme, /Tailwind CSS and PostCSS/);
   assert.match(builderReadme, /named generated Vitest 5 unit\/component projects/);
@@ -813,7 +813,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.doesNotMatch(builderIndex, /capability-upgrade-writer\.js/);
   assert.match(builderIndex, /apply-profile-transition\.js/);
   assert.match(builderIndex, /profile-transition-writer\.js/);
-  assert.match(builderReadme, /historical capability-upgrade edges[^\n]+retired/i);
+  assert.match(builderReadme, /Capability upgrades, portfolio-to-site transitions, outgoing app transitions and app-foundation removal are unsupported/);
   assert.doesNotMatch(builderIndex, /lifecycle-control-persistence\.js/);
   assert.doesNotMatch(builderIndex, /lifecycle-control-snapshot\.js/);
 
@@ -833,8 +833,15 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.match(builderReadme, /planProfileTransition/);
   assert.match(builderReadme, /applyProfileTransition/);
   assert.match(builderReadme, /createFileSystemProfileTransitionWriter/);
-  assert.match(builderReadme, /bounded exact binary bytes/);
-
+  assert.match(builderReadme, /Portfolio execution remains closed until exact environment visual acceptance/);
+  assert.match(
+    builderReadme,
+    /Capability upgrades, portfolio-to-site transitions, outgoing app transitions and app-foundation removal are unsupported/,
+  );
+  assert.match(
+    builderReadme,
+    /Application accepts only that exact fingerprint[\s\S]+verifies a VCS-metadata-free separate copy[\s\S]+pending-add inference[\s\S]+appends one successful migration record[\s\S]+persists state last[\s\S]+final state\/inference[\s\S]+final awaited check/,
+  );
   assert.match(cliInstructions, /ten exact commands/);
   assert.match(cliInstructions, /`plan-add` remains read-only/);
   assert.match(cliInstructions, /`apply-add` is limited/);
@@ -851,7 +858,7 @@ test("builder-core direct consumers describe the private generation boundary", a
 
   assert.match(cliInstructions, /modified[^\n]+application-owned[^\n]+preserv[^\n]+eject/);
   assert.match(cliInstructions, /remain read-only/);
-  assert.match(cliInstructions, /does not add overwrite/);
+  assert.match(cliInstructions, /Add no generic capability list, overwrite, Git mutation, deployment, publication or provider behavior/);
   assert.match(cliReadme, /ten exact commands/);
   assert.match(cliReadme, /`apply-add` accepts/);
   assert.match(cliReadme, /`plan-remove` is also read-only/);
@@ -863,7 +870,7 @@ test("builder-core direct consumers describe the private generation boundary", a
   );
   assert.match(
     cliReadme,
-    /`apply-profile-transition --directory <same-worktree> --to-profile app --approved-plan sha256:<digest>`/,
+    /`apply-profile-transition --directory <absolute-existing-linked-worktree> --to-profile app --approved-plan sha256:<digest>`/,
   );
   assert.match(cliReadme, /`not-required`[^\n]+recovery/);
   assert.match(cliReadme, /migration append[^\n]+state-last persistence/);
@@ -909,21 +916,12 @@ test("builder-core direct consumers describe the private generation boundary", a
   assert.doesNotMatch(packageOwnership, /future CLI consumer/);
   assert.match(packageOwnership, /existing-repository transformation/);
   assert.match(rootReadme, /ten commands/);
-  assert.match(rootReadme, /`apply-remove` is the exact current removal command|`apply-remove --directory/);
-  assert.match(rootReadme, /transaction evidence awaiting verified-final-diff approval/);
-  assert.match(rootReadme, /`plan-remove`/);
-
-  assert.match(
-    rootReadme,
-    /egeria plan-profile-transition --directory <absolute-existing-linked-worktree> --to-profile app/,
-  );
-  assert.match(
-    rootReadme,
-    /egeria apply-profile-transition --directory <same-worktree> --to-profile app --approved-plan sha256:<digest>/,
-  );
-  assert.match(rootReadme, /`assume-unchanged` and `skip-worktree`/);
-  assert.match(rootReadme, /canonical managed-surface inventory/);
-  assert.match(rootReadme, /No lifecycle command creates the branch\/worktree/);
+  assert.match(rootReadme, /Current add\/remove\/re-add supports contact, booking, analytics, multilingual and email/);
+  assert.match(rootReadme, /clean isolated Git state, exact plan approval and state-last transaction safeguards/);
+  assert.match(rootReadme, /portfolio@0\.12\.0 -> app@0\.3\.0/);
+  assert.match(rootReadme, /site@0\.13\.0 -> app@0\.3\.0/);
+  assert.match(rootReadme, /Capability upgrades, portfolio-to-site and outgoing app transitions have no executable edge/);
+  assert.match(rootReadme, /No local result authorizes provider actions, deployment, publication or disposal/);
   assert.match(enforcementMap, /desired, installed, and inferred/);
   assert.match(enforcementMap, /read-only diagnostics/);
   assert.match(enforcementMap, /exact source and template allowlists/);
@@ -985,9 +983,7 @@ test("builder-core keeps schemas private and reserves every later-stage builder 
       "certification-registry.schema.json",
       "migration-record.schema.json",
       "profile.schema.json",
-      "project-environment.schema.json",
       "project.schema.json",
-      "state-environment.schema.json",
       "state.schema.json",
     ],
   );

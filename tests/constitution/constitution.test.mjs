@@ -326,17 +326,13 @@ test("the root workspace remains private and pins the compatibility-proof toolch
     manifest.scripts["test:synthetic-client-journey"],
     "node --test tests/client-journey/*.test.mjs",
   );
-  for (const aggregate of ["test", "verify:builder-kernel"]) {
-    assert.equal(
-      manifest.scripts[aggregate]
-        .split(" && ")
-        .filter(
-          (command) => command === "pnpm run test:synthetic-client-journey",
-        ).length,
-      1,
-      `${aggregate} must invoke the synthetic client journey exactly once`,
-    );
-  }
+  assert.equal(
+    manifest.scripts.test
+      .split(" && ")
+      .filter(command => command === "pnpm run test:synthetic-client-journey").length,
+    1,
+    "test must invoke the synthetic client journey exactly once",
+  );
   assert.equal(
     manifest.scripts["check:semantic-naming"],
     "node scripts/check-semantic-naming.mjs",
@@ -453,6 +449,8 @@ test("each authored code context names its test runner, command, and evidence bo
   }
 });
 
+const withVerificationGit = command => `sh packages/builder-core/templates/common/application-environments/apps/web/scripts/prepare-ci-git.sh ${command}`;
+
 function workflowCommands(job) {
   return job.steps
     .flatMap(({ run }) => (typeof run === "string" ? [run] : []))
@@ -463,7 +461,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const expectedJobIdentifiers = [
     "scope",
     "builder-and-packages",
-    "cli-jobs",
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
@@ -513,7 +510,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cancel-in-progress": true,
   });
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
-  for (const identifier of ["builder-and-packages", "cli-jobs", "cli-lifecycle"]) {
+  for (const identifier of ["builder-and-packages", "cli-lifecycle"]) {
     const job = workflow.jobs[identifier];
     assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : identifier === "cli-lifecycle" ? 45 : 90);
     for (const property of ["if", "needs", "continue-on-error", "concurrency"]) {
@@ -617,12 +614,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").length, 1);
+    ({ run }) => run === withVerificationGit("pnpm run verify:app-transition-visuals")).length, 1);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").if,
+    ({ run }) => run === withVerificationGit("pnpm run verify:app-transition-visuals")).if,
     "github.event_name != 'pull_request' || !github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
-    ({ run }) => run === "pnpm run verify:app-transition-visuals -- --candidates --app-recipe-version=0.2.7").if,
+    ({ run }) => run === withVerificationGit("pnpm run verify:app-transition-visuals -- --candidates")).if,
     "github.event_name == 'pull_request' && github.event.pull_request.draft");
   assert.equal(workflow.jobs["app-transition-visuals"].steps.find(
     ({ uses }) => uses?.startsWith("actions/checkout@")).with.ref,
@@ -647,27 +644,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   );
   const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs';
   const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
-  const cliJobs = workflow.jobs["cli-jobs"];
-  assert.equal(cliJobs.name, "CLI jobs (${{ matrix.fixture }})");
-  assert.deepEqual(cliJobs.strategy, {
-    "fail-fast": false,
-    matrix: {
-      include: [
-        { fixture: "portfolio", "test-pattern": "^compiled current jobs lifecycle on portfolio completes production verification$" },
-        { fixture: "app-persistence-email", "test-pattern": "^compiled current jobs lifecycle on app-persistence-email completes production verification$" },
-      ],
-    },
-  });
-  assert.deepEqual(cliJobs.steps.filter(({ run }) => run).map(({ run }) => run), [
-    "pnpm install --frozen-lockfile",
-    "pnpm run build:builder",
-    jobsCommand,
-  ]);
-  assert.deepEqual(cliJobs.steps.find(({ run }) => run === jobsCommand).env, {
-    CLI_TEST_PATTERN: "${{ matrix.test-pattern }}",
-  });
-  assert.ok(cliJobs.steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@")) <
-    cliJobs.steps.findIndex(({ run }) => run === "pnpm install --frozen-lockfile"));
   assert.equal(
     workflow.jobs["builder-and-packages"].steps.find(({ name }) => name === "Test CLI excluding dedicated lifecycle jobs")?.run,
     nonJobsCommand,
@@ -697,16 +673,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
     ({ run }) => run === nonJobsCommand,
   );
-  const skipPattern = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
+  const skipPattern = lifecycle.strategy.matrix.include
     .map((group) => `(?:${group["test-pattern"]})`).join("|");
   assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: skipPattern });
-  const selectors = [...cliJobs.strategy.matrix.include, ...lifecycle.strategy.matrix.include]
-    .map((group) => new RegExp(group["test-pattern"], "u"));
+  const selectors = lifecycle.strategy.matrix.include.map((group) => new RegExp(group["test-pattern"], "u"));
   const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
   const dedicatedNames = [
-    ...["portfolio", "app-persistence-email"].map(
-      (profile) => `compiled current jobs lifecycle on ${profile} completes production verification`,
-    ),
     "compiled current app optional lifecycle completes production verification",
     ...["portfolio", "site"].map(
       (profile) => `compiled current email lifecycle on ${profile} verifies and retains its foundation`,
@@ -715,10 +687,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       (profile) => `compiled current Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
     ),
   ];
-  assert.equal(new Set(dedicatedNames).size, 7);
+  assert.equal(new Set(dedicatedNames).size, 5);
   assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
     (name) => selector.test(name),
-  ).length), [1, 1, 1, 1, 1, 1, 1]);
+  ).length), [1, 1, 1, 1, 1]);
   for (const name of dedicatedNames) {
     assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
     assert.equal(skipSelector.test(name), true, name);
@@ -732,6 +704,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery",
     "application environment compiled CLI refuses inputs before dependencies and preserves existing content",
     "retired upgrade commands refuse before repository or verifier access",
+    "compiled jobs lifecycle refuses both desired and installed jobs without effects",
     ...dedicatedNames.map((name) => `${name} with extra coverage`),
     ...dedicatedNames.map((name) => name.replace(/^compiled [\s\S]+? (jobs|app optional|email|Web3Forms) lifecycle/u, "compiled future $1 lifecycle")),
     ...dedicatedNames.filter((name) => name.includes(" on ")).map(
@@ -761,7 +734,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     commandsByJob["builder-and-packages"],
     /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
   );
-  const generatedJobsCommand = 'node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs';
+  const generatedJobsCommand = withVerificationGit('node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs');
   const generatedJobs = workflow.jobs["generated-jobs-profiles"];
   assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.group }})");
   assert.deepEqual(generatedJobs.strategy, {
@@ -828,8 +801,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     PROFILE_RESULT: "${{ needs.generated-jobs-profiles.result }}",
   });
   const generatedCommands = {
-    "generated-projects": ["pnpm run build:builder", "pnpm run verify:generated-visuals"],
-    "generated-fixtures": ["pnpm run build:builder", "pnpm run test:generated-fixtures"],
+    "generated-projects": ["pnpm run build:builder", withVerificationGit("pnpm run verify:generated-visuals")],
+    "generated-fixtures": ["pnpm run build:builder", withVerificationGit("pnpm run test:generated-fixtures")],
     "generated-jobs-profiles": ["pnpm --filter @egeria-systems/builder-core run build", generatedJobsCommand],
   };
   for (const [identifier, commands] of Object.entries(generatedCommands)) {
@@ -906,7 +879,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   }
   const generatedProjectSteps = workflow.jobs["generated-projects"].steps;
   const visualVerificationIndex = generatedProjectSteps.findIndex(
-    ({ run }) => run === "pnpm run verify:generated-visuals",
+    ({ run }) => run === withVerificationGit("pnpm run verify:generated-visuals"),
   );
   const visualArtifactUploadIndex = generatedProjectSteps.findIndex(
     ({ name }) => name === "Upload generated visual failure artifacts",
@@ -965,7 +938,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const jobsWithCheckout = [
     "scope",
     "builder-and-packages",
-    "cli-jobs",
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
@@ -975,7 +947,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   ];
   const jobsWithToolchain = [
     "builder-and-packages",
-    "cli-jobs",
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
@@ -986,7 +957,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = identifier === "builder-and-packages" ? 180 : ["generated-projects", "cli-jobs"].includes(identifier) ? 90 : 45;
+    const maximumMinutes = identifier === "builder-and-packages" ? 180 : identifier === "generated-projects" ? 90 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
@@ -1000,7 +971,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
     assert.equal(checkout?.with?.["persist-credentials"], false, identifier);
   }
-  for (const identifier of ["scope", "builder-and-packages", "cli-jobs", "cli-lifecycle"]) {
+  for (const identifier of ["scope", "builder-and-packages", "cli-lifecycle"]) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
       uses?.startsWith("actions/checkout@"),
     );
@@ -1131,44 +1102,11 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     },
     {
-      name: "omitted CLI jobs cohort",
-      mutateWorkflow(candidate) {
-        candidate.jobs["cli-jobs"].strategy.matrix.include.pop();
-      },
-    },
-    {
-      name: "overlapping CLI jobs selectors",
-      mutateWorkflow(candidate) {
-        const groups = candidate.jobs["cli-jobs"].strategy.matrix.include;
-        groups[1]["test-pattern"] = groups[0]["test-pattern"];
-      },
-    },
-    {
       name: "incomplete non-jobs selector",
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].steps.find(
           ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
         ).run = "node --test --test-name-pattern='^parser' apps/cli/tests/*.test.mjs";
-      },
-    },
-    {
-      name: "skipped CLI jobs",
-      mutateWorkflow(candidate) {
-        candidate.jobs["cli-jobs"].if = "false";
-      },
-    },
-    {
-      name: "missing CLI jobs build prerequisite",
-      mutateWorkflow(candidate) {
-        candidate.jobs["cli-jobs"].steps = candidate.jobs["cli-jobs"].steps.filter(
-          ({ run }) => run !== "pnpm run build:builder",
-        );
-      },
-    },
-    {
-      name: "suppressed CLI jobs failure",
-      mutateWorkflow(candidate) {
-        candidate.jobs["cli-jobs"]["continue-on-error"] = true;
       },
     },
     {
@@ -1195,7 +1133,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         candidate.jobs["generated-projects"].steps = candidate.jobs[
           "generated-projects"
         ].steps.filter(
-          ({ run }) => run !== "pnpm run verify:generated-visuals",
+          ({ run }) => run !== withVerificationGit("pnpm run verify:generated-visuals"),
         );
       },
     },
@@ -1260,7 +1198,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["cli-jobs", "cli-lifecycle"]) {
+  for (const identifier of ["cli-lifecycle"]) {
     negativeCases.push({
       name: `${identifier} cancels sibling verification`,
       mutateWorkflow(candidate) { candidate.jobs[identifier].strategy["fail-fast"] = true; },
@@ -1444,11 +1382,6 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     "pnpm --filter @egeria-systems/builder-core run build && pnpm --filter @egeria-systems/builder-core run test:generated-jobs");
   assert.equal(coreManifest.scripts["test:generated-jobs"],
     "node --test tests/background-job-generation.integration.mjs");
-  const kernelCommands = rootManifest.scripts["verify:builder-kernel"].split(" && ");
-  assert.ok(
-    kernelCommands.indexOf("pnpm run build:builder") <
-      kernelCommands.indexOf("pnpm run test:packages"),
-  );
 
   const bookingWorkflow = await readFile(
     resolve(repositoryRoot, ".github/workflows/booking-calendly-certification.yml"),
@@ -2264,6 +2197,37 @@ test("credential-bearing steps reject package build or test commands at the end 
   }
 });
 
+test("synthetic protected staging admission refuses invalid origins and incomplete Access pairs", async () => {
+  const workflow = parse(await readRepositoryFile(".github/workflows/synthetic-client-journey.yml"));
+  const step = workflow.jobs["verify-and-deploy"].steps.find(({ name }) => name === "Verify protected staging inputs");
+  assert.ok(step, "protected staging admission must precede deployment effects");
+  const program = /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(step.run)?.[1];
+  assert.equal(typeof program, "string");
+  const environment = { PATH: process.env.PATH, DEPLOY_URL: "https://synthetic-client-staging.qa.example.com", CF_ACCESS_CLIENT_ID: "synthetic-client.access", CF_ACCESS_CLIENT_SECRET: "cfast_synthetic-secret" };
+  const verify = async (overrides, expected) => {
+    try {
+      const result = await execFileAsync(process.execPath, ["--input-type=module", "--eval", `globalThis.fetch = () => { throw new Error("UNEXPECTED_NETWORK_REQUEST"); };\n${program}`], {
+        cwd: repositoryRoot, env: { ...environment, ...overrides }, encoding: "utf8", timeout: 5000, maxBuffer: 8192,
+      });
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, "");
+      assert.equal(expected, 0);
+    } catch (error) {
+      if (error.code === "ERR_ASSERTION") throw error;
+      assert.equal(error.signal, null);
+      assert.equal(error.stdout, "");
+      assert.equal(error.stderr, "");
+      assert.equal(error.code, expected, JSON.stringify(overrides));
+    }
+  };
+  await verify({}, 0);
+  for (const value of ["", "http://qa.example.com", "https://qa.example.com/", "https://qa.example.com/path", "https://qa.example.com?query=1", "https://qa.example.com#fragment", "https://user:password@qa.example.com", "https://qa.example.com:8443", "https://localhost", "https://qa.local", "https://127.0.0.1", "https://[::1]", "https://worker.account.workers.dev", " https://qa.example.com"]) await verify({ DEPLOY_URL: value }, 1);
+  for (const name of ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"]) {
+    await verify({ [name]: "" }, 1);
+    await verify({ [name]: " " }, 1);
+  }
+});
+
 test("the synthetic client journey workflow is manual, protected, and content-safe", async () => {
   const source = await readRepositoryFile(
     ".github/workflows/synthetic-client-journey.yml",
@@ -2286,7 +2250,7 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.deepEqual(workflow.concurrency, {
-    group: "test-deploy",
+    group: "synthetic-client-staging",
     "cancel-in-progress": false,
     queue: "max",
   });
@@ -2296,7 +2260,7 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 60);
   assert.deepEqual(job.environment, {
-    name: "test-deploy",
+    name: "synthetic-client-staging",
     url: "${{ vars.DEPLOY_URL }}",
   });
   const stepsByName = Object.fromEntries(
@@ -2381,7 +2345,7 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
     .join(" ");
   assert.match(
     generationCommand,
-    /node apps\/cli\/dist\/index\.js create --profile site --name harbour-light-studio --display-name "Harbour Light Studio" --directory "\$JOURNEY_ROOT" --multilingual --cloudflare-web-analytics-token "\$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"/u,
+    /node apps\/cli\/dist\/index\.js create --profile site --name harbour-light-studio --display-name "Harbour Light Studio" --directory "\$JOURNEY_ROOT" --multilingual --cloudflare-web-analytics/u,
   );
   assert.match(
     stepsByName["Apply synthetic client packet"].run,
@@ -2416,24 +2380,73 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
   }
   assert.match(
     stepsByName["Deploy synthetic client Worker"].run,
-    /opennextjs-cloudflare deploy --name test-deploy/u,
+    /opennextjs-cloudflare deploy --env staging --name synthetic-client-staging -- --x-provision=false --x-auto-create=false/u,
   );
   assert.doesNotMatch(
     stepsByName["Deploy synthetic client Worker"].run,
     credentialBoundPackageCommandPattern,
   );
   assert.deepEqual(stepsByName["Deploy synthetic client Worker"].env, {
+    APPLICATION_ENVIRONMENT: "staging",
+    CLOUDFLARE_ENV: "staging",
+    NEXT_PUBLIC_SITE_URL: "${{ vars.DEPLOY_URL }}",
     CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
     CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
     JOURNEY_ROOT: "${{ runner.temp }}/synthetic-client-journey/project",
+    NEXT_PUBLIC_ANALYTICS_ENABLED: "true",
+    NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: "${{ inputs.cloudflare_web_analytics_site_token }}",
   });
+  assert.deepEqual(job.env, {
+    APPLICATION_ENVIRONMENT: "development",
+    NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
+    BUILD_SOURCE_REVISION: "${{ github.sha }}",
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  assert.ok(stepNames.indexOf("Verify protected staging inputs") < stepNames.indexOf("Install builder dependencies"));
+  for (const name of ["Build and prepare generated project", "Run generated local browser checks", "Prepare protected staging artifact"]) {
+    assert.equal(stepsByName[name].env.NEXT_PUBLIC_ANALYTICS_ENABLED, "true");
+    assert.equal(stepsByName[name].env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN, "${{ inputs.cloudflare_web_analytics_site_token }}");
+  }
+  const local = stepsByName["Run generated local browser checks"].env;
+  const staging = stepsByName["Prepare protected staging artifact"].env;
+  for (const inputs of [local, staging]) {
+    assert.equal(inputs.ANALYTICS_TEST_BUILD_FLAG, "true");
+    assert.equal(inputs.ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN, "${{ inputs.cloudflare_web_analytics_site_token }}");
+    for (const key of ["ANALYTICS_TEST_EXPECTED_GA4_ID", "ANALYTICS_TEST_EXPECTED_CLARITY_ID", "ANALYTICS_TEST_EXPECTED_VERIFICATION"]) assert.equal(inputs[key], "");
+  }
+  assert.equal(local.ANALYTICS_TEST_TARGET, "development");
+  assert.equal(local.ANALYTICS_TEST_EXPECTED_SITE_ORIGIN, "http://localhost:3000");
+  assert.equal(staging.APPLICATION_ENVIRONMENT, "staging");
+  assert.equal(staging.CLOUDFLARE_ENV, "staging");
+  assert.equal(staging.NEXT_PUBLIC_SITE_URL, "${{ vars.DEPLOY_URL }}");
+  assert.equal(staging.ANALYTICS_TEST_TARGET, "staging");
+  assert.equal(staging.ANALYTICS_TEST_EXPECTED_SITE_ORIGIN, "${{ vars.DEPLOY_URL }}");
+  const preparation = stepsByName["Prepare protected staging artifact"].run;
+  assert.match(preparation, /run check:environment:deployment/u);
+  const record = preparation.indexOf('run check:prepared-artifact record staging');
+  const preview = preparation.indexOf('run test:e2e:preview');
+  assert.ok(preparation.includes("run test:e2e:preview '/tests/e2e/(?!synthetic-client-deployed[.]spec[.]ts$)'"));
+  assert.ok(record >= 0 && preview > record);
+  assert.equal((preparation.match(/run check:prepared-artifact verify staging/gu) ?? []).length, 2);
+  assert.match(preparation, /--builder-generated="\$SYNTHETIC_GENERATED_REVISION"/u);
+  assert.ok(stepNames.indexOf("Record applied synthetic packet") < stepNames.indexOf("Build and prepare generated project"));
+  assert.ok(stepNames.indexOf("Run generated local browser checks") < stepNames.indexOf("Add deployed-only journey specification"));
+  assert.ok(stepNames.indexOf("Add deployed-only journey specification") < stepNames.indexOf("Prepare protected staging artifact"));
+  assert.match(stepsByName["Add deployed-only journey specification"].run, /git[^\n]+status --porcelain=v1 --untracked-files=all/u);
+  assert.match(stepsByName["Add deployed-only journey specification"].run, /SYNTHETIC_GENERATED_REVISION/u);
+  const deployment = stepsByName["Deploy synthetic client Worker"].run;
+  assert.ok(deployment.indexOf('run check:prepared-artifact verify staging') < deployment.indexOf('opennextjs-cloudflare deploy'));
+  const browser = stepsByName["Test deployed synthetic client journey"].env;
+  assert.equal(browser.APPLICATION_ENVIRONMENT, "staging");
+  assert.equal(browser.NEXT_PUBLIC_SITE_URL, "${{ vars.DEPLOY_URL }}");
+  assert.equal(browser.DEPLOY_URL, "${{ vars.DEPLOY_URL }}");
   assert.match(
     stepsByName["Test deployed synthetic client journey"].run,
     /synthetic-client-deployed\.spec\.ts/u,
   );
   assert.match(
     stepsByName["Test deployed synthetic client journey"].run,
-    /test:e2e:deployed/u,
+    /run test:e2e:deployed tests\/e2e\/synthetic-client-deployed\.spec\.ts/u,
   );
   assert.equal(
     isPinnedGitHubActionReference(
@@ -2465,6 +2478,14 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
 
   assertWorkflowSecretBoundary(workflow, [
     {
+      path: 'jobs.verify-and-deploy.steps["Verify protected staging inputs"].env.CF_ACCESS_CLIENT_ID',
+      reference: "secrets.CF_ACCESS_CLIENT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Verify protected staging inputs"].env.CF_ACCESS_CLIENT_SECRET',
+      reference: "secrets.CF_ACCESS_CLIENT_SECRET",
+    },
+    {
       path: 'jobs.verify-and-deploy.steps["Deploy synthetic client Worker"].env.CLOUDFLARE_ACCOUNT_ID',
       reference: "secrets.CLOUDFLARE_ACCOUNT_ID",
     },
@@ -2472,22 +2493,31 @@ test("the synthetic client journey workflow is manual, protected, and content-sa
       path: 'jobs.verify-and-deploy.steps["Deploy synthetic client Worker"].env.CLOUDFLARE_API_TOKEN',
       reference: "secrets.CLOUDFLARE_API_TOKEN",
     },
+    {
+      path: 'jobs.verify-and-deploy.steps["Test deployed synthetic client journey"].env.CF_ACCESS_CLIENT_ID',
+      reference: "secrets.CF_ACCESS_CLIENT_ID",
+    },
+    {
+      path: 'jobs.verify-and-deploy.steps["Test deployed synthetic client journey"].env.CF_ACCESS_CLIENT_SECRET',
+      reference: "secrets.CF_ACCESS_CLIENT_SECRET",
+    },
   ]);
   assert.deepEqual(
-    [...source.matchAll(/vars\.([A-Z0-9_]+)/gu)].map(([, name]) => name),
-    ["DEPLOY_URL", "DEPLOY_URL"],
+    [...new Set([...source.matchAll(/vars\.([A-Z0-9_]+)/gu)].map(([, name]) => name))],
+    ["DEPLOY_URL"],
   );
   assert.doesNotMatch(source, /api\.cloudflare\.com/u);
   assert.doesNotMatch(source, /CLOUDFLARE_WEB_ANALYTICS_API_TOKEN/u);
   assert.doesNotMatch(source, /^  (?:pull_request|push|schedule):/mu);
 });
 
-test("stateless manual deployments share one serialized protected deployment boundary", async () => {
+test("the shared deployment lease is limited to eligible manual jobs", async (context) => {
   const [
     compatibilitySource,
     calendlySource,
     observabilitySource,
     syntheticClientSource,
+    web3formsSource,
     policy,
     compatibilityRecord,
   ] = await Promise.all([
@@ -2497,22 +2527,55 @@ test("stateless manual deployments share one serialized protected deployment bou
       ".github/workflows/observability-error-diagnostics-certification.yml",
     ),
     readRepositoryFile(".github/workflows/synthetic-client-journey.yml"),
+    readRepositoryFile(".github/workflows/web3forms-certification.yml"),
     readRepositoryFile("docs/governance/shared-test-deployment.md"),
     readRepositoryFile("docs/compatibility/nextjs-cloudflare.md"),
   ]);
 
-  for (const source of [
-    compatibilitySource,
-    calendlySource,
-    observabilitySource,
-    syntheticClientSource,
+  const sharedLease = {
+    group: "test-deploy",
+    "cancel-in-progress": false,
+    queue: "max",
+  };
+  const compatibility = parse(compatibilitySource);
+  assert.deepEqual(compatibility.concurrency, sharedLease);
+  assert.equal(compatibility.jobs["verify-and-deploy"].needs, undefined);
+
+  for (const [source, subject] of [
+    [calendlySource, "booking-calendly@0.2.0"],
+    [observabilitySource, "observability@0.4.0"],
+    [web3formsSource, "contact-form-web3forms@0.2.0"],
   ]) {
-    const workflow = parse(source);
-    assert.deepEqual(workflow.concurrency, {
-      group: "test-deploy",
-      "cancel-in-progress": false,
-      queue: "max",
+    await context.test(subject, async () => {
+      const workflow = parse(source);
+      assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
+      assert.equal(workflow.concurrency, undefined);
+      assert.equal(workflow.env, undefined);
+      assert.equal(workflow.defaults, undefined);
+      assert.deepEqual(Object.keys(workflow.jobs).sort(), ["check-hosted-eligibility", "verify-and-deploy"]);
+      const refusal = workflow.jobs["check-hosted-eligibility"];
+      const message = `Shared hosted certification is unavailable for ${subject}. See docs/governance/shared-test-deployment.md for protected staging requirements.`;
+      const expectedRun = `printf '%s\\n' '${message}' >&2\nexit 1\n`;
+      assert.deepEqual(refusal, {
+        "runs-on": "ubuntu-24.04",
+        permissions: {},
+        steps: [{ name: "Refuse shared hosted certification", run: expectedRun }],
+      });
+      const hosted = workflow.jobs["verify-and-deploy"];
+      assert.equal(hosted.needs, "check-hosted-eligibility");
+      assert.equal(hosted.if, "github.ref == 'refs/heads/main'");
+      assert.deepEqual(hosted.concurrency, sharedLease);
+      await assert.rejects(
+        execFileAsync("/bin/sh", ["-c", refusal.steps[0].run], {
+          cwd: tmpdir(), env: {}, timeout: 2000, maxBuffer: 4096,
+        }),
+        { code: 1, killed: false, signal: null, stdout: "", stderr: `${message}\n` },
+      );
     });
+  }
+
+  for (const source of [compatibilitySource, calendlySource, observabilitySource, web3formsSource]) {
+    const workflow = parse(source);
     assert.deepEqual(workflow.jobs["verify-and-deploy"].environment, {
       name: "test-deploy",
       url: "${{ vars.DEPLOY_URL }}",
@@ -2540,7 +2603,7 @@ test("stateless manual deployments share one serialized protected deployment bou
     /wrangler secret bulk "\$SECRET_FILE" --name test-deploy/u,
   );
   assert.match(
-    syntheticClientSource,
+    web3formsSource,
     /opennextjs-cloudflare deploy --name test-deploy/u,
   );
 
@@ -2574,27 +2637,21 @@ test("stateless manual deployments share one serialized protected deployment bou
     /bounded synthetic measurement traffic[\s\S]+provider-account retention/iu,
   );
   assert.match(policy, /no control-plane[\s\S]+mutation/iu);
-  assert.match(
-    policy,
-    /exclusive lease[\s\S]+compatibility[\s\S]+restore[\s\S]+baseline/iu,
-  );
 
+  const synthetic = parse(syntheticClientSource);
+  assert.deepEqual(synthetic.concurrency, { group: "synthetic-client-staging", "cancel-in-progress": false, queue: "max" });
+  assert.equal(synthetic.jobs["verify-and-deploy"].environment.name, "synthetic-client-staging");
+  assert.match(syntheticClientSource, /deploy --env staging --name synthetic-client-staging/u);
+  assert.match(policy, /Dedicated synthetic staging[\s\S]+synthetic-client-staging/u);
+  assert.match(policy, /protected staging[\s\S]+CF_ACCESS_CLIENT_ID[\s\S]+CF_ACCESS_CLIENT_SECRET/iu);
+  assert.match(policy, /self-approval[\s\S]+distinct[\s\S]+reviewer/iu);
   assert.match(compatibilityRecord, /shared-test-deployment\.md/u);
 });
 
-test("Calendly certification deployment is manual, revision-bound, and secret-minimal", async () => {
-  const [source, wranglerTemplate, renderingSource] =
-    await Promise.all([
-      readRepositoryFile(
-        ".github/workflows/booking-calendly-certification.yml",
-      ),
-      readRepositoryFile(
-        "packages/builder-core/templates/common/apps/web/wrangler.jsonc.template",
-      ),
-      readRepositoryFile(
-        "packages/builder-core/src/generation/render-skeleton.ts",
-      ),
-    ]);
+test("the historical Calendly deployment job retains manual revision and credential controls", async () => {
+  const source = await readRepositoryFile(
+    ".github/workflows/booking-calendly-certification.yml",
+  );
   const workflow = parse(source);
 
   assert.deepEqual(Object.keys(workflow.on), ["workflow_dispatch"]);
@@ -2611,13 +2668,12 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
     },
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(workflow.concurrency, {
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.deepEqual(job.concurrency, {
     group: "test-deploy",
     "cancel-in-progress": false,
     queue: "max",
   });
-
-  const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 60);
@@ -2647,7 +2703,7 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   );
   assert.match(
     stepsByName["Create fresh-added deployment candidate"].run,
-    /node scripts\/certify-booking-calendly\.mjs --calendly-url "\$CALENDLY_URL" --output-root "\$CERTIFICATION_OWNER"/u,
+    /node scripts\/certify-booking-calendly\.mjs [^\n]*--output-root "\$CERTIFICATION_OWNER"/u,
   );
   assert.doesNotMatch(
     stepsByName["Create fresh-added deployment candidate"].run,
@@ -2790,11 +2846,6 @@ test("Calendly certification deployment is manual, revision-bound, and secret-mi
   assert.match(
     stepsByName["Create fresh-added deployment candidate"].run,
     /booking-calendly-local-receipt\.json/u,
-  );
-  assert.match(wranglerTemplate, /"name": "\{\{workerName\}\}"/u);
-  assert.match(
-    renderingSource,
-    /workerName: projectResult\.value\.project\.name/u,
   );
 });
 
@@ -3042,7 +3093,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     capabilityModel,
-    /Runtime status:[^\n]+fourteen admission descriptors[^\n]+three generation recipes[^\n]+exact descriptors[^\n]+Implementation and registry admission do not certify/iu,
+    /Runtime status:[^\n]+schema-2 source candidate[^\n]+fourteen admission descriptors[^\n]+current environment generation[^\n]+pending acceptance/iu,
   );
   const completedRemovalGuardStage = ["P", "3", "C"].join("");
   const appFoundationStage = ["P", "4"].join("");
@@ -3091,7 +3142,7 @@ test("accepted app architecture keeps the public recipe convergent and Effect se
   );
   assert.match(
     rootInstructions,
-    /Builder-core supports `app@0\.2\.7` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
+    /Builder-core supports `app@0\.3\.0` project\/state parsing, rendering, and state-last new-directory generation[\s\S]+exact optional-capability addition\/removal[\s\S]+CLI, transition, immutable-fixture, and remaining certification boundaries/iu,
   );
   for (const instructions of [builderInstructions, cliInstructions]) {
     assert.match(
@@ -3402,7 +3453,7 @@ test("the documented capability catalog uses the normalized contract", async () 
   }
   assert.match(
     builderInstructions,
-    /fourteen-capability admission catalog[^\n]+app-foundation@0\.1\.0[^\n]+app@0\.2\.7[^\n]+project\/state parsing[^\n]+state-last new-directory generation[^\n]+exact optional-capability addition\/removal is active under the existing lifecycle preconditions[^\n]+incoming app execution follows the same canonical boundary[^\n]+CLI delegates app creation and incoming transitions through these existing boundaries/iu,
+    /schema-2 contracts[^\n]+fourteen-capability admission catalog[^\n]+actual installed tuples[\s\S]+Shared profile\/project\/state contracts[\s\S]+optional-capability addition\/removal[\s\S]+Incoming app planning and execution follow only the exact edges/iu,
   );
 });
 
@@ -3901,11 +3952,11 @@ test("multilingual implementation and certification remain exact and claim-limit
   for (const instructions of [cliInstructions, builderCoreInstructions]) {
     assert.match(
       instructions,
-      /booking-calendly@0\.1\.0[\s\S]+multilingual@0\.1\.0/iu,
+      /booking-calendly@0\.2\.0[\s\S]+multilingual@0\.1\.0/iu,
     );
     assert.match(
       instructions,
-      /multilingual@0\.1\.0[\s\S]+certif(?:ied|ication)[\s\S]+96b587a254cf6fc859867d6fc66c7e0c900c4cfd/iu,
+      /\(\.\.\/\.\.\/docs\/architecture\/capability-model\.md#current-environment-generation\)/u,
     );
   }
 });
@@ -3964,34 +4015,18 @@ test("executable capability certification ownership is current", async () => {
     "standards",
     "transactional-email-resend",
   ]);
-  const pendingSubjects = new Set([
-    "analytics", "app-foundation", "application-persistence", "background-job-delivery", "booking-calendly",
-    "deployment-cloudflare", "standards", "transactional-email-resend",
-  ]);
-  for (const [capabilityId, record] of Object.entries(registry.records)) {
-    const pending = pendingSubjects.has(capabilityId);
-    assert.equal(record.status, pending ? "pending" : "certified");
-    assert.equal(
-      record.taskPlan,
-      capabilityId === "standards"
-        ? "docs/superpowers/plans/2026-10-21-patched-standards-certification.md"
-        : capabilityId === "deployment-cloudflare" ? "docs/superpowers/plans/2026-10-22-deployment-adapter-certification-renewal.md" : capabilityId === "background-job-delivery" ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : capabilityId === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md" : ["app-foundation", "transactional-email-resend"].includes(capabilityId)
-        ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
-        : capabilityId === "application-persistence"
-        ? "docs/superpowers/plans/2026-10-22-persistence-worker-types-certification-renewal.md"
-        : pending || capabilityId === "observability"
-          ? "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md"
-          : "docs/superpowers/plans/2026-09-13-app-foundation-certification.md",
-    );
-    assert.deepEqual(record.evidence.map(({ kind }) => kind), pending ? [] : record.requiredEvidence);
+  for (const record of Object.values(registry.records)) {
+    assert.equal(record.status, "pending");
+    assert.equal(record.taskPlan, "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
+    assert.deepEqual(record.evidence, []);
   }
   assert.match(
     rootReadme,
     /recipe `0\.10\.0`[^\n]+standards@0\.4\.0[^\n]+observability@0\.3\.0[^\n]+deployment-cloudflare@0\.3\.0/iu,
   );
   assert.match(
-    rootReadme,
-    /booking-calendly@0\.1\.0[^\n]+fresh-scaffold[^\n]+existing-repository-lifecycle[^\n]+b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059[^\n]+deployed-application[^\n]+provider-confirmed[^\n]+cleanup-recovery[^\n]+f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d/iu,
+    capabilityModel,
+    /prior `booking-calendly@0\.1\.0` descriptor subject was certified[^\n]+local evidence revision `b30e10b86b9ac9ef8dfdf1e8fa8e4077e2abe059`[^\n]+protected\/provider evidence revision `f9bd78f115c2118afd6dcc17ce49b2bfe34ca10d`/iu,
   );
   assert.match(
     capabilityModel,
@@ -3999,7 +4034,7 @@ test("executable capability certification ownership is current", async () => {
   );
   assert.match(
     capabilityModel,
-    /generation-executable recipes are `portfolio@0\.11\.7`, `site@0\.12\.7`, and `app@0\.2\.7`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
+    /preceding generation-executable recipes were `portfolio@0\.11\.7`, `site@0\.12\.7`, and `app@0\.2\.7`[^\n]+shared[^\n]+project\/state[^\n]+generation/iu,
   );
   assert.match(
     capabilityModel,
@@ -4073,8 +4108,8 @@ test("executable capability certification ownership is current", async () => {
     roadmap,
     /provider certification[^.]+complete/iu,
   );
+  assert.match(builderCoreReadme, /private certification registry/iu);
   for (const document of [builderCoreInstructions, builderCoreReadme]) {
-    assert.match(document, /private certification registry/iu);
     assert.match(document, /descriptor admission/iu);
     assert.match(document, /closure/iu);
   }
@@ -4158,8 +4193,8 @@ test("canonical documentation records visual regression and the client-ready clo
   ]) {
     assert.match(currentContractOwner, /\bsubjects\b[^\n]+\b(?:pending|empty evidence)\b/iu);
   }
-  assert.match(capabilityModel, /\bCurrent admission passes for all fourteen records\b/iu);
-  assert.match(capabilityModel, /\bsix certified and eight pending subjects\b/iu);
+  assert.match(capabilityModel, /All fourteen current registry records are pending[^\n]+separate required evidence[^\n]+no inherited successful receipt/iu);
+  assert.match(capabilityModel, /At that historical boundary, admission passed for fourteen records[^\n]+closure rejected its eight pending subjects/iu);
 
   assert.match(
     capabilityModel,
@@ -4747,7 +4782,7 @@ test("canonical documentation accepts profile-transition execution and records t
   ]) {
     assert.match(historicalCertificationOwner, multilingualEligibilityPattern);
   }
-  assert.match(builderCoreInstructions, /\bsix exact subjects are certified; eight subjects remain pending\b/iu);
+  assert.match(builderCoreInstructions, /All fourteen current subjects remain pending with empty evidence/iu);
 
   for (const semanticStatusConsumer of [rootReadme, builderCoreReadme]) {
     assert.match(semanticStatusConsumer, semanticLifecycleClosurePattern);
@@ -5175,8 +5210,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
     },
     {
       fixtures: "node --test tests/generated-fixtures/*.test.mjs",
-      kernel:
-        "pnpm run test:constitution && pnpm run test:synthetic-client-journey && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run test:builder-core && pnpm run test:cli && pnpm run test:packages && pnpm run test:capability-certification && pnpm run check:capability-certification && pnpm run test:generated-fixtures && pnpm run lint:builder && pnpm run typecheck:builder && pnpm run verify:generated-skeletons && pnpm run test:generated-jobs && pnpm run changeset:status",
+      kernel: "node scripts/verify-builder-kernel.mjs",
       skeletons: "node scripts/verify-generated-skeletons.mjs",
     },
   );
@@ -5199,7 +5233,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     capabilityModel,
-    /fourteen admission descriptors.*three generation recipes.*exact descriptors.*Implementation and registry admission do not certify/isu,
+    /Runtime status:[^\n]+schema-2 source candidate[^\n]+fourteen admission descriptors[^\n]+current environment generation[^\n]+pending acceptance/iu,
   );
   assert.match(
     packageOwnership,
@@ -5211,7 +5245,7 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     cliReadme,
-    /paired `--calendly-url` and `--calendly-mode`.*strict analytics options/isu,
+    /`--booking-calendly` and `--calendly-mode` selection-only options.*strict analytics options/isu,
   );
   assert.match(
     roadmap,
@@ -5541,8 +5575,8 @@ test("app transition hosted retention preserves successful measurements and boun
     "generated-visual-artifacts/app-transitions/**/*.md",
   ]);
   assert.equal(upload.with["if-no-files-found"], "${{ (steps.visual_candidates.outcome == 'success' || steps.visual_comparison.outcome == 'success') && 'error' || 'warn' }}");
-  assert.equal(job.steps.find(step => step.run?.includes("--candidates --app-recipe-version=0.2.7")).id, "visual_candidates");
-  assert.equal(job.steps.find(step => step.run === "pnpm run verify:app-transition-visuals -- --app-recipe-version=0.2.7").id, "visual_comparison");
+  assert.equal(job.steps.find(step => step.run === withVerificationGit("pnpm run verify:app-transition-visuals -- --candidates")).id, "visual_candidates");
+  assert.equal(job.steps.find(step => step.run === withVerificationGit("pnpm run verify:app-transition-visuals")).id, "visual_comparison");
   assert.equal(job["timeout-minutes"], 45);
   assert.deepEqual(workflow.permissions, { contents: "read" });
   assert.equal(job.steps.some(step => /--promote|--update-snapshots/u.test(step.run ?? "")), false);

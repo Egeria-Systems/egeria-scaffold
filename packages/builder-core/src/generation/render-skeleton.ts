@@ -13,15 +13,11 @@ import {
 import { createGenerationRenderingContext, isApplicationEnvironmentRenderingContext } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
-  applicationEnvironmentProjectConfigurationSchema,
-  type ApplicationEnvironmentProjectConfiguration,
-  type ApplicationEnvironmentAnalyticsSettings,
-  type ApplicationEnvironmentBookingSettings,
+  type ProjectConfiguration,
   type AnalyticsSettings,
   type CalendlyBookingSettings,
   type Web3FormsContactSettings,
   projectConfigurationSchema,
-  type ProjectConfiguration,
 } from "../contracts/project.js";
 import type {
   ContractIssue,
@@ -62,11 +58,7 @@ export type GenerationRequest = Readonly<{
   packageVersions: CapabilityPackageVersions;
 }>;
 
-export type ApplicationEnvironmentGenerationRequest = Readonly<Omit<GenerationRequest, "analytics" | "bookingCalendly" | "contactFormWeb3Forms"> & {
-  analytics?: ApplicationEnvironmentAnalyticsSettings;
-  bookingCalendly?: ApplicationEnvironmentBookingSettings;
-  contactFormWeb3Forms?: true;
-}>;
+export type ApplicationEnvironmentGenerationRequest = GenerationRequest;
 
 export type GeneratedFile = Readonly<{
   path: string;
@@ -83,9 +75,11 @@ export type RenderedSkeleton<P = ProjectConfiguration> = Readonly<{
 export type SkeletonRenderingContext = Readonly<{
   catalogSnapshot: CapabilityCatalogSnapshot;
   profiles: readonly ProfileRecipe[];
+  projectSchemaVersion: "2.0.0";
+  retainAppFoundation?: true;
 }>;
 
-export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext & Readonly<{ projectSchemaVersion: "2.0.0"; retainAppFoundation?: true }>;
+export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext;
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -106,12 +100,11 @@ function generatedIssue(
 }
 
 function createProject(
-  request: GenerationRequest | ApplicationEnvironmentGenerationRequest,
+  request: GenerationRequest,
   resolved: ResolvedCapabilities,
-  applicationEnvironments: boolean,
-): ValidationResult<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration> {
+): ValidationResult<ProjectConfiguration> {
   const value = {
-    schemaVersion: applicationEnvironments ? "2.0.0" : "1.0.0",
+    schemaVersion: "2.0.0",
     builderCompatibility: "0.0.0",
     project: {
       name: request.projectName,
@@ -125,7 +118,6 @@ function createProject(
       ({ identifier }) => identifier,
     ),
     capabilitySettings: {
-      ...(applicationEnvironments || request.contactFormWeb3Forms === undefined ? {} : { "contact-form-web3forms": request.contactFormWeb3Forms }),
       ...(request.analytics === undefined
         ? {}
         : { analytics: request.analytics }),
@@ -135,9 +127,7 @@ function createProject(
     },
     ejectedAreas: [],
   };
-  return applicationEnvironments
-    ? validateContract(applicationEnvironmentProjectConfigurationSchema, value)
-    : validateContract(projectConfigurationSchema, value);
+  return validateContract(projectConfigurationSchema, value);
 }
 
 function remapTokenIssues(
@@ -226,7 +216,6 @@ function enrichApplicationManifest(
   profile: ProfileIdentifier,
   persistence: boolean,
   foundation: boolean,
-  applicationEnvironments: boolean,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -265,12 +254,12 @@ function enrichApplicationManifest(
     );
   }
 
-  const productionSite = profile === "app" || profile === "site";
   const enrichedManifest = {
     ...manifest,
     scripts: {
       ...manifest.scripts,
-      ...(applicationEnvironments ? { ...applicationEnvironmentScripts, ...applicationEnvironmentVerificationScripts } : {}),
+      ...applicationEnvironmentScripts,
+      ...applicationEnvironmentVerificationScripts,
       ...(foundation
         ? { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts" }
         : {}),
@@ -287,7 +276,7 @@ function enrichApplicationManifest(
       ...manifest.devDependencies,
       "@egeria-systems/standards": packageVersions.standards,
       ...(persistence ? { "@cloudflare/workers-types": "5.20261006.1", "drizzle-kit": "0.31.10" } : {}),
-      ...(productionSite
+      ...(profile !== "portfolio"
         ? { "eslint-config-next": "16.3.3" }
         : {}),
     },
@@ -299,14 +288,14 @@ function enrichApplicationManifest(
         content: encoder.encode(`${stringifyCanonicalJson(enrichedManifest)}\n`),
       };
     }
-    if (applicationEnvironments && file.path === "apps/web/tsconfig.json") {
+    if (file.path === "apps/web/tsconfig.json") {
       const configuration = JSON.parse(decoder.decode(file.content)) as { compilerOptions: Record<string, unknown> };
       return { path: file.path, content: encoder.encode(`${stringifyCanonicalJson({ ...configuration, compilerOptions: { ...configuration.compilerOptions, allowImportingTsExtensions: true } })}\n`) };
     }
-    if (applicationEnvironments && file.path === ".gitignore") {
+    if (file.path === ".gitignore") {
       return { path: file.path, content: encoder.encode(`${decoder.decode(file.content)}.dev.vars*\n!.dev.vars.example\n`) };
     }
-    if (applicationEnvironments && file.path === "README.md") {
+    if (file.path === "README.md") {
       return { path: file.path, content: encoder.encode(`${decoder.decode(file.content)}\nSee [Application environments](docs/environments.md) for build inputs, runtime targets and local recovery.\n`) };
     }
     if (file.path === "pnpm-workspace.yaml") {
@@ -362,14 +351,14 @@ function createPackageSurface(
   );
 }
 
-function createBuilderSurfaces(applicationEnvironments: boolean): readonly ManagedSurfaceDescriptor[] {
+function createBuilderSurfaces(): readonly ManagedSurfaceDescriptor[] {
   return [
     createFileSurface("builder-literal-lint-roots-patch", "patches/next-eslint-plugin-next.patch", "managed"),
-    ...(applicationEnvironments ? [
+    ...[
       createFileSurface("builder-application-environment-guide", "docs/environments.md", "application-owned"),
       createFileSurface("builder-build-environment-example", "apps/web/.env.example", "application-owned"),
       createFileSurface("builder-runtime-environment-example", "apps/web/.dev.vars.example", "application-owned"),
-    ] : []),
+    ],
     createFileSurface("builder-gitignore", ".gitignore", "application-owned"),
     createFileSurface("builder-node-version", ".nvmrc", "managed"),
     createFileSurface(
@@ -462,41 +451,141 @@ function createBuilderSurfaces(applicationEnvironments: boolean): readonly Manag
 
 function createDesiredSurfaces(
   resolved: ResolvedCapabilities,
-  applicationEnvironments: boolean,
 ): readonly ManagedSurfaceDescriptor[] {
   return [
     ...resolved.capabilities.flatMap(({ managedSurfaces }) => managedSurfaces),
-    ...createBuilderSurfaces(applicationEnvironments),
+    ...createBuilderSurfaces(),
   ].sort((left, right) => compareText(left.identifier, right.identifier));
 }
 
-export function renderSkeleton(request: ApplicationEnvironmentGenerationRequest, context: ApplicationEnvironmentRenderingContext): Promise<ValidationResult<RenderedSkeleton<ApplicationEnvironmentProjectConfiguration>>>;
-export function renderSkeleton(request: GenerationRequest, context?: SkeletonRenderingContext): Promise<ValidationResult<RenderedSkeleton>>;
-export async function renderSkeleton(
-  request: GenerationRequest | ApplicationEnvironmentGenerationRequest,
-  context?: SkeletonRenderingContext | ApplicationEnvironmentRenderingContext,
-): Promise<ValidationResult<RenderedSkeleton<ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>>> {
-  const applicationEnvironments = context !== undefined && "projectSchemaVersion" in context;
-  const environmentDescriptor = context?.catalogSnapshot.standards === "0.9.0" || context?.catalogSnapshot.standards === "0.10.0" || context?.catalogSnapshot.appFoundation === "0.3.0" || context?.catalogSnapshot.siteRouting === "0.5.0" || context?.catalogSnapshot.backgroundJobDelivery === "0.3.0" || ["0.9.0", "0.10.0", "0.11.0", "0.12.0"].includes(context?.catalogSnapshot.deploymentCloudflare ?? "");
-  if ((applicationEnvironments || environmentDescriptor || (context !== undefined && "projectSchemaVersion" in context)) &&
-      (!applicationEnvironments || !isApplicationEnvironmentRenderingContext(context))) {
-    return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
+export async function renderProjectTemplates(
+  project: ProjectConfiguration,
+  destinations?: ReadonlySet<string>,
+): Promise<ValidationResult<GeneratedFile[]>> {
+  const selected = project.selectedCapabilities;
+  const analytics = project.capabilitySettings.analytics;
+  const booking = project.capabilitySettings["booking-calendly"];
+  const contactForm = selected.includes("contact-form-web3forms");
+  const multilingual = selected.includes("multilingual");
+  const jobsSelected = selected.includes("background-job-delivery");
+  const templateCatalogResult = createTemplateCatalog(
+    project.originProfile,
+    booking !== undefined,
+    project.recipeVersion,
+    multilingual,
+    analytics !== undefined,
+    selected.includes("application-persistence"),
+    selected.includes("app-foundation"),
+    selected.includes("transactional-email-resend"),
+    contactForm,
+    jobsSelected,
+  );
+  if (!templateCatalogResult.ok) {
+    return templateCatalogResult;
   }
-  if (applicationEnvironments && Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
+
+  const tokens: TemplateTokens = {
+    projectName: project.project.name,
+    displayNameJson: JSON.stringify(project.project.displayName),
+    workerName: project.project.name,
+    workerEntryJson: JSON.stringify(jobsSelected ? "worker.mjs" : ".open-next/worker.js"),
+    ...(analytics === undefined
+      ? {}
+      : {
+          analyticsSettingsJson: JSON.stringify(analytics, null, 2),
+        }),
+    ...(booking === undefined ? {} : {
+      calendlyModeJson: JSON.stringify(booking.mode),
+    }),
+  };
+  const templateRoot = new URL("../../templates/", import.meta.url);
+  const files: GeneratedFile[] = [];
+
+  for (const [index, entry] of templateCatalogResult.value.entries()) {
+    if (destinations !== undefined && !destinations.has(entry.destination)) continue;
+    const result = await renderTemplateCatalogEntry(
+      entry,
+      index,
+      templateRoot,
+      tokens,
+    );
+    if (!result.ok) {
+      return result;
+    }
+    files.push(result.value);
+  }
+
+  const publicInputs = [
+    ...(contactForm ? ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"] : []),
+    ...(booking === undefined ? [] : ["NEXT_PUBLIC_CALENDLY_URL"]),
+    ...(analytics === undefined ? [] : ["NEXT_PUBLIC_ANALYTICS_ENABLED",
+      ...(analytics.providers.cloudflareWebAnalytics === undefined ? [] : ["NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"]),
+      ...(analytics.providers.googleAnalytics4 === undefined ? [] : ["NEXT_PUBLIC_GA4_MEASUREMENT_ID"]),
+      ...(analytics.providers.microsoftClarity === undefined ? [] : ["NEXT_PUBLIC_CLARITY_PROJECT_ID"]),
+      ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"]),
+    ]),
+  ];
+  for (const [path, jobs] of [
+    [".github/workflows/quality.yml", ["verify"]],
+    [".github/workflows/deploy.yml", ["verify-source", "staging", "production"]],
+  ] as const) {
+    const workflowIndex = files.findIndex(file => file.path === path);
+    const workflowFile = files[workflowIndex];
+    if (workflowFile === undefined) continue;
+    const workflow = parseDocument(decoder.decode(workflowFile.content));
+    for (const job of jobs) {
+      const local = job === "verify" || job === "verify-source";
+      const target = local ? "development" : job;
+      const publicValue = (key: string): string => local ? (key === "NEXT_PUBLIC_ANALYTICS_ENABLED" ? "false" : "") : "${{ vars." + key + " }}";
+      const set = (key: string, value: string): void => { workflow.setIn(["jobs", job, "env", key], value); };
+      if (job === "verify") {
+        set("APPLICATION_ENVIRONMENT", "development");
+        set("NEXT_PUBLIC_SITE_URL", "http://localhost:3000");
+        set("BUILD_SOURCE_REVISION", "${{ github.sha }}");
+      }
+      for (const key of publicInputs) set(key, publicValue(key));
+      if (contactForm) set("CONTACT_TEST_EXPECTED_ACCESS_KEY", publicValue("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"));
+      if (booking !== undefined) {
+        set("BOOKING_TEST_EXPECTED_URL", publicValue("NEXT_PUBLIC_CALENDLY_URL"));
+        set("BOOKING_TEST_MODE", booking.mode);
+        set("BOOKING_TEST_MULTILINGUAL", String(multilingual));
+      }
+      if (analytics !== undefined) {
+        set("ANALYTICS_TEST_BUILD_FLAG", publicValue("NEXT_PUBLIC_ANALYTICS_ENABLED"));
+        set("ANALYTICS_TEST_TARGET", target);
+        set("ANALYTICS_TEST_EXPECTED_SITE_ORIGIN", local ? "http://localhost:3000" : "${{ vars.NEXT_PUBLIC_SITE_URL }}");
+        for (const [expectation, input] of [
+          ["CLOUDFLARE_TOKEN", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"], ["GA4_ID", "NEXT_PUBLIC_GA4_MEASUREMENT_ID"],
+          ["CLARITY_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID"], ["VERIFICATION", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"],
+        ] as const) set(`ANALYTICS_TEST_EXPECTED_${expectation}`, publicInputs.includes(input) && (expectation !== "VERIFICATION" || target === "production") ? publicValue(input) : "");
+      }
+    }
+    files[workflowIndex] = { ...workflowFile, content: encoder.encode(workflow.toString()) };
+  }
+  return { ok: true, value: files };
+}
+
+export async function renderSkeleton(
+  request: GenerationRequest,
+  context?: SkeletonRenderingContext,
+): Promise<ValidationResult<RenderedSkeleton>> {
+  context ??= createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true, request.backgroundJobDelivery === true);
+  if (!isApplicationEnvironmentRenderingContext(context)) return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
+  if (Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if (applicationEnvironments && (request.backgroundJobDelivery === true) !== (context.catalogSnapshot.backgroundJobDelivery === "0.3.0")) {
+  if ((request.backgroundJobDelivery === true) !== (context.catalogSnapshot.backgroundJobDelivery === "0.3.0")) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
   }
-  if (applicationEnvironments && (request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
+  if ((request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
   }
   const packageVersions: CapabilityPackageVersions = {
     standards: request.packageVersions.standards,
     observability: request.packageVersions.observability,
   };
-  const renderingContext = context ?? createGenerationRenderingContext(request.applicationPersistence === true, request.transactionalEmailResend === true, request.backgroundJobDelivery === true);
-  const retainedFoundation = renderingContext.catalogSnapshot.appFoundation === "0.2.0" || (applicationEnvironments && context.retainAppFoundation === true);
+  const renderingContext = context;
+  const retainedFoundation = context.retainAppFoundation === true;
   const catalogResult = createCapabilityCatalogSnapshot(packageVersions, renderingContext.catalogSnapshot);
   if (!catalogResult.ok) {
     return catalogResult;
@@ -534,62 +623,15 @@ export async function renderSkeleton(
     return resolutionResult;
   }
 
-  const projectResult = createProject(request, resolutionResult.value, applicationEnvironments);
+  const projectResult = createProject(request, resolutionResult.value);
   if (!projectResult.ok) {
     return projectResult;
   }
 
-  const templateCatalogResult = createTemplateCatalog(
-    request.profile,
-    request.bookingCalendly !== undefined,
-    resolutionResult.value.recipeVersion,
-    request.multilingual === true,
-    request.analytics !== undefined,
-    request.applicationPersistence === true,
-    resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
-    request.transactionalEmailResend === true,
-    request.contactFormWeb3Forms !== undefined,
-    request.backgroundJobDelivery === true,
-    renderingContext.catalogSnapshot.backgroundJobDelivery,
-    applicationEnvironments,
-  );
-  if (!templateCatalogResult.ok) {
-    return templateCatalogResult;
-  }
-
-  const tokens: TemplateTokens = {
-    projectName: projectResult.value.project.name,
-    displayNameJson: JSON.stringify(projectResult.value.project.displayName),
-    workerName: projectResult.value.project.name,
-    workerEntryJson: JSON.stringify(request.backgroundJobDelivery === true ? "worker.mjs" : ".open-next/worker.js"),
-    ...(request.contactFormWeb3Forms === undefined || typeof request.contactFormWeb3Forms !== "object" ? {} : { web3FormsAccessKeyJson: JSON.stringify(request.contactFormWeb3Forms.accessKey) }),
-    ...(request.analytics === undefined
-      ? {}
-      : {
-          analyticsSettingsJson: JSON.stringify(request.analytics, null, 2),
-        }),
-    ...(request.bookingCalendly === undefined ? {} : {
-      calendlyModeJson: JSON.stringify(request.bookingCalendly.mode),
-      ...("destination" in request.bookingCalendly ? { calendlyDestinationJson: JSON.stringify(request.bookingCalendly.destination) } : {}),
-    }),
-  };
-  const templateRoot = new URL("../../templates/", import.meta.url);
-  const files: GeneratedFile[] = [];
-
-  for (const [index, entry] of templateCatalogResult.value.entries()) {
-    const result = await renderTemplateCatalogEntry(
-      entry,
-      index,
-      templateRoot,
-      tokens,
-    );
-    if (!result.ok) {
-      return result;
-    }
-    files.push(result.value);
-  }
-
-  if (applicationEnvironments) {
+  const templates = await renderProjectTemplates(projectResult.value);
+  if (!templates.ok) return templates;
+  const files = templates.value;
+  {
     const analytics = request.analytics;
     const analyticsExample = analytics === undefined ? "" : [
       "NEXT_PUBLIC_ANALYTICS_ENABLED=false",
@@ -599,44 +641,6 @@ export async function renderSkeleton(
       ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION="]),
       "",
     ].join("\n");
-    const publicInputs = [
-      ...(request.contactFormWeb3Forms === true ? ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"] : []),
-      ...(request.bookingCalendly === undefined ? [] : ["NEXT_PUBLIC_CALENDLY_URL"]),
-      ...(analytics === undefined ? [] : ["NEXT_PUBLIC_ANALYTICS_ENABLED",
-        ...(analytics.providers.cloudflareWebAnalytics === undefined ? [] : ["NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"]),
-        ...(analytics.providers.googleAnalytics4 === undefined ? [] : ["NEXT_PUBLIC_GA4_MEASUREMENT_ID"]),
-        ...(analytics.providers.microsoftClarity === undefined ? [] : ["NEXT_PUBLIC_CLARITY_PROJECT_ID"]),
-        ...(analytics.operationalIntegrations.googleSearchConsole === undefined ? [] : ["NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"]),
-      ]),
-    ];
-    const workflowIndex = files.findIndex(file => file.path === ".github/workflows/deploy.yml");
-    const workflowFile = files[workflowIndex];
-    if (workflowFile !== undefined) {
-      const workflow = parseDocument(decoder.decode(workflowFile.content));
-      for (const job of ["verify-source", "staging", "production"]) {
-        const local = job === "verify-source";
-        const target = local ? "development" : job;
-        const publicValue = (key: string): string => local ? (key === "NEXT_PUBLIC_ANALYTICS_ENABLED" ? "false" : "") : "${{ vars." + key + " }}";
-        const set = (key: string, value: string): void => { workflow.setIn(["jobs", job, "env", key], value); };
-        for (const key of publicInputs) set(key, publicValue(key));
-        if (request.contactFormWeb3Forms === true) set("CONTACT_TEST_EXPECTED_ACCESS_KEY", publicValue("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"));
-        if (request.bookingCalendly !== undefined) {
-          set("BOOKING_TEST_EXPECTED_URL", publicValue("NEXT_PUBLIC_CALENDLY_URL"));
-          set("BOOKING_TEST_MODE", request.bookingCalendly.mode);
-          set("BOOKING_TEST_MULTILINGUAL", String(request.multilingual === true));
-        }
-        if (analytics !== undefined) {
-          set("ANALYTICS_TEST_BUILD_FLAG", publicValue("NEXT_PUBLIC_ANALYTICS_ENABLED"));
-          set("ANALYTICS_TEST_TARGET", target);
-          set("ANALYTICS_TEST_EXPECTED_SITE_ORIGIN", local ? "http://localhost:3000" : "${{ vars.NEXT_PUBLIC_SITE_URL }}");
-          for (const [expectation, input] of [
-            ["CLOUDFLARE_TOKEN", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN"], ["GA4_ID", "NEXT_PUBLIC_GA4_MEASUREMENT_ID"],
-            ["CLARITY_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID"], ["VERIFICATION", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"],
-          ] as const) set(`ANALYTICS_TEST_EXPECTED_${expectation}`, publicInputs.includes(input) && (expectation !== "VERIFICATION" || target === "production") ? publicValue(input) : "");
-        }
-      }
-      files[workflowIndex] = { ...workflowFile, content: encoder.encode(workflow.toString()) };
-    }
     files.push(
       { path: "apps/web/.env.example", content: encoder.encode(`APPLICATION_ENVIRONMENT=development\nNEXT_PUBLIC_SITE_URL=http://localhost:3000\n${request.contactFormWeb3Forms === true ? "NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY=\n" : ""}${request.bookingCalendly === undefined ? "" : "NEXT_PUBLIC_CALENDLY_URL=\n"}${analyticsExample}`) },
       { path: "apps/web/.dev.vars.example", content: encoder.encode("APPLICATION_ENVIRONMENT=development\nBETTER_STACK_INGESTING_HOST=\nBETTER_STACK_SOURCE_TOKEN=\n" + (request.transactionalEmailResend === true ? "RESEND_API_KEY=\nTRANSACTIONAL_EMAIL_FROM=\nTRANSACTIONAL_EMAIL_DOMAIN=\nTRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS=\n" : "")) },
@@ -648,7 +652,6 @@ export async function renderSkeleton(
     projectResult.value.originProfile,
     request.applicationPersistence === true,
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
-    applicationEnvironments,
   );
   if (!manifestResult.ok) {
     return manifestResult;
@@ -657,7 +660,7 @@ export async function renderSkeleton(
   const sortedFiles = [...manifestResult.value].sort((left, right) =>
     compareText(left.path, right.path),
   );
-  const surfaces = createDesiredSurfaces(resolutionResult.value, applicationEnvironments);
+  const surfaces = createDesiredSurfaces(resolutionResult.value);
   const materialization = materializeInstalledSurfaces({
     files: new Map(sortedFiles.map(({ path, content }) => [path, content])),
     surfaces,

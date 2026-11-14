@@ -1,28 +1,24 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import * as core from "../dist/index.js";
-const retainedRenderingContext = { catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: [] };
 
 const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
 const packageVersions = { standards: "0.1.0", observability: "0.3.0" };
 const request = profile => ({ profile, projectName: "contact-contract", displayName: "Contact Contract", packageVersions });
 
-test("contact settings accept only an exact public identifier", () => {
-  assert.ok(core.web3FormsContactSettingsSchema, "contact settings schema must exist");
-  for (const value of [settings, {accessKey: "ABCDEFAB-1234-4321-ABCD-0123456789AB"}])
-    assert.equal(core.web3FormsContactSettingsSchema.safeParse(value).success, true);
-  for (const value of [undefined, {}, { ...settings, accessKey: " private-value " },
-    { ...settings, accessKey: ` ${settings.accessKey}` }, { ...settings, accessKey: `${settings.accessKey}\n` },
-    { ...settings, endpoint: "https://example.invalid" }, { ...settings, accessKey: 1 }])
+test("contact configuration accepts only an explicit selection", () => {
+  assert.equal(core.web3FormsContactSettingsSchema.safeParse(true).success, true);
+  for (const value of [undefined, false, "true", {}, settings, { accessKey: "private-value" }, { endpoint: "https://example.invalid" }]) {
     assert.equal(core.web3FormsContactSettingsSchema.safeParse(value).success, false);
+  }
 });
 
 test("contact selection is strict, profile-independent and adds only its declared browser surfaces", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
-    const result = await core.renderSkeleton({ ...request(profile), contactFormWeb3Forms: settings });
+    const result = await core.renderSkeleton({ ...request(profile), contactFormWeb3Forms: true });
     assert.equal(result.ok, true, JSON.stringify(result.issues));
-    assert.deepEqual(result.value.project.capabilitySettings["contact-form-web3forms"], settings);
+    assert.equal(result.value.project.capabilitySettings["contact-form-web3forms"], undefined);
     const capability = result.value.resolved.capabilities.find(c => c.identifier === "contact-form-web3forms");
     assert.ok(capability, "selected contact capability must resolve");
     assert.deepEqual(capability.dependencies, ["content-files", "section-composition"]);
@@ -34,15 +30,16 @@ test("contact selection is strict, profile-independent and adds only its declare
       assert.ok(result.value.files.some(f => f.path === `apps/web/src/integrations/contact-form-web3forms/${path}`));
     assert.equal(result.value.files.some(f => /app\/api\/.*contact/.test(f.path)), false);
     const { project } = result.value;
-    assert.equal(core.projectConfigurationSchema.safeParse({ ...project, capabilitySettings: {} }).success, false);
-    assert.equal(core.projectConfigurationSchema.safeParse({ ...project, selectedCapabilities: project.selectedCapabilities.filter(c => c !== capability.identifier) }).success, false);
+    assert.equal(core.projectConfigurationSchema.safeParse({ ...project, capabilitySettings: { "contact-form-web3forms": settings } }).success, false);
+    assert.equal(core.projectConfigurationSchema.safeParse({ ...project, selectedCapabilities: project.selectedCapabilities.filter(c => c !== capability.identifier) }).success, true);
   }
 });
 
-test("contact generation refuses retained recipes and malformed settings", async () => {
+test("contact generation rejects retired contexts and redacts invalid selections", async () => {
+  const current = core.createGenerationRenderingContext();
   for (const profile of ["portfolio", "site"]) {
-    const result = await core.renderSkeleton({ ...request(profile), contactFormWeb3Forms: settings }, retainedRenderingContext);
-    assert.equal(result.ok, false, "retained generation must refuse new contact selection");
+    const result = await core.renderSkeleton({ ...request(profile), contactFormWeb3Forms: true }, { ...current, projectSchemaVersion: "1.0.0" });
+    assert.equal(result.ok, false);
   }
   const result = await core.renderSkeleton({ ...request("portfolio"), contactFormWeb3Forms: { accessKey: "private-value" } });
   assert.equal(result.ok, false);
@@ -54,7 +51,7 @@ test("absent contact selection preserves the existing portfolio source", async (
   assert.equal(result.ok, true);
   assert.equal(result.value.files.some(f => f.path.includes("web3forms")), false);
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
-    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.11.7/${path}`, import.meta.url)));
+    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.12.0/${path}`, import.meta.url)));
 });
 
 test("environment contact selection renders every profile and locale without literal settings", async () => {

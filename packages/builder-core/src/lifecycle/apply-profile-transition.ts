@@ -4,7 +4,7 @@ import { isAbsolute, join, resolve } from "node:path";
 
 import {
   createCapabilityCatalogSnapshot,
-  vitestFiveCapabilityCatalogSnapshot,
+  applicationEnvironmentCatalogSnapshot,
 } from "../catalog/capability-catalog.js";
 import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
@@ -115,11 +115,11 @@ export type ProfileTransitionExecutionResult =
           fromProfile: "portfolio" | "site";
           fromRecipeVersion: string;
           toProfile: "app";
-          toRecipeVersion: "0.2.7";
+          toRecipeVersion: "0.3.0";
         }>;
         migration:
-          | "transition-portfolio-0-11-7-to-app-0-2-7"
-          | "transition-site-0-12-7-to-app-0-2-7";
+          | "transition-portfolio-0-12-0-to-app-0-3-0"
+          | "transition-site-0-13-0-to-app-0-3-0";
         changedPaths: readonly string[];
         verificationChecks: typeof appProfileTransitionVerificationChecks;
       }>;
@@ -659,8 +659,8 @@ export async function applyProfileTransition(input: Readonly<{
   }
   const plan = appPreparation.plan;
   const migrationIdentifier = plan.source.profile === "portfolio"
-    ? "transition-portfolio-0-11-7-to-app-0-2-7"
-    : "transition-site-0-12-7-to-app-0-2-7";
+    ? "transition-portfolio-0-12-0-to-app-0-3-0"
+    : "transition-site-0-13-0-to-app-0-3-0";
   const persistedChecks = appProfileTransitionPersistedVerificationChecks;
   const desiredCapabilities = plan.target.capabilities.map(
     ({ identifier }) => identifier,
@@ -818,7 +818,7 @@ export async function applyProfileTransition(input: Readonly<{
 
   const targetCatalog = createCapabilityCatalogSnapshot(
     verifiedCapabilityPackageVersions,
-    vitestFiveCapabilityCatalogSnapshot,
+    applicationEnvironmentCatalogSnapshot,
   );
   if (!targetCatalog.ok) {
     return failure(

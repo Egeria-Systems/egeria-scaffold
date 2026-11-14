@@ -7,12 +7,12 @@ import { createApplicationEnvironmentRenderingContext, createGenerationRendering
 import { createInMemoryRepositoryReader } from "../dist/repository/repository-reader.js";
 const decoder = new TextDecoder();
 const request = { profile: "app", projectName: "test-app", displayName: "Test app", packageVersions: verifiedCapabilityPackageVersions };
-const { createCurrentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-const currentContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createCurrentProfileRecipes() });
+const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
+const currentContext = (persistence = false) => ({ ...createGenerationRenderingContext(persistence), profiles: createApplicationEnvironmentProfileRecipes() });
 const ordinary = (await renderSkeleton(request, currentContext())).value;
 const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, currentContext(true))).value;
 const manifest = (rendered) => JSON.parse(decoder.decode(rendered.files.find(({ path }) => path === "apps/web/package.json").content));
-const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence" : "web-recipe-app-0.2.7"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
 async function reader(rendered, modify = (value) => value, lockSource) {
   return createInMemoryRepositoryReader({
     "package.json": decoder.decode(rendered.files.find(({ path }) => path === "package.json").content),
@@ -63,7 +63,7 @@ test("persistence refuses a changed root dependency graph before replacing its l
 
 test("current persistence dependency replacement refuses swapped source locks", async () => {
   const cases = [
-    { profiles: createCurrentProfileRecipes(), ordinary: "web-recipe-app-0.2.7", persistent: "web-recipe-app-0.2.7-persistence" },
+    { profiles: createApplicationEnvironmentProfileRecipes(), ordinary: "web-recipe-app-0.3.0", persistent: "web-recipe-app-0.2.7-persistence" },
   ];
   for (const cohort of cases) {
     const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
@@ -72,7 +72,7 @@ test("current persistence dependency replacement refuses swapped source locks", 
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
     const expectedNext = "16.4.1";
-    assert.equal(currentOrdinary.value.project.recipeVersion, "0.2.7");
+    assert.equal(currentOrdinary.value.project.recipeVersion, "0.3.0");
     assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
     assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
     assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);

@@ -9,7 +9,7 @@ const core = await import(pathToFileURL(builtEntry));
 const encoder = new TextEncoder();
 
 const validProject = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "2.0.0",
   builderCompatibility: "0.0.0",
   project: {
     name: "sample-portfolio",
@@ -17,7 +17,7 @@ const validProject = {
     defaultLocale: "en-CA",
   },
   originProfile: "portfolio",
-  recipeVersion: "0.11.7",
+  recipeVersion: "0.12.0",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
   capabilitySettings: {},
@@ -35,19 +35,17 @@ const validInstalledSurface = {
 };
 
 const validState = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "2.0.0",
   builderVersion: "0.0.0",
-  projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
+  projectSchemaVersion: "2.0.0",
+  origin: { profile: "portfolio", recipeVersion: "0.12.0" },
   installedCapabilities: [
-    {
-      identifier: "standards",
-      version: "0.5.1",
-      deliveryMode: "package-backed",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-    },
-  ],
+    ["standards", "0.9.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+    ["deployment-cloudflare", "0.9.0"], ["observability", "0.4.0"],
+  ].map(([identifier, version]) => ({ identifier, version,
+    deliveryMode: ["standards", "observability"].includes(identifier) ? "package-backed" : "source-generated",
+    stateClassifications: ["repository-stateful"], removalPolicy: "reviewed",
+  })),
   appliedMigrations: [],
   managedSurfaces: [validInstalledSurface],
   ejections: [],
@@ -138,14 +136,14 @@ test("builder-core exports the approved state codec and ownership API", () => {
 });
 
 test("project YAML uses strict YAML 1.2 semantics and deterministic serialization", () => {
-  const source = `schemaVersion: 1.0.0
+  const source = `schemaVersion: 2.0.0
 builderCompatibility: 0.0.0
 project:
   name: sample-portfolio
   displayName: No
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.7
+recipeVersion: 0.12.0
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -168,8 +166,8 @@ project:
   defaultLocale: en-CA
   displayName: Sample Portfolio
   name: sample-portfolio
-recipeVersion: 0.11.7
-schemaVersion: 1.0.0
+recipeVersion: 0.12.0
+schemaVersion: 2.0.0
 selectedCapabilities:
   - standards
 `,
@@ -180,9 +178,9 @@ selectedCapabilities:
 
 test("project YAML rejects unsafe document features without echoing source", () => {
   const cases = [
-    `schemaVersion: 1.0.0\nschemaVersion: 1.0.0\nsecret: duplicate-value\n`,
+    `schemaVersion: 2.0.0\nschemaVersion: 2.0.0\nsecret: duplicate-value\n`,
     `project: &project { name: secret-anchor }\ncopy: *project\n`,
-    `schemaVersion: 1.0.0\n---\nsecret: second-document\n`,
+    `schemaVersion: 2.0.0\n---\nsecret: second-document\n`,
     `schemaVersion: !!timestamp 2026-08-05\nsecret: tagged-value\n`,
   ];
 
@@ -192,14 +190,14 @@ test("project YAML rejects unsafe document features without echoing source", () 
     assert.doesNotMatch(JSON.stringify(result.issues), /secret|duplicate-value|secret-anchor|second-document|tagged-value/);
   }
 
-  const schemaResult = core.parseProjectYaml(`schemaVersion: 1.0.0
+  const schemaResult = core.parseProjectYaml(`schemaVersion: 2.0.0
 builderCompatibility: 0.0.0
 project:
   name: sample-portfolio
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.7
+recipeVersion: 0.12.0
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -210,14 +208,14 @@ unknownKey: secret-schema-value
   assertIssue(schemaResult, "PROJECT_SCHEMA_INVALID");
   assert.doesNotMatch(JSON.stringify(schemaResult.issues), /secret-schema-value/);
 
-  const dynamicKeyResult = core.parseProjectYaml(`schemaVersion: 1.0.0
+  const dynamicKeyResult = core.parseProjectYaml(`schemaVersion: 2.0.0
 builderCompatibility: 0.0.0
 project:
   name: sample-portfolio
   displayName: Sample Portfolio
   defaultLocale: en-CA
 originProfile: portfolio
-recipeVersion: 0.11.7
+recipeVersion: 0.12.0
 platformAdapter: cloudflare-workers
 selectedCapabilities:
   - standards
@@ -264,10 +262,11 @@ test("profile-transition receipts require the exact conservative persisted check
     "component-tests",
     "next-build",
     "opennext-build",
+    "worker-integration",
     "post-change-inference",
   ];
-  assert.deepEqual(core.profileTransitionPersistedVerificationChecks, expectedChecks);
-  assert.deepEqual(core.profileTransitionVerificationChecks, [
+  assert.deepEqual(core.appProfileTransitionPersistedVerificationChecks, expectedChecks);
+  assert.deepEqual(core.appProfileTransitionVerificationChecks, [
     ...expectedChecks,
     "migration-record",
     "post-state-inference",
@@ -275,7 +274,10 @@ test("profile-transition receipts require the exact conservative persisted check
 
   const transitionState = {
     ...validState,
-    origin: { profile: "site", recipeVersion: "0.12.7" },
+    origin: { profile: "app", recipeVersion: "0.3.0" },
+    installedCapabilities: [...validState.installedCapabilities, ...[
+      ["site-routing", "0.5.0"], ["app-foundation", "0.3.0"],
+    ].map(([identifier, version]) => ({ identifier, version, deliveryMode: "source-generated", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" }))],
     lastSuccessfulVerification: {
       kind: "profile-transition",
       checks: expectedChecks,

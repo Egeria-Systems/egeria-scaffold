@@ -121,6 +121,14 @@ Apart from the precise unused-public-generation timing exception above, this ADR
 
 No other architecture is superseded. In particular, retain materialized recipes and installed authority, application ownership, state-last guarded transactions, narrow ports, Effect boundaries, externalized copy, accessibility claim limits and public-package controls. No new generic executor, wrapper or configuration framework is justified.
 
+### Public environment generation activation
+
+The authored integration candidate selects one schema-2 public path: `portfolio@0.12.0`, `site@0.13.0`, and `app@0.3.0`. Project and state schema versions are `2.0.0`; builder compatibility remains `0.0.0`, and public standards/observability package pins remain `0.1.0`/`0.3.0`. There is no legacy generation switch or executable schema-1 installed fallback. Historical templates, fixtures, lockfiles and receipts remain immutable evidence.
+
+This activation replaces only the recipe endpoints retained by [ADR-0013](0013-convergent-app-profile.md) and [ADR-0015](0015-vitest-five-generation.md): `portfolio@0.12.0 -> app@0.3.0` and `site@0.13.0 -> app@0.3.0`, each over the eight analytics/booking/multilingual subsets. It retains the two incoming responsibilities, source-content preservation and every transaction safeguard. Hosted-contact, email/retained-foundation, persistence and jobs-bearing sources refuse. Portfolio admission remains closed until exact new visual inputs and all four image/manifest approvals are satisfied. There is no outgoing app, portfolio-to-site or capability-upgrade edge.
+
+The [current generation boundary](../architecture/capability-model.md#current-environment-generation) owns the finite installed tuples, optional lifecycle, fixture identities and source/runtime/hosted acceptance distinction. The remaining consumer reconciliation, runtime/security checks, visual acceptance and separate subject renewals still gate release.
+
 ## Consequences
 
 - Local work can omit optional public destinations without accidental provider calls; deployments require deliberate target configuration.
@@ -133,3 +141,5 @@ No other architecture is superseded. In particular, retain materialized recipes 
 The [enforcement map](../architecture/enforcement-map.md) owns actual versus planned gates; the [capability boundary](../architecture/capability-model.md#application-environments) owns assembly, lifecycle and certification limits. Configuration, compiled/runtime target refusal, credential isolation, provider/consent behavior, artifact verification and composed examples remain planned until their owning implementation and tests land. Document checks establish structure and source ownership only.
 
 Primary sources checked on 2026-09-24 support the bounded decisions: [Next.js public build inputs](https://nextjs.org/docs/app/guides/environment-variables), [Wrangler environment declarations](https://developers.cloudflare.com/workers/wrangler/environments/), [native GitHub deployment review](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/review-deployments), [Google project separation](https://developers.google.com/identity/siwg/best-practices#google-cloud-project-setup) and [Stripe sandboxes](https://docs.stripe.com/sandboxes). Revalidate relevant provider requirements at implementation/certification preparation; project sharing policy is not a universal provider rule.
+
+Hosted generated-client source binding follows the [canonical dual-source provenance contract](../architecture/capability-model.md#hosted-generated-client-provenance). Ordinary generated releases keep their existing source authority; temporary generated commits are derived inputs, never reviewed builder revisions.

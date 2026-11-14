@@ -1,3 +1,4 @@
+import { syntheticApplicationEnvironment } from "./verify-generated-skeletons.mjs";
 import {
   constants,
   copyFile,
@@ -24,8 +25,7 @@ const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const subject = Object.freeze({
   descriptorVersion: "0.4.0",
-  behaviorContractDigest:
-    "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
+  behaviorContractDigest: "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
 });
 const expectedCapabilities = Object.freeze([
   "standards",
@@ -45,8 +45,12 @@ const expectedVerificationChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -132,13 +136,13 @@ function configurationFor(revision) {
     expectedCapabilities,
     capabilityIdentifier: "content-files",
     capabilityVersion: "0.4.0",
-    expectedRecipeVersion: "0.11.7",
+    expectedRecipeVersion: "0.12.0",
     verifierIdentifier: "portfolio",
     expectedVerificationChecks,
     expectedFixtureChecks,
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.11.7",
+      recipeVersion: "0.12.0",
       locale: "en-CA",
       evidenceRevision: revision,
     }),
@@ -244,6 +248,7 @@ async function verifyContentFixture({ projectRoot, runCommand, environment }) {
 
   const childEnvironment = {
     ...environment,
+    ...syntheticApplicationEnvironment([], {}, "development", "http://localhost:3000"),
     HOME: home,
     USERPROFILE: home,
     TMPDIR: temporary,

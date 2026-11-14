@@ -51,12 +51,11 @@ export const appTransitionVisualProject = Object.freeze({
   displayName: "App transition",
 });
 export const appTransitionVisualBookingSettings = Object.freeze({
-  destination: "https://calendly.com/example/discovery",
   mode: "popup" as const,
 });
 export const appTransitionVisualAnalyticsSettings = Object.freeze({
   consent: { policy: "explicit-opt-in" as const },
-  providers: { cloudflareWebAnalytics: { siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
+  providers: { cloudflareWebAnalytics: true as const },
   operationalIntegrations: {},
 });
 // Historical visual provenance only; these retired inputs confer no current admission.
@@ -335,7 +334,7 @@ export function prepareAppProfileTransition(input: Readonly<{
   validators: AppTransitionContentValidators;
 }>): AppTransitionResult<AppTransitionPreparation> {
   try {
-    if (input.source.project.selectedCapabilities.includes("contact-form-web3forms")) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
+    if (input.source.project.selectedCapabilities.some(identifier => ["contact-form-web3forms", "transactional-email-resend", "app-foundation", "application-persistence", "background-job-delivery"].includes(identifier))) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
     const profile = input.source.project.originProfile;
     const edge = resolveSupportedProfileTransition({
       fromProfile: profile, fromRecipeVersion: input.source.project.recipeVersion, toProfile: input.target.project.originProfile, toRecipeVersion: input.target.project.recipeVersion
@@ -442,7 +441,7 @@ export function selectAppTransitionVisuals(input: Readonly<{
   source: RenderedSkeleton;
   evidence: AppTransitionVisualEvidence | undefined;
 }>): AppTransitionResult<AppTransitionPreparation> {
-  if (input.source.project.selectedCapabilities.includes("contact-form-web3forms")) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
+  if (input.source.project.selectedCapabilities.some(identifier => ["contact-form-web3forms", "transactional-email-resend", "app-foundation", "application-persistence", "background-job-delivery"].includes(identifier))) return appTransitionFailure("PROFILE_TRANSITION_UNSUPPORTED");
   if (input.source.project.originProfile === "site") {
     return { ok: true, value: input.prepared };
   }

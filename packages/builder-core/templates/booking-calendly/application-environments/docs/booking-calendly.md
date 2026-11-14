@@ -4,7 +4,7 @@ Follow [Application environments](environments.md) for the single origin, source
 
 This selected integration offers an ordinary scheduling link, a lazy inline frame, or a native popup dialog. All three use one validated destination, `NEXT_PUBLIC_CALENDLY_URL`. The browser uses the value selected when its artifact was built. Changing a runtime variable cannot enable an unavailable artifact or retarget an existing one.
 
-The environment-aware generation is currently an internal candidate. Public builder commands retain the previous complete generation until the complete environment candidate activates. Do not add an internal-mode CLI flag or manually rewrite `.egeria` controls to opt in. These instructions apply to an already generated environment-aware project; the selected mode is recorded as `link`, `inline`, or `popup` in its project settings, with no stored URL.
+Public builder commands generate the current environment-aware project. These instructions apply to that generated project; the selected mode is recorded as `link`, `inline`, or `popup` in its project settings, with no stored URL.
 
 ## Prepare an isolated booking setup
 
@@ -80,7 +80,7 @@ Controlled frames, unit/component checks and automated accessibility checks esta
 
 To disable local testing, blank `NEXT_PUBLIC_CALENDLY_URL` and restart the development server or rebuild the artifact. Keep reusable nonproduction calendars/events. A runtime edit does not disable an existing build. Selected staging/production booking cannot have a blank URL; remove the selection through the supported reviewed lifecycle and rebuild instead.
 
-Builder lifecycle planning and application must use the actual generated repository's clean attached isolated worktree and exact approved plan. Current candidate commands remain internal until activation; do not run a guessed public schema switch. Removal concerns generated source/configuration, not Calendly accounts or provider data. The guide, localized copy, component and tests are application-owned: modified files are preserved/ejected, and re-add refuses collisions. Modified managed/shared files and surviving references require review before removal.
+Builder lifecycle planning and application must use the actual generated repository's clean attached isolated worktree and exact approved plan. Removal concerns generated source/configuration, not Calendly accounts or provider data. The guide, localized copy, component and tests are application-owned: modified files are preserved/ejected, and re-add refuses collisions. Modified managed/shared files and surviving references require review before removal.
 
 Inspect a failed source or verification operation and its recovery report before retrying. Source/controls, dependencies, build artifacts and provider state are separate recovery domains. Do not delete calendars, events, accounts or user edits to recover a local build. Retain the original approved URL/source revision and rebuild the intended target after a reviewed correction.
 

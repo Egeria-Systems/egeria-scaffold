@@ -111,3 +111,17 @@ Correct invalid local configuration and rebuild when build inputs changed. Rever
 If booking is selected, see the generated `docs/booking-calendly.md` guide for isolated calendars, its fixed public build input, modes and safe recovery.
 
 If analytics is selected, see the generated `docs/analytics.md` guide for build-time activation, consent, separate provider destinations, production Search verification and a complete contact/booking example.
+
+
+## Builder-hosted generated projects
+
+Ordinary releases from this repository use the existing prepared-artifact commands. A builder-hosted certification or synthetic journey has two source commits: the reviewed builder checkout and a separately frozen generated repository. Finish all generated source and browser-specification edits, commit that source, and capture its actual HEAD before building. Keep the runner-owned `GITHUB_SHA` and `EXPECTED_REVISION` equal to the builder checkout HEAD, and keep `GITHUB_WORKSPACE` pointing to that real checkout.
+
+From `apps/web`, the explicit hosted case records and revalidates the same artifact:
+
+```sh
+node --experimental-strip-types scripts/check-prepared-artifact.mjs record staging "$EXPECTED_REVISION" --builder-generated="$GENERATED_SOURCE_REVISION"
+node --experimental-strip-types scripts/check-prepared-artifact.mjs verify staging "$EXPECTED_REVISION" --builder-generated="$GENERATED_SOURCE_REVISION"
+```
+
+Both repositories must remain clean, with no assume-unchanged or skip-worktree flags. Verification checks both revisions and repository identities, the actual build ID, target and full output inventory; it never changes the receipt. Run it immediately before deployment. A changed source or artifact requires a new reviewed source/build cycle. This receipt provides same-run derivation and tamper detection, not cryptographic attestation or human approval. Never replace `GITHUB_SHA` or use `--local` for a hosted deployment.

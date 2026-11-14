@@ -43,14 +43,6 @@ export type ProfileTransitionPlanningFailureCode =
   | "PROJECT_INSPECTION_INVALID"
   | "PROJECT_STATE_INCOMPATIBLE";
 
-export type ProfileTransitionControlFileEvidence = Readonly<{
-  path:
-    | ".egeria/migrations.jsonl"
-    | ".egeria/project.yaml"
-    | ".egeria/state.json";
-  fingerprint: `sha256:${string}`;
-}>;
-
 export type ProfileTransitionCapabilitySubject = Readonly<{
   identifier: string;
   version: string;
@@ -328,7 +320,7 @@ export type AppProfileTransitionPlan = Readonly<{
   }>;
   target: Readonly<{
     profile: "app";
-    recipeVersion: "0.2.7";
+    recipeVersion: "0.3.0";
     capabilities: readonly ProfileTransitionCapabilitySubject[];
   }>;
   actions: readonly AppTransitionDisposition[];
@@ -382,7 +374,7 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
   if (!inputRecord.ok) return undefined;
   const multilingual = input.source.project.selectedCapabilities.includes("multilingual");
   try {
-    const baselines = await Promise.all(appTransitionBaselinePaths.map(async (path, index) => ({ path, content: new Uint8Array(await readFile(new URL(`../../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${multilingual ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url))) })));
+    const baselines = await Promise.all(appTransitionBaselinePaths.map(async (path, index) => ({ path, content: new Uint8Array(await readFile(new URL(`../../templates/portfolio/application-environments/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${multilingual ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url))) })));
     const approvedBaselines = verifyAppTransitionVisualInputRecord({
       optionalCapabilities,
       influencingFingerprints: canonical.value.influencingFingerprints,
@@ -429,19 +421,19 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
   const project = controls.project.value;
-  if (project.selectedCapabilities.includes("contact-form-web3forms")) {
+  if (project.selectedCapabilities.some(identifier => ["contact-form-web3forms", "transactional-email-resend", "app-foundation", "application-persistence", "background-job-delivery"].includes(identifier))) {
     return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
   }
   if (project.ejectedAreas.length > 0 || controls.state.value.ejections.length > 0) {
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
   const snapshot = createVerifiedProjectSnapshot(project, controls.state.value);
-  if (!snapshot.ok || snapshot.value.renderingContext === undefined) {
+  if (!snapshot.ok) {
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
   const renderingContext = snapshot.value.renderingContext;
   const targetRecipeVersion = snapshot.value.profiles.find(({ identifier }) => identifier === "app")?.recipeVersion;
-  if (targetRecipeVersion !== "0.2.7") {
+  if (targetRecipeVersion !== "0.3.0") {
     return planningFailure("PROFILE_TRANSITION_EDGE_MISSING");
   }
   const edge = resolveSupportedProfileTransition({

@@ -83,7 +83,7 @@ function assertIssues(result, expectedIssues) {
 }
 
 function createCatalog() {
-  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
+  return assertOk(core.createCapabilityCatalogSnapshot(packageVersions, core.createGenerationRenderingContext().catalogSnapshot));
 }
 
 function resolveRequest(
@@ -95,6 +95,7 @@ function resolveRequest(
 }
 
 const appFoundationFileSurfaces = [
+  ["app-foundation-application-environment-adapter", "apps/web/src/infrastructure/cloudflare/application-environment.ts", "managed"],
   ["app-foundation-health-route-entry", "apps/web/app/api/health/route.ts", "managed"],
   ["app-foundation-build-information-domain", "apps/web/src/domain/build-information.ts", "managed"],
   ["app-foundation-build-information-reader", "apps/web/src/application/build-information-reader.ts", "managed"],
@@ -118,7 +119,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
   assert.deepEqual(core.profileRecipes.at(-1), {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.7",
+    recipeVersion: "0.3.0",
     defaultCapabilities: ["app-foundation", "site-routing"],
   });
 
@@ -136,7 +137,7 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
     const identifiers = resolution.capabilities.map(({ identifier }) => identifier);
 
-    assert.equal(resolution.recipeVersion, "0.2.7");
+    assert.equal(resolution.recipeVersion, "0.3.0");
     assert.deepEqual(
       identifiers,
       [
@@ -152,19 +153,9 @@ test("app recipe resolves exact defaults, dependency order, optional subsets, an
     );
   }
 
-  assertIssues(
-    resolveRequest({
-      profile: "portfolio",
-      requestedCapabilities: ["app-foundation"],
-    }),
-    [
-      {
-        code: "CAPABILITY_UNSUPPORTED",
-        path: ["capabilities", "app-foundation"],
-        context: { identifier: "app-foundation", profile: "portfolio" },
-      },
-    ],
-  );
+  const portfolioFoundation = assertOk(resolveRequest({ profile: "portfolio", requestedCapabilities: ["app-foundation"] }));
+  assert.ok(portfolioFoundation.capabilities.some(capability => capability.identifier === "app-foundation"));
+
   assertIssues(
     resolveRequest({ profile: "app", requestedCapabilities: ["unknown"] }),
     [
@@ -222,7 +213,7 @@ test("app foundation descriptor owns only its exact server, dependency, and veri
     },
     {
       identifier: "app-foundation",
-      version: "0.1.0",
+      version: "0.3.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -233,7 +224,7 @@ test("app foundation descriptor owns only its exact server, dependency, and veri
         "multilingual",
         "site-routing",
       ],
-      supportedProfiles: ["app"],
+      supportedProfiles: ["portfolio", "site", "app"],
       requiredPackages: ["effect"],
       environmentVariables: [],
       secrets: [],
@@ -243,10 +234,7 @@ test("app foundation descriptor owns only its exact server, dependency, and veri
       dataClassifications: [],
       retentionAssumptions: [],
       privilegedOperations: [],
-      migrationPlanners: [
-        "transition-portfolio-0-10-0-to-app-0-1-0",
-        "transition-site-0-11-0-to-app-0-1-0",
-      ],
+      migrationPlanners: [],
     },
   );
 
@@ -298,6 +286,7 @@ test("app foundation descriptor owns only its exact server, dependency, and veri
     "cause-and-cancellation-contracts",
     "health-delivery-contracts",
     "whole-worker-execution",
+    "runtime-target-refusal-before-effects",
     "server-only-imports",
   ]);
   assert.deepEqual(descriptor.documentationEvidenceRequirements, [
@@ -321,7 +310,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   );
 
   assert.notEqual(standards, undefined);
-  assert.equal(standards.version, "0.5.1");
+  assert.equal(standards.version, "0.9.0");
   assert.equal(standards.deliveryMode, "hybrid");
   assert.deepEqual(standards.requiredPackages, [
     "@axe-core/playwright",
@@ -335,10 +324,8 @@ test("standards hybrid ownership declares generated unit, component, browser, an
     "jsdom",
     "vitest",
   ]);
-  assert.deepEqual(standards.environmentVariables, [
-    "PLAYWRIGHT_DEPLOYED_URL",
-  ]);
-  assert.deepEqual(standards.secrets, []);
+  assert.deepEqual(standards.environmentVariables, ["DEPLOY_URL", "EXPECTED_REVISION"]);
+  assert.deepEqual(standards.secrets, ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN"]);
   assert.deepEqual(standards.externalDomains, [
     "cdn.playwright.dev",
     "playwright.download.prss.microsoft.com",
@@ -355,7 +342,12 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   assert.deepEqual(
     standards.managedSurfaces.map(({ identifier }) => identifier).toSorted(),
     [
+      "standards-application-environment-tests", "standards-site-origin-tests", "standards-application-build-tests",
+      "standards-prepared-artifact-check", "standards-deployment-protection-check", "standards-prepared-artifact-tests", "standards-deployment-protection-tests",
+      "standards-application-test-fixture", "standards-application-test-transport", "standards-application-transport-tests", "standards-application-transport-config",
+      "standards-check-prepared-artifact-script", "standards-test-deployment-contracts-script", "standards-test-transport-script",
       "standards-axe-playwright-package",
+      "standards-browser-development-server",
       "standards-browser-install-ci-script",
       "standards-browser-install-script",
       "standards-browser-quality-specification",
@@ -395,7 +387,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
       "standards-vitest-package",
     ].toSorted(),
   );
-  assert.equal(standards.inferenceProbes.length, 36);
+  assert.equal(standards.inferenceProbes.length, 51);
   const visualSurfaces = new Map(
     standards.managedSurfaces
       .filter(({ identifier }) => identifier.includes("visual"))
@@ -476,7 +468,7 @@ test("standards hybrid ownership declares generated unit, component, browser, an
   ]);
 });
 
-test("the current catalog preserves existing capability contracts while widening profile support", async () => {
+test("the current catalog exposes exact capability contracts and keeps observability independent from analytics", async () => {
   const catalogEntry = builtDeclaration.match(
     /export \* from "(\.\/catalog\/[^\"]+)\.js";/,
   )?.[1];
@@ -506,895 +498,1636 @@ test("the current catalog preserves existing capability contracts while widening
 
   assert.deepEqual(catalog.slice(1, 7), [
     {
-      identifier: "content-files",
-      version: "0.4.0",
-      deliveryMode: "source-generated",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: ["standards"],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site", "app"],
-      requiredPackages: ["raw-loader", "yaml"],
-      environmentVariables: [],
-      secrets: [],
-      platformResources: [],
-      externalDomains: [],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
-      adapterSemanticRequirements: [],
-      managedSurfaces: [
-        {
-          identifier: "content-files-raw-loader-package",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/raw-loader",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "content-files-yaml-package",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/dependencies/yaml",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "content-files-configuration",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/content/content.config.yaml",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "content-files-long-form-introduction",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/content/en-CA/long-form/introduction.md",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "content-files-site-content",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/content/en-CA/site.yaml",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "content-files-schema",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/src/content/content-schema.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "content-files-source-declarations",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/src/content/content-source.d.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "content-files-reader",
-          owner: { kind: "capability", identifier: "content-files" },
-          path: "apps/web/src/content/read-content.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
+      "identifier": "content-files",
+      "version": "0.4.0",
+      "deliveryMode": "source-generated",
+      "stateClassifications": [
+        "repository-stateful"
       ],
-      inferenceProbes: [
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "raw-loader",
-          version: "4.0.2",
-        },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "dependencies",
-          packageName: "yaml",
-          version: "2.9.0",
-        },
-        { kind: "file", path: "apps/web/content/content.config.yaml" },
-        {
-          kind: "file",
-          path: "apps/web/content/en-CA/long-form/introduction.md",
-        },
-        { kind: "file", path: "apps/web/content/en-CA/site.yaml" },
-        { kind: "file", path: "apps/web/src/content/content-schema.ts" },
-        {
-          kind: "file",
-          path: "apps/web/src/content/content-source.d.ts",
-        },
-        { kind: "file", path: "apps/web/src/content/read-content.ts" },
+      "removalPolicy": "reviewed",
+      "dependencies": [
+        "standards"
       ],
-      migrationPlanners: [],
-      verificationPlan: ["content-contracts", "typecheck"],
-      documentationEvidenceRequirements: ["copy-externalization"],
-      removalAndRecoveryRequirements: ["review-content-and-source-removal"],
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "portfolio",
+        "site",
+        "app"
+      ],
+      "requiredPackages": [
+        "raw-loader",
+        "yaml"
+      ],
+      "environmentVariables": [],
+      "secrets": [],
+      "platformResources": [],
+      "externalDomains": [],
+      "contentSecurityPolicyContributions": [],
+      "browserStorage": [],
+      "dataClassifications": [],
+      "retentionAssumptions": [],
+      "privilegedOperations": [],
+      "threatReviewLevel": "standard",
+      "adapterSemanticRequirements": [],
+      "managedSurfaces": [
+        {
+          "identifier": "content-files-raw-loader-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/devDependencies/raw-loader"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "content-files-yaml-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/dependencies/yaml"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "content-files-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/content/content.config.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "content-files-long-form-introduction",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/content/en-CA/long-form/introduction.md",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "content-files-site-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/content/en-CA/site.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "content-files-schema",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/src/content/content-schema.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "content-files-source-declarations",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/src/content/content-source.d.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "content-files-reader",
+          "owner": {
+            "kind": "capability",
+            "identifier": "content-files"
+          },
+          "path": "apps/web/src/content/read-content.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
+      ],
+      "inferenceProbes": [
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "devDependencies",
+          "packageName": "raw-loader",
+          "version": "4.0.2"
+        },
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "dependencies",
+          "packageName": "yaml",
+          "version": "2.9.0"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/content.config.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/long-form/introduction.md"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/site.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/content/content-schema.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/content/content-source.d.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/content/read-content.ts"
+        }
+      ],
+      "migrationPlanners": [],
+      "verificationPlan": [
+        "content-contracts",
+        "typecheck"
+      ],
+      "documentationEvidenceRequirements": [
+        "copy-externalization"
+      ],
+      "removalAndRecoveryRequirements": [
+        "review-content-and-source-removal"
+      ]
     },
     {
-      identifier: "section-composition",
-      version: "0.3.0",
-      deliveryMode: "source-generated",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: ["content-files"],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site", "app"],
-      requiredPackages: ["@tailwindcss/postcss", "postcss", "tailwindcss"],
-      environmentVariables: [],
-      secrets: [],
-      platformResources: [],
-      externalDomains: [],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
-      adapterSemanticRequirements: [],
-      managedSurfaces: [
-        {
-          identifier: "section-composition-global-styles",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/app/globals.css",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "section-composition-postcss-package",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/postcss",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "section-composition-tailwind-package",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/tailwindcss",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "section-composition-tailwind-postcss-package",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/@tailwindcss~1postcss",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "section-composition-postcss-configuration",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/postcss.config.mjs",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "section-composition-presentation",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/src/presentation/content-page.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "section-composition-registry",
-          owner: { kind: "capability", identifier: "section-composition" },
-          path: "apps/web/src/sections/section-registry.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
+      "identifier": "section-composition",
+      "version": "0.3.0",
+      "deliveryMode": "source-generated",
+      "stateClassifications": [
+        "repository-stateful"
       ],
-      inferenceProbes: [
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "@tailwindcss/postcss",
-          version: "4.3.3",
-        },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "postcss",
-          version: "8.5.26",
-        },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "tailwindcss",
-          version: "4.3.3",
-        },
-        { kind: "file", path: "apps/web/app/globals.css" },
-        { kind: "file", path: "apps/web/postcss.config.mjs" },
-        {
-          kind: "file",
-          path: "apps/web/src/presentation/content-page.tsx",
-        },
-        {
-          kind: "file",
-          path: "apps/web/src/sections/section-registry.tsx",
-        },
+      "removalPolicy": "reviewed",
+      "dependencies": [
+        "content-files"
       ],
-      migrationPlanners: [],
-      verificationPlan: ["typecheck", "next-build"],
-      documentationEvidenceRequirements: ["bounded-section-composition"],
-      removalAndRecoveryRequirements: [
-        "review-route-and-presentation-removal",
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "portfolio",
+        "site",
+        "app"
       ],
+      "requiredPackages": [
+        "@tailwindcss/postcss",
+        "postcss",
+        "tailwindcss"
+      ],
+      "environmentVariables": [],
+      "secrets": [],
+      "platformResources": [],
+      "externalDomains": [],
+      "contentSecurityPolicyContributions": [],
+      "browserStorage": [],
+      "dataClassifications": [],
+      "retentionAssumptions": [],
+      "privilegedOperations": [],
+      "threatReviewLevel": "standard",
+      "adapterSemanticRequirements": [],
+      "managedSurfaces": [
+        {
+          "identifier": "section-composition-global-styles",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/app/globals.css",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "section-composition-postcss-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/devDependencies/postcss"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "section-composition-tailwind-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/devDependencies/tailwindcss"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "section-composition-tailwind-postcss-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/devDependencies/@tailwindcss~1postcss"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "section-composition-postcss-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/postcss.config.mjs",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "section-composition-presentation",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/src/presentation/content-page.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "section-composition-registry",
+          "owner": {
+            "kind": "capability",
+            "identifier": "section-composition"
+          },
+          "path": "apps/web/src/sections/section-registry.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
+      ],
+      "inferenceProbes": [
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "devDependencies",
+          "packageName": "@tailwindcss/postcss",
+          "version": "4.3.3"
+        },
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "devDependencies",
+          "packageName": "postcss",
+          "version": "8.5.26"
+        },
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "devDependencies",
+          "packageName": "tailwindcss",
+          "version": "4.3.3"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/globals.css"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/postcss.config.mjs"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/presentation/content-page.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/sections/section-registry.tsx"
+        }
+      ],
+      "migrationPlanners": [],
+      "verificationPlan": [
+        "typecheck",
+        "next-build"
+      ],
+      "documentationEvidenceRequirements": [
+        "bounded-section-composition"
+      ],
+      "removalAndRecoveryRequirements": [
+        "review-route-and-presentation-removal"
+      ]
     },
     {
-      identifier: "deployment-cloudflare",
-      version: "0.3.1",
-      deliveryMode: "hybrid",
-      stateClassifications: ["repository-stateful", "external-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: ["standards"],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site", "app"],
-      requiredPackages: ["@opennextjs/cloudflare", "wrangler"],
-      environmentVariables: ["DEPLOY_URL"],
-      secrets: ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"],
-      platformResources: ["cloudflare-worker", "cloudflare-static-assets"],
-      externalDomains: [],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: [],
-      privilegedOperations: ["cloudflare-worker-deployment"],
-      threatReviewLevel: "elevated",
-      adapterSemanticRequirements: ["node-runtime", "worker-static-assets"],
-      managedSurfaces: [
-        {
-          identifier: "deployment-cloudflare-package",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/dependencies/@opennextjs~1cloudflare",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "deployment-cloudflare-wrangler-package",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/devDependencies/wrangler",
-          },
-          mergeStrategy: "json-property",
-        },
-        {
-          identifier: "deployment-cloudflare-workflow",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: ".github/workflows/deploy.yml",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "deployment-cloudflare-next-configuration",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: "apps/web/next.config.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "deployment-cloudflare-open-next-configuration",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: "apps/web/open-next.config.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "deployment-cloudflare-wrangler-configuration",
-          owner: { kind: "capability", identifier: "deployment-cloudflare" },
-          path: "apps/web/wrangler.jsonc",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
+      "identifier": "deployment-cloudflare",
+      "version": "0.9.0",
+      "deliveryMode": "hybrid",
+      "stateClassifications": [
+        "repository-stateful",
+        "external-stateful"
       ],
-      inferenceProbes: [
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "dependencies",
-          packageName: "@opennextjs/cloudflare",
-          version: "1.20.12",
-        },
-        {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "devDependencies",
-          packageName: "wrangler",
-          version: "4.148.0",
-        },
-        { kind: "file", path: ".github/workflows/deploy.yml" },
-        { kind: "file", path: "apps/web/next.config.ts" },
-        { kind: "file", path: "apps/web/open-next.config.ts" },
-        { kind: "file", path: "apps/web/wrangler.jsonc" },
+      "removalPolicy": "reviewed",
+      "dependencies": [
+        "standards"
       ],
-      migrationPlanners: [],
-      verificationPlan: [
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "portfolio",
+        "site",
+        "app"
+      ],
+      "requiredPackages": [
+        "@opennextjs/cloudflare",
+        "wrangler"
+      ],
+      "environmentVariables": [
+        "DEPLOY_URL",
+        "APPLICATION_ENVIRONMENT",
+        "NEXT_PUBLIC_APPLICATION_ENVIRONMENT"
+      ],
+      "secrets": [
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_TOKEN"
+      ],
+      "platformResources": [
+        "cloudflare-worker",
+        "cloudflare-static-assets"
+      ],
+      "externalDomains": [],
+      "contentSecurityPolicyContributions": [],
+      "browserStorage": [],
+      "dataClassifications": [],
+      "retentionAssumptions": [],
+      "privilegedOperations": [
+        "cloudflare-worker-deployment"
+      ],
+      "threatReviewLevel": "elevated",
+      "adapterSemanticRequirements": [
+        "node-runtime",
+        "worker-static-assets"
+      ],
+      "managedSurfaces": [
+        {
+          "identifier": "deployment-site-origin",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/src/configuration/site-origin.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-build-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/src/configuration/application-build.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-application-environment-contract",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/src/configuration/application-environment.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-application-environment-preflight",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/scripts/check-application-environment.mjs",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-check-environment-script",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/scripts/check:environment"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "deployment-check-environment-deployment-script",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/scripts/check:environment:deployment"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "deployment-cloudflare-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/dependencies/@opennextjs~1cloudflare"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "deployment-cloudflare-wrangler-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/devDependencies/wrangler"
+          },
+          "mergeStrategy": "json-property"
+        },
+        {
+          "identifier": "deployment-cloudflare-ci-git",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/scripts/prepare-ci-git.sh",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-cloudflare-workflow",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": ".github/workflows/deploy.yml",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-cloudflare-next-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/next.config.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-cloudflare-open-next-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/open-next.config.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "deployment-cloudflare-wrangler-configuration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "deployment-cloudflare"
+          },
+          "path": "apps/web/wrangler.jsonc",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
+      ],
+      "inferenceProbes": [
+        {
+          "kind": "file",
+          "path": "apps/web/src/configuration/site-origin.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/configuration/application-build.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/configuration/application-environment.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/scripts/check-application-environment.mjs"
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/package.json",
+          "pointer": "/scripts/check:environment",
+          "expected": "node scripts/check-application-environment.mjs --local"
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/package.json",
+          "pointer": "/scripts/check:environment:deployment",
+          "expected": "node scripts/check-application-environment.mjs --deployment"
+        },
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "dependencies",
+          "packageName": "@opennextjs/cloudflare",
+          "version": "1.20.12"
+        },
+        {
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "devDependencies",
+          "packageName": "wrangler",
+          "version": "4.148.0"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/scripts/prepare-ci-git.sh"
+        },
+        {
+          "kind": "file",
+          "path": ".github/workflows/deploy.yml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/next.config.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/open-next.config.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/wrangler.jsonc"
+        }
+      ],
+      "migrationPlanners": [],
+      "verificationPlan": [
         "next-build",
         "opennext-build",
         "wrangler-types",
         "deployment-workflow-contracts",
-        "browser-deployed",
+        "application-environment-preflight",
+        "compiled-runtime-target-agreement",
+        "browser-artifact-secret-exclusion",
+        "browser-deployed"
       ],
-      documentationEvidenceRequirements: [
+      "documentationEvidenceRequirements": [
         "nextjs-opennext-cloudflare-compatibility",
         "deployment-authority-and-claim-boundaries",
+        "application-environment-build-runtime-configuration"
       ],
-      removalAndRecoveryRequirements: [
+      "removalAndRecoveryRequirements": [
         "review-deployment-source-and-provider-state-separately",
-        "revoke-or-rotate-deployment-credentials-separately",
-      ],
+        "revoke-or-rotate-deployment-credentials-separately"
+      ]
     },
     {
-      identifier: "observability",
-      version: "0.3.0",
-      deliveryMode: "hybrid",
-      stateClassifications: ["repository-stateful", "external-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: [
+      "identifier": "observability",
+      "version": "0.4.0",
+      "deliveryMode": "hybrid",
+      "stateClassifications": [
+        "repository-stateful",
+        "external-stateful"
+      ],
+      "removalPolicy": "reviewed",
+      "dependencies": [
         "content-files",
         "deployment-cloudflare",
-        "section-composition",
+        "section-composition"
       ],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site", "app"],
-      requiredPackages: ["@egeria-systems/observability"],
-      environmentVariables: [],
-      secrets: [
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "portfolio",
+        "site",
+        "app"
+      ],
+      "requiredPackages": [
+        "@egeria-systems/observability"
+      ],
+      "environmentVariables": [
+        "APPLICATION_ENVIRONMENT",
+        "NEXT_PUBLIC_SITE_URL"
+      ],
+      "secrets": [
         "BETTER_STACK_INGESTING_HOST",
-        "BETTER_STACK_SOURCE_TOKEN",
+        "BETTER_STACK_SOURCE_TOKEN"
       ],
-      platformResources: [
+      "platformResources": [
         "better-stack-telemetry-source",
-        "cloudflare-workers-logs",
+        "cloudflare-workers-logs"
       ],
-      externalDomains: ["*.betterstackdata.com"],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [
+      "externalDomains": [
+        "*.betterstackdata.com"
+      ],
+      "contentSecurityPolicyContributions": [],
+      "browserStorage": [],
+      "dataClassifications": [
         "bounded-operational-telemetry",
         "provider-platform-error-and-exception-logs",
-        "restricted-error-diagnostics",
+        "restricted-error-diagnostics"
       ],
-      retentionAssumptions: ["provider-controlled-operational-log-retention"],
-      privilegedOperations: [
+      "retentionAssumptions": [
+        "provider-controlled-operational-log-retention"
+      ],
+      "privilegedOperations": [
         "cloudflare-secret-configuration",
-        "provider-source-configuration",
+        "provider-source-configuration"
       ],
-      threatReviewLevel: "elevated",
-      adapterSemanticRequirements: [
+      "threatReviewLevel": "elevated",
+      "adapterSemanticRequirements": [
         "cloudflare-execution-context-lifetime",
         "cloudflare-version-metadata",
         "same-origin-browser-ingest",
         "separate-operational-and-diagnostic-sinks",
+        "matched-build-runtime-target",
+        "optional-complete-provider-configuration",
+        "authoritative-environment-labels",
+        "exact-staging-origin-browser-credentials",
+        "redirect-refusal"
       ],
-      managedSurfaces: [
+      "managedSurfaces": [
         {
-          identifier: "observability-package",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/package.json",
-          ownership: "merge-managed",
-          fingerprintTarget: {
-            kind: "json-value",
-            pointer: "/dependencies/@egeria-systems~1observability",
+          "identifier": "observability-package",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
           },
-          mergeStrategy: "json-property",
+          "path": "apps/web/package.json",
+          "ownership": "merge-managed",
+          "fingerprintTarget": {
+            "kind": "json-value",
+            "pointer": "/dependencies/@egeria-systems~1observability"
+          },
+          "mergeStrategy": "json-property"
         },
         {
-          identifier: "observability-browser-ingest-route",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/app/api/observability/route.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-browser-ingest-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/app/api/observability/route.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-browser-instrumentation",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/instrumentation-client.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-browser-instrumentation",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/instrumentation-client.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-browser-reporter",
-          owner: { kind: "capability", identifier: "observability" },
-          path:
-            "apps/web/src/infrastructure/observability/browser-reporter.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-browser-reporter",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/observability/browser-reporter.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-cloudflare-context",
-          owner: { kind: "capability", identifier: "observability" },
-          path:
-            "apps/web/src/infrastructure/cloudflare/observability-context.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-cloudflare-context",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-registration",
-          owner: { kind: "capability", identifier: "observability" },
-          path:
-            "apps/web/src/infrastructure/observability/installed-capability.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-registration",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/observability/installed-capability.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-server-instrumentation",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/instrumentation.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-server-instrumentation",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/instrumentation.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-server-reporter",
-          owner: { kind: "capability", identifier: "observability" },
-          path:
-            "apps/web/src/infrastructure/observability/server-reporter.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-server-reporter",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/observability/server-reporter.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-web-vitals-reporter",
-          owner: { kind: "capability", identifier: "observability" },
-          path:
-            "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-web-vitals-reporter",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-page-error-boundary",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/app/error.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-page-error-boundary",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/app/error.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-global-error-boundary",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/app/global-error.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-global-error-boundary",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/app/global-error.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-error-copy-source",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/content/en-CA/observability.yaml",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-error-copy-source",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/content/en-CA/observability.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-error-copy",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/src/infrastructure/observability/error-copy.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-error-copy",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/infrastructure/observability/error-copy.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "observability-error-fallback",
-          owner: { kind: "capability", identifier: "observability" },
-          path: "apps/web/src/presentation/error-fallback.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "observability-error-fallback",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/src/presentation/error-fallback.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
+        {
+          "identifier": "observability-environment-tests",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "apps/web/tests/unit/observability-environment.test.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "observability-operator-guide",
+          "owner": {
+            "kind": "capability",
+            "identifier": "observability"
+          },
+          "path": "docs/observability.md",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
       ],
-      inferenceProbes: [
+      "inferenceProbes": [
         {
-          kind: "package",
-          path: "apps/web/package.json",
-          section: "dependencies",
-          packageName: "@egeria-systems/observability",
-          version: "4.5.6",
+          "kind": "package",
+          "path": "apps/web/package.json",
+          "section": "dependencies",
+          "packageName": "@egeria-systems/observability",
+          "version": "4.5.6"
         },
         {
-          kind: "file",
-          path: "apps/web/app/api/observability/route.ts",
+          "kind": "file",
+          "path": "apps/web/app/api/observability/route.ts"
         },
         {
-          kind: "file",
-          path: "apps/web/instrumentation-client.ts",
+          "kind": "file",
+          "path": "apps/web/instrumentation-client.ts"
         },
         {
-          kind: "file",
-          path: "apps/web/instrumentation.ts",
+          "kind": "file",
+          "path": "apps/web/instrumentation.ts"
         },
         {
-          kind: "file",
-          path:
-            "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts"
         },
         {
-          kind: "file",
-          path:
-            "apps/web/src/infrastructure/observability/browser-reporter.ts",
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/observability/browser-reporter.ts"
         },
         {
-          kind: "file",
-          path:
-            "apps/web/src/infrastructure/observability/installed-capability.ts",
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/observability/installed-capability.ts"
         },
         {
-          kind: "file",
-          path:
-            "apps/web/src/infrastructure/observability/server-reporter.ts",
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/observability/server-reporter.ts"
         },
         {
-          kind: "file",
-          path:
-            "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
-        },
-        { kind: "file", path: "apps/web/app/error.tsx" },
-        { kind: "file", path: "apps/web/app/global-error.tsx" },
-        {
-          kind: "file",
-          path: "apps/web/content/en-CA/observability.yaml",
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx"
         },
         {
-          kind: "file",
-          path: "apps/web/src/infrastructure/observability/error-copy.ts",
+          "kind": "file",
+          "path": "apps/web/app/error.tsx"
         },
         {
-          kind: "file",
-          path: "apps/web/src/presentation/error-fallback.tsx",
+          "kind": "file",
+          "path": "apps/web/app/global-error.tsx"
         },
         {
-          kind: "json-value",
-          path: "apps/web/wrangler.jsonc",
-          pointer: "/observability/enabled",
-          expected: true,
+          "kind": "file",
+          "path": "apps/web/content/en-CA/observability.yaml"
         },
         {
-          kind: "json-value",
-          path: "apps/web/wrangler.jsonc",
-          pointer: "/observability/head_sampling_rate",
-          expected: 1,
+          "kind": "file",
+          "path": "apps/web/src/infrastructure/observability/error-copy.ts"
         },
         {
-          kind: "json-value",
-          path: "apps/web/wrangler.jsonc",
-          pointer: "/observability/logs/invocation_logs",
-          expected: false,
+          "kind": "file",
+          "path": "apps/web/src/presentation/error-fallback.tsx"
         },
         {
-          kind: "json-value",
-          path: "apps/web/wrangler.jsonc",
-          pointer: "/version_metadata/binding",
-          expected: "CF_VERSION_METADATA",
+          "kind": "file",
+          "path": "apps/web/tests/unit/observability-environment.test.ts"
         },
+        {
+          "kind": "file",
+          "path": "docs/observability.md"
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/wrangler.jsonc",
+          "pointer": "/observability/enabled",
+          "expected": true
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/wrangler.jsonc",
+          "pointer": "/observability/head_sampling_rate",
+          "expected": 1
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/wrangler.jsonc",
+          "pointer": "/observability/logs/invocation_logs",
+          "expected": false
+        },
+        {
+          "kind": "json-value",
+          "path": "apps/web/wrangler.jsonc",
+          "pointer": "/version_metadata/binding",
+          "expected": "CF_VERSION_METADATA"
+        }
       ],
-      migrationPlanners: [],
-      verificationPlan: [
+      "migrationPlanners": [],
+      "verificationPlan": [
         "package-resolution",
         "observability-contracts",
+        "environment-configuration-and-target-refusal",
+        "same-artifact-runtime-and-browser-isolation",
+        "controlled-route-diagnostics-delivery",
         "lint",
         "typecheck",
         "next-build",
         "opennext-build",
         "wrangler-types",
         "browser-development",
-        "browser-preview",
+        "browser-preview"
       ],
-      documentationEvidenceRequirements: [
+      "documentationEvidenceRequirements": [
         "public-package-version-and-provenance",
         "analytics-separation",
+        "console-only-and-runtime-provider-examples",
+        "environment-and-staging-session-boundary",
+        "provider-retention-and-recovery-handoff"
       ],
-      removalAndRecoveryRequirements: [
+      "removalAndRecoveryRequirements": [
         "review-deployment-observability-configuration-removal",
         "review-generated-observability-source-removal",
         "review-observability-credential-revocation-or-rotation",
         "review-observability-provider-resource-removal",
         "review-observability-retention-and-data-disposition",
         "review-observability-source-provider-and-credential-recovery-separately",
-        "review-package-and-registration-removal",
-      ],
+        "review-package-and-registration-removal"
+      ]
     },
     {
-      identifier: "site-routing",
-      version: "0.4.0",
-      deliveryMode: "source-generated",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-      dependencies: ["content-files", "observability", "section-composition"],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["site", "app"],
-      requiredPackages: [],
-      environmentVariables: [],
-      secrets: [],
-      platformResources: [],
-      externalDomains: [],
-      contentSecurityPolicyContributions: [],
-      browserStorage: [],
-      dataClassifications: [],
-      retentionAssumptions: [],
-      privilegedOperations: [],
-      threatReviewLevel: "standard",
-      adapterSemanticRequirements: [],
-      managedSurfaces: [
+      "identifier": "site-routing",
+      "version": "0.5.0",
+      "deliveryMode": "source-generated",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "removalPolicy": "reviewed",
+      "dependencies": [
+        "content-files",
+        "observability",
+        "section-composition"
+      ],
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "site",
+        "app"
+      ],
+      "requiredPackages": [],
+      "environmentVariables": [],
+      "secrets": [],
+      "platformResources": [],
+      "externalDomains": [],
+      "contentSecurityPolicyContributions": [],
+      "browserStorage": [],
+      "dataClassifications": [],
+      "retentionAssumptions": [],
+      "privilegedOperations": [],
+      "threatReviewLevel": "standard",
+      "adapterSemanticRequirements": [],
+      "managedSurfaces": [
         {
-          identifier: "site-routing-about-route",
-          owner: { kind: "capability", identifier: "site-routing" },
-          path: "apps/web/app/about/page.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "site-routing-about-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/about/page.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
         {
-          identifier: "site-routing-about-content",
-          owner: { kind: "capability", identifier: "site-routing" },
-          path: "apps/web/content/en-CA/about.yaml",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
+          "identifier": "site-routing-about-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/content/en-CA/about.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
         },
-        ...[
-          ["site-routing-not-found-route", "apps/web/app/not-found.tsx"],
-          ["site-routing-robots-route", "apps/web/app/robots.ts"],
-          ["site-routing-sitemap-route", "apps/web/app/sitemap.ts"],
-          ["site-routing-work-error-boundary", "apps/web/app/work/error.tsx"],
-          ["site-routing-work-index-route", "apps/web/app/work/page.tsx"],
-          [
-            "site-routing-featured-work-route",
-            "apps/web/app/work/featured/page.tsx",
-          ],
-          [
-            "site-routing-not-found-content",
-            "apps/web/content/en-CA/not-found.yaml",
-          ],
-          [
-            "site-routing-configuration-content",
-            "apps/web/content/en-CA/routing.yaml",
-          ],
-          [
-            "site-routing-featured-work-content",
-            "apps/web/content/en-CA/work-featured.yaml",
-          ],
-          [
-            "site-routing-content-reader",
-            "apps/web/src/routing/read-routing-content.ts",
-          ],
-          [
-            "site-routing-content-schema",
-            "apps/web/src/routing/routing-content-schema.ts",
-          ],
-          ["site-routing-presentation", "apps/web/src/routing/site-page.tsx"],
-          [
-            "site-routing-component-test",
-            "apps/web/tests/component/site-page.test.tsx",
-          ],
-          [
-            "site-routing-browser-test",
-            "apps/web/tests/e2e/site-routing.spec.ts",
-          ],
-          [
-            "site-routing-unit-test",
-            "apps/web/tests/unit/routing-content.test.ts",
-          ],
-        ].map(([identifier, path]) => ({
-          identifier,
-          owner: { kind: "capability", identifier: "site-routing" },
-          path,
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        })),
+        {
+          "identifier": "site-routing-not-found-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/not-found.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-robots-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/robots.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-sitemap-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/sitemap.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-work-error-boundary",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/work/error.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-work-index-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/work/page.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-featured-work-route",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/app/work/featured/page.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-not-found-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/content/en-CA/not-found.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-featured-work-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/content/en-CA/work-featured.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-content-reader",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/src/routing/read-routing-content.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-content-schema",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/src/routing/routing-content-schema.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-presentation",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/src/routing/site-page.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-component-test",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/tests/component/site-page.test.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-browser-test",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/tests/e2e/site-routing.spec.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "site-routing-unit-test",
+          "owner": {
+            "kind": "capability",
+            "identifier": "site-routing"
+          },
+          "path": "apps/web/tests/unit/routing-content.test.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
       ],
-      inferenceProbes: [
-        { kind: "file", path: "apps/web/app/about/page.tsx" },
-        { kind: "file", path: "apps/web/content/en-CA/about.yaml" },
-        ...[
-          "apps/web/app/not-found.tsx",
-          "apps/web/app/robots.ts",
-          "apps/web/app/sitemap.ts",
-          "apps/web/app/work/error.tsx",
-          "apps/web/app/work/page.tsx",
-          "apps/web/app/work/featured/page.tsx",
-          "apps/web/content/en-CA/not-found.yaml",
-          "apps/web/content/en-CA/routing.yaml",
-          "apps/web/content/en-CA/work-featured.yaml",
-          "apps/web/src/routing/read-routing-content.ts",
-          "apps/web/src/routing/routing-content-schema.ts",
-          "apps/web/src/routing/site-page.tsx",
-          "apps/web/tests/component/site-page.test.tsx",
-          "apps/web/tests/e2e/site-routing.spec.ts",
-          "apps/web/tests/unit/routing-content.test.ts",
-        ].map((path) => ({ kind: "file", path })),
+      "inferenceProbes": [
+        {
+          "kind": "file",
+          "path": "apps/web/app/about/page.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/about.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/not-found.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/robots.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/sitemap.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/work/error.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/work/page.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/app/work/featured/page.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/not-found.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/work-featured.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/routing/read-routing-content.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/routing/routing-content-schema.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/routing/site-page.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/tests/component/site-page.test.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/tests/e2e/site-routing.spec.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/tests/unit/routing-content.test.ts"
+        }
       ],
-      migrationPlanners: ["upgrade-site-routing-0-3-0-to-0-4-0"],
-      verificationPlan: [
+      "migrationPlanners": [],
+      "verificationPlan": [
         "content-contracts",
         "component-tests",
         "typecheck",
         "next-build",
         "opennext-build",
         "browser-development",
-        "browser-preview",
+        "browser-preview"
       ],
-      documentationEvidenceRequirements: [
+      "documentationEvidenceRequirements": [
         "browser-route-and-navigation-behavior",
         "crawl-metadata-contract",
         "nested-error-and-not-found-behavior",
-        "page-and-navigation-migration-contract",
+        "page-and-navigation-migration-contract"
       ],
-      removalAndRecoveryRequirements: [
+      "removalAndRecoveryRequirements": [
         "review-route-content-and-crawl-metadata-removal",
-        "review-redirect-and-navigation-recovery",
-      ],
+        "review-redirect-and-navigation-recovery"
+      ]
     },
     {
-      identifier: "booking-calendly",
-      version: "0.1.0",
-      deliveryMode: "source-generated",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "automatic",
-      dependencies: ["section-composition"],
-      optionalIntegrations: [],
-      conflicts: [],
-      supportedProfiles: ["portfolio", "site", "app"],
-      requiredPackages: [],
-      environmentVariables: [],
-      secrets: [],
-      platformResources: [],
-      externalDomains: ["calendly.com", "www.calendly.com"],
-      contentSecurityPolicyContributions: [
-        "frame-src https://calendly.com https://www.calendly.com",
+      "identifier": "booking-calendly",
+      "version": "0.2.0",
+      "deliveryMode": "source-generated",
+      "stateClassifications": [
+        "repository-stateful"
       ],
-      browserStorage: ["provider-controlled-cross-origin-frame"],
-      dataClassifications: ["provider-controlled-scheduling-data"],
-      retentionAssumptions: ["provider-controlled"],
-      privilegedOperations: [],
-      threatReviewLevel: "elevated",
-      adapterSemanticRequirements: [],
-      managedSurfaces: [
-        {
-          identifier: "booking-calendly-browser-specification",
-          owner: { kind: "capability", identifier: "booking-calendly" },
-          path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "booking-calendly-client-component",
-          owner: { kind: "capability", identifier: "booking-calendly" },
-          path:
-            "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "booking-calendly-content",
-          owner: { kind: "capability", identifier: "booking-calendly" },
-          path: "apps/web/content/en-CA/booking-calendly.yaml",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "booking-calendly-content-reader",
-          owner: { kind: "capability", identifier: "booking-calendly" },
-          path:
-            "apps/web/src/integrations/booking-calendly/booking-content.ts",
-          ownership: "application-owned",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
-        {
-          identifier: "booking-calendly-settings",
-          owner: { kind: "capability", identifier: "booking-calendly" },
-          path:
-            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-          ownership: "managed",
-          fingerprintTarget: { kind: "file" },
-          mergeStrategy: "replace-file",
-        },
+      "removalPolicy": "automatic",
+      "dependencies": [
+        "section-composition"
       ],
-      inferenceProbes: [
-        {
-          kind: "file",
-          path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-        },
-        {
-          kind: "file",
-          path:
-            "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-        },
-        {
-          kind: "file",
-          path: "apps/web/content/en-CA/booking-calendly.yaml",
-        },
-        {
-          kind: "file",
-          path:
-            "apps/web/src/integrations/booking-calendly/booking-content.ts",
-        },
-        {
-          kind: "file",
-          path:
-            "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-        },
+      "optionalIntegrations": [],
+      "conflicts": [],
+      "supportedProfiles": [
+        "portfolio",
+        "site",
+        "app"
       ],
-      migrationPlanners: [],
-      verificationPlan: [
+      "requiredPackages": [],
+      "environmentVariables": [
+        "NEXT_PUBLIC_CALENDLY_URL"
+      ],
+      "secrets": [],
+      "platformResources": [],
+      "externalDomains": [
+        "calendly.com",
+        "www.calendly.com"
+      ],
+      "contentSecurityPolicyContributions": [
+        "frame-src https://calendly.com https://www.calendly.com"
+      ],
+      "browserStorage": [
+        "provider-controlled-cross-origin-frame"
+      ],
+      "dataClassifications": [
+        "provider-controlled-scheduling-data"
+      ],
+      "retentionAssumptions": [
+        "provider-controlled"
+      ],
+      "privilegedOperations": [],
+      "threatReviewLevel": "elevated",
+      "adapterSemanticRequirements": [],
+      "managedSurfaces": [
+        {
+          "identifier": "booking-calendly-browser-specification",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/tests/e2e/calendly-booking.spec.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-client-component",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/content/en-CA/booking-calendly.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-content-reader",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/src/integrations/booking-calendly/booking-content.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-settings",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+          "ownership": "managed",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-french-content",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/content/fr-CA/booking-calendly.yaml",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-configuration-tests",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/tests/unit/booking-configuration.test.ts",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-availability-tests",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "apps/web/tests/component/booking-availability.test.tsx",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        },
+        {
+          "identifier": "booking-calendly-operator-guide",
+          "owner": {
+            "kind": "capability",
+            "identifier": "booking-calendly"
+          },
+          "path": "docs/booking-calendly.md",
+          "ownership": "application-owned",
+          "fingerprintTarget": {
+            "kind": "file"
+          },
+          "mergeStrategy": "replace-file"
+        }
+      ],
+      "inferenceProbes": [
+        {
+          "kind": "file",
+          "path": "apps/web/tests/e2e/calendly-booking.spec.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/integrations/booking-calendly/calendly-booking.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/en-CA/booking-calendly.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/integrations/booking-calendly/booking-content.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/src/integrations/booking-calendly/booking-settings.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/content/fr-CA/booking-calendly.yaml"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/tests/unit/booking-configuration.test.ts"
+        },
+        {
+          "kind": "file",
+          "path": "apps/web/tests/component/booking-availability.test.tsx"
+        },
+        {
+          "kind": "file",
+          "path": "docs/booking-calendly.md"
+        }
+      ],
+      "migrationPlanners": [
+        "add-booking-calendly-0-2-0",
+        "remove-booking-calendly-0-2-0"
+      ],
+      "verificationPlan": [
         "typecheck",
         "next-build",
         "browser-development",
-        "browser-preview",
+        "browser-preview"
       ],
-      documentationEvidenceRequirements: [
+      "documentationEvidenceRequirements": [
         "cross-origin-provider-data-boundary",
-        "booking-fallback-and-activation-contract",
+        "booking-fallback-and-activation-contract"
       ],
-      removalAndRecoveryRequirements: [
+      "removalAndRecoveryRequirements": [
         "remove-generated-booking-surfaces",
-        "exclude-calendly-account-and-provider-data",
-      ],
-    },
+        "exclude-calendly-account-and-provider-data"
+      ]
+    }
   ]);
 
   const observability = catalog.find(
@@ -1584,7 +2317,7 @@ test("the catalog declares the exact analytics capability contract without obser
   );
 
   assert.notEqual(analytics, undefined);
-  assert.equal(analytics.version, "0.1.0");
+  assert.equal(analytics.version, "0.2.0");
   assert.equal(analytics.deliveryMode, "hybrid");
   assert.deepEqual(analytics.stateClassifications, [
     "repository-stateful",
@@ -1596,7 +2329,7 @@ test("the catalog declares the exact analytics capability contract without obser
   assert.equal(analytics.dependencies.includes("observability"), false);
   assert.deepEqual(analytics.supportedProfiles, ["portfolio", "site", "app"]);
   assert.deepEqual(analytics.requiredPackages, []);
-  assert.deepEqual(analytics.environmentVariables, []);
+  assert.deepEqual(analytics.environmentVariables, ["NEXT_PUBLIC_ANALYTICS_ENABLED", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", "NEXT_PUBLIC_SITE_URL"]);
   assert.deepEqual(analytics.secrets, []);
   assert.deepEqual(analytics.platformResources, [
     "cloudflare-web-analytics-site",
@@ -1630,7 +2363,7 @@ test("the catalog declares the exact analytics capability contract without obser
   assert.deepEqual(analytics.browserStorage, [
     "functional-consent-local-storage",
     "cloudflare-web-analytics-cookie-free",
-    "google-analytics-first-party-cookies-_ga-and-_ga_<container-id>",
+    "google-analytics-host-only-cookies-egeria_production_ga-and-egeria_nonproduction_ga-with-stream-suffix",
     "microsoft-clarity-first-party-cookies-_clck-and-_clsk",
     "provider-controlled-third-party-storage",
   ]);
@@ -1695,6 +2428,8 @@ test("the catalog declares the exact analytics capability contract without obser
       ["analytics-runtime-specification", "apps/web/tests/unit/analytics-runtime.test.ts", "managed"],
       ["analytics-consent-component-specification", "apps/web/tests/component/analytics-consent.test.tsx", "managed"],
       ["analytics-browser-specification", "apps/web/tests/e2e/analytics-consent.spec.ts", "managed"],
+      ["analytics-configuration", "apps/web/src/integrations/analytics/analytics-configuration.ts", "managed"],
+      ["analytics-configuration-specification", "apps/web/tests/unit/analytics-configuration.test.ts", "managed"],
     ],
   );
   assert.deepEqual(
@@ -1702,8 +2437,8 @@ test("the catalog declares the exact analytics capability contract without obser
     analytics.managedSurfaces.map(({ path }) => ({ kind: "file", path })),
   );
   assert.deepEqual(analytics.migrationPlanners, [
-    "add-analytics-0-1-0",
-    "remove-analytics-0-1-0",
+    "add-analytics-0-2-0",
+    "remove-analytics-0-2-0",
   ]);
   assert.deepEqual(analytics.verificationPlan, [
     "settings-contracts",
@@ -1843,7 +2578,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "portfolio",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.11.7",
+      recipeVersion: "0.12.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1855,7 +2590,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "site",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.12.7",
+      recipeVersion: "0.13.0",
       defaultCapabilities: [
         "standards",
         "content-files",
@@ -1868,7 +2603,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     {
       identifier: "app",
       schemaVersion: "1.0.0",
-      recipeVersion: "0.2.7",
+      recipeVersion: "0.3.0",
       defaultCapabilities: ["app-foundation", "site-routing"],
     },
   ]);
@@ -1892,7 +2627,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   );
 
   assert.equal(portfolio.profile, "portfolio");
-  assert.equal(portfolio.recipeVersion, "0.11.7");
+  assert.equal(portfolio.recipeVersion, "0.12.0");
   assert.deepEqual(
     portfolio.capabilities.map(({ identifier }) => identifier),
     [
@@ -1928,7 +2663,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
 
     assert.equal(
       selected.recipeVersion,
-      profile === "portfolio" ? "0.11.7" : "0.12.7",
+      profile === "portfolio" ? "0.12.0" : "0.13.0",
     );
     assert.equal(
       selectedIdentifiers.indexOf("section-composition") <
@@ -1938,7 +2673,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     assert.equal(selectedIdentifiers.at(-1), "booking-calendly");
     assert.deepEqual(core.createInstalledManifest(selected).at(-1), {
       identifier: "booking-calendly",
-      version: "0.1.0",
+      version: "0.2.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "automatic",
@@ -1974,7 +2709,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   assert.deepEqual(core.createInstalledManifest(site), [
     {
       identifier: "standards",
-      version: "0.5.1",
+      version: "0.9.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1995,21 +2730,21 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     },
     {
       identifier: "deployment-cloudflare",
-      version: "0.3.1",
+      version: "0.9.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
     },
     {
       identifier: "observability",
-      version: "0.3.0",
+      version: "0.4.0",
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
     },
     {
       identifier: "site-routing",
-      version: "0.4.0",
+      version: "0.5.0",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -2017,31 +2752,15 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
   ]);
 });
 
-test("current recipes add app while historical portfolio and site snapshots stay exact", () => {
-  assert.deepEqual(
-    core.profileRecipes.map(({ identifier, recipeVersion }) => ({
-      identifier,
-      recipeVersion,
-    })),
-    [
-      { identifier: "portfolio", recipeVersion: "0.11.7" },
-      { identifier: "site", recipeVersion: "0.12.7" },
-      { identifier: "app", recipeVersion: "0.2.7" },
-    ],
-  );
-
-  const currentSiteRouting = createCatalog().find(
-    ({ identifier }) => identifier === "site-routing",
-  );
-  assert.equal(currentSiteRouting?.version, "0.4.0");
-  assert.deepEqual(currentSiteRouting?.migrationPlanners, [
-    "upgrade-site-routing-0-3-0-to-0-4-0",
+test("current recipes have one default tuple and refuse retired catalog views", () => {
+  assert.deepEqual(core.profileRecipes.map(({ identifier, recipeVersion }) => ({ identifier, recipeVersion })), [
+    { identifier: "portfolio", recipeVersion: "0.12.0" },
+    { identifier: "site", recipeVersion: "0.13.0" },
+    { identifier: "app", recipeVersion: "0.3.0" },
   ]);
-
-  assert.equal(core.createCapabilityCatalogSnapshot(packageVersions, {
-    standards: "0.4.0", siteRouting: "0.3.0",
-  }).ok, false);
-
+  assert.deepEqual(core.createApplicationEnvironmentProfileRecipes(), core.profileRecipes);
+  assert.equal(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.4.0", siteRouting: "0.3.0" }).ok, false);
+  assert.equal(core.createCapabilityCatalogSnapshot(packageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }).ok, false);
 });
 
 test("resolution traverses dependency identifiers lexically rather than trusting descriptor order", () => {
@@ -2087,7 +2806,6 @@ test("resolution rejects unknown profiles and capability identifiers outside its
 
   for (const identifier of [
     "application-persistence",
-    "transactional-email-resend",
     "background-job-delivery",
     "durable-contact-submissions",
     "cms-payload",
@@ -2258,13 +2976,10 @@ test("resolution reports unsupported capabilities, missing dependencies, cycles,
 });
 
 
-test("supported profile transitions admit only the current incoming app edges", () => {
-  for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
-    ["portfolio", "0.11.7", "app", "0.2.7"],
-    ["site", "0.12.7", "app", "0.2.7"],
-  ]) {
-    assert.deepEqual(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}), {
-      ok: true, value: {source: {profile: fromProfile, recipeVersion: fromRecipeVersion}, target: {profile: toProfile, recipeVersion: toRecipeVersion}},
+test("supported profile transitions admit only current incoming app endpoints", () => {
+  for (const [fromProfile, fromRecipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"]]) {
+    assert.deepEqual(core.resolveSupportedProfileTransition({ fromProfile, fromRecipeVersion, toProfile: "app", toRecipeVersion: "0.3.0" }), {
+      ok: true, value: { source: { profile: fromProfile, recipeVersion: fromRecipeVersion }, target: { profile: "app", recipeVersion: "0.3.0" } },
     });
   }
   for (const [fromProfile, fromRecipeVersion, toProfile, toRecipeVersion] of [
@@ -2291,6 +3006,11 @@ test("supported profile transitions admit only the current incoming app edges", 
     ["portfolio", "0.12.1", "app", "0.2.1"],
     ["site", "0.11.1", "app", "0.2.1"],
     ["portfolio", "0.11.1", "app", "9.9.9"],
+    ["portfolio", "0.12.0", "site", "0.13.0"], ["app", "0.3.0", "site", "0.13.0"],
+    ["app", "0.3.0", "app", "0.3.0"], ["site", "0.13.0", "portfolio", "0.12.0"],
+    ["portfolio", "0.11.2", "app", "0.3.0"], ["site", "0.12.2", "app", "0.3.0"],
+    ["portfolio", "0.12.0", "app", "0.2.2"], ["site", "0.13.0", "app", "unknown"],
+    ["unknown", "0.13.0", "app", "0.3.0"],
   ]) assert.equal(core.resolveSupportedProfileTransition({fromProfile, fromRecipeVersion, toProfile, toRecipeVersion}).ok, false);
 });
 
@@ -2313,30 +3033,20 @@ test("retired portfolio recipes cannot select locks or incoming app edges", asyn
 
 const deploymentSnapshotCases = [
   {
-    name: "ordinary",
-    version: "0.3.1",
-    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" },
-  },
-  {
-    name: "persistence",
-    version: "0.4.1",
-    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.1.0", applicationPersistence: "0.1.1" },
-  },
-  {
-    name: "jobs",
-    version: "0.5.1",
-    snapshot: { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0" },
-  },
-  {
-    name: "jobs with persistence",
-    version: "0.6.1",
-    snapshot: { standards: "0.6.1", siteRouting: "0.4.0", appFoundation: "0.2.0", transactionalEmailResend: "0.1.0", backgroundJobDelivery: "0.2.0", applicationPersistence: "0.1.1" },
-  },
-  {
-    name: "explicit internal environments",
-    version: "0.9.0",
-    retiredVersions: ["0.7.0", "0.7.1", "0.8.0"],
+    name: "ordinary", version: "0.9.0", retiredVersions: ["0.3.0", "0.3.1", "0.7.0", "0.7.1", "0.8.0"],
     snapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0" },
+  },
+  {
+    name: "persistence", version: "0.10.0", retiredVersions: ["0.4.0", "0.4.1"],
+    snapshot: { standards: "0.10.0", siteRouting: "0.5.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0", applicationPersistence: "0.2.0" },
+  },
+  {
+    name: "jobs", version: "0.11.0", retiredVersions: ["0.5.0", "0.5.1"],
+    snapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0", backgroundJobDelivery: "0.3.0" },
+  },
+  {
+    name: "jobs with persistence", version: "0.12.0", retiredVersions: ["0.6.0", "0.6.1"],
+    snapshot: { standards: "0.10.0", siteRouting: "0.5.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0", backgroundJobDelivery: "0.3.0", applicationPersistence: "0.2.0" },
   },
 ];
 

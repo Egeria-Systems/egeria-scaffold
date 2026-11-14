@@ -18,41 +18,20 @@ const certificationScript = resolve(
 );
 const revision = "a".repeat(40);
 const subject = Object.freeze({
-  descriptorVersion: "0.1.0",
+  descriptorVersion: "0.2.0",
   behaviorContractDigest:
-    "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378",
+    "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b",
 });
 const providerArguments = Object.freeze([
-  "--cloudflare-web-analytics-token",
-  "0123456789abcdef0123456789abcdef",
-  "--google-analytics-id",
-  "G-ABCDEF1234",
-  "--microsoft-clarity-id",
-  "clarity123",
-  "--microsoft-clarity-audience",
-  "not-directed-to-minors",
-  "--search-console-verification",
-  "search-console-verification-token",
-  "--looker-studio",
+  "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
+  "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio",
 ]);
 const analyticsSettings = Object.freeze({
   consent: Object.freeze({ policy: "explicit-opt-in" }),
-  providers: Object.freeze({
-    cloudflareWebAnalytics: Object.freeze({
-      siteToken: "0123456789abcdef0123456789abcdef",
-    }),
-    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
-    microsoftClarity: Object.freeze({
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    }),
-  }),
-  operationalIntegrations: Object.freeze({
-    googleSearchConsole: Object.freeze({
-      verificationToken: "search-console-verification-token",
-    }),
-    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
-  }),
+  providers: Object.freeze({ cloudflareWebAnalytics: true, googleAnalytics4: true,
+    microsoftClarity: Object.freeze({ audience: "not-directed-to-minors" }) }),
+  operationalIntegrations: Object.freeze({ googleSearchConsole: true,
+    lookerStudio: Object.freeze({ connector: "google-analytics-4" }) }),
 });
 const commonCapabilities = Object.freeze([
   "standards",
@@ -72,8 +51,12 @@ const generatedChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -178,7 +161,11 @@ function createJourney({
         await mkdir(join(projectRoot, ".egeria"), { recursive: true });
         await writeFile(
           join(projectRoot, ".egeria/project.yaml"),
-          `recipeVersion: ${recipeVersion}\n`,
+          JSON.stringify({ schemaVersion: "2.0.0", builderCompatibility: "0.0.0",
+            project: { name: projectName, displayName, defaultLocale: "en-CA" }, originProfile: profile,
+            recipeVersion, platformAdapter: "cloudflare-workers", selectedCapabilities: expectedCapabilities,
+            capabilitySettings: { analytics: analyticsSettings, ...(profile === "site" ? { "booking-calendly": { mode: "popup" } } : {}) }, ejectedAreas: [],
+          }),
         );
         const settingsPath = join(
           projectRoot,
@@ -201,8 +188,9 @@ function createJourney({
             state: {
               kind: "valid",
               value: {
+                schemaVersion: "2.0.0", origin: { profile, recipeVersion },
                 installedCapabilities: [
-                  { identifier: "analytics", version: "0.1.0" },
+                  { identifier: "analytics", version: "0.2.0" },
                 ],
               },
             },
@@ -263,7 +251,7 @@ function createCertificationAdapters(overrides = {}) {
     projectName: "acme-portfolio-analytics",
     displayName: "Acme Portfolio Analytics",
     expectedCapabilities: [...commonCapabilities, "analytics"],
-    recipeVersion: "0.10.0",
+    recipeVersion: "0.12.0",
     verifierIdentifier: "portfolio-analytics",
     createArguments: providerArguments,
     settingsArtifactSource: overrides.portfolioSettingsArtifactSource,
@@ -271,17 +259,19 @@ function createCertificationAdapters(overrides = {}) {
   });
   const site = createJourney({
     profile: "site",
-    projectName: "acme-site-multilingual-analytics",
-    displayName: "Acme Site Multilingual Analytics",
+    projectName: "acme-site-public-integrations",
+    displayName: "Acme Site Public Integrations",
     expectedCapabilities: [
       ...commonCapabilities,
       "site-routing",
+      "contact-form-web3forms",
+      "booking-calendly",
       "analytics",
       "multilingual",
     ],
-    recipeVersion: "0.11.0",
-    verifierIdentifier: "site-multilingual-analytics",
-    createArguments: [...providerArguments, "--multilingual"],
+    recipeVersion: "0.13.0",
+    verifierIdentifier: "site-public-integrations",
+    createArguments: [...providerArguments, "--multilingual", "--booking-calendly", "--calendly-mode", "popup", "--contact-form-web3forms"],
     settingsArtifactSource: overrides.siteSettingsArtifactSource,
   });
   const lifecycleCommands = [];
@@ -333,7 +323,7 @@ test("analytics certification binds both full-matrix profiles and lifecycle evid
   assert.deepEqual(result, {
     ok: true,
     capability: "analytics",
-    version: "0.1.0",
+    version: "0.2.0",
     profiles: ["portfolio", "site"],
     subject,
     evidenceRevision: revision,
@@ -387,8 +377,7 @@ test("analytics certification rejects missing or changed generated settings fiel
       name: "portfolio changed provider field",
       profile: "portfolio",
       mutate(settings) {
-        settings.providers.cloudflareWebAnalytics.siteToken =
-          "changed-private-site-token";
+        settings.providers.cloudflareWebAnalytics = false;
       },
     },
     {
@@ -486,6 +475,8 @@ test("analytics portfolio verification executes isolated unit, component, build,
         ["run", "typecheck"],
         ["run", "test:unit"],
         ["run", "test:component"],
+        ["--dir", "apps/web", "run", "test:deployment-contracts"],
+        ["--dir", "apps/web", "run", "check:environment"],
         ["run", "build"],
         [
           "--dir",
@@ -495,12 +486,20 @@ test("analytics portfolio verification executes isolated unit, component, build,
           "build",
           "--skipNextBuild",
         ],
+        ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"],
         ["--dir", "apps/web", "run", "browser:install"],
+        ["--dir", "apps/web", "run", "test:transport"],
+        ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"],
         ["--dir", "apps/web", "run", "test:e2e:dev"],
         ["--dir", "apps/web", "run", "test:e2e:preview"],
+        ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"],
       ],
     );
     for (const command of commands) {
+      assert.equal(command.environment.APPLICATION_ENVIRONMENT, "development");
+      assert.equal(command.environment.NEXT_PUBLIC_SITE_URL, "http://localhost:3000");
+      assert.equal(command.environment.NEXT_PUBLIC_ANALYTICS_ENABLED, "false");
+      assert.equal(command.environment.ANALYTICS_TEST_BUILD_FLAG, "false");
       assert.equal(command.cwd, projectRoot);
       assert.equal(command.environment.PATH, "/verified/bin");
       assert.equal(command.environment.CLOUDFLARE_API_TOKEN, undefined);

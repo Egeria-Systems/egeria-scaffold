@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { access, copyFile, cp, mkdir, mkdtemp, readFile, realpath, rm, symlink, writeFile } from "node:fs/promises";
+import { access, copyFile, cp, mkdir, mkdtemp, readFile, realpath, rename, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
@@ -416,4 +416,116 @@ test("traced aliases count toward the artifact entry limit", async t => {
   assert.equal(record.status, 1);
   assert.ok(record.stderr.includes("PREPARED_ARTIFACT_SIZE_INVALID"), record.stderr);
   assert.equal(await access(join(root, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
+});
+
+
+function sourceGit(root, arguments_) {
+  const result = spawnSync("git", ["-c", "user.name=Artifact Contract", "-c", "user.email=artifact@example.invalid", "-c", "core.hooksPath=/dev/null", ...arguments_], {
+    cwd: root, encoding: "utf8", timeout: 10000,
+    env: { PATH: process.env.PATH, GIT_CONFIG_NOSYSTEM: "1", GIT_CONFIG_GLOBAL: "/dev/null", GIT_TERMINAL_PROMPT: "0" },
+  });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.trim();
+}
+
+async function releaseFixture(t, builderGenerated) {
+  const webRoot = await realpath(await preparedFixture(t, true));
+  const generatedRoot = dirname(dirname(webRoot));
+  await writeFile(join(generatedRoot, ".gitignore"), "**/.next/\n**/.open-next/\n");
+  sourceGit(generatedRoot, ["init", "-b", "main", "--template="]);
+  sourceGit(generatedRoot, ["add", "."]);
+  sourceGit(generatedRoot, ["commit", "-m", "Freeze generated contract fixture"]);
+  const generatedRevision = sourceGit(generatedRoot, ["rev-parse", "HEAD"]);
+  let builderRoot = generatedRoot;
+  let builderRevision = generatedRevision;
+  if (builderGenerated) {
+    builderRoot = await realpath(await mkdtemp(join(tmpdir(), "artifact-builder-contract-")));
+    t.after(() => rm(builderRoot, { recursive: true, force: true }));
+    await writeFile(join(builderRoot, "README.md"), "Synthetic builder source\n");
+    sourceGit(builderRoot, ["init", "-b", "main", "--template="]);
+    sourceGit(builderRoot, ["add", "."]);
+    sourceGit(builderRoot, ["commit", "-m", "Freeze builder contract fixture"]);
+    builderRevision = sourceGit(builderRoot, ["rev-parse", "HEAD"]);
+  }
+  for (const path of [".next/BUILD_ID", ".open-next/assets/BUILD_ID"]) await writeFile(join(webRoot, path), `egeria-staging-${builderRevision}`);
+  const environment = { PATH: process.env.PATH, CI: "true", NODE_NO_WARNINGS: "1", GITHUB_REF: "refs/heads/main", GITHUB_SHA: builderRevision, EXPECTED_REVISION: builderRevision, GITHUB_WORKSPACE: builderRoot, pnpm_config_verify_deps_before_run: "error" };
+  const run = (mode = "verify", overrides = {}) => spawnSync(process.execPath, ["--experimental-strip-types", "scripts/check-prepared-artifact.mjs", mode, "staging", builderRevision,
+    ...(builderGenerated ? [`--builder-generated=${overrides.generatedRevision ?? generatedRevision}`] : [])], {
+    cwd: webRoot, encoding: "utf8", timeout: 10000, env: { ...environment, ...overrides.environment },
+  });
+  return { webRoot, generatedRoot, generatedRevision, builderRoot, builderRevision, environment, run };
+}
+
+test("ordinary generated release retains its existing receipt contract", async t => {
+  const fixture = await releaseFixture(t, false);
+  const recorded = fixture.run("record");
+  assert.equal(recorded.status, 0, recorded.stderr);
+  const receipt = JSON.parse(await readFile(join(fixture.webRoot, ".open-next/prepared-artifact.json"), "utf8"));
+  assert.deepEqual(Object.keys(receipt), ["schemaVersion", "target", "revision", "buildId", "files", "symlinks"]);
+  assert.equal(fixture.run().status, 0);
+});
+
+test("builder generated release binds both frozen sources and actual output without rewriting its receipt", async t => {
+  const fixture = await releaseFixture(t, true);
+  const recorded = fixture.run("record");
+  assert.equal(recorded.status, 0, recorded.stderr);
+  const path = join(fixture.webRoot, ".open-next/prepared-artifact.json");
+  const before = await readFile(path, "utf8");
+  const receipt = JSON.parse(before);
+  assert.equal(receipt.schemaVersion, 2);
+  assert.equal(receipt.revision, fixture.builderRevision);
+  assert.equal(receipt.buildId, `egeria-staging-${fixture.builderRevision}`);
+  assert.equal(receipt.source.kind, "builder-generated");
+  assert.equal(receipt.source.builder.revision, fixture.builderRevision);
+  assert.equal(receipt.source.generated.revision, fixture.generatedRevision);
+  for (const source of [receipt.source.builder, receipt.source.generated]) assert.match(source.identity, /^[a-f0-9]{64}$/u);
+  assert.ok(receipt.files.some(file => file.path === ".open-next/worker.js"));
+  assert.equal(fixture.run().status, 0);
+  assert.notEqual(fixture.run("record").status, 0);
+  assert.equal(await readFile(path, "utf8"), before);
+});
+
+test("builder generated provenance refuses missing authority, wrong roots, revisions and hidden or dirty sources", async t => {
+  for (const mutation of ["workspace-missing", "workspace-wrong", "workspace-subdirectory", "builder-revision", "expected-revision", "generated-revision", "builder-dirty", "generated-dirty", "builder-hidden", "generated-hidden"]) {
+    const fixture = await releaseFixture(t, true);
+    const overrides = { environment: {} };
+    if (mutation === "workspace-missing") overrides.environment.GITHUB_WORKSPACE = "";
+    if (mutation === "workspace-wrong") overrides.environment.GITHUB_WORKSPACE = fixture.generatedRoot;
+    if (mutation === "workspace-subdirectory") { await mkdir(join(fixture.builderRoot, "nested")); overrides.environment.GITHUB_WORKSPACE = join(fixture.builderRoot, "nested"); }
+    if (mutation === "builder-revision") overrides.environment.GITHUB_SHA = "a".repeat(40);
+    if (mutation === "expected-revision") overrides.environment.EXPECTED_REVISION = "a".repeat(40);
+    if (mutation === "generated-revision") overrides.generatedRevision = "a".repeat(40);
+    if (mutation === "builder-dirty") await writeFile(join(fixture.builderRoot, "README.md"), "Changed source\n");
+    if (mutation === "generated-dirty") await writeFile(join(fixture.generatedRoot, "unexpected.txt"), "Changed source\n");
+    if (mutation === "builder-hidden") sourceGit(fixture.builderRoot, ["update-index", "--skip-worktree", "README.md"]);
+    if (mutation === "generated-hidden") sourceGit(fixture.generatedRoot, ["update-index", "--assume-unchanged", ".gitignore"]);
+    const result = fixture.run("record", overrides);
+    assert.notEqual(result.status, 0, mutation);
+    assert.equal(JSON.parse(result.stderr).code, "PREPARED_ARTIFACT_SOURCE_INVALID", mutation);
+    assert.equal(await access(join(fixture.webRoot, ".open-next/prepared-artifact.json")).then(() => true, () => false), false);
+  }
+});
+
+test("builder generated verification rejects source identity replacement and output tampering", async t => {
+  for (const mutation of ["source-revision", "root-identity", "output", "missing-provenance"]) {
+    const fixture = await releaseFixture(t, true);
+    const recorded = fixture.run("record");
+    assert.equal(recorded.status, 0, recorded.stderr);
+    const receiptPath = join(fixture.webRoot, ".open-next/prepared-artifact.json");
+    if (mutation === "source-revision") sourceGit(fixture.generatedRoot, ["commit", "--allow-empty", "-m", "Change generated identity"]);
+    if (mutation === "root-identity") {
+      const prior = `${fixture.builderRoot}-prior`;
+      await rename(fixture.builderRoot, prior);
+      t.after(() => rm(prior, { recursive: true, force: true }));
+      await cp(prior, fixture.builderRoot, { recursive: true });
+    }
+    if (mutation === "output") await writeFile(join(fixture.webRoot, ".open-next/worker.js"), "Changed output\n");
+    if (mutation === "missing-provenance") {
+      const receipt = JSON.parse(await readFile(receiptPath, "utf8")); delete receipt.source;
+      await writeFile(receiptPath, `${JSON.stringify(receipt)}\n`);
+    }
+    const before = await readFile(receiptPath, "utf8");
+    assert.notEqual(fixture.run().status, 0, mutation);
+    assert.equal(await readFile(receiptPath, "utf8"), before);
+  }
 });

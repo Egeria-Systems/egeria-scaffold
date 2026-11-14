@@ -90,15 +90,18 @@ const expectedProjectCapabilities = [
   "multilingual",
 ];
 const expectedInstalledCapabilities = [
-  { identifier: "standards", version: "0.4.0" },
+  { identifier: "standards", version: "0.9.0" },
   { identifier: "content-files", version: "0.4.0" },
   { identifier: "section-composition", version: "0.3.0" },
-  { identifier: "deployment-cloudflare", version: "0.3.1" },
-  { identifier: "observability", version: "0.3.0" },
-  { identifier: "site-routing", version: "0.4.0" },
-  { identifier: "analytics", version: "0.1.0" },
+  { identifier: "deployment-cloudflare", version: "0.9.0" },
+  { identifier: "observability", version: "0.4.0" },
+  { identifier: "site-routing", version: "0.5.0" },
+  { identifier: "analytics", version: "0.2.0" },
   { identifier: "multilingual", version: "0.1.0" },
 ];
+// The immutable packet retains its historical origin/expectation provenance.
+// Current origins come from build configuration; only its still-owned content is applied.
+const currentContentFiles = expectedContentFiles.filter(path => path !== "content/en-CA/routing.yaml");
 
 class SyntheticClientPacketError extends Error {
   constructor(code, options) {
@@ -511,7 +514,6 @@ async function validateProjectIdentity(projectRoot, packet) {
   }
 
   const analytics = project.capabilitySettings?.analytics;
-  const standardsVersion = project.recipeVersion === "0.12.7" ? "0.5.1" : undefined;
   if (
     packageManifest.name !== packet.identifier ||
     webPackageManifest.name !== `${packet.identifier}-web` ||
@@ -521,17 +523,15 @@ async function validateProjectIdentity(projectRoot, packet) {
       name: packet.identifier,
     }) ||
     project.originProfile !== packet.profile ||
-    standardsVersion === undefined ||
-    project.schemaVersion !== "1.0.0" ||
-    state.schemaVersion !== "1.0.0" ||
-    state.projectSchemaVersion !== "1.0.0" ||
+    project.schemaVersion !== "2.0.0" ||
+    state.schemaVersion !== "2.0.0" ||
+    state.projectSchemaVersion !== "2.0.0" ||
+    project.recipeVersion !== "0.13.0" ||
     !sameJson(project.selectedCapabilities, expectedProjectCapabilities) ||
     !sameJson(Object.keys(analytics?.providers ?? {}), [
       "cloudflareWebAnalytics",
     ]) ||
-    !/^[0-9a-f]{32}$/u.test(
-      analytics?.providers?.cloudflareWebAnalytics?.siteToken ?? "",
-    ) ||
+    analytics?.providers?.cloudflareWebAnalytics !== true ||
     !sameJson(analytics?.operationalIntegrations, {}) ||
     analytics?.consent?.policy !== packet.analytics.consentPolicy ||
     !sameJson(state.origin, {
@@ -543,11 +543,7 @@ async function validateProjectIdentity(projectRoot, packet) {
         identifier,
         version,
       })),
-      expectedInstalledCapabilities.map((capability) =>
-        capability.identifier === "standards"
-          ? { ...capability, version: standardsVersion }
-          : capability,
-      ),
+      expectedInstalledCapabilities,
     )
   ) {
     refuse("PROJECT_IDENTITY_INVALID");
@@ -556,7 +552,7 @@ async function validateProjectIdentity(projectRoot, packet) {
 
 async function stageDeclaredWrites(context) {
   const stagedWrites = [];
-  for (const contentPath of expectedContentFiles) {
+  for (const contentPath of currentContentFiles) {
     const relativePath = `${context.packet.destinationRoot}/${contentPath}`;
     const absolutePath = resolve(context.projectRoot, relativePath);
     await assertSafeDestination(context.projectRoot, absolutePath);
@@ -569,34 +565,6 @@ async function stageDeclaredWrites(context) {
       mode: stats.mode,
     });
   }
-
-  const expectation = context.packet.contentCoupledExpectation;
-  const absolutePath = resolve(context.projectRoot, expectation.path);
-  await assertSafeDestination(context.projectRoot, absolutePath);
-  const sourceBytes = await readFile(absolutePath);
-  const sourceText = sourceBytes.toString("utf8");
-  const occurrences = sourceText.split(expectation.from).length - 1;
-  if (
-    sha256(sourceBytes) !== expectation.sourceSha256 ||
-    occurrences !== expectation.expectedOccurrences
-  ) {
-    refuse("CONTENT_EXPECTATION_DRIFT");
-  }
-  const targetBytes = Buffer.from(
-    sourceText.replaceAll(expectation.from, expectation.to),
-    "utf8",
-  );
-  if (sha256(targetBytes) !== expectation.targetSha256) {
-    refuse("CONTENT_EXPECTATION_INVALID");
-  }
-  const stats = await lstat(absolutePath);
-  stagedWrites.push({
-    absolutePath,
-    relativePath: expectation.path,
-    originalBytes: sourceBytes,
-    targetBytes,
-    mode: stats.mode,
-  });
 
   return stagedWrites
     .map((write) => ({ ...write, sha256: sha256(write.targetBytes) }))

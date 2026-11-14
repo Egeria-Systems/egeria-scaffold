@@ -19,7 +19,6 @@ import {
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cliEntry = resolve(repositoryRoot, "apps/cli/dist/index.js");
-const defaultCalendlyUrl = "https://calendly.com/example/intro";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const projectName = "acme-app-calendly";
 const expectedBaseCapabilities = Object.freeze([
@@ -195,7 +194,7 @@ function requireAdditionPlan(value) {
     !/^sha256:[a-f0-9]{64}$/u.test(plan.planFingerprint) ||
     plan.profile !== "app" ||
     plan.capability?.identifier !== "booking-calendly" ||
-    plan.capability.version !== "0.1.0"
+    plan.capability.version !== "0.2.0"
   ) {
     fail("CAPABILITY_ADDITION_PLAN_INVALID");
   }
@@ -207,8 +206,8 @@ function requireAddition(value) {
   if (
     result?.status !== "verified-final-diff-approval-required" ||
     result.capability?.identifier !== "booking-calendly" ||
-    result.capability.version !== "0.1.0" ||
-    result.migration !== "add-booking-calendly-0-1-0"
+    result.capability.version !== "0.2.0" ||
+    result.migration !== "add-booking-calendly-0-2-0"
   ) {
     fail("CAPABILITY_ADDITION_INVALID");
   }
@@ -220,11 +219,11 @@ function requireInference(value) {
   if (
     value.result?.state?.kind !== "valid" ||
     value.result?.state?.value?.origin?.profile !== "app" ||
-    value.result?.state?.value?.origin?.recipeVersion !== "0.2.7" ||
+    value.result?.state?.value?.origin?.recipeVersion !== "0.3.0" ||
     !Array.isArray(installedCapabilities) ||
     !installedCapabilities.some(
       ({ identifier, version }) =>
-        identifier === "booking-calendly" && version === "0.1.0",
+        identifier === "booking-calendly" && version === "0.2.0",
     ) ||
     !Array.isArray(inferredCapabilities) ||
     !inferredCapabilities.some(
@@ -341,8 +340,6 @@ async function createFreshAddedProject(input, adapters, owner) {
     projectRoot,
     "--capability",
     "booking-calendly",
-    "--calendly-url",
-    input.calendlyUrl,
     "--calendly-mode",
     "popup",
   ];
@@ -412,8 +409,8 @@ export function certifyBookingCalendly(input = {}) {
 }
 
 export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
+  if (input === null || typeof input !== "object" || Object.keys(input).some(key => key !== "outputRoot")) fail("CERTIFICATION_ARGUMENT_INVALID");
   requireAdapters(adapters);
-  const calendlyUrl = input?.calendlyUrl ?? defaultCalendlyUrl;
   const outputRoot = input?.outputRoot;
   let owner;
   let succeeded = false;
@@ -422,7 +419,7 @@ export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
     owner = await createOwnedDirectory(outputRoot);
     if (!(await pathIdentityMatches(owner))) fail("CERTIFICATION_SETUP_FAILED");
     const verification = await createFreshAddedProject(
-      { calendlyUrl },
+      {},
       adapters,
       owner,
     );
@@ -430,12 +427,12 @@ export async function certifyBookingCalendlyForTesting(input = {}, adapters) {
     return {
       ok: true,
       capability: "booking-calendly",
-      version: "0.1.0",
+      version: "0.2.0",
       profile: "app",
       mode: "popup",
       subject: {
-        descriptorVersion: "0.1.0",
-        behaviorContractDigest: "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
+        descriptorVersion: "0.2.0",
+        behaviorContractDigest: "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08",
       },
       workerIntegration: verification.workerIntegration,
       appBuildEvidence: verification.appBuildEvidence,
@@ -461,10 +458,6 @@ function parseArguments(arguments_) {
     const name = normalizedArguments[index];
     const value = normalizedArguments[index + 1];
     if (value === undefined) return undefined;
-    if (name === "--calendly-url" && result.calendlyUrl === undefined) {
-      result.calendlyUrl = value;
-      continue;
-    }
     if (name === "--output-root" && result.outputRoot === undefined) {
       result.outputRoot = value;
       continue;

@@ -25,10 +25,9 @@ const execute = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const cliEntry = join(repositoryRoot, "apps/cli/dist/index.js");
 const exactRevisionPattern = /^[a-f0-9]{40}$/u;
-const accessKeyPattern = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/iu;
 const capability = "contact-form-web3forms";
 const profile = "site";
-const recipeVersion = "0.12.7";
+const recipeVersion = "0.13.0";
 const projectName = "acme-web3forms-certification";
 const displayName = "Web3Forms Certification";
 const expectedCapabilities = [
@@ -36,8 +35,8 @@ const expectedCapabilities = [
   "observability", "site-routing", capability,
 ];
 const expectedSubject = {
-  descriptorVersion: "0.1.0",
-  behaviorContractDigest: "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9",
+  descriptorVersion: "0.2.0",
+  behaviorContractDigest: "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
 };
 const requiredEvidence = [
   "cleanup-recovery", "deployed-application", "existing-repository-lifecycle",
@@ -66,7 +65,7 @@ const errorCodes = {
 function validInput(input) {
   return input !== null && typeof input === "object" &&
     typeof input.revision === "string" && exactRevisionPattern.test(input.revision) &&
-    typeof input.accessKey === "string" && accessKeyPattern.test(input.accessKey) &&
+    Object.keys(input).every(key => ["revision", "outputRoot"].includes(key)) &&
     typeof input.outputRoot === "string" && isAbsolute(input.outputRoot);
 }
 
@@ -114,14 +113,14 @@ async function runCli(adapters, arguments_, code) {
   }
 }
 
-async function requireProject(projectRoot, accessKey) {
+async function requireProject(projectRoot) {
   try {
     const project = parseProjectYaml(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"));
     if (!project.ok || project.value.originProfile !== profile ||
       project.value.recipeVersion !== recipeVersion ||
       project.value.project.name !== projectName || project.value.project.displayName !== displayName ||
       !isDeepStrictEqual(project.value.selectedCapabilities, expectedCapabilities) ||
-      !isDeepStrictEqual(project.value.capabilitySettings, { [capability]: { accessKey } })) {
+      !isDeepStrictEqual(project.value.capabilitySettings, {})) {
       throw new Error();
     }
   } catch {
@@ -157,7 +156,7 @@ export async function prepareWeb3FormsCertification(input, adapters = { runComma
   const projectRoot = join(input.outputRoot, "project");
   const created = await runCli(adapters, [
     "create", "--profile", profile, "--name", projectName, "--display-name", displayName,
-    "--directory", projectRoot, "--web3forms-access-key", input.accessKey,
+    "--directory", projectRoot, "--contact-form-web3forms",
   ], "CERTIFICATION_CREATE_INVALID");
   if (created.profile !== profile || !isDeepStrictEqual(created.capabilities, expectedCapabilities)) {
     throw createError("CERTIFICATION_CREATE_INVALID");
@@ -184,7 +183,7 @@ export async function prepareWeb3FormsCertification(input, adapters = { runComma
   if (diff.result?.equal !== true || !isDeepStrictEqual(diff.result.differences, [])) {
     throw createError("CERTIFICATION_DIFF_INVALID");
   }
-  await requireProject(projectRoot, input.accessKey);
+  await requireProject(projectRoot);
   if (!(await pathIdentityMatches(owner))) throw createError("CERTIFICATION_OUTPUT_ROOT_INVALID");
   await requireAuthority(preflight, input.revision);
   return {
@@ -199,7 +198,6 @@ await runCertificationCli({
     const input = {
       revision: process.env.EXPECTED_REVISION,
       outputRoot: process.env.CERTIFICATION_OWNER,
-      accessKey: process.env.WEB3FORMS_ACCESS_KEY,
     };
     return arguments_.length === 0 && validInput(input) ? input : undefined;
   },

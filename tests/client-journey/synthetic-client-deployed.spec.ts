@@ -1,7 +1,8 @@
 import { writeFileSync } from "node:fs";
 
 import AxeBuilder from "@axe-core/playwright";
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
+import { expect, test } from "./application-test";
 
 import { createAnalyticsProviderDeclarations } from "../../src/integrations/analytics/analytics-provider-contract";
 import { analyticsSettings } from "../../src/integrations/analytics/analytics-settings";
@@ -9,7 +10,7 @@ import { analyticsSettings } from "../../src/integrations/analytics/analytics-se
 const providerDeclarations = createAnalyticsProviderDeclarations(
   analyticsSettings,
 );
-const deployedUrl = process.env.PLAYWRIGHT_DEPLOYED_URL;
+const deployedUrl = process.env.DEPLOY_URL;
 if (deployedUrl === undefined) {
   throw new Error("DEPLOYED_URL_REQUIRED");
 }
@@ -60,7 +61,8 @@ async function focusWithTab(page: Page, target: Locator): Promise<void> {
 
 test("the hosted synthetic client journey is bilingual, opt-in, and bounded", async ({
   page,
-  request,
+  getApplicationResponse,
+  openApplicationPage,
 }) => {
   expect(providerDeclarations.map(({ identifier }) => identifier)).toEqual([
     "cloudflare-web-analytics",
@@ -74,7 +76,7 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
     if (
       window.sessionStorage.getItem("synthetic-client-initialized") === null
     ) {
-      window.localStorage.removeItem("egeria.analytics.consent.v2");
+      window.localStorage.removeItem("egeria.analytics.consent.v3");
       window.sessionStorage.setItem("synthetic-client-initialized", "true");
     }
   });
@@ -94,7 +96,7 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
     ["/en-CA", "en-CA", "Harbour Light Studio"],
     ["/fr-CA", "fr-CA", "Harbour Light Studio"],
   ] as const) {
-    await page.goto(path, { waitUntil: "networkidle" });
+    await openApplicationPage(page, path);
     await expect(page.locator("html")).toHaveAttribute("lang", locale);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(
       heading,
@@ -107,7 +109,7 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
     expect(providerRequests).toEqual([]);
   }
 
-  await page.goto("/en-CA", { waitUntil: "networkidle" });
+  await openApplicationPage(page, "/en-CA");
   await focusWithTab(page, action(page, "choose"));
   await page.keyboard.press("Enter");
   await expect(
@@ -170,11 +172,11 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
   await reloaded;
   await page.waitForLoadState("networkidle");
   const requestsAfterWithdrawal = providerRequests.length;
-  await page.goto("/fr-CA/about", { waitUntil: "networkidle" });
+  await openApplicationPage(page, "/fr-CA/about");
   expect(providerRequests).toHaveLength(requestsAfterWithdrawal);
 
   await page.setViewportSize({ width: 320, height: 800 });
-  await page.goto("/fr-CA/work/featured", { waitUntil: "networkidle" });
+  await openApplicationPage(page, "/fr-CA/work/featured");
   await expect(page.locator("html")).toHaveAttribute("lang", "fr-CA");
   await expect(page.locator('nav a[aria-current="page"]')).toHaveAttribute(
     "href",
@@ -192,10 +194,10 @@ test("the hosted synthetic client journey is bilingual, opt-in, and bounded", as
   ).violations;
   expect(axeViolations).toEqual([]);
 
-  const redirect = await request.get("/fr-CA/work", { maxRedirects: 0 });
+  const redirect = await getApplicationResponse("/fr-CA/work", { redirect: "manual" });
   expect(redirect.status()).toBe(308);
   expect(redirect.headers().location).toBe("/fr-CA/work/featured");
-  const missing = await page.goto("/en-CA/missing-page");
+  const missing = await openApplicationPage(page, "/en-CA/missing-page");
   expect(missing?.status()).toBe(404);
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
 

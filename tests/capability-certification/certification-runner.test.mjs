@@ -136,8 +136,12 @@ const fixedChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -365,6 +369,14 @@ function createSuccessfulScaffoldAdapters({
           ];
           state.ownedPath = dirname(state.projectRoot);
           assert.equal((await lstat(state.ownedPath)).mode & 0o777, 0o700);
+          await mkdir(join(state.projectRoot, ".egeria"), { recursive: true });
+          await writeFile(join(state.projectRoot, ".egeria/project.yaml"), JSON.stringify({
+            schemaVersion: "2.0.0", builderCompatibility: "0.0.0",
+            project: { name: input.arguments[input.arguments.indexOf("--name") + 1], displayName: input.arguments[input.arguments.indexOf("--display-name") + 1], defaultLocale: "en-CA" },
+            originProfile: profile, recipeVersion: profile === "portfolio" ? "0.12.0" : "0.13.0",
+            platformAdapter: "cloudflare-workers", selectedCapabilities: expectedCapabilities,
+            capabilitySettings: expectedCapabilities.includes("booking-calendly") ? { "booking-calendly": { mode: "popup" } } : {}, ejectedAreas: [],
+          }));
           await postCreate(state.projectRoot);
           return `${JSON.stringify({
             ok: true,
@@ -381,7 +393,7 @@ function createSuccessfulScaffoldAdapters({
             result: {
               state: {
                 kind: "valid",
-                value: { installedCapabilities: [inferredCapability] },
+                value: { schemaVersion: "2.0.0", origin: { profile, recipeVersion: profile === "portfolio" ? "0.12.0" : "0.13.0" }, installedCapabilities: [inferredCapability] },
               },
               capabilities: [
                 {
@@ -457,7 +469,7 @@ test("section composition certification binds both supported fresh-scaffold prof
       version: "0.3.0",
     },
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
     verifyFixture: async ({ environment }) => {
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
       assert.equal(environment.CLOUDFLARE_ACCOUNT_ID, undefined);
@@ -480,7 +492,7 @@ test("section composition certification binds both supported fresh-scaffold prof
     },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.7"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),
     verifierIdentifier: "site",
   });
 
@@ -500,9 +512,9 @@ test("section composition certification binds both supported fresh-scaffold prof
     subject: {
       descriptorVersion: "0.3.0",
       behaviorContractDigest:
-        "sha256:4f63f9d6169048b5a1f5b1d042b3a0ddaa22ca1273d1acadf6235ce93e616696",
+        "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
     },
-    recipeVersions: { portfolio: "0.11.7", site: "0.12.7" },
+    recipeVersions: { portfolio: "0.12.0", site: "0.13.0" },
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -702,7 +714,7 @@ test("section composition certification fails closed on authority and journey dr
         version: "0.3.0",
       },
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
       verifyFixture: async () => ({
         ok: true,
         checks: sectionCompositionFixtureChecks,
@@ -723,7 +735,7 @@ test("section composition certification fails closed on authority and journey dr
       },
       profile: "site",
       readCurrentRevision: authority.readCurrentRevision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.7"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),
       verifierIdentifier: "site",
       ...siteOverrides,
     });
@@ -862,11 +874,10 @@ test("the section composition certification command requires one exact revision 
 });
 
 async function writeRecipeVersion(projectRoot, version) {
-  await mkdir(join(projectRoot, ".egeria"), { recursive: true });
-  await writeFile(
-    join(projectRoot, ".egeria/project.yaml"),
-    `recipeVersion: ${version}\n`,
-  );
+  const path = join(projectRoot, ".egeria/project.yaml");
+  const project = JSON.parse(await readFile(path, "utf8"));
+  project.recipeVersion = version;
+  await writeFile(path, JSON.stringify(project));
 }
 
 async function copyCertificationRuntime(cleanRoot) {
@@ -1032,7 +1043,13 @@ test("the repository registry admits accepted subjects and refuses closure for r
       "application-persistence",
       "background-job-delivery",
       "booking-calendly",
+      "contact-form-web3forms",
+      "content-files",
       "deployment-cloudflare",
+      "multilingual",
+      "observability",
+      "section-composition",
+      "site-routing",
       "standards",
       "transactional-email-resend",
     ].map((identifier) => ({
@@ -1467,8 +1484,8 @@ test("generated testing certification binds a fresh portfolio to the exact stand
   const previousToken = process.env.NPM_TOKEN;
   process.env.NPM_TOKEN = "PRIVATE_VALUE";
   const scaffold = createSuccessfulScaffoldAdapters({
-    inferredCapability: { identifier: "standards", version: "0.5.1" },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
+    inferredCapability: { identifier: "standards", version: "0.9.0" },
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
     verificationChecks: visualChecks,
   });
 
@@ -1478,14 +1495,14 @@ test("generated testing certification binds a fresh portfolio to the exact stand
     assert.deepEqual(result, {
       ok: true,
       capability: "standards",
-      version: "0.5.1",
+      version: "0.9.0",
       profile: "portfolio",
       subject: {
-        descriptorVersion: "0.5.1",
+        descriptorVersion: "0.9.0",
         behaviorContractDigest:
-          "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
+          "sha256:3a2fa4c930a6f9b3c75cd03b38db173d080589050a7b4c9ebedb9a9594cedf3c",
       },
-      recipeVersion: "0.11.7",
+      recipeVersion: "0.12.0",
       checks: [
         "compiled-cli-create",
         "state-inference",
@@ -1540,9 +1557,9 @@ test("generated testing certification rejects missing, extra, or reordered visua
 
   for (const checks of invalidChecks) {
     const scaffold = createSuccessfulScaffoldAdapters({
-      inferredCapability: { identifier: "standards", version: "0.5.1" },
+      inferredCapability: { identifier: "standards", version: "0.9.0" },
       postCreate: (projectRoot) =>
-        writeRecipeVersion(projectRoot, "0.11.7"),
+        writeRecipeVersion(projectRoot, "0.12.0"),
       verificationChecks: checks,
     });
     await assert.rejects(
@@ -1560,10 +1577,10 @@ test("generated testing certification rejects stale state, recipe, diagnostics, 
   const validInput = Object.freeze({
     inferredCapability: Object.freeze({
       identifier: "standards",
-      version: "0.5.1",
+      version: "0.9.0",
     }),
     postCreate: (projectRoot) =>
-      writeRecipeVersion(projectRoot, "0.11.7"),
+      writeRecipeVersion(projectRoot, "0.12.0"),
     verificationChecks: visualChecks,
   });
   const cases = [
@@ -1671,7 +1688,7 @@ test("content files certification binds a clean exact revision to causal fresh-s
       indexReads += 1;
       return "H selected-evidence.test.mjs\0";
     },
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
     verifyFixture: async ({ projectRoot, environment }) => {
       assert.equal(projectRoot, scaffold.state.projectRoot);
       assert.equal(environment.CLOUDFLARE_API_TOKEN, undefined);
@@ -1695,9 +1712,9 @@ test("content files certification binds a clean exact revision to causal fresh-s
     subject: {
       descriptorVersion: "0.4.0",
       behaviorContractDigest:
-        "sha256:5ae35debef622dc0fb9eeee3889e79a72fd6ff28eb730865bfe95e8674c9ff05",
+        "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
     },
-    recipeVersion: "0.11.7",
+    recipeVersion: "0.12.0",
     locale: "en-CA",
     evidenceRevision: revision,
     checks: [
@@ -1967,7 +1984,7 @@ test("content files certification fails closed on invalid authority and evidence
     createSuccessfulScaffoldAdapters({
       inferredCapability: { identifier: "content-files", version: "0.4.0" },
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.7"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
       verifyFixture: async () => ({ ok: true, checks: contentFixtureChecks }),
       ...overrides,
     });
@@ -2091,7 +2108,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
   const subject = {
     descriptorVersion: "0.1.0",
     behaviorContractDigest:
-      "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
+      "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
   };
   let revisionReads = 0;
   let statusReads = 0;
@@ -2119,7 +2136,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
     inferredCapability: { identifier: "multilingual", version: "0.1.0" },
     profile: "portfolio",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
     verifierIdentifier: "portfolio-multilingual-calendly",
   });
   const site = createSuccessfulScaffoldAdapters({
@@ -2131,7 +2148,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
     inferredCapability: { identifier: "multilingual", version: "0.1.0" },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
-    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+    postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),
     verifierIdentifier: "site-multilingual",
   });
   const lifecycleCommands = [];
@@ -2214,8 +2231,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
         "--directory",
         portfolio.state.projectRoot,
         "--multilingual",
-        "--calendly-url",
-        "https://calendly.com/example/intro",
+        "--booking-calendly",
         "--calendly-mode",
         "popup",
       ],
@@ -2341,6 +2357,8 @@ test("multilingual portfolio verification runs the full isolated project and bro
           arguments: ["run", "test:component"],
           cwd: projectRoot,
         },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], cwd: projectRoot },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "check:environment"], cwd: projectRoot },
         {
           executable: "pnpm",
           arguments: ["run", "build"],
@@ -2358,11 +2376,14 @@ test("multilingual portfolio verification runs the full isolated project and bro
           ],
           cwd: projectRoot,
         },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"], cwd: projectRoot },
         {
           executable: "pnpm",
           arguments: ["--dir", "apps/web", "run", "browser:install"],
           cwd: projectRoot,
         },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "test:transport"], cwd: projectRoot },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"], cwd: projectRoot },
         {
           executable: "pnpm",
           arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
@@ -2373,9 +2394,14 @@ test("multilingual portfolio verification runs the full isolated project and bro
           arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
           cwd: projectRoot,
         },
+        { executable: "pnpm", arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"], cwd: projectRoot },
       ],
     );
     for (const command of commands) {
+      assert.equal(command.environment.APPLICATION_ENVIRONMENT, "development");
+      assert.equal(command.environment.NEXT_PUBLIC_SITE_URL, "http://localhost:3000");
+      assert.equal(command.environment.BOOKING_TEST_MULTILINGUAL, "true");
+      assert.equal(command.environment.NEXT_PUBLIC_CALENDLY_URL, command.environment.BOOKING_TEST_EXPECTED_URL);
       assert.equal(command.environment.PATH, "/verified/bin");
       assert.equal(command.environment.HOME, join(supportRoot, "home"));
       assert.equal(command.environment.USERPROFILE, join(supportRoot, "home"));
@@ -2440,7 +2466,7 @@ test("multilingual certification fails closed on authority and selected-evidence
       inferredCapability: { identifier: "multilingual", version: "0.1.0" },
       profile: "portfolio",
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.10.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
       verifierIdentifier: "portfolio-multilingual-calendly",
     });
     const site = createSuccessfulScaffoldAdapters({
@@ -2452,7 +2478,7 @@ test("multilingual certification fails closed on authority and selected-evidence
       inferredCapability: { identifier: "multilingual", version: "0.1.0" },
       profile: "site",
       readCurrentRevision: async () => revision,
-      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.11.0"),
+      postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),
       verifierIdentifier: "site-multilingual",
     });
     return {
@@ -2599,14 +2625,14 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
   };
   try {
     for (const [recipeVersion, invalidRuntime, expectedErrorCode] of [
-      ["0.2.7", false, undefined],
-      ["0.2.7", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
+      ["0.3.0", false, undefined],
+      ["0.3.0", true, "CERTIFICATION_RUNTIME_EVIDENCE_INVALID"],
       ["0.2.2", false, "CAPABILITY_ADDITION_INFERENCE_INVALID"],
     ]) {
       commands.length = 0;
       verifiedRoot = undefined;
       const execution = certifyBookingCalendlyForTesting(
-        { calendlyUrl: "https://calendly.com/example/intro" },
+        {},
         {
           async runCommand(input) {
             commands.push(input);
@@ -2655,7 +2681,7 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                   profile: "app",
                   capability: {
                     identifier: "booking-calendly",
-                    version: "0.1.0",
+                    version: "0.2.0",
                   },
                 },
               })}\n`;
@@ -2668,9 +2694,9 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                   status: "verified-final-diff-approval-required",
                   capability: {
                     identifier: "booking-calendly",
-                    version: "0.1.0",
+                    version: "0.2.0",
                   },
-                  migration: "add-booking-calendly-0-1-0",
+                  migration: "add-booking-calendly-0-2-0",
                 },
               })}\n`;
             }
@@ -2684,14 +2710,14 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
                     value: {
                       origin: { profile: "app", recipeVersion },
                       installedCapabilities: [
-                        { identifier: "standards", version: "0.5.1" },
-                        { identifier: "deployment-cloudflare", version: "0.3.1" },
+                        { identifier: "standards", version: "0.9.0" },
+                        { identifier: "deployment-cloudflare", version: "0.9.0" },
                         { identifier: "content-files", version: "0.4.0" },
                         { identifier: "section-composition", version: "0.3.0" },
-                        { identifier: "observability", version: "0.3.0" },
-                        { identifier: "app-foundation", version: "0.1.0" },
-                        { identifier: "site-routing", version: "0.4.0" },
-                        { identifier: "booking-calendly", version: "0.1.0" },
+                        { identifier: "observability", version: "0.4.0" },
+                        { identifier: "app-foundation", version: "0.3.0" },
+                        { identifier: "site-routing", version: "0.5.0" },
+                        { identifier: "booking-calendly", version: "0.2.0" },
                       ],
                     },
                   },
@@ -2744,10 +2770,10 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
       assert.deepEqual(result, {
         ok: true,
         capability: "booking-calendly",
-        version: "0.1.0",
+        version: "0.2.0",
         profile: "app",
         mode: "popup",
-        subject: { descriptorVersion: "0.1.0", behaviorContractDigest: "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca" },
+        subject: { descriptorVersion: "0.2.0", behaviorContractDigest: "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08" },
         ...runtime,
         checks: [
           "compiled-cli-create-baseline",
@@ -2783,8 +2809,6 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
             projectRoot,
             "--capability",
             "booking-calendly",
-            "--calendly-url",
-            "https://calendly.com/example/intro",
             "--calendly-mode",
             "popup",
           ],
@@ -2794,8 +2818,6 @@ test("Calendly app addition requires actual Worker evidence and preserves owned-
             projectRoot,
             "--capability",
             "booking-calendly",
-            "--calendly-url",
-            "https://calendly.com/example/intro",
             "--calendly-mode",
             "popup",
             "--approved-plan",
@@ -2852,7 +2874,7 @@ test("Calendly production mutation maps command failures and removes its real ow
   await assert.rejects(
     () =>
       certifyBookingCalendlyForTesting(
-        { calendlyUrl: "https://calendly.com/example/private-value" },
+        {},
         {
           async runCommand(input) {
             ownedPath = dirname(
@@ -2895,7 +2917,6 @@ test("Calendly certification canonicalizes an owned directory below a symbolic-l
       () =>
         certifyBookingCalendlyForTesting(
           {
-            calendlyUrl: "https://calendly.com/example/private-value",
             outputRoot: requestedOutputRoot,
           },
           {
@@ -2928,7 +2949,7 @@ test("Calendly testing API rejects the production-adapter mutation", async () =>
     await assert.rejects(
       () =>
         certifyBookingCalendlyForTesting(
-          { calendlyUrl: "https://calendly.com/example/intro" },
+          {},
           adapters,
         ),
       (error) => {
@@ -2961,7 +2982,6 @@ test("Calendly certification rejects unsafe retained output roots before command
         () =>
           certifyBookingCalendlyForTesting(
             {
-              calendlyUrl: "https://calendly.com/example/private-value",
               outputRoot,
             },
             adapters,
@@ -3017,8 +3037,6 @@ test("the certification entry accepts retained output syntax before safe root va
       certificationScript,
       "--output-root",
       "private-relative-output",
-      "--calendly-url",
-      "https://calendly.com/example/private-value",
     ], {
       cwd: repositoryRoot,
       encoding: "utf8",
@@ -3049,8 +3067,6 @@ test("the certification entry accepts the conventional package-script separator"
       "--",
       "--output-root",
       "private-relative-output",
-      "--calendly-url",
-      "https://calendly.com/example/private-value",
     ], {
       cwd: repositoryRoot,
       encoding: "utf8",
@@ -3071,4 +3087,11 @@ test("the certification entry accepts the conventional package-script separator"
     })}\n`,
   );
   assert.doesNotMatch(result.stderr, /private-relative|calendly\.com/u);
+});
+
+ test("Calendly certification rejects retired literal destination input before adapter access", async () => {
+  let calls = 0;
+  const adapters = new Proxy({}, { get() { calls += 1; throw new Error("must not inspect adapter"); } });
+  await assert.rejects(certifyBookingCalendlyForTesting({ calendlyUrl: "https://calendly.com/example/private-value" }, adapters), { code: "CERTIFICATION_ARGUMENT_INVALID" });
+  assert.equal(calls, 0);
 });

@@ -28,10 +28,14 @@ const verificationChecks = [
   "post-state-inference",
 ];
 
+const currentContext = core.createGenerationRenderingContext();
+const currentCatalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, currentContext.catalogSnapshot).value;
+const currentCapabilities = core.createInstalledManifest(core.resolveCapabilities({ profile: "portfolio" }, currentCatalog, currentContext.profiles).value);
+
 function createDescriptor(identifier, probes) {
   return {
     identifier,
-    version: "0.1.0",
+    version: currentCapabilities.find(capability => capability.identifier === identifier)?.version ?? "0.1.0",
     deliveryMode: "source-generated",
     stateClassifications: ["repository-stateful"],
     removalPolicy: "reviewed",
@@ -73,11 +77,10 @@ function installCapability(descriptor, overrides = {}) {
 
 function createState(overrides = {}) {
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderVersion: "0.0.0",
-    projectSchemaVersion: "1.0.0",
-    origin: { profile: "portfolio", recipeVersion: "0.11.7" },
-    installedCapabilities: [],
+    projectSchemaVersion: "2.0.0",
+    origin: { profile: "portfolio", recipeVersion: "0.12.0" },
     appliedMigrations: [],
     managedSurfaces: [],
     ejections: [],
@@ -91,12 +94,7 @@ function createState(overrides = {}) {
       checks: verificationChecks,
     },
     ...overrides,
-    installedCapabilities: [
-      ...((overrides.installedCapabilities ?? []).some(({ identifier }) => identifier === "standards") ? [] : [{
-        identifier: "standards", version: "0.5.1", deliveryMode: "hybrid", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed",
-      }]),
-      ...(overrides.installedCapabilities ?? []),
-    ],
+    installedCapabilities: currentCapabilities.map(capability => overrides.installedCapabilities?.find(value => value.identifier === capability.identifier) ?? capability),
   };
 }
 
@@ -503,14 +501,14 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
 });
 
 test("standards recognizes only the exact patched Vitest declaration without accepting other versions or managed drift", async () => {
-  const root = resolve(packageRoot, "../../fixtures/generated/app-0.2.7");
+  const root = resolve(packageRoot, "../../fixtures/generated/app-0.3.0");
   const reader = { async readText(path) {
     try { return { kind: "file", content: await readFile(resolve(root, path), "utf8") }; }
     catch (error) { return error.code === "ENOENT" ? { kind: "missing" } : { kind: "error", code: "FILE_ENCODING_INVALID" }; }
   } };
   const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
   const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
-  const catalog = core.createCapabilityCatalogSnapshot({ standards: "0.1.0", observability: "0.3.0" }, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" });
+  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, core.createGenerationRenderingContext().catalogSnapshot);
   assert.equal(catalog.ok, true);
 
   for (const version of ["5.0.3", "4.1.10", "4.1.11", "5.0.0", "^5.0.3"]) {
@@ -543,13 +541,13 @@ test("standards recognizes only the exact patched Vitest declaration without acc
 });
 
 test("probe failures distinguish missing, mismatch, and ambiguity", async () => {
-  const invalidJson = createDescriptor("invalid-json", [
+  const invalidJson = createDescriptor("standards", [
       { kind: "json-value", path: "invalid.json", pointer: "/enabled", expected: true },
     ]);
-  const missingPackageSection = createDescriptor("missing-package-section", [
+  const missingPackageSection = createDescriptor("content-files", [
       { kind: "package", path: "package.json", section: "dependencies", packageName: "missing", version: "1.0.0" },
     ]);
-  const mismatchedJson = createDescriptor("mismatched-json", [
+  const mismatchedJson = createDescriptor("section-composition", [
       { kind: "json-value", path: "valid.json", pointer: "/enabled", expected: true },
     ]);
   const catalog = [
@@ -568,33 +566,21 @@ test("probe failures distinguish missing, mismatch, and ambiguity", async () => 
     })),
   });
 
-  assert.deepEqual(inference.capabilities, [
-    {
-      identifier: "invalid-json",
-      category: "ambiguous",
-      probes: [{ kind: "json-value", path: "invalid.json", status: "ambiguous", code: "JSON_INVALID" }],
-    },
-    {
-      identifier: "mismatched-json",
-      category: "contradictory",
-      probes: [{ kind: "json-value", path: "valid.json", status: "mismatched", code: "JSON_VALUE_MISMATCH" }],
-    },
-    {
-      identifier: "missing-package-section",
-      category: "contradictory",
-      probes: [{ kind: "package", path: "package.json", status: "missing", code: "PACKAGE_MEMBER_MISSING" }],
-    },
-    { identifier: "standards", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING", probes: [] },
+  assert.equal(inference.state.kind, "valid");
+  assert.deepEqual(inference.capabilities.filter(value => catalog.some(descriptor => descriptor.identifier === value.identifier)), [
+    { identifier: "content-files", category: "contradictory", probes: [{ kind: "package", path: "package.json", status: "missing", code: "PACKAGE_MEMBER_MISSING" }] },
+    { identifier: "section-composition", category: "contradictory", probes: [{ kind: "json-value", path: "valid.json", status: "mismatched", code: "JSON_VALUE_MISMATCH" }] },
+    { identifier: "standards", category: "ambiguous", probes: [{ kind: "json-value", path: "invalid.json", status: "ambiguous", code: "JSON_INVALID" }] },
   ]);
 });
 
 test("capability inference applies the approved category precedence and omission rule", async () => {
-  const confirmed = createDescriptor("confirmed", [{ kind: "file", path: "confirmed.txt" }]);
-  const contradictory = createDescriptor("contradictory", [
+  const confirmed = createDescriptor("standards", [{ kind: "file", path: "confirmed.txt" }]);
+  const contradictory = createDescriptor("content-files", [
     { kind: "file", path: "contradictory-present.txt" },
     { kind: "file", path: "missing.txt" },
   ]);
-  const metadataMismatch = createDescriptor("metadata-mismatch", [{ kind: "file", path: "metadata.txt" }]);
+  const metadataMismatch = createDescriptor("section-composition", [{ kind: "file", path: "metadata.txt" }]);
   const probable = createDescriptor("probable", [{ kind: "file", path: "probable.txt" }]);
   const partial = createDescriptor("partial", [
     { kind: "file", path: "partial-present.txt" },
@@ -605,14 +591,8 @@ test("capability inference applies the approved category precedence and omission
     installedCapabilities: [
       installCapability(confirmed),
       installCapability(contradictory),
-      installCapability(metadataMismatch, { version: "0.2.0" }),
-      {
-        identifier: "unknown-installed",
-        version: "0.1.0",
-        deliveryMode: "source-generated",
-        stateClassifications: ["repository-stateful"],
-        removalPolicy: "reviewed",
-      },
+      installCapability(metadataMismatch, { removalPolicy: "unsupported" }),
+
     ],
   });
   const inference = await core.inferRepository({
@@ -629,13 +609,13 @@ test("capability inference applies the approved category precedence and omission
   assert.deepEqual(
     inference.capabilities.map(({ identifier, category, code }) => ({ identifier, category, ...(code === undefined ? {} : { code }) })),
     [
-      { identifier: "confirmed", category: "confirmed" },
-      { identifier: "contradictory", category: "contradictory" },
-      { identifier: "metadata-mismatch", category: "contradictory", code: "CAPABILITY_METADATA_MISMATCH" },
+      { identifier: "content-files", category: "contradictory" },
+      { identifier: "deployment-cloudflare", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING" },
+      { identifier: "observability", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING" },
       { identifier: "partial", category: "partial" },
       { identifier: "probable", category: "probable" },
-      { identifier: "standards", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING" },
-      { identifier: "unknown-installed", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING" },
+      { identifier: "section-composition", category: "contradictory", code: "CAPABILITY_METADATA_MISMATCH" },
+      { identifier: "standards", category: "confirmed" },
     ],
   );
 });
@@ -647,7 +627,7 @@ test("observability inference requires source files and deployment-owned Wrangle
     ({ identifier }) => identifier === "observability",
   );
   assert.notEqual(descriptor, undefined);
-  assert.equal(descriptor.version, "0.3.0");
+  assert.equal(descriptor.version, "0.4.0");
 
   const files = Object.fromEntries(
     descriptor.inferenceProbes
@@ -666,7 +646,6 @@ test("observability inference requires source files and deployment-owned Wrangle
     version_metadata: { binding: "CF_VERSION_METADATA" },
   })}\n`;
   const state = createState({
-    origin: { profile: "portfolio", recipeVersion: "0.11.7" },
     installedCapabilities: [installCapability(descriptor)],
   });
 
@@ -674,16 +653,15 @@ test("observability inference requires source files and deployment-owned Wrangle
     catalog: [descriptor],
     reader: core.createInMemoryRepositoryReader(stateFiles(state, files)),
   });
-  assert.equal(inference.capabilities.length, 2);
-  assert.deepEqual(inference.capabilities[1], { identifier: "standards", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING", probes: [] });
-  assert.equal(inference.capabilities[0]?.identifier, "observability");
-  assert.equal(inference.capabilities[0]?.category, "confirmed");
+  assert.equal(inference.state.kind, "valid");
+  assert.equal(inference.capabilities.find(value => value.identifier === descriptor.identifier)?.identifier, "observability");
+  assert.equal(inference.capabilities.find(value => value.identifier === descriptor.identifier)?.category, "confirmed");
   assert.equal(
-    inference.capabilities[0]?.probes.length,
+    inference.capabilities.find(value => value.identifier === descriptor.identifier)?.probes.length,
     descriptor.inferenceProbes.length,
   );
   assert.equal(
-    inference.capabilities[0]?.probes.every(
+    inference.capabilities.find(value => value.identifier === descriptor.identifier)?.probes.every(
       ({ status }) => status === "present",
     ),
     true,
@@ -701,15 +679,15 @@ test("observability inference requires source files and deployment-owned Wrangle
     catalog: [descriptor],
     reader: core.createInMemoryRepositoryReader(stateFiles(state, files)),
   });
-  assert.equal(mismatched.capabilities[0]?.category, "contradictory");
+  assert.equal(mismatched.capabilities.find(value => value.identifier === descriptor.identifier)?.category, "contradictory");
 });
 
 test("ambiguous probes take precedence over installed metadata mismatch", async () => {
-  const descriptor = createDescriptor("ambiguous-precedence", [
+  const descriptor = createDescriptor("standards", [
     { kind: "json-value", path: "invalid.json", pointer: "/enabled", expected: true },
   ]);
   const state = createState({
-    installedCapabilities: [installCapability(descriptor, { version: "0.2.0" })],
+    installedCapabilities: [installCapability(descriptor, { removalPolicy: "unsupported" })],
   });
   const inference = await core.inferRepository({
     catalog: [descriptor],
@@ -718,8 +696,9 @@ test("ambiguous probes take precedence over installed metadata mismatch", async 
     })),
   });
 
-  assert.deepEqual(inference.capabilities, [{
-    identifier: "ambiguous-precedence",
+  assert.equal(inference.state.kind, "valid");
+  assert.deepEqual(inference.capabilities.filter(value => value.identifier === descriptor.identifier), [{
+    identifier: "standards",
     category: "ambiguous",
     probes: [{
       kind: "json-value",
@@ -727,12 +706,12 @@ test("ambiguous probes take precedence over installed metadata mismatch", async 
       status: "ambiguous",
       code: "JSON_INVALID",
     }],
-  }, { identifier: "standards", category: "ambiguous", code: "CAPABILITY_DESCRIPTOR_MISSING", probes: [] }]);
+  }]);
 });
 
 test("state classification sets compare independently of declaration order", async () => {
   const descriptor = {
-    ...createDescriptor("classification-set", [{ kind: "file", path: "present.txt" }]),
+    ...createDescriptor("standards", [{ kind: "file", path: "present.txt" }]),
     stateClassifications: ["repository-stateful", "external-stateful"],
   };
   const state = createState({
@@ -749,7 +728,7 @@ test("state classification sets compare independently of declaration order", asy
     })),
   });
 
-  assert.equal(inference.capabilities[0]?.category, "confirmed");
+  assert.equal(inference.capabilities.find(value => value.identifier === descriptor.identifier)?.category, "confirmed");
 
   const differentState = createState({
     installedCapabilities: [
@@ -765,9 +744,9 @@ test("state classification sets compare independently of declaration order", asy
     })),
   });
 
-  assert.equal(differentInference.capabilities[0]?.category, "contradictory");
+  assert.equal(differentInference.capabilities.find(value => value.identifier === descriptor.identifier)?.category, "contradictory");
   assert.equal(
-    differentInference.capabilities[0]?.code,
+    differentInference.capabilities.find(value => value.identifier === descriptor.identifier)?.code,
     "CAPABILITY_METADATA_MISMATCH",
   );
 });
@@ -904,17 +883,55 @@ test("application-owned and ejected surfaces are reported without reading their 
 });
 
 
-test("Vitest five standards refuse retained declarations and ranges even with matching installed fingerprints", async () => {
-  const reader = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated/app-0.2.7"));
-  const manifest = JSON.parse((await reader.readText("apps/web/package.json")).content);
-  const originalState = JSON.parse((await reader.readText(".egeria/state.json")).content);
-  const catalog = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" });
-  assert.equal(catalog.ok, true);
-  for (const version of ["5.0.3", "5.0.0", "4.1.10", "4.1.11", "^5.0.3", "5.0.1"]) {
+test("installed deployment verification files must match the selected recipe even when their recorded fingerprints agree", async (t) => {
+  const workflow = ".github/workflows/deploy.yml";
+  const helper = "apps/web/scripts/prepare-ci-git.sh";
+  for (const fixture of ["site-public-integrations-0.13.0", "app-persistence-0.3.0", "app-jobs-0.3.0", "app-persistence-jobs-email-0.3.0"]) {
+    await t.test(fixture, async () => {
+      const source = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated", fixture));
+      const state = JSON.parse((await source.readText(".egeria/state.json")).content);
+      const deploy = (await source.readText(workflow)).content;
+      const unwrapped = deploy.replace("sh " + helper + " pnpm", "pnpm");
+      assert.notEqual(unwrapped, deploy);
+      for (const [path, replacement] of [[workflow, unwrapped], [helper, 'exec "$@"\n']]) {
+        const mixed = structuredClone(state);
+        mixed.managedSurfaces.find(surface => surface.path === path).fingerprint = core.fingerprintFileContent(encoder.encode(replacement));
+        const reader = { readText: async (requested) => {
+          if (requested === path) return { kind: "file", content: replacement };
+          if (requested === ".egeria/state.json") return { kind: "file", content: core.serializeStateJson(mixed) };
+          return source.readText(requested);
+        } };
+        const snapshot = await core.readVerifiedProjectSnapshot(reader);
+        assert.equal(snapshot.ok, true);
+        const inference = await core.inferRepository(snapshot.value);
+        assert.equal(inference.surfaces.find(surface => surface.path === path)?.status, "drifted", path);
+        assert.equal(inference.surfaces.find(surface => surface.path === (path === workflow ? helper : workflow))?.status, "confirmed");
+      }
+    });
+  }
+});
+
+test("current standards refuse retired Vitest declarations and detect managed drift", async () => {
+  const rendered = await core.renderSkeleton({ profile: "portfolio", projectName: "inference-example", displayName: "Inference Example", packageVersions: core.verifiedCapabilityPackageVersions });
+  assert.equal(rendered.ok, true);
+  const entries = new Map(rendered.value.files.map(file => [file.path, file.content]));
+  const surfaces = core.materializeInstalledSurfaces({ files: entries, surfaces: rendered.value.surfaces });
+  assert.equal(surfaces.ok, true);
+  const manifest = JSON.parse(new TextDecoder().decode(entries.get("apps/web/package.json")));
+  const originalState = createState({ installedCapabilities: core.createInstalledManifest(rendered.value.resolved), managedSurfaces: surfaces.value });
+  const source = Object.fromEntries([...entries].map(([path, content]) => [path, new TextDecoder().decode(content)]));
+  for (const version of ["5.0.3", "4.1.10", "4.1.11", "^5.0.3", "5.0.1"]) {
     const state = structuredClone(originalState);
-    state.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package").fingerprint = core.fingerprintJsonValue(version);
-    const files = { "apps/web/package.json": JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, vitest: version } }), ".egeria/state.json": core.serializeStateJson(state) };
-    const inference = await core.inferRepository({ catalog: catalog.value, reader: { readText: async path => Object.hasOwn(files, path) ? { kind: "file", content: files[path] } : reader.readText(path) } });
+    const surface = state.managedSurfaces.find(({ identifier }) => identifier === "standards-vitest-package");
+    surface.fingerprint = core.fingerprintJsonValue(version);
+    const files = { ...source, "apps/web/package.json": JSON.stringify({ ...manifest, devDependencies: { ...manifest.devDependencies, vitest: version } }), ".egeria/state.json": core.serializeStateJson(state) };
+    const inference = await core.inferRepository({ catalog: currentCatalog, reader: core.createInMemoryRepositoryReader(files) });
+    assert.equal(inference.state.kind, "valid");
     assert.equal(inference.capabilities.find(({ identifier }) => identifier === "standards").category, version === "5.0.3" ? "confirmed" : "contradictory", version);
+    assert.equal(inference.surfaces.find(({ identifier }) => identifier === "standards-vitest-package").status, "confirmed");
+    surface.fingerprint = core.fingerprintJsonValue("different");
+    files[".egeria/state.json"] = core.serializeStateJson(state);
+    const drifted = await core.inferRepository({ catalog: currentCatalog, reader: core.createInMemoryRepositoryReader(files) });
+    assert.equal(drifted.surfaces.find(({ identifier }) => identifier === "standards-vitest-package").status, "drifted");
   }
 });

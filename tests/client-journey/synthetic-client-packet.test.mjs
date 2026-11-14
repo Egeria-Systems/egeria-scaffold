@@ -36,7 +36,7 @@ const packetRoot = resolve(
 );
 const generatedFixtureRoot = resolve(
   repositoryRoot,
-  generatedFixtureContracts.find(({ identifier }) => identifier === "site-multilingual-analytics").relativeRoot,
+  generatedFixtureContracts.find(({ identifier }) => identifier === "site-public-integrations").relativeRoot,
 );
 const adapterPath = resolve(
   repositoryRoot,
@@ -85,8 +85,7 @@ const expectedContentFiles = [
   "content/en-CA/long-form/introduction.md",
 ];
 const expectedWritePaths = [
-  ...expectedContentFiles.map((path) => `apps/web/${path}`),
-  "apps/web/tests/e2e/site-routing.spec.ts",
+  ...expectedContentFiles.filter(path => path !== "content/en-CA/routing.yaml").map((path) => `apps/web/${path}`),
 ].toSorted();
 
 function sha256(bytes) {
@@ -209,7 +208,14 @@ async function createProjectFixture({ preserveFixtureIdentity = false } = {}) {
         project.capabilitySettings.analytics.providers.cloudflareWebAnalytics,
     };
     project.capabilitySettings.analytics.operationalIntegrations = {};
+    delete project.capabilitySettings["booking-calendly"];
+    project.selectedCapabilities = project.selectedCapabilities.filter(identifier => !["booking-calendly", "contact-form-web3forms"].includes(identifier));
     await writeFile(projectPath, stringify(project));
+    // Isolated adapter unit input, never a new fixture or generation receipt.
+    const statePath = resolve(projectRoot, ".egeria/state.json");
+    const state = JSON.parse(await readFile(statePath, "utf8"));
+    state.installedCapabilities = state.installedCapabilities.filter(({ identifier }) => project.selectedCapabilities.includes(identifier));
+    await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
   }
   await runGit(projectRoot, ["init", "-b", "main"]);
   await runGit(projectRoot, ["config", "user.name", "Synthetic Journey Test"]);
@@ -565,7 +571,7 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
     { recipe: "0.12.2", standards: "0.4.0", stateRecipe: "0.12.2", accepted: false },
     { recipe: "0.12.2", standards: "0.5.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.3", standards: "0.5.0", stateRecipe: "0.12.3", accepted: false },
-    { recipe: "0.12.7", standards: "0.5.1", stateRecipe: "0.12.7", accepted: true },
+    { recipe: "0.12.7", standards: "0.5.1", stateRecipe: "0.12.7", accepted: false },
     { recipe: "0.12.4", standards: "0.5.0", stateRecipe: "0.12.4", accepted: false },
     { recipe: "0.12.7", standards: "0.5.0", stateRecipe: "0.12.7", accepted: false },
     { recipe: "0.12.7", standards: "0.5.1", stateRecipe: "0.12.7", schemaVersion: "2.0.0", accepted: false },
@@ -577,6 +583,12 @@ test("the adapter accepts exact generation identities and refuses mixed or unsup
     { recipe: "0.12.0", standards: "0.4.0", stateRecipe: "0.12.0", accepted: false },
     { recipe: "0.12.0", standards: "0.5.0", stateRecipe: "0.11.0", accepted: false },
     { recipe: "0.13.0", standards: "0.5.0", stateRecipe: "0.13.0", accepted: false },
+    { recipe: "0.13.0", standards: "0.9.0", stateRecipe: "0.13.0", accepted: true },
+    { recipe: "0.13.0", standards: "0.5.1", stateRecipe: "0.13.0", accepted: false },
+    { recipe: "0.13.0", standards: "0.9.0", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.2", standards: "0.5.1", stateRecipe: "0.12.2", accepted: false },
+    { recipe: "0.12.1", standards: "0.5.1", stateRecipe: "0.12.1", accepted: false },
+    { recipe: "0.12.0", standards: "0.5.1", stateRecipe: "0.12.0", accepted: false },
   ];
   for (const identity of identities) {
     const fixture = await createProjectFixture();
@@ -693,30 +705,19 @@ test("the adapter refuses packet, manifest, content, and source drift before wri
     }
   }
 
-  for (const replacement of [
-    "https://harbour-light.example/extra",
-    "https://different.example",
-  ]) {
-    const project = await createProjectFixture();
-    try {
-      const sourcePath = resolve(
-        project.projectRoot,
-        "apps/web/tests/e2e/site-routing.spec.ts",
-      );
-      const source = await readFile(sourcePath, "utf8");
-      await writeFile(
-        sourcePath,
-        source.replace("https://example.com", replacement),
-      );
-      await runGit(project.projectRoot, ["add", sourcePath]);
-      await runGit(project.projectRoot, ["commit", "-m", "Introduce source drift"]);
-      await assertRefusalWithoutAdditionalWrites({
-        projectRoot: project.projectRoot,
-      });
-    } finally {
-      await project.cleanup();
-    }
-  }
+  const project = await createProjectFixture();
+  try {
+    const sourcePath = resolve(project.projectRoot, "apps/web/tests/e2e/site-routing.spec.ts");
+    const source = await readFile(sourcePath, "utf8");
+    const changed = `${source}\n// Application-owned browser expectation.\n`;
+    await writeFile(sourcePath, changed);
+    await runGit(project.projectRoot, ["add", sourcePath]);
+    await runGit(project.projectRoot, ["commit", "-m", "Customize browser expectation"]);
+    await applySyntheticClientPacket({ projectRoot: project.projectRoot });
+    assert.equal(await readFile(sourcePath, "utf8"), changed);
+    await assert.rejects(readFile(resolve(project.projectRoot, "apps/web/content/en-CA/routing.yaml")), { code: "ENOENT" });
+  } finally { await project.cleanup(); }
+
 });
 
 test("the adapter refuses unsafe repository boundaries and rolls back injected failure", async () => {

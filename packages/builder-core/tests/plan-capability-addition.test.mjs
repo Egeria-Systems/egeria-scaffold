@@ -11,28 +11,11 @@ const core = await import(
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
-const settings = Object.freeze({
-  destination: "https://calendly.com/example/discovery",
-  mode: "popup",
-});
+const settings = Object.freeze({ mode: "popup" });
 const analyticsSettings = Object.freeze({
   consent: { policy: "explicit-opt-in" },
-  providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    },
-    googleAnalytics4: { measurementId: "G-TEST123456" },
-    microsoftClarity: {
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    },
-  },
-  operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
-    lookerStudio: { connector: "google-analytics-4" },
-  },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 });
 const git = Object.freeze({
   ok: true,
@@ -128,7 +111,7 @@ function createSnapshotReader(entries, overrides = new Map()) {
 }
 
 async function fixtureEntries(name) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}-${name.startsWith("portfolio") ? "0.11.7" : name.startsWith("site") ? "0.12.7" : "0.2.7"}`));
+  return environmentContactEntries(name.startsWith("site") ? "site" : name.startsWith("app") ? "app" : "portfolio", { multilingual: name.includes("multilingual"), ...(name.includes("calendly") ? { booking: "popup" } : {}) });
 }
 
 function assertFailure(result, code) {
@@ -164,48 +147,22 @@ async function planFromEntries(entries, options = {}) {
 
 function expectedActions() {
   return [
-    {
-      kind: "replace-project-configuration",
-      path: ".egeria/project.yaml",
-      ownership: "managed",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "replace-file",
-      path: "apps/web/app/page.tsx",
-      ownership: "application-owned",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/content/en-CA/booking-calendly.yaml",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-content.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-      ownership: "managed",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "create-file",
-      path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
+    { kind: "replace-project-configuration", path: ".egeria/project.yaml", ownership: "managed", owner: "builder-kernel" },
+    { kind: "replace-file", path: ".github/workflows/deploy.yml", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: ".github/workflows/quality.yml", ownership: "managed", owner: "standards" },
+    { kind: "replace-file", path: "apps/web/.env.example", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "create-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/component/booking-availability.test.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/e2e/calendly-booking.spec.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "apps/web/tests/unit/booking-configuration.test.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "create-file", path: "docs/booking-calendly.md", ownership: "application-owned", owner: "booking-calendly" },
   ];
 }
 
@@ -227,11 +184,10 @@ function expectedPlan(profile, planFingerprint) {
     profile,
     capability: {
       identifier: "booking-calendly",
-      version: "0.1.0",
+      version: "0.2.0",
     },
     settings: {
       mode: "popup",
-      destination: "redacted",
     },
     currentCapabilities,
     desiredCapabilities: ["booking-calendly", ...currentCapabilities].sort(
@@ -305,6 +261,7 @@ test("multilingual addition plans the exact locale overlay with or without Calen
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
       [
+        ...(fixture.includes("calendly") ? [".github/workflows/deploy.yml", ".github/workflows/quality.yml"] : []),
         "apps/web/app/error.tsx",
         "apps/web/app/layout.tsx",
         "apps/web/tests/visual/home-visual.spec.ts",
@@ -340,6 +297,7 @@ test("analytics addition redacts public identifiers and composes after multiling
   const expectedCreatedPaths = [
     "apps/web/content/en-CA/analytics.yaml",
     "apps/web/content/fr-CA/analytics.yaml",
+    "apps/web/src/integrations/analytics/analytics-configuration.ts",
     "apps/web/src/integrations/analytics/analytics-consent-state.ts",
     "apps/web/src/integrations/analytics/analytics-consent.tsx",
     "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
@@ -349,6 +307,7 @@ test("analytics addition redacts public identifiers and composes after multiling
     "apps/web/src/integrations/analytics/analytics-settings.ts",
     "apps/web/tests/component/analytics-consent.test.tsx",
     "apps/web/tests/e2e/analytics-consent.spec.ts",
+    "apps/web/tests/unit/analytics-configuration.test.ts",
     "apps/web/tests/unit/analytics-consent-state.test.ts",
     "apps/web/tests/unit/analytics-provider-contract.test.ts",
     "apps/web/tests/unit/analytics-runtime.test.ts",
@@ -363,7 +322,7 @@ test("analytics addition redacts public identifiers and composes after multiling
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.deepEqual(result.value.capability, {
       identifier: "analytics",
-      version: "0.1.0",
+      version: "0.2.0",
     });
     assert.deepEqual(result.value.settings, {
       consentPolicy: "explicit-opt-in",
@@ -373,7 +332,6 @@ test("analytics addition redacts public identifiers and composes after multiling
         "microsoft-clarity",
       ],
       operationalIntegrations: ["google-search-console", "looker-studio"],
-      providerIdentifiers: "redacted",
     });
     assert.deepEqual(
       result.value.actions
@@ -385,7 +343,7 @@ test("analytics addition redacts public identifiers and composes after multiling
       result.value.actions
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
-      ["apps/web/app/layout.tsx"],
+      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs"],
     );
     assert.doesNotMatch(
       JSON.stringify(result.value),
@@ -639,10 +597,10 @@ test("capability addition plan binds private settings and exact Git identity wit
 
   const first = await planFromEntries(base);
   const repeated = await planFromEntries(base);
-  const differentDestination = await planFromEntries(reordered, {
+  const differentSelection = await planFromEntries(reordered, {
     settings: {
       ...settings,
-      destination: "https://www.calendly.com/example/another-secret",
+      mode: "link",
     },
   });
   const differentGitIdentity = await planFromEntries(base, {
@@ -656,11 +614,11 @@ test("capability addition plan binds private settings and exact Git identity wit
   });
   assert.equal(first.ok, true);
   assert.equal(repeated.ok, true);
-  assert.equal(differentDestination.ok, true);
+  assert.equal(differentSelection.ok, true);
   assert.equal(differentGitIdentity.ok, true);
   assert.deepEqual(repeated.value, first.value);
   assert.notEqual(
-    differentDestination.value.planFingerprint,
+    differentSelection.value.planFingerprint,
     first.value.planFingerprint,
   );
   assert.notEqual(
@@ -668,7 +626,7 @@ test("capability addition plan binds private settings and exact Git identity wit
     first.value.planFingerprint,
   );
   assert.deepEqual(
-    { ...differentDestination.value, planFingerprint: first.value.planFingerprint },
+    { ...differentSelection.value, settings: first.value.settings, planFingerprint: first.value.planFingerprint },
     first.value,
   );
   assert.deepEqual(
@@ -678,7 +636,7 @@ test("capability addition plan binds private settings and exact Git identity wit
   assert.doesNotMatch(
     JSON.stringify([
       first.value,
-      differentDestination.value,
+      differentSelection.value,
       differentGitIdentity.value,
     ]),
     /discovery|another-secret|another-transactional-change|calendly\.com/iu,
@@ -713,7 +671,7 @@ test("analytics addition planning refuses drift and binds private authority", as
   }
 
   const changedSettings = structuredClone(analyticsSettings);
-  changedSettings.providers.googleAnalytics4.measurementId = "G-PRIVATE654321";
+  delete changedSettings.providers.microsoftClarity;
   const first = await planFromEntries(base, {
     capability: "analytics",
     settings: analyticsSettings,
@@ -745,7 +703,7 @@ test("analytics addition planning refuses drift and binds private authority", as
   assert.notEqual(changed.value.planFingerprint, first.value.planFingerprint);
   assert.notEqual(changedGit.value.planFingerprint, first.value.planFingerprint);
   assert.deepEqual(
-    { ...changed.value, planFingerprint: first.value.planFingerprint },
+    { ...changed.value, settings: first.value.settings, planFingerprint: first.value.planFingerprint },
     first.value,
   );
   assert.deepEqual(
@@ -804,6 +762,20 @@ test("environment contact addition plans are selection-only and bind exact contr
   assert.notEqual(rebound.value.planFingerprint, plan.value.planFingerprint);
 });
 
+test("current multilingual addition preserves selection-only neighbors without a context switch", async () => {
+  const entries = await environmentContactEntries("site", { contact: true, booking: "popup" });
+  const snapshot = createSnapshotReader(entries);
+  const before = snapshot.snapshot();
+  const plan = await core.planCapabilityAddition({ reader: snapshot.reader, git, capability: "multilingual" });
+  assert.equal(plan.ok, true, JSON.stringify(plan));
+  assert.deepEqual(plan.value.capability, { identifier: "multilingual", version: "0.1.0" });
+  for (const identifier of ["contact-form-web3forms", "booking-calendly", "site-routing"]) {
+    assert.ok(plan.value.desiredCapabilities.includes(identifier));
+  }
+  assert.ok(plan.value.actions.some(({ kind, path }) => kind === "create-file" && path.includes("/i18n/")));
+  assert.equal(snapshot.snapshot(), before);
+});
+
 test("environment contact addition refuses settings, forged context and other lifecycle before reading", async () => {
   let reads = 0;
   const reader = { async readText() { reads += 1; return { kind: "missing" }; } };
@@ -811,7 +783,7 @@ test("environment contact addition refuses settings, forged context and other li
   for (const override of [
     { settings: {} }, { settings: { accessKey: "00000000-0000-4000-8000-000000000001" } },
     { renderingContext: { ...renderingContext, projectSchemaVersion: "1.0.0" } },
-    ...["analytics", "booking-calendly", "multilingual", "background-job-delivery"].map(capability => ({ capability })),
+    ...["analytics", "booking-calendly", "background-job-delivery"].map(capability => ({ capability })),
   ]) {
     const result = await core.planCapabilityAddition({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override });
     assertFailure(result, "CAPABILITY_ADDITION_UNSUPPORTED");

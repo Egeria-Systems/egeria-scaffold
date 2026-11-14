@@ -4,10 +4,10 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
-import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
+import { createApplicationEnvironmentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 const currentCohorts = [
-  { profiles: createCurrentProfileRecipes(), supportedProfiles: ["portfolio", "site"] },
+  { profiles: createApplicationEnvironmentProfileRecipes(), supportedProfiles: ["portfolio", "site"] },
 ];
 
 
@@ -21,28 +21,11 @@ const stateSurfaces = await import(
 );
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
-const settings = Object.freeze({
-  destination: "https://calendly.com/private/discovery",
-  mode: "popup",
-});
+const settings = Object.freeze({ mode: "popup" });
 const analyticsSettings = Object.freeze({
   consent: { policy: "explicit-opt-in" },
-  providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    },
-    googleAnalytics4: { measurementId: "G-TEST123456" },
-    microsoftClarity: {
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    },
-  },
-  operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
-    lookerStudio: { connector: "google-analytics-4" },
-  },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 });
 const git = Object.freeze({
   ok: true,
@@ -88,7 +71,7 @@ async function loadTextEntries(root) {
 }
 
 async function baseFixtureEntries(profile) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${{ portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }[profile]}`));
+  return environmentContactEntries(profile);
 }
 
 async function installedEntries(profile, options = {}) {
@@ -103,7 +86,7 @@ async function installedEntries(profile, options = {}) {
     ...(bookingSettings === undefined ? {} : { bookingCalendly: bookingSettings }),
     ...(options.multilingual === true ? { multilingual: true } : {}),
     ...(options.analytics === undefined ? {} : { analytics: options.analytics }),
-  }, { ...createGenerationRenderingContext(), profiles: options.profiles ?? createCurrentProfileRecipes() });
+  }, { ...createGenerationRenderingContext(), profiles: options.profiles ?? createApplicationEnvironmentProfileRecipes() });
   assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
 
   const byteFiles = new Map(
@@ -131,9 +114,9 @@ async function installedEntries(profile, options = {}) {
   assert.equal(surfaces.ok, true, JSON.stringify(surfaces.issues));
 
   const state = {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderVersion: "0.0.0",
-    projectSchemaVersion: "1.0.0",
+    projectSchemaVersion: "2.0.0",
     origin: { profile, recipeVersion: rendered.value.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.value.resolved),
     appliedMigrations: [],
@@ -247,52 +230,24 @@ function assertFailure(result, code) {
 }
 
 function expectedActions(overrides = new Map()) {
-  const actions = [
-    {
-      kind: "replace-project-configuration",
-      path: ".egeria/project.yaml",
-      ownership: "managed",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "replace-file",
-      path: "apps/web/app/page.tsx",
-      ownership: "application-owned",
-      owner: "builder-kernel",
-    },
-    {
-      kind: "delete-file",
-      path: "apps/web/content/en-CA/booking-calendly.yaml",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "delete-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-content.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "delete-file",
-      path: "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-      ownership: "managed",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "delete-file",
-      path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
-    {
-      kind: "delete-file",
-      path: "apps/web/tests/e2e/calendly-booking.spec.ts",
-      ownership: "application-owned",
-      owner: "booking-calendly",
-    },
+  return [
+    { kind: "replace-project-configuration", path: ".egeria/project.yaml", ownership: "managed", owner: "builder-kernel" },
+    { kind: "replace-file", path: ".github/workflows/deploy.yml", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: ".github/workflows/quality.yml", ownership: "managed", owner: "standards" },
+    { kind: "replace-file", path: "apps/web/.env.example", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
+    { kind: "delete-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/tests/component/booking-availability.test.tsx", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/tests/e2e/calendly-booking.spec.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "apps/web/tests/unit/booking-configuration.test.ts", ownership: "application-owned", owner: "booking-calendly" },
+    { kind: "delete-file", path: "docs/booking-calendly.md", ownership: "application-owned", owner: "booking-calendly" },
   ].map((action) => overrides.get(action.path) ?? action);
-
-  return actions.sort((left, right) => compareText(left.path, right.path));
 }
 
 const expectedCalendlyReferenceWarningRequirement = Object.freeze({
@@ -305,6 +260,10 @@ const expectedCalendlyReferenceWarningRequirement = Object.freeze({
     Object.freeze({
       code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
       path: "apps/web/AGENTS.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "docs/environments.md",
     }),
     Object.freeze({
       code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
@@ -345,6 +304,14 @@ const expectedAnalyticsReferenceWarningRequirement = Object.freeze({
       path: "apps/web/src/sections/section-registry.tsx",
     }),
     Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "docs/environments.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "docs/observability.md",
+    }),
+    Object.freeze({
       code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
       path: "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
     }),
@@ -368,7 +335,7 @@ function expectedPlan(
     planFingerprint,
     baseRevision: git.identity.revision,
     profile,
-    capability: { identifier: "booking-calendly", version: "0.1.0" },
+    capability: { identifier: "booking-calendly", version: "0.2.0" },
     currentCapabilities,
     desiredCapabilities: currentCapabilities.filter(
       (identifier) => identifier !== "booking-calendly",
@@ -708,6 +675,10 @@ test("Calendly removal reference guard fingerprints heuristic, dynamic, and cove
           path: "apps/web/src/comment-only.ts",
         },
         {
+          code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+          path: "docs/environments.md",
+        },
+        {
           code: "CAPABILITY_REMOVAL_REFERENCE_COVERAGE_INCOMPLETE",
         },
         {
@@ -907,7 +878,7 @@ test("analytics removal restores the composed layout and requires provider dispo
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.deepEqual(result.value.capability, {
       identifier: "analytics",
-      version: "0.1.0",
+      version: "0.2.0",
     });
     assert.equal(result.value.desiredCapabilities.includes("analytics"), false);
     assert.equal(
@@ -921,7 +892,8 @@ test("analytics removal restores the composed layout and requires provider dispo
       [
         "apps/web/content/en-CA/analytics.yaml",
         "apps/web/content/fr-CA/analytics.yaml",
-        "apps/web/src/integrations/analytics/analytics-consent-state.ts",
+        "apps/web/src/integrations/analytics/analytics-configuration.ts",
+    "apps/web/src/integrations/analytics/analytics-consent-state.ts",
         "apps/web/src/integrations/analytics/analytics-consent.tsx",
         "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
         "apps/web/src/integrations/analytics/analytics-content.ts",
@@ -930,7 +902,8 @@ test("analytics removal restores the composed layout and requires provider dispo
         "apps/web/src/integrations/analytics/analytics-settings.ts",
         "apps/web/tests/component/analytics-consent.test.tsx",
         "apps/web/tests/e2e/analytics-consent.spec.ts",
-        "apps/web/tests/unit/analytics-consent-state.test.ts",
+        "apps/web/tests/unit/analytics-configuration.test.ts",
+    "apps/web/tests/unit/analytics-consent-state.test.ts",
         "apps/web/tests/unit/analytics-provider-contract.test.ts",
         "apps/web/tests/unit/analytics-runtime.test.ts",
         "docs/analytics.md",
@@ -940,7 +913,7 @@ test("analytics removal restores the composed layout and requires provider dispo
       result.value.actions
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
-      ["apps/web/app/layout.tsx"],
+      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs"],
     );
     assert.deepEqual(result.value.reviewRequirements, [
       {
@@ -1263,7 +1236,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
     ".egeria/state.json",
     JSON.stringify({
       ...state.value,
-      appliedMigrations: ["add-booking-calendly-0-1-0"],
+      appliedMigrations: ["add-booking-calendly-0-2-0"],
     }),
   );
 
@@ -1275,7 +1248,7 @@ test("capability removal plan refuses unsupported recipe, provenance, migration,
       installedCapabilities: state.value.installedCapabilities.map(
         (capability) =>
           capability.identifier === "booking-calendly"
-            ? { ...capability, version: "0.2.0" }
+            ? { ...capability, version: "0.1.0" }
             : capability,
       ),
     }),
@@ -1425,7 +1398,7 @@ test("capability removal plan binds private controls and Git identity without di
   const changedSettings = await installedEntries("portfolio", {
     bookingSettings: {
       ...settings,
-      destination: "https://calendly.com/private/changed",
+      mode: "link",
     },
   });
   const second = await planFromEntries(changedSettings);
@@ -1545,7 +1518,7 @@ test("analytics removal planning refuses drift and binds private authority", asy
   }
 
   const changedSettings = structuredClone(analyticsSettings);
-  changedSettings.providers.googleAnalytics4.measurementId = "G-PRIVATE654321";
+  delete changedSettings.providers.microsoftClarity;
   const changedEntries = await installedEntries("portfolio", {
     bookingSettings: undefined,
     analytics: changedSettings,
@@ -1582,36 +1555,23 @@ test("analytics removal planning refuses drift and binds private authority", asy
   );
 });
 
-test("capability removal plan fingerprint binds its review requirements", async () => {
+test("capability removal approval changes when reference coverage requires additional review", async () => {
   const entries = await installedEntries("portfolio");
-  const result = await planFromEntries(entries);
-  assert.equal(result.ok, true, JSON.stringify(result.issues));
-  const project = core.parseProjectYaml(entries.get(".egeria/project.yaml"));
-  const state = core.parseStateJson(entries.get(".egeria/state.json"));
-  assert.equal(project.ok, true, JSON.stringify(project.issues));
-  assert.equal(state.ok, true, JSON.stringify(state.issues));
-  const { planFingerprint, ...plan } = result.value;
-  const fingerprintInput = {
-    plan,
-    project: project.value,
-    state: state.value,
-    gitIdentity: git.identity,
-  };
-
-  assert.equal(planFingerprint, core.fingerprintJsonValue(fingerprintInput));
-  assert.notEqual(
-    planFingerprint,
-    core.fingerprintJsonValue({
-      ...fingerprintInput,
-      plan: { ...plan, reviewRequirements: [] },
-    }),
-  );
+  const complete = await planFromEntries(entries);
+  const repeated = await planFromEntries(entries);
+  const incomplete = await planFromEntries(entries, { inventory: { truncated: true } });
+  assert.equal(complete.ok, true, JSON.stringify(complete.issues));
+  assert.equal(repeated.ok, true, JSON.stringify(repeated.issues));
+  assert.equal(incomplete.ok, true, JSON.stringify(incomplete.issues));
+  assert.deepEqual(repeated.value, complete.value);
+  assert.notDeepEqual(incomplete.value.reviewRequirements, complete.value.reviewRequirements);
+  assert.notEqual(incomplete.value.planFingerprint, complete.value.planFingerprint);
 });
 
 
 test("current cohort refuses managed drift and surviving references without mutation", async () => {
   for (const profile of ["portfolio", "site"]) for (const mode of ["managed-drift", "surviving-reference"]) {
-    const entries = await installedEntries(profile, { profiles: createCurrentProfileRecipes() });
+    const entries = await installedEntries(profile, { profiles: createApplicationEnvironmentProfileRecipes() });
     if (mode === "managed-drift") entries.set("apps/web/package.json", "changed managed manifest\n");
     else entries.set("apps/web/src/custom-booking.ts", 'import { CalendlyBooking } from "./integrations/booking-calendly/calendly-booking";\n');
     const before = [...entries];
@@ -1662,11 +1622,26 @@ test("environment contact removal preserves shared ownership and refuses survivi
   assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
 });
 
+test("current multilingual removal preserves selected neighbors and refuses surviving locale references", async () => {
+  const entries = await environmentContactEntries("site", { contact: true, booking: "popup", multilingual: true });
+  const plan = files => core.planCapabilityRemoval({
+    reader: createSnapshotReader(files).reader, git, capability: "multilingual",
+    inspectRepositoryInventory: async () => inventoryFromEntries(files),
+  });
+  const accepted = await plan(entries);
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  assert.ok(!accepted.value.desiredCapabilities.includes("multilingual"));
+  for (const identifier of ["booking-calendly", "contact-form-web3forms", "site-routing"]) assert.ok(accepted.value.desiredCapabilities.includes(identifier));
+  const referenced = new Map(entries);
+  referenced.set("apps/web/src/locale-consumer.ts", 'import { defaultLocale } from "./i18n/locale";\n');
+  assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
+});
+
 test("environment contact removal refuses forged contexts and unsupported operations before reading", async () => {
   let reads = 0;
   const reader = { async readText() { reads += 1; return { kind: "missing" }; } };
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
-  for (const override of [{ renderingContext: {} }, { capability: "multilingual" }, { capability: "background-job-delivery" }]) {
+  for (const override of [{ renderingContext: {} }, { capability: "background-job-delivery" }]) {
     assertFailure(await core.planCapabilityRemoval({ reader, git, capability: "contact-form-web3forms", renderingContext, ...override }), "CAPABILITY_REMOVAL_UNSUPPORTED");
   }
   assert.equal(reads, 0);
