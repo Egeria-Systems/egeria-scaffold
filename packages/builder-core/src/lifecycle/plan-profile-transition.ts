@@ -421,7 +421,10 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
   const project = controls.project.value;
-  if (project.selectedCapabilities.some(identifier => ["contact-form-web3forms", "transactional-email-resend", "app-foundation", "application-persistence", "background-job-delivery"].includes(identifier))) {
+  if (project.selectedCapabilities.some(identifier =>
+    (identifier !== "app-foundation" || project.originProfile !== "app") &&
+    ["contact-form-web3forms", "transactional-email-resend", "app-foundation", "application-persistence", "background-job-delivery"].includes(identifier)
+  )) {
     return planningFailure("PROFILE_TRANSITION_UNSUPPORTED");
   }
   if (project.ejectedAreas.length > 0 || controls.state.value.ejections.length > 0) {

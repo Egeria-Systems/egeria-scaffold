@@ -4168,6 +4168,75 @@ for (const profile of ["site"]) {
   }
 }
 
+async function assertCompiledAppTransitionRefusal({ linked, primary }, command, code) {
+  const before = await gitRepositorySnapshot(linked);
+  const primaryBefore = await gitRepositorySnapshot(primary);
+  const applying = command === "apply-profile-transition";
+  const arguments_ = applying
+    ? applyProfileTransitionArguments(linked, "sha256:" + "a".repeat(64), "app")
+    : planProfileTransitionArguments(linked, "app");
+  const result = await executeBuilt(arguments_);
+
+  assert.deepEqual(await gitRepositorySnapshot(linked), before);
+  assert.deepEqual(await gitRepositorySnapshot(primary), primaryBefore);
+  assert.equal(result.exitCode, 1, result.stderr);
+  assert.equal(result.stdout, "");
+  assert.equal(result.stderr.trimEnd().split("\n").length, 1);
+  assert.deepEqual(JSON.parse(result.stderr), {
+    ok: false, command, code,
+    ...(applying ? { phase: "precondition" } : {}),
+    recovery: "not-required",
+  });
+}
+
+test("compiled app profile transition refuses the current app without writes", async (context) => {
+  await withGitFixture("app", async (fixture) => {
+    for (const command of ["plan-profile-transition", "apply-profile-transition"]) {
+      await context.test(command, () =>
+        assertCompiledAppTransitionRefusal(fixture, command, "PROFILE_ALREADY_CURRENT"));
+    }
+  });
+});
+
+test("compiled app profile transition preserves source admission refusals", async () => {
+  function editState(edit) {
+    return async (root) => {
+      const path = join(root, ".egeria/state.json");
+      const state = JSON.parse(await readFile(path, "utf8"));
+      edit(state);
+      await writeFile(path, JSON.stringify(state));
+    };
+  }
+  const ejectReadme = editState(state => state.ejections.push("README.md"));
+  const cases = [
+    { fixture: "app-persistence-jobs-email", code: "PROFILE_TRANSITION_UNSUPPORTED" },
+    {
+      fixture: "app", code: "PROFILE_TRANSITION_UNSUPPORTED",
+      options: { generationRequest: { contactFormWeb3Forms: true } },
+    },
+    {
+      fixture: "app", code: "PROJECT_STATE_INCOMPATIBLE",
+      options: { preparePrimary: editState(state => {
+        state.installedCapabilities.find(({ identifier }) => identifier === "app-foundation").version = "0.2.0";
+      }) },
+    },
+    { fixture: "app", code: "PROJECT_EJECTION_UNSUPPORTED", options: { preparePrimary: ejectReadme } },
+    { fixture: "site-contact-form", code: "PROFILE_TRANSITION_UNSUPPORTED" },
+    {
+      fixture: "site-contact-form", code: "PROFILE_TRANSITION_UNSUPPORTED",
+      options: { preparePrimary: ejectReadme },
+    },
+    { fixture: "portfolio-email", code: "PROFILE_TRANSITION_UNSUPPORTED" },
+  ];
+  for (const { fixture, options, code } of cases) {
+    await withGitFixture(fixture, async (worktrees) => {
+      for (const command of ["plan-profile-transition", "apply-profile-transition"]) {
+        await assertCompiledAppTransitionRefusal(worktrees, command, code);
+      }
+    }, options);
+  }
+});
+
 test("compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
   await withAppTransitionFixture("site", false, async ({ linked, primary }) => {
     const planning = planProfileTransitionArguments(linked, "app");
