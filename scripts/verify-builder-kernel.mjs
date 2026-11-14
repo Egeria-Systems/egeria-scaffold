@@ -288,7 +288,9 @@ async function runChild(step, log, setActive) {
       signal = childSignal;
       if (stopping) return;
       if (childSignal) {
-        stop(childSignal === "SIGINT" ? "SIGINT" : "SIGTERM");
+        // After an unexpected exit, a reaped leader cannot prove descendant ownership.
+        cleanup = "unconfirmed";
+        abandonStreams();
       } else {
         drainTimer = setTimeout(() => {
           if (!abandonStreams()) return;
@@ -395,7 +397,7 @@ async function main() {
         const result = await runChild(step, join(directory, group + suffix + ".log"), stop => { stopActive = stop; });
         steps.push(interrupted ? { ...result, status: "interrupted",
           diagnostic: result.cleanup === "unconfirmed" ? result.diagnostic : interrupted } : result);
-        if (result.drainExpired) schedulingStopped = "Previous child cleanup could not be confirmed";
+        if (result.cleanup === "unconfirmed") schedulingStopped = "Previous child cleanup could not be confirmed";
       }
     }
     const problem = steps.find(step => step.status === "failed") ?? steps.find(step => step.status === "blocked");

@@ -128,14 +128,15 @@ server.listen(0, "127.0.0.1", () => writeFileSync("ready", String(server.address
 const drainListener = String.raw`
 import { appendFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
-const token = JSON.parse(process.env.KERNEL_FIXTURE).drainToken;
+const fixture = JSON.parse(process.env.KERNEL_FIXTURE);
+const token = fixture.drainToken;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => appendFileSync("drain-signals", signal + "\n"));
 }
 const watchdog = setTimeout(() => {
   server.close();
   server.closeAllConnections();
-}, 15000);
+}, fixture.unexpectedSignal ? 45000 : 15000);
 const server = createServer((request, response) => {
   if (request.headers.authorization !== "Bearer " + token ||
       (request.url !== "/alive" && request.url !== "/close")) {
@@ -154,24 +155,54 @@ server.listen(0, "127.0.0.1", () => {
 });
 `;
 
-// Run at the actual pnpm stage entry. A pnpm package script may run in a different group.
-const holdStagePipe = String.raw`
-const { execFileSync, spawn } = require("node:child_process");
-const { writeFileSync } = require("node:fs");
-const { join } = require("node:path");
+// Replace only the controlled build. Exec keeps the reporter's direct stage PID.
+const stagePnpm = String.raw`#!/bin/sh
+if [ "$#" -eq 4 ] && [ "$1" = --filter ] && [ "$2" = @egeria-systems/builder-core ] &&
+    [ "$3" = run ] && [ "$4" = build ]; then
+  exec "$KERNEL_FIXTURE_NODE" "$KERNEL_FIXTURE_ROOT/drain-stage.mjs"
+fi
+exec "$KERNEL_FIXTURE_PNPM" "$@"
+`;
+
+const drainStage = String.raw`
+import { execFileSync, spawn } from "node:child_process";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 const fixture = JSON.parse(process.env.KERNEL_FIXTURE);
-if (process.argv.slice(2).join(" ") === fixture.holdPipeAfterExit) {
-  const directory = process.env.KERNEL_FIXTURE_ROOT;
-  const descendant = spawn(process.execPath, [join(directory, "drain-listener.mjs")], {
-    cwd: directory, stdio: "inherit",
-  });
-  const groupOf = pid => Number(execFileSync("/bin/ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }));
-  if (groupOf(process.pid) !== process.pid || groupOf(descendant.pid) !== process.pid) {
-    throw new Error("Fixture listener escaped the stage group");
-  }
-  writeFileSync(join(directory, "drain-leader"), String(process.pid), { flag: "wx" });
-  process.exit(0);
+const directory = process.env.KERNEL_FIXTURE_ROOT;
+const detached = fixture.unexpectedSignal === true;
+const listener = spawn(process.execPath, [join(directory, "drain-listener.mjs")], {
+  cwd: directory, detached, stdio: detached ? "ignore" : "inherit",
+});
+const groupOf = pid => Number(execFileSync("/bin/ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }));
+if (groupOf(process.pid) !== process.pid || groupOf(listener.pid) !== (detached ? listener.pid : process.pid)) {
+  throw new Error("Fixture listener group mismatch");
 }
+let port;
+for (let attempt = 0; attempt < 100 && !port; attempt++) {
+  try { port = Number(await readFile(join(directory, "drain-port"), "utf8")); }
+  catch (error) { if (error.code !== "ENOENT") throw error; }
+  if (!port) await delay(20);
+}
+const response = await fetch("http://127.0.0.1:" + port + "/alive", {
+  headers: { authorization: "Bearer " + fixture.drainToken },
+  signal: AbortSignal.timeout(1000),
+});
+if (!response.ok || await response.text() !== fixture.drainToken) {
+  throw new Error("Detached fixture listener readiness failed");
+}
+await writeFile(join(directory, "drain-leader"), String(process.pid), { flag: "wx" });
+if (detached) process.kill(process.pid, "SIGKILL");
+process.exit(0);
+`;
+
+// Only copied reporter code sees this guard. Simulate an empty old group without delivering any signals.
+const interceptReporterSignals = String.raw`
+process.kill = (target, signal) => {
+  writeFileSync(process.env.KERNEL_FIXTURE_ROOT + "/reporter-signals", JSON.stringify({ target, signal }) + "\n", { flag: "a" });
+  throw Object.assign(new Error("Fixture suppressed reporter signal"), { code: "ESRCH" });
+};
 `;
 
 async function controlDrainListener(port, token, action) {
@@ -234,7 +265,13 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   }
   if (manifest.scripts[command].includes(runner)) {
     await mkdir(join(directory, "scripts"));
-    await copyFile(new URL(runner, root), join(directory, runner));
+    const destination = join(directory, runner);
+    if (options.unexpectedSignal) {
+      const source = await readFile(new URL(runner, root), "utf8");
+      await writeFile(destination, interceptReporterSignals + source);
+    } else {
+      await copyFile(new URL(runner, root), destination);
+    }
   }
 
   const pnpm = process.env.npm_execpath ?? "pnpm";
@@ -250,11 +287,19 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   await writeFile(join(directory, "listener.mjs"), listener);
   const environment = { ...process.env };
   delete environment.NODE_TEST_CONTEXT;
-  if (options.holdPipeAfterExit) {
-    const preload = join(directory, "hold-stage-pipe.cjs");
-    await writeFile(preload, holdStagePipe);
+  if (options.drainToken) {
+    const selectedPnpm = spawnSync("/bin/sh", ["-c", "command -v pnpm"], { encoding: "utf8" });
+    assert.equal(selectedPnpm.status, 0);
+    const pnpmPath = selectedPnpm.stdout.trim();
+    assert.ok(pnpmPath.startsWith("/"));
+    const bin = join(directory, "bin");
+    await mkdir(bin);
+    await writeFile(join(bin, "pnpm"), stagePnpm, { mode: 0o700 });
+    await writeFile(join(directory, "drain-stage.mjs"), drainStage);
     await writeFile(join(directory, "drain-listener.mjs"), drainListener);
-    environment.NODE_OPTIONS = [environment.NODE_OPTIONS, "--require=" + JSON.stringify(preload)].filter(Boolean).join(" ");
+    environment.PATH = bin + ":" + environment.PATH;
+    environment.KERNEL_FIXTURE_NODE = process.execPath;
+    environment.KERNEL_FIXTURE_PNPM = pnpmPath;
   }
   const child = spawn(executable, [...prefix, "run", command], {
     cwd: directory,
@@ -463,8 +508,8 @@ test("a capture refusal and unexpected child signal are failures with separate s
   });
   const result = await invocation.finish();
   assert.notEqual(result.code, 0);
-  assert.ok(result.completed.includes("run test:generated-jobs"),
-    "independent generated-jobs must finish after the earlier child signal");
+  assert.ok(!result.completed.includes("run test:generated-jobs"),
+    "later work must wait for confirmed cleanup of the signalled stage");
   const { rows } = await readReport(invocation);
   const capture = rows["test:package-boundaries"];
   assert.equal(capture.status, "failed");
@@ -483,11 +528,12 @@ test("a capture refusal and unexpected child signal are failures with separate s
   assert.equal(signalled.status, "failed");
   assert.equal(signalled.steps[0].signal, "SIGKILL");
   assert.equal(signalled.steps[0].capture, "filtered");
-  assert.equal(rows["test:generated-jobs"].status, "passed");
+  assert.equal(signalled.steps[0].cleanup, "unconfirmed");
+  assert.equal(rows["test:generated-jobs"].status, "unstarted");
 });
 
-async function waitForFile(path, invocation) {
-  for (let attempt = 0; attempt < 400; attempt++) {
+async function waitForFile(path, invocation, attempts = 400) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
     const content = await readOptional(path);
     if (content) return content;
     assert.equal(invocation.child.exitCode, null, "public command exited before readiness");
@@ -496,10 +542,11 @@ async function waitForFile(path, invocation) {
   assert.fail("timed out waiting for controlled child readiness");
 }
 
-async function startDrainFixture(context) {
+async function startDrainFixture(context, options = {}) {
   const token = randomUUID();
-  const invocation = await fixtureInvocation(context, { holdPipeAfterExit: coreBuild, drainToken: token });
-  const leader = await waitForFile(join(invocation.directory, "drain-leader"), invocation);
+  const invocation = await fixtureInvocation(context, { ...options, drainToken: token });
+  // Launcher startup can take longer than the ordinary fixture readiness window.
+  const leader = await waitForFile(join(invocation.directory, "drain-leader"), invocation, 750);
   const port = Number(await waitForFile(join(invocation.directory, "drain-port"), invocation));
   for (let attempt = 0; attempt < 100; attempt++) {
     const observed = spawnSync("/bin/ps", ["-o", "stat=", "-p", leader], { encoding: "utf8" });
@@ -542,6 +589,33 @@ test("a normal stage exit with inherited pipes times out without signalling the 
     { exitCode: 0, signal: null, cleanup: "unconfirmed", drainExpired: true });
   assert.equal(observability.status, "unstarted");
   assert.equal(cli.status, "unstarted");
+  for (const group of expectedGroups.slice(3)) assert.equal(rows[group].status, "unstarted", group);
+  assert.deepEqual(result.trace, ["run test:constitution", "run test:package-boundaries"]);
+});
+
+test("an unexpected stage signal stops scheduling without signalling a detached listener", {
+  timeout: 65000,
+  skip: process.platform === "win32" ? "requires Unix process-group evidence" : false,
+}, async context => {
+  const { invocation, port, token } = await startDrainFixture(context, { unexpectedSignal: true });
+  const result = await invocation.finish();
+  await assertDrainListenerUnsignalled(invocation, port, token);
+
+  const { rows } = await readReport(invocation);
+  const [core, observability, cli] = rows["build:builder"].steps;
+  assert.deepEqual([result.code, result.signal], [1, null]);
+  assert.equal(rows["build:builder"].status, "failed");
+  assert.equal(core.status, "failed");
+  assert.equal(core.exitCode, null);
+  assert.equal(core.signal, "SIGKILL");
+  const attempts = await readOptional(join(invocation.directory, "reporter-signals"));
+  assert.deepEqual({
+    cleanup: core.cleanup,
+    observability: observability.status,
+    cli: cli.status,
+    later: rows["test:generated-jobs"].status,
+    attemptedSignal: attempts !== "",
+  }, { cleanup: "unconfirmed", observability: "unstarted", cli: "unstarted", later: "unstarted", attemptedSignal: false });
   for (const group of expectedGroups.slice(3)) assert.equal(rows[group].status, "unstarted", group);
   assert.deepEqual(result.trace, ["run test:constitution", "run test:package-boundaries"]);
 });
