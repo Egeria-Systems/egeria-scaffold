@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
+import { randomUUID } from "node:crypto";
 import { once } from "node:events";
 import { copyFile, mkdir, mkdtemp, readFile, readdir, rm, stat, symlink, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
@@ -124,6 +125,64 @@ const server = createServer();
 server.listen(0, "127.0.0.1", () => writeFileSync("ready", String(server.address().port)));
 `;
 
+const drainListener = String.raw`
+import { appendFileSync, renameSync, writeFileSync } from "node:fs";
+import { createServer } from "node:http";
+const token = JSON.parse(process.env.KERNEL_FIXTURE).drainToken;
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => appendFileSync("drain-signals", signal + "\n"));
+}
+const watchdog = setTimeout(() => {
+  server.close();
+  server.closeAllConnections();
+}, 15000);
+const server = createServer((request, response) => {
+  if (request.headers.authorization !== "Bearer " + token ||
+      (request.url !== "/alive" && request.url !== "/close")) {
+    response.writeHead(404, { connection: "close" }).end();
+    return;
+  }
+  if (request.url === "/close") {
+    clearTimeout(watchdog);
+    server.close();
+  }
+  response.writeHead(200, { connection: "close" }).end(token);
+});
+server.listen(0, "127.0.0.1", () => {
+  writeFileSync("drain-port.tmp", String(server.address().port));
+  renameSync("drain-port.tmp", "drain-port");
+});
+`;
+
+// Run at the actual pnpm stage entry. A pnpm package script may run in a different group.
+const holdStagePipe = String.raw`
+const { execFileSync, spawn } = require("node:child_process");
+const { writeFileSync } = require("node:fs");
+const { join } = require("node:path");
+const fixture = JSON.parse(process.env.KERNEL_FIXTURE);
+if (process.argv.slice(2).join(" ") === fixture.holdPipeAfterExit) {
+  const directory = process.env.KERNEL_FIXTURE_ROOT;
+  const descendant = spawn(process.execPath, [join(directory, "drain-listener.mjs")], {
+    cwd: directory, stdio: "inherit",
+  });
+  const groupOf = pid => Number(execFileSync("/bin/ps", ["-o", "pgid=", "-p", String(pid)], { encoding: "utf8" }));
+  if (groupOf(process.pid) !== process.pid || groupOf(descendant.pid) !== process.pid) {
+    throw new Error("Fixture listener escaped the stage group");
+  }
+  writeFileSync(join(directory, "drain-leader"), String(process.pid), { flag: "wx" });
+  process.exit(0);
+}
+`;
+
+async function controlDrainListener(port, token, action) {
+  const response = await fetch("http://127.0.0.1:" + port + "/" + action, {
+    headers: { authorization: "Bearer " + token },
+    signal: AbortSignal.timeout(1000),
+  });
+  assert.equal(response.status, 200);
+  assert.equal(await response.text(), token);
+}
+
 async function fixtureInvocation(context, options = {}, sharedReports) {
   const directory = await mkdtemp(join(tmpdir(), "kernel-entry-"));
   const reports = sharedReports ?? join(directory, "reports");
@@ -191,6 +250,12 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   await writeFile(join(directory, "listener.mjs"), listener);
   const environment = { ...process.env };
   delete environment.NODE_TEST_CONTEXT;
+  if (options.holdPipeAfterExit) {
+    const preload = join(directory, "hold-stage-pipe.cjs");
+    await writeFile(preload, holdStagePipe);
+    await writeFile(join(directory, "drain-listener.mjs"), drainListener);
+    environment.NODE_OPTIONS = [environment.NODE_OPTIONS, "--require=" + JSON.stringify(preload)].filter(Boolean).join(" ");
+  }
   const child = spawn(executable, [...prefix, "run", command], {
     cwd: directory,
     detached: true,
@@ -206,6 +271,13 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   child.stderr.setEncoding("utf8").on("data", data => { stderr += data; });
   const closed = once(child, "close");
   context.after(async () => {
+    if (options.drainToken) {
+      const port = Number(await readOptional(join(directory, "drain-port")));
+      if (port) {
+        // The listener may already have closed. Its watchdog bounds fallback teardown.
+        try { await controlDrainListener(port, options.drainToken, "close"); } catch {}
+      }
+    }
     if (child.exitCode === null && child.signalCode === null) {
       process.kill(-child.pid, "SIGTERM");
     }
@@ -423,6 +495,93 @@ async function waitForFile(path, invocation) {
   }
   assert.fail("timed out waiting for controlled child readiness");
 }
+
+async function startDrainFixture(context) {
+  const token = randomUUID();
+  const invocation = await fixtureInvocation(context, { holdPipeAfterExit: coreBuild, drainToken: token });
+  const leader = await waitForFile(join(invocation.directory, "drain-leader"), invocation);
+  const port = Number(await waitForFile(join(invocation.directory, "drain-port"), invocation));
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const observed = spawnSync("/bin/ps", ["-o", "stat=", "-p", leader], { encoding: "utf8" });
+    if (observed.status === 1) {
+      await controlDrainListener(port, token, "alive");
+      return { invocation, port, token };
+    }
+    assert.equal(observed.status, 0);
+    await delay(20);
+  }
+  assert.fail("stage leader did not exit while the listener held its pipes");
+}
+
+async function assertDrainListenerUnsignalled(invocation, port, token) {
+  await controlDrainListener(port, token, "alive");
+  assert.equal(await readOptional(join(invocation.directory, "drain-signals")), "");
+  await controlDrainListener(port, token, "close");
+}
+
+test("a normal stage exit with inherited pipes times out without signalling the listener", {
+  timeout: 65000,
+  skip: process.platform === "win32" ? "requires Unix process-group evidence" : false,
+}, async context => {
+  const { invocation, port, token } = await startDrainFixture(context);
+  const result = await invocation.finish();
+  assert.deepEqual([result.code, result.signal], [1, null]);
+  await assertDrainListenerUnsignalled(invocation, port, token);
+
+  const { rows } = await readReport(invocation);
+  assert.equal(rows["build:builder"].status, "failed");
+  const [core, observability, cli] = rows["build:builder"].steps;
+  assert.equal(core.status, "failed");
+  assert.equal(core.exitCode, 0);
+  assert.equal(core.signal, null);
+  assert.equal(core.cleanup, "unconfirmed");
+  assert.equal(core.drainExpired, true);
+  assert.match(core.diagnostic, /stdio remained open after exit/u);
+  const log = await readFile(core.log, "utf8");
+  assert.deepEqual(JSON.parse(log.trim().split("\n").at(-1)),
+    { exitCode: 0, signal: null, cleanup: "unconfirmed", drainExpired: true });
+  assert.equal(observability.status, "unstarted");
+  assert.equal(cli.status, "unstarted");
+  for (const group of expectedGroups.slice(3)) assert.equal(rows[group].status, "unstarted", group);
+  assert.deepEqual(result.trace, ["run test:constitution", "run test:package-boundaries"]);
+});
+
+test("inherited pipes closing within the grace allow the serial schedule to continue", {
+  timeout: 65000,
+  skip: process.platform === "win32" ? "requires Unix process-group evidence" : false,
+}, async context => {
+  const { invocation, port, token } = await startDrainFixture(context);
+  await assertDrainListenerUnsignalled(invocation, port, token);
+
+  const result = await invocation.finish();
+  const { rows } = await readReport(invocation);
+  assert.deepEqual([result.code, result.signal], [0, null]);
+  assert.equal(rows["build:builder"].steps[0].status, "passed");
+  assert.equal(rows["build:builder"].steps[0].drainExpired, undefined);
+  assert.deepEqual(result.trace, expectedCommands.filter(command => command !== coreBuild));
+});
+
+test("a foreground interrupt during normal-exit drain releases pipes without signalling the listener", {
+  timeout: 65000,
+  skip: process.platform === "win32" ? "requires Unix process-group evidence" : false,
+}, async context => {
+  const { invocation, port, token } = await startDrainFixture(context);
+  process.kill(-invocation.child.pid, "SIGINT");
+  const result = await invocation.finish();
+  assert.ok(result.signal === "SIGINT" || result.code === 130);
+  await assertDrainListenerUnsignalled(invocation, port, token);
+
+  const { rows } = await readReport(invocation);
+  assert.equal(rows["build:builder"].status, "interrupted");
+  const [core, observability, cli] = rows["build:builder"].steps;
+  assert.equal(core.exitCode, 0);
+  assert.equal(core.signal, null);
+  assert.equal(core.drainExpired, undefined);
+  assert.equal(core.cleanup, "unconfirmed");
+  assert.equal(observability.status, "unstarted");
+  assert.equal(cli.status, "unstarted");
+  for (const group of expectedGroups.slice(3)) assert.equal(rows[group].status, "unstarted", group);
+});
 
 test("foreground interruption flushes completed results and releases an owned separate listener", {
   timeout: 60000,

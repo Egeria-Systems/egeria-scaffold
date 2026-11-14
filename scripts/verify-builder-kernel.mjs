@@ -26,7 +26,7 @@ const packageScript = (name, script) => ({
   executable: "pnpm",
   args: ["--filter", "@egeria-systems/" + name, "run", script],
 });
-const buildSucceeded = step => step?.exitCode === 0 && !step.launchError && !step.signal;
+const buildSucceeded = step => step?.exitCode === 0 && !step.launchError && !step.signal && !step.drainExpired;
 const blocked = (name, producer) => ({
   name, status: "blocked", durationMs: 0, diagnostic: "Requires successful " + producer,
 });
@@ -239,6 +239,8 @@ async function runChild(step, log, setActive) {
   let signal = null;
   let stopping;
   let releaseClose;
+  let drainTimer;
+  let drainExpired = false;
 
   function logLine(line) {
     if (capture === "failed") return;
@@ -257,15 +259,22 @@ async function runChild(step, log, setActive) {
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
+  function abandonStreams() {
+    if (closed) return false;
+    child.stdout?.destroy();
+    child.stderr?.destroy();
+    child.unref();
+    releaseClose();
+    return true;
+  }
   function stop(reason) {
-    stopping ??= stopOwnedProcesses(child, reason, () => {
-      if (closed) return false;
-      child.stdout?.destroy();
-      child.stderr?.destroy();
-      child.unref();
-      releaseClose();
-      return true;
-    });
+    clearTimeout(drainTimer);
+    if (exitCode !== null && signal === null) {
+      // A reaped leader's numeric group no longer establishes ownership.
+      if (abandonStreams()) cleanup = "unconfirmed";
+      return;
+    }
+    stopping ??= stopOwnedProcesses(child, reason, abandonStreams);
   }
   setActive(stop);
   const finished = new Promise(resolveClose => {
@@ -277,10 +286,20 @@ async function runChild(step, log, setActive) {
     child.once("exit", (code, childSignal) => {
       exitCode = code;
       signal = childSignal;
-      if (childSignal && !stopping) stop(childSignal === "SIGINT" ? "SIGINT" : "SIGTERM");
+      if (stopping) return;
+      if (childSignal) {
+        stop(childSignal === "SIGINT" ? "SIGINT" : "SIGTERM");
+      } else {
+        drainTimer = setTimeout(() => {
+          if (!abandonStreams()) return;
+          drainExpired = true;
+          cleanup = "unconfirmed";
+        }, 5000);
+      }
     });
     child.once("close", () => {
       closed = true;
+      clearTimeout(drainTimer);
       resolveClose();
     });
   });
@@ -301,19 +320,21 @@ async function runChild(step, log, setActive) {
   if (stopping) cleanup = await stopping;
   setActive(undefined);
 
-  logLine(JSON.stringify({ exitCode, signal, launchError, cleanup }));
+  const drainEvidence = drainExpired ? { drainExpired } : {};
+  logLine(JSON.stringify({ exitCode, signal, launchError, cleanup, ...drainEvidence }));
   if (descriptor !== undefined) {
     try { fsyncSync(descriptor); } catch { capture = "failed"; }
     try { closeSync(descriptor); } catch { capture = "failed"; }
   }
-  const status = exitCode === 0 && !launchError && !signal && capture !== "failed" ? "passed" : "failed";
+  const status = exitCode === 0 && !launchError && !signal && !drainExpired && capture !== "failed" ? "passed" : "failed";
   const diagnostic = capture === "failed" ? "Child log capture failed"
     : launchError ? "Child launch failed (" + launchError + ")"
+    : drainExpired ? "Child stdio remained open after exit. Owned process cleanup could not be confirmed"
     : cleanup === "unconfirmed" ? "Owned process cleanup could not be confirmed"
     : status === "passed" ? null
     : firstDiagnostic?.text ?? (signal ? "Child signal " + signal : "Child exit " + exitCode);
   return { name: step.name, status, durationMs: Math.round(performance.now() - started),
-    diagnostic, log: logPublished ? log : null, capture, exitCode, signal, launchError, cleanup };
+    diagnostic, log: logPublished ? log : null, capture, exitCode, signal, launchError, cleanup, ...drainEvidence };
 }
 
 async function main() {
@@ -325,6 +346,7 @@ async function main() {
   const results = [];
   let journalFailed = false;
   let interrupted;
+  let schedulingStopped;
   let stopActive;
 
   function interrupt(signal) {
@@ -356,16 +378,16 @@ async function main() {
   }
 
   async function runGroup(group, commands = [rootScript(group)]) {
-    if (interrupted) {
-      publish({ group, status: "unstarted", durationMs: 0, diagnostic: interrupted, steps: [] });
+    if (interrupted || schedulingStopped) {
+      publish({ group, status: "unstarted", durationMs: 0, diagnostic: interrupted ?? schedulingStopped, steps: [] });
       return [];
     }
     const started = performance.now();
     const steps = [];
     for (const [index, command] of commands.entries()) {
       const step = typeof command === "function" ? command(steps) : command;
-      if (interrupted) {
-        steps.push({ name: step.name, status: "unstarted", durationMs: 0, diagnostic: interrupted });
+      if (interrupted || schedulingStopped) {
+        steps.push({ name: step.name, status: "unstarted", durationMs: 0, diagnostic: interrupted ?? schedulingStopped });
       } else if (step.status === "blocked") {
         steps.push(step);
       } else {
@@ -373,6 +395,7 @@ async function main() {
         const result = await runChild(step, join(directory, group + suffix + ".log"), stop => { stopActive = stop; });
         steps.push(interrupted ? { ...result, status: "interrupted",
           diagnostic: result.cleanup === "unconfirmed" ? result.diagnostic : interrupted } : result);
+        if (result.drainExpired) schedulingStopped = "Previous child cleanup could not be confirmed";
       }
     }
     const problem = steps.find(step => step.status === "failed") ?? steps.find(step => step.status === "blocked");
