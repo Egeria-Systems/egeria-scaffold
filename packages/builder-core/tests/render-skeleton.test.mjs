@@ -3747,8 +3747,10 @@ test("generated deployment binds staging and production to reviewed source and p
     assert.equal((steps["Test prepared local preview"].run.match(/check:prepared-artifact verify/gu) ?? []).length, 2);
     const deployStep = steps["Deploy prepared Cloudflare Worker"];
     assert.deepEqual(deployStep.env, { CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}", CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}" });
-    assert.ok(deployStep.run.indexOf("check:prepared-artifact verify") < deployStep.run.indexOf("opennextjs-cloudflare deploy"));
-    assert.match(deployStep.run, new RegExp(`deploy --env ${name} -- --x-provision=false --x-auto-create=false`));
+    const commandLines = deployStep.run.split("\n").map(line => line.trim());
+    const verifyArtifact = commandLines.indexOf('pnpm run check:prepared-artifact verify "$APPLICATION_ENVIRONMENT" "$EXPECTED_REVISION"');
+    const deployWorker = commandLines.indexOf(`pnpm exec opennextjs-cloudflare deploy --env ${name} -- --x-provision=false --x-auto-create=false`);
+    assert.ok(verifyArtifact >= 0 && deployWorker > verifyArtifact, `${name} must verify the prepared artifact before deployment`);
     assert.doesNotMatch(deployStep.run, /\b(?:build|install|preview)\b/u);
     assert.equal(job.steps.filter(step => JSON.stringify(step.env ?? {}).includes("secrets.CLOUDFLARE_")).length, 1);
   }
