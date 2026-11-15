@@ -123,14 +123,24 @@ if (command === "run verify:generated-skeletons" && fixture.skeletonFailures) {
   if (command === "run changeset:status" && fixture.skeletonFailures) {
     console.error(JSON.stringify(fixture.skeletonFailures[0]));
   }
-  if (command === "run verify:generated-skeletons") {
+  if (command === "run verify:generated-skeletons" || command === "run verify:generated-visuals") {
     console.log(JSON.stringify({
       ok: true, fixtures: ["portfolio", "fixtureSecretValueNeverRetain"],
       workerIntegration: { executed: [], skipped: ["portfolio"] },
       bindingIntegration: { executed: [], skipped: ["portfolio"] },
       auditDispositions: [{ fixture: "portfolio", status: "passed", artifactDirectory: "audit-abc123" }],
       appBuildEvidence: [], extra: "fixtureSecretValueNeverRetain",
+      visualComparisons: [
+        { fixture: "portfolio", passedCases: 2, privateValue: "fixtureSecretValueNeverRetain" },
+        { fixture: "site", passedCases: 1 },
+        { fixture: "fixtureSecretValueNeverRetain", passedCases: 2 },
+      ],
     }));
+  }
+  if (command === "run verify:generated-visuals" && fixture.visualFailure) {
+    console.error(JSON.stringify(fixture.visualFailure));
+    console.error(JSON.stringify({ ...fixture.visualFailure, code: "VISUAL_UNKNOWN_FAILURE" }));
+    process.exit(7);
   }
   console.log("# pass 1");
   appendFileSync("completed", command + "\n");
@@ -264,6 +274,7 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
     await writeFile(join(source, "fixture.ts"), "export {};\n");
     await symlink(join(directory, "tests/package-boundaries/assertion.test.mjs"), join(source, "alias.ts"));
   }
+  if (!options.omitVisualScript) scripts["verify:generated-visuals"] = "node controlled.mjs run verify:generated-visuals";
   scripts["check:copy-externalization"] = "node controlled.mjs run check:copy-externalization";
   scripts[command] = manifest.scripts[command];
   await writeFile(join(directory, "package.json"), JSON.stringify({ private: true, scripts }));
@@ -321,7 +332,7 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
     environment.KERNEL_FIXTURE_NODE = process.execPath;
     environment.KERNEL_FIXTURE_PNPM = pnpmPath;
   }
-  const child = spawn(executable, [...prefix, "run", command], {
+  const child = spawn(executable, [...prefix, "run", command, ...(options.arguments ?? [])], {
     cwd: directory,
     detached: true,
     env: { ...environment, KERNEL_FIXTURE_ROOT: directory, KERNEL_NODE_VERSION: process.version,
@@ -517,7 +528,10 @@ test("the public kernel command runs each required group in reader-before-writer
       assert.match(await readFile(step.log, "utf8"), /# pass 1/u);
     }
   }
-  const skeletonLog = await readFile(rows["verify:generated-skeletons"].steps[0].log, "utf8");
+  const skeleton = rows["verify:generated-skeletons"].steps[0];
+  assert.equal(skeleton.name, "verify:generated-skeletons");
+  const skeletonLog = await readFile(skeleton.log, "utf8");
+  assert.doesNotMatch(skeletonLog, /visualComparisons/u);
   assert.match(skeletonLog, /"fixtures":\["portfolio"\]/u);
   assert.match(skeletonLog, /"artifactDirectory":"audit-abc123"/u);
   assert.doesNotMatch(skeletonLog, /fixtureSecretValueNeverRetain/u);
@@ -527,6 +541,97 @@ test("the public kernel command runs each required group in reader-before-writer
   const secondReport = await readReport(second, directory);
   assert.notEqual(secondReport.directory, directory);
   assert.deepEqual(await snapshotReport(directory), firstReport);
+});
+
+test("the public kernel replaces only fixed-root verification when fixed visuals are requested", { timeout: 60000 }, async context => {
+  const invocation = await fixtureInvocation(context, { arguments: ["--", "--include-fixed-visuals"] });
+  const result = await invocation.finish();
+  assert.equal(result.code, 0, result.stderr);
+  const expected = expectedCommands.map(command => command === "run verify:generated-skeletons"
+    ? "run verify:generated-visuals" : command);
+  assert.deepEqual(result.trace, expected);
+  assert.deepEqual(result.completed, expected);
+  const { rows } = await readReport(invocation);
+  const selected = rows["verify:generated-skeletons"];
+  assert.equal(selected.mode, "fixed-visuals");
+  assert.equal(selected.steps[0].name, "verify:generated-visuals");
+  assert.match(result.stdout, /pnpm run verify:generated-visuals/u);
+  const log = await readFile(selected.steps[0].log, "utf8");
+  const evidence = JSON.parse(log.split("\n").find(line => line.startsWith('stdout {"fixtures":')).slice(7));
+  assert.deepEqual(evidence.visualComparisons, [{ fixture: "portfolio", passedCases: 2 }]);
+  assert.doesNotMatch(log, /fixtureSecretValueNeverRetain/u);
+});
+
+test("the public kernel rejects invalid fixed-visual arguments before spawning checks", { timeout: 60000 }, async context => {
+  for (const arguments_ of [
+    ["--", "--unknown-option"],
+    ["--", "--include-fixed-visuals", "--include-fixed-visuals"],
+  ]) {
+    const invocation = await fixtureInvocation(context, { arguments: arguments_ });
+    const result = await invocation.finish();
+    assert.deepEqual([result.code, result.signal], [1, null]);
+    assert.deepEqual(result.trace, [""]);
+    assert.deepEqual((await readdir(invocation.reports)).filter(name => name.startsWith("builder-kernel-")), []);
+    assert.match(result.stderr, /--include-fixed-visuals/u);
+  }
+});
+
+test("the kernel retains fixed visual and export failure codes without claiming passes", { timeout: 60000 }, async context => {
+  const ownerParent = await mkdtemp(join(tmpdir(), "kernel-visual-diagnostics-"));
+  context.after(() => rm(ownerParent, { recursive: true, force: true }));
+  const privateValue = "fixtureSecretValueNeverRetain";
+  const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === "portfolio");
+  const fixture = fileURLToPath(new URL("../../" + relativeRoot, import.meta.url));
+  for (const [failingScript, failureCode] of [
+    ["test:visual", "VISUAL_REGRESSION_FAILED"],
+    ["test:e2e:preview", "BROWSER_PREVIEW_FAILED"],
+  ]) {
+    await context.test(failureCode, async failureContext => {
+      let visualFailure;
+      await assert.rejects(verifyGeneratedProjectForTesting(fixture, "portfolio", {
+        createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
+        runCommand: async ({ arguments: arguments_ }) => {
+          if (arguments_.at(-1) === failingScript) throw new Error(privateValue);
+          return arguments_[0] === "--version" ? manifest.packageManager.slice("pnpm@".length) : "";
+        },
+        captureVisualArtifacts: async () => { throw new Error(privateValue); },
+      }, undefined, { includeVisual: true }), error => {
+        visualFailure = { ...formatGeneratedFixtureFailure(error), privateValue };
+        return true;
+      });
+
+      const invocation = await fixtureInvocation(failureContext, { arguments: ["--", "--include-fixed-visuals"], visualFailure });
+      const result = await invocation.finish();
+      const { rows } = await readReport(invocation);
+      const { status, steps: [step] } = rows["verify:generated-skeletons"];
+      assert.deepEqual([result.code, result.signal], [1, null]);
+      assert.equal(status, "failed");
+      assert.equal(step.exitCode, 7);
+      const expectedDiagnostic = failureCode + " (VISUAL_ARTIFACT_EXPORT_FAILED)";
+      assert.equal(step.diagnostic, expectedDiagnostic);
+      assert.equal(rows["changeset:status"].status, "passed");
+
+      const log = await readFile(step.log, "utf8");
+      assert.ok(log.split("\n").includes("stderr " + expectedDiagnostic));
+      assert.doesNotMatch([log, JSON.stringify(rows), result.stdout, result.stderr].join("\n"),
+        /fixtureSecretValueNeverRetain|VISUAL_UNKNOWN_FAILURE|visualComparisons/u);
+    });
+  }
+});
+
+test("a missing fixed-visual child script leaves its kernel group failed", { timeout: 60000 }, async context => {
+  const invocation = await fixtureInvocation(context, {
+    arguments: ["--", "--include-fixed-visuals"],
+    omitVisualScript: true,
+  });
+  const result = await invocation.finish();
+  const { rows } = await readReport(invocation);
+  const group = rows["verify:generated-skeletons"];
+  assert.equal(result.code, 1);
+  assert.equal(group.status, "failed");
+  assert.equal(group.steps[0].name, "verify:generated-visuals");
+  assert.equal(rows["changeset:status"].status, "passed");
+  assert.equal(result.trace.includes("run verify:generated-skeletons"), false);
 });
 
 test("a failed core build blocks dependent readers but runs independent portions", { timeout: 60000 }, async context => {
