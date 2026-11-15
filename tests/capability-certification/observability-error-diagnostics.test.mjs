@@ -41,6 +41,11 @@ const exactSubject = Object.freeze({
   behaviorContractDigest:
     "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
 });
+// Hosted diagnostics fixtures retain their historical subject until separately renewed.
+const currentSubject = Object.freeze({
+  descriptorVersion: "0.4.0",
+  behaviorContractDigest: "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
+});
 const appProjectSource = await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/project.yaml"), "utf8");
 const appState = JSON.parse(await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/state.json"), "utf8"));
 const installedCapabilities = appState.installedCapabilities;
@@ -77,8 +82,12 @@ const fixedVerificationChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -154,8 +163,8 @@ function createLocalFixtureReceipt() {
   return {
     ok: true,
     capability: "observability",
-    version: "0.3.0",
-    subject: exactSubject,
+    version: "0.4.0",
+    subject: currentSubject,
     revision: exactRevision,
     scope: "local-full",
     cases: localCases,
@@ -228,7 +237,7 @@ async function loadModule(path) {
   return import(`${pathToFileURL(path).href}?test=${Date.now()}`);
 }
 
-function commandOutput(command, version = "0.3.0") {
+function commandOutput(command, version = "0.4.0") {
   if (command === "create") {
     return {
       ok: true,
@@ -245,8 +254,9 @@ function commandOutput(command, version = "0.3.0") {
         state: {
           kind: "valid",
           value: {
+            schemaVersion: "2.0.0",
             installedCapabilities: installedCapabilities.map(capability => capability.identifier === "observability" ? { ...capability, version } : { ...capability }),
-            origin: { profile: "app", recipeVersion: "0.2.7" },
+            origin: { profile: "app", recipeVersion: "0.3.0" },
           },
         },
         capabilities: installedCapabilities.map(({ identifier }) => ({ identifier, category: "confirmed" })),
@@ -270,7 +280,7 @@ function commandOutput(command, version = "0.3.0") {
   throw new Error("unexpected command");
 }
 
-async function createRunnerAdapters({ recipeVersion = "0.2.7" } = {}) {
+async function createRunnerAdapters({ recipeVersion = "0.3.0" } = {}) {
   let projectRoot;
   const commands = [];
   const adapters = {
@@ -285,7 +295,7 @@ async function createRunnerAdapters({ recipeVersion = "0.2.7" } = {}) {
         await mkdir(join(projectRoot, ".egeria"), { recursive: true });
         await writeFile(
           join(projectRoot, ".egeria/project.yaml"),
-          appProjectSource.replace("recipeVersion: 0.2.7", `recipeVersion: ${recipeVersion}`),
+          appProjectSource.replace("recipeVersion: 0.3.0", `recipeVersion: ${recipeVersion}`),
           "utf8",
         );
       }
@@ -542,26 +552,11 @@ function validateCompletedCertificationReceipt(receipt) {
   return issues;
 }
 
-test("the historical diagnostics receipt remains reviewable after separate current-subject acceptance", async (t) => {
+test("historical diagnostics evidence remains reviewable while the current subject awaits renewal", async (t) => {
   const registry = JSON.parse(await readFile(registryPath, "utf8"));
-  const record = registry.records.observability;
-  assert.deepEqual(record, {
-    subject: {
-      descriptorVersion: "0.3.0",
-      behaviorContractDigest:
-        "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
-    },
-    requiredEvidence,
-    status: "certified",
-    taskPlan:
-      "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md",
-    evidence: requiredEvidence.map((kind) => ({
-      kind,
-      path: "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
-      outcome: "passed",
-      revision: "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
-      subject: exactSubject,
-    })),
+  assert.deepEqual(registry.records.observability, {
+    subject: currentSubject, requiredEvidence, status: "pending",
+    taskPlan: "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md", evidence: [],
   });
 
   if (!(await pathExists(localReceiptPath))) {
@@ -632,10 +627,10 @@ test("the current app runner retains complete identity and actual Worker and Eff
   assert.deepEqual(result, {
     ok: true,
     capability: "observability",
-    version: "0.3.0",
+    version: "0.4.0",
     profile: "app",
-    subject: exactSubject,
-    recipeVersion: "0.2.7",
+    subject: currentSubject,
+    recipeVersion: "0.3.0",
     evidenceRevision: exactRevision,
     cleanup: "identity-checked",
     installedCapabilities,
@@ -699,7 +694,6 @@ test("the current app runner refuses incomplete installed identity before runtim
     value => { value.result.state.value.origin.profile = "portfolio"; },
     value => { value.result.state.value.origin.recipeVersion = "0.2.0"; },
     value => { value.result.state.value.origin.recipeVersion = "0.2.2"; },
-    value => { value.result.state.value.origin.recipeVersion = "0.3.0"; },
     value => { value.result.capabilities[0].category = "unconfirmed"; },
   ]) {
     const { adapters } = await createRunnerAdapters();
@@ -746,13 +740,12 @@ test("deployment candidate validation requires the complete current app identity
   const accepted = validateObservabilityDeploymentCandidate(candidate);
   assert.equal(accepted.ok, true);
   assert.equal(accepted.profile, "app");
-  assert.equal(accepted.recipeVersion, "0.2.7");
-  assert.deepEqual(accepted.subject, exactSubject);
+  assert.equal(accepted.recipeVersion, "0.3.0");
+  assert.deepEqual(accepted.subject, currentSubject);
   assert.equal(accepted.revision, exactRevision);
   for (const mutate of [
     value => { value.projectSource = value.projectSource.replace("originProfile: app", "originProfile: portfolio"); },
-    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.7", "recipeVersion: 0.1.0"); },
-    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.2.7", "recipeVersion: 0.2.2"); },
+    value => { value.projectSource = value.projectSource.replace("recipeVersion: 0.3.0", "recipeVersion: 0.1.0"); },
     value => { value.projectSource += "unexpected: true\n"; },
     value => { value.infer.result.state.value.installedCapabilities.pop(); },
     value => { value.infer.result.state.value.installedCapabilities.push({ identifier: "analytics", version: "0.1.0" }); },
@@ -784,8 +777,8 @@ test("the local fixture receipt binds every capture case and rejects semantic or
 
   const reordered = structuredClone(receipt);
   reordered.subject = {
-    behaviorContractDigest: exactSubject.behaviorContractDigest,
-    descriptorVersion: exactSubject.descriptorVersion,
+    behaviorContractDigest: currentSubject.behaviorContractDigest,
+    descriptorVersion: currentSubject.descriptorVersion,
   };
   reordered.counts = {
     diagnosticDeliveryFailures: 1,
@@ -1638,13 +1631,13 @@ test("the prepared workflow is manual, exact-revision, protected, single-attempt
     },
   });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(workflow.concurrency, {
+  assert.deepEqual(Object.keys(workflow.jobs).sort(), ["check-hosted-eligibility", "verify-and-deploy"]);
+  const job = workflow.jobs["verify-and-deploy"];
+  assert.deepEqual(job.concurrency, {
     group: "test-deploy",
     "cancel-in-progress": false,
     queue: "max",
   });
-  assert.deepEqual(Object.keys(workflow.jobs), ["verify-and-deploy"]);
-  const job = workflow.jobs["verify-and-deploy"];
   assert.equal(job.if, "github.ref == 'refs/heads/main'");
   assert.equal(job["runs-on"], "ubuntu-24.04");
   assert.equal(job["timeout-minutes"], 60);

@@ -2,7 +2,7 @@
 
 Follow [Application environments](environments.md) for the single origin, source build identity, prepared receipts, protected test transport and GitHub release setup. Service configuration below supplements those requirements.
 
-Analytics selection belongs to `.egeria/project.yaml`; destinations and activation belong to the build environment. This environment-aware generation is an internal candidate until the complete public generator is activated. Use the existing approved internal generation workflow; there is no public environment-selection CLI switch to enable it early.
+Analytics selection belongs to `.egeria/project.yaml`; destinations and activation belong to the build environment. Public builder commands generate the current environment-aware project from these selections.
 
 The generated selection contains only chosen providers, Clarity's audience declaration and optional operational integrations. Keep identifiers, origins and activation values out of project/state controls. Provider identifiers are public browser configuration, not credentials; never supply API keys or private data through these variables.
 

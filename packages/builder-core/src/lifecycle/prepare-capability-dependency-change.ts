@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
-import type { ApplicationEnvironmentProjectConfiguration, ProjectConfiguration } from "../contracts/project.js";
+import type { ProjectConfiguration} from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
 import type { RenderedSkeleton } from "../generation/render-skeleton.js";
@@ -52,7 +52,7 @@ function projectManifestMembers(
   return result;
 }
 
-export async function prepareCapabilityDependencyChange<P extends ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>(input: Readonly<{
+export async function prepareCapabilityDependencyChange<P extends ProjectConfiguration>(input: Readonly<{
   reader: RepositoryReader;
   current: RenderedSkeleton<P>;
   desired: RenderedSkeleton<P>;

@@ -24,15 +24,11 @@ import { parse as parseYaml } from "yaml";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const portfolioRecipeLockfile = resolve(
   packageRoot,
-  "lockfiles/web-recipe-portfolio-0.11.7/pnpm-lock.yaml",
-);
-const siteRecipeLockfile = resolve(
-  packageRoot,
-  "lockfiles/web-recipe-site-0.12.7/pnpm-lock.yaml",
+  "lockfiles/web-recipe-portfolio-0.12.0/pnpm-lock.yaml",
 );
 const portfolioRecipeIdentity = Object.freeze({
   originProfile: "portfolio",
-  recipeVersion: "0.11.7",
+  recipeVersion: "0.12.0",
 });
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const { createGenerationRenderingContext } = await import(
@@ -67,7 +63,7 @@ const completeChecks = [
   "post-state-inference",
 ];
 
-test("application environment dependency locks are isolated from retained recipes", async () => {
+test("application environment dependency locks reject retired recipe identities", async () => {
   const context = core.createApplicationEnvironmentRenderingContext();
   for (const [profile, candidateVersion, retainedVersion] of [
     ["portfolio", "0.12.0", "0.11.7"],
@@ -82,15 +78,7 @@ test("application environment dependency locks are isolated from retained recipe
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
     assert.equal(manifest.dependencies.next, "16.4.1");
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), `${profile}-${candidateVersion}`);
-    const retained = assertSuccess(await core.renderSkeleton({
-      profile, projectName: "dependency-example", displayName: "Dependency Example",
-      packageVersions: core.verifiedCapabilityPackageVersions,
-    }, { ...createGenerationRenderingContext(), profiles: core.createCurrentProfileRecipes() }));
-    const retainedManifest = JSON.parse(new TextDecoder().decode(retained.files.find(({ path }) => path === "apps/web/package.json").content));
-    assert.equal(retained.project.recipeVersion, retainedVersion);
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(retained.project, retainedManifest), `${profile}-${retainedVersion}`);
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(retained.project, manifest), profile + "-" + retainedVersion);
-    assert.deepEqual(manifest.devDependencies, retainedManifest.devDependencies);
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...rendered.project, recipeVersion: retainedVersion }, manifest), undefined);
     for (const [section, key, version] of [
       ["dependencies", "next", "16.3.1"],
       ["devDependencies", "eslint-config-next", "16.3.1"],
@@ -118,14 +106,13 @@ test("application environment dependency locks are isolated from retained recipe
   }
 });
 
-test("application environment generation preserves state-last verification and supports exact read-only inspection", async () => {
-  const context = core.createApplicationEnvironmentRenderingContext();
+test("default generation preserves state-last verification and supports exact read-only inspection", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withTestRoot(async (owner) => {
       const verifier = createFakeVerifier();
       const result = assertSuccess(await core.generateProject({
         request: { profile, projectName: "target-example", displayName: "Target Example", multilingual: true },
-        destination: join(owner, profile), verifier: verifier.verifier, renderingContext: context,
+        destination: join(owner, profile), verifier: verifier.verifier,
       }));
       assert.equal(result.state.schemaVersion, "2.0.0");
       assert.equal(result.state.projectSchemaVersion, "2.0.0");
@@ -135,12 +122,12 @@ test("application environment generation preserves state-last verification and s
       assert.deepEqual(result.state.lastSuccessfulVerification.checks, completeChecks);
       assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
       const reader = core.createFileSystemRepositoryReader(result.destination);
-      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, context));
-      const inference = await core.inferRepository({ reader, catalog: snapshot.catalog, projectSchemaVersion: "2.0.0" });
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader));
+      const inference = await core.inferRepository({ reader, catalog: snapshot.catalog });
       assert.equal(inference.state.kind, "valid");
       assert.ok(inference.capabilities.every(({ category }) => category === "confirmed"));
-      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
-      assert.equal((await core.inferRepository({ reader, catalog: snapshot.catalog })).state.kind, "invalid");
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles }), { healthy: true, diagnostics: [] });
+      assert.equal((await core.inferRepository({ reader, catalog: snapshot.catalog })).state.kind, "valid");
     });
   }
 });
@@ -192,15 +179,14 @@ test("environment analytics generation verifies and infers the selected candidat
   }
 });
 
-test("application environment generation rejects noncandidate contexts before destination or verifier access", async (context) => {
+test("application environment generation rejects invalid contexts before destination or verifier access", async (context) => {
   const candidate = core.createApplicationEnvironmentRenderingContext();
   for (const [name, renderingContext] of [
-    ["legacy", createGenerationRenderingContext()],
     ["null", null],
     ["undefined", undefined],
     ["empty", {}],
     ["wrong schema", { ...candidate, projectSchemaVersion: "1.0.0" }],
-    ["mixed catalog", { ...candidate, catalogSnapshot: createGenerationRenderingContext().catalogSnapshot }],
+    ["mixed catalog", { ...candidate, catalogSnapshot: { ...candidate.catalogSnapshot, schemaVersion: "retired" } }],
     ["malformed profiles", { ...candidate, profiles: undefined }],
   ]) {
     await context.test(name, async () => {
@@ -362,12 +348,12 @@ test("application environment lock selection uses its own matching dependency gr
 });
 
 test("app lockfile selection requires exact profile, recipe, Next, ESLint, and Effect", async () => {
-  const identity = { originProfile: "app", recipeVersion: "0.2.7" };
+  const identity = { originProfile: "app", recipeVersion: "0.3.0" };
   const manifest = {
     dependencies: { next: "16.4.1", effect: "4.0.0-rc.112" },
     devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.3" },
   };
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.2.7");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.3.0");
   for (const changed of [
     { ...identity, originProfile: "site" },
     { ...identity, recipeVersion: "0.2.0" },
@@ -383,8 +369,8 @@ test("app lockfile selection requires exact profile, recipe, Next, ESLint, and E
       ...manifest, [section]: { ...manifest[section], [key]: "16.3.0" },
     }), undefined);
   }
-  assert.equal(new URL(recipeLockfiles.createRecipeLockfileUrl("app-0.2.7")).pathname,
-    resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml"));
+  assert.equal(new URL(recipeLockfiles.createRecipeLockfileUrl("app-0.3.0")).pathname,
+    resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml"));
 });
 
 test("Worker integration verifier records execution only for the exact owned script", async () => {
@@ -410,10 +396,12 @@ test("Worker integration verifier records execution only for the exact owned scr
         assert.equal(result.issues[0].code, "WORKER_INTEGRATION_INVALID");
         assert.deepEqual(calls, []);
       } else {
-        assert.equal(calls.at(-1).arguments.join(" "), command);
-        assert.deepEqual(calls.at(-2).arguments,
-          ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"]);
+        const operations = calls.map(call => call.arguments.join(" "));
+        const workerIndex = operations.indexOf(command);
+        assert.ok(workerIndex > operations.indexOf("--dir apps/web exec opennextjs-cloudflare build --skipNextBuild"));
+        assert.equal(operations[workerIndex - 1], `--dir apps/web run check:prepared-artifact record development ${"a".repeat(40)} --local`);
         if (scenario === "failed") {
+          assert.equal(calls.at(-1).arguments.join(" "), command);
           assert.equal(result.ok, false);
           assert.equal(result.issues[0].code, "WORKER_INTEGRATION_FAILED");
         } else {
@@ -426,7 +414,7 @@ test("Worker integration verifier records execution only for the exact owned scr
 });
 
 for (const profile of ["portfolio", "site", "app"]) {
-  test(`current public ${profile} verification preserves an application-owned prepared-artifact script`, async () => {
+  test(`current public ${profile} verification refuses a substituted prepared-artifact script before commands`, async () => {
     await withTestRoot(async owner => {
       const fake = await createFakePnpmExecutable(owner);
       const source = await createVerifierSource(owner);
@@ -439,12 +427,10 @@ for (const profile of ["portfolio", "site", "app"]) {
       await writeFile(join(source, ".egeria/project.yaml"), core.serializeProjectYaml(rendered.project));
       const before = await snapshotFileBytes(source);
       const result = await core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fake.executable }).verifyInIsolatedCopy(source);
-      assertSuccess(result);
+      assert.equal(result.ok, false);
+      assert.equal(result.issues[0].code, "WORKER_INTEGRATION_INVALID");
       assert.deepEqual(await snapshotFileBytes(source), before);
-      const calls = await fake.readCalls();
-      assert.ok(calls.length > 0);
-      assert.equal(calls.some(call => call.arguments.includes("test:deployment-contracts")), false);
-      assert.equal(calls.some(call => call.environment.APPLICATION_ENVIRONMENT !== undefined), false);
+      assert.deepEqual(await fake.readCalls(), []);
     });
   });
 }
@@ -498,7 +484,7 @@ test("app generation requires its complete verification vector before state or d
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.7" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.3.0" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.1");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks,
@@ -518,7 +504,7 @@ test("persistence binding verification refuses missing or substituted commands a
       const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
       manifest.dependencies["drizzle-orm"] = "0.45.2";
       manifest.devDependencies["drizzle-kit"] = "0.31.10";
-      manifest.scripts = { "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts", "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts" };
+      manifest.scripts = { ...manifest.scripts, "test:integration:cloudflare": "vitest run --config vitest.cloudflare.config.ts", "cf-typegen": "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts" };
       if (scenario !== "missing") manifest.scripts["test:integration:bindings"] = scenario === "invalid" ? "echo skipped" : "vitest run --config vitest.bindings.config.ts";
       if (scenario === "missing-foundation") delete manifest.scripts["test:integration:cloudflare"];
       if (scenario === "missing-typegen") delete manifest.scripts["cf-typegen"];
@@ -544,7 +530,7 @@ test("persistence binding verification refuses missing or substituted commands a
         const operations = calls.map(({ arguments: values }) => values.join(" "));
         assert.ok(operations.indexOf("--dir apps/web run cf-typegen") > operations.indexOf("run lint"));
         assert.ok(operations.indexOf("--dir apps/web run cf-typegen") < operations.indexOf("run typecheck"));
-        assert.equal(calls.at(-1).arguments.join(" "), command);
+        assert.equal(calls.at(scenario === "failed" ? -1 : -2).arguments.join(" "), command);
         if (scenario === "failed") {
           assert.equal(result.ok, false);
           assert.equal(result.issues[0].code, "BINDING_INTEGRATION_FAILED");
@@ -555,10 +541,10 @@ test("persistence binding verification refuses missing or substituted commands a
 });
 
 test("persistence lock selection requires the exact compatible optional packages", () => {
-  const identity = { originProfile: "app", recipeVersion: "0.2.7" };
+  const identity = { originProfile: "app", recipeVersion: "0.3.0" };
   const manifest = { dependencies: { next: "16.4.1", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.3", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20261006.1" } };
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.2.7-persistence");
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.3.0" }, manifest), "app-0.2.7-persistence");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.2.0" }, manifest), undefined);
   for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]]) {
     for (const version of [undefined, "latest", "0.1.0", "5.20260730.1"]) {
       assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, [section]: { ...manifest[section], [key]: version } }), undefined);
@@ -596,6 +582,7 @@ test("environment persistence uses current dependency locks and refuses retired 
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), "app-0.2.7-persistence");
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.2" }, manifest), undefined);
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.3" }, manifest), undefined);
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.7" }, manifest), undefined);
   for (const [section, key] of [
     ["dependencies", "next"], ["dependencies", "effect"], ["dependencies", "drizzle-orm"],
     ["devDependencies", "eslint-config-next"], ["devDependencies", "vitest"],
@@ -677,149 +664,26 @@ test("persistence generation requires binding checks before state or destination
         assert.equal(await exists(destination), false);
       } else {
         const generated = assertSuccess(result);
-        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.2.7" });
+        assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.3.0" });
         assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.1");
         assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
-        assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.1.1");
+        assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
       }
     });
   }
 });
-const portfolioRenderedPaths = [
-  ".github/workflows/deploy.yml",
-  ".github/workflows/quality.yml",
-  ".gitignore",
-  ".nvmrc",
-  "AGENTS.md",
-  "README.md",
-  "apps/web/AGENTS.md",
-  "apps/web/app/api/observability/route.ts",
-  "apps/web/app/error.tsx",
-  "apps/web/app/global-error.tsx",
-  "apps/web/app/globals.css",
-  "apps/web/app/layout.tsx",
-  "apps/web/app/page.tsx",
-  "apps/web/content/content.config.yaml",
-  "apps/web/content/en-CA/long-form/introduction.md",
-  "apps/web/content/en-CA/observability.yaml",
-  "apps/web/content/en-CA/site.yaml",
-  "apps/web/eslint.config.mjs",
-  "apps/web/instrumentation-client.ts",
-  "apps/web/instrumentation.ts",
-  "apps/web/next.config.ts",
-  "apps/web/open-next.config.ts",
-  "apps/web/package.json",
-  "apps/web/playwright.config.shared.ts",
-  "apps/web/playwright.deployed.config.ts",
-  "apps/web/playwright.dev.config.ts",
-  "apps/web/playwright.preview.config.ts",
-  "apps/web/playwright.visual.config.ts",
-  "apps/web/postcss.config.mjs",
-  "apps/web/src/content/content-schema.ts",
-  "apps/web/src/content/content-source.d.ts",
-  "apps/web/src/content/read-content.ts",
-  "apps/web/src/infrastructure/cloudflare/observability-context.ts",
-  "apps/web/src/infrastructure/observability/browser-reporter.ts",
-  "apps/web/src/infrastructure/observability/error-copy.ts",
-  "apps/web/src/infrastructure/observability/installed-capability.ts",
-  "apps/web/src/infrastructure/observability/server-reporter.ts",
-  "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
-  "apps/web/src/presentation/content-page.tsx",
-  "apps/web/src/presentation/error-fallback.tsx",
-  "apps/web/src/sections/section-registry.tsx",
-  "apps/web/tests/component/content-page.test.tsx",
-  "apps/web/tests/e2e/site-quality.spec.ts",
-  "apps/web/tests/setup/component.ts",
-  "apps/web/tests/unit/content-schema.test.ts",
-  "apps/web/tests/visual/home-visual.spec.ts",
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-  "apps/web/tsconfig.json",
-  "apps/web/vitest.config.ts",
-  "apps/web/wrangler.jsonc",
-  "package.json",
-  "patches/next-eslint-plugin-next.patch",
-  "pnpm-workspace.yaml",
-];
-const siteRenderedPaths = [
-  ...portfolioRenderedPaths,
-  "apps/web/app/about/page.tsx",
-  "apps/web/app/not-found.tsx",
-  "apps/web/app/robots.ts",
-  "apps/web/app/sitemap.ts",
-  "apps/web/app/work/error.tsx",
-  "apps/web/app/work/featured/page.tsx",
-  "apps/web/app/work/page.tsx",
-  "apps/web/content/en-CA/about.yaml",
-  "apps/web/content/en-CA/not-found.yaml",
-  "apps/web/content/en-CA/routing.yaml",
-  "apps/web/content/en-CA/work-featured.yaml",
-  "apps/web/src/routing/read-routing-content.ts",
-  "apps/web/src/routing/routing-content-schema.ts",
-  "apps/web/src/routing/site-page.tsx",
-  "apps/web/tests/component/site-page.test.tsx",
-  "apps/web/tests/e2e/site-routing.spec.ts",
-  "apps/web/tests/unit/routing-content.test.ts",
-].sort();
-const bookingCalendlyRenderedPaths = [
-  "apps/web/content/en-CA/booking-calendly.yaml",
-  "apps/web/src/integrations/booking-calendly/booking-content.ts",
-  "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-  "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-  "apps/web/tests/e2e/calendly-booking.spec.ts",
-];
-const multilingualRenderedPaths = [
-  "apps/web/app/[locale]/[[...segments]]/page.tsx",
-  "apps/web/app/[locale]/layout.tsx",
-  "apps/web/app/[locale]/not-found.tsx",
-  "apps/web/content/en-CA/localized-content.yaml",
-  "apps/web/content/fr-CA/localized-content.yaml",
-  "apps/web/middleware.ts",
-  "apps/web/src/i18n/locale.ts",
-  "apps/web/src/i18n/localized-content.ts",
-  "apps/web/src/i18n/localized-profile.ts",
-  "apps/web/src/i18n/read-localized-content.ts",
-  "apps/web/src/integrations/booking/localized-booking.tsx",
-  "apps/web/src/presentation/localized-page.tsx",
-  "apps/web/tests/component/multilingual-page.test.tsx",
-  "apps/web/tests/e2e/multilingual-routing.spec.ts",
-  "apps/web/tests/unit/locale.test.ts",
-  "apps/web/tests/unit/localized-content.test.ts",
-];
-const analyticsRenderedPaths = [
-  "apps/web/content/en-CA/analytics.yaml",
-  "apps/web/content/fr-CA/analytics.yaml",
-  "apps/web/src/integrations/analytics/analytics-consent-state.ts",
-  "apps/web/src/integrations/analytics/analytics-consent.tsx",
-  "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
-  "apps/web/src/integrations/analytics/analytics-content.ts",
-  "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
-  "apps/web/src/integrations/analytics/analytics-runtime.ts",
-  "apps/web/src/integrations/analytics/analytics-settings.ts",
-  "apps/web/tests/component/analytics-consent.test.tsx",
-  "apps/web/tests/e2e/analytics-consent.spec.ts",
-  "apps/web/tests/unit/analytics-consent-state.test.ts",
-  "apps/web/tests/unit/analytics-provider-contract.test.ts",
-  "apps/web/tests/unit/analytics-runtime.test.ts",
-  "docs/analytics.md",
-];
 const analyticsSettings = {
   consent: { policy: "explicit-opt-in" },
   providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "0123456789abcdef0123456789abcdef",
-    },
-    googleAnalytics4: { measurementId: "G-TEST123456" },
+    cloudflareWebAnalytics: true,
+    googleAnalytics4: true,
     microsoftClarity: {
-      projectId: "clarity123",
       audience: "not-directed-to-minors",
     },
   },
   operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
+    googleSearchConsole: true,
     lookerStudio: { connector: "google-analytics-4" },
   },
 };
@@ -849,23 +713,16 @@ function assertFailure(result, code) {
   assert.ok(result.issues.every((issue) => !("input" in issue)));
 }
 
-test("generated dependency recipes select only their exact reviewed lockfile", async () => {
-  for (const [profile, recipeVersion, eslintConfigNext] of [
-    ["portfolio", "0.11.7", "16.3.0"], ["site", "0.12.7", "16.3.3"], ["app", "0.2.7", "16.3.3"],
+test("retired dependency recipes have no public lockfile selection", () => {
+  for (const [originProfile, recipeVersion, next] of [
+    ["portfolio", "0.10.0", "16.3.0"], ["portfolio", "0.11.2", "16.4.1"],
+    ["site", "0.10.0", "16.3.0"], ["site", "0.11.0", "16.3.3"], ["site", "0.12.2", "16.4.1"],
+    ["app", "0.1.0", "16.3.3"], ["app", "0.2.2", "16.4.1"],
   ]) {
-    const manifest = {
-      dependencies: { next: "16.4.1", ...(profile === "app" ? { effect: "4.0.0-rc.112" } : {}) },
-      devDependencies: { "eslint-config-next": eslintConfigNext, vitest: "5.0.3" },
-    };
-    const project = { schemaVersion: "1.0.0", originProfile: profile, recipeVersion };
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(project, manifest), profile + "-" + recipeVersion);
-    for (const version of ["4.1.10", "4.1.11", "5.0.0", "^5.0.3"]) {
-      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(project, { ...manifest, devDependencies: { ...manifest.devDependencies, vitest: version } }), undefined);
+    for (const vitest of ["4.1.10", "4.1.11", "5.0.3"]) {
+      const manifest = { dependencies: { next, ...(originProfile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": originProfile === "portfolio" ? "16.3.0" : "16.3.3", vitest } };
+      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile, recipeVersion }, manifest), undefined);
     }
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...project, recipeVersion: "0.9.0" }, manifest), undefined);
-    const lock = parseYaml(await readFile(recipeLockfiles.createRecipeLockfileUrl(profile + "-" + recipeVersion), "utf8"));
-    assert.equal(lock.importers["apps/web"].dependencies.next.specifier, "16.4.1");
-    assert.equal(lock.importers["apps/web"].devDependencies.vitest.specifier, "5.0.3");
   }
 });
 
@@ -1072,9 +929,15 @@ async function listFiles(root) {
 }
 
 async function infer(root) {
+  const project = assertSuccess(core.parseProjectYaml(await readFile(join(root, ".egeria/project.yaml"), "utf8")));
+  const context = createGenerationRenderingContext(
+    project.selectedCapabilities.includes("application-persistence"),
+    project.selectedCapabilities.includes("app-foundation"),
+    project.selectedCapabilities.includes("background-job-delivery"),
+  );
   return core.inferRepository({
     reader: core.createFileSystemRepositoryReader(root),
-    catalog: assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" })),
+    catalog: assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, context.catalogSnapshot)),
   });
 }
 
@@ -1155,6 +1018,7 @@ const entries = ${readLinuxEntry}
 const support = join(${JSON.stringify(owner)}, basename(dirname(process.cwd())), "support");
 // Persist every key, but record a value only when it matches that key's fixture expectation.
 const expectedEnvironment = {
+  pnpm_config_verify_deps_before_run: "error",
   APPLICATION_ENVIRONMENT: "development",
   CI: "true",
   NEXT_TELEMETRY_DISABLED: "1",
@@ -1238,22 +1102,25 @@ async function createFakeVoltaPnpmExecutable(owner) {
 
 async function createVerifierSource(owner, name = "source") {
   const root = join(owner, name);
+  const rendered = assertSuccess(await core.renderSkeleton({ ...request(), packageVersions: core.verifiedCapabilityPackageVersions }));
   await mkdir(join(root, "apps/web"), { recursive: true });
+  await mkdir(join(root, ".egeria"));
+  await writeFile(join(root, ".egeria/project.yaml"), core.serializeProjectYaml(rendered.project));
   await writeFile(join(root, "package.json"), '{"private":true}\n');
   await writeFile(
     join(root, "apps/web/package.json"),
-    `${JSON.stringify({
-      dependencies: { next: "16.4.1" },
-      devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.3" },
-    })}\n`,
+    rendered.files.find(({ path }) => path === "apps/web/package.json").content,
   );
-  await mkdir(join(root, ".egeria"));
-  const rendered = assertSuccess(await core.renderSkeleton({
-    profile: "portfolio", projectName: "verifier-source", displayName: "Verifier Source", packageVersions: core.verifiedCapabilityPackageVersions,
-  }, createGenerationRenderingContext()));
-  await writeFile(join(root, ".egeria/project.yaml"), core.serializeProjectYaml(rendered.project));
   await writeFile(join(root, "marker"), "source-marker\n");
   return root;
+}
+
+async function assertRenderedFiles(destination, selection) {
+  const rendered = assertSuccess(await core.renderSkeleton({ ...selection, packageVersions: core.verifiedCapabilityPackageVersions }));
+  assert.deepEqual(await listFiles(destination), [...new Set([...rendered.files.map(file => file.path), ...controlPaths])].sort());
+  for (const file of rendered.files) {
+    assert.deepEqual(new Uint8Array(await readFile(join(destination, file.path))), file.content, file.path);
+  }
 }
 
 async function snapshotFileBytes(root) {
@@ -1391,6 +1258,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
     WRANGLER_SEND_METRICS: process.env.WRANGLER_SEND_METRICS,
     ARBITRARY_INHERITED_VALUE: process.env.ARBITRARY_INHERITED_VALUE,
     ...(process.platform === "linux" && { UV_USE_IO_URING: process.env.UV_USE_IO_URING }),
+    pnpm_config_verify_deps_before_run: process.env.pnpm_config_verify_deps_before_run,
   };
   context.after(() => {
     for (const [key, value] of Object.entries(originalEnvironment)) {
@@ -1406,6 +1274,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
   if (process.platform === "linux") {
     process.env.UV_USE_IO_URING = syntheticEnvironment.UV_USE_IO_URING;
   }
+  process.env.pnpm_config_verify_deps_before_run = "install";
 
   await withTestRoot(async (owner) => {
     const fakePnpm = await createFakePnpmExecutable(owner, { observeEntryEnvironment: true });
@@ -1445,6 +1314,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
         ["run", "typecheck"],
         ["run", "test:unit"],
         ["run", "test:component"],
+        ["--dir", "apps/web", "run", "test:deployment-contracts"],
         ["run", "build"],
         [
           "--dir",
@@ -1454,7 +1324,9 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
           "build",
           "--skipNextBuild",
         ],
+        ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"],
         ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
+        ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"],
       ],
     );
     assert.notEqual(calls[0].cwd, canonicalSource);
@@ -1479,8 +1351,12 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       "TEMP",
       "NPM_CONFIG_REGISTRY",
       "NPM_CONFIG_USERCONFIG",
+      "pnpm_config_verify_deps_before_run",
       "NEXT_TELEMETRY_DISABLED",
       "WRANGLER_SEND_METRICS",
+      "APPLICATION_ENVIRONMENT",
+      "NEXT_PUBLIC_SITE_URL",
+      "BUILD_SOURCE_REVISION",
       "PATH",
       "SystemRoot",
       "ComSpec",
@@ -1496,6 +1372,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       );
       assert.ok(forbiddenEnvironmentKeys.every((key) => !(key in environment)));
       assert.equal(environment.CI, "true");
+      assert.equal(environment.pnpm_config_verify_deps_before_run, "error");
       assert.equal(environment.NEXT_TELEMETRY_DISABLED, "1");
       assert.equal(environment.WRANGLER_SEND_METRICS, "false");
       assert.equal(environment.NPM_CONFIG_REGISTRY, "https://registry.npmjs.org/");
@@ -1510,7 +1387,7 @@ test("the pnpm verifier materializes reviewed recipe bytes before exact isolated
       .join(" ");
     assert.doesNotMatch(
       commandText,
-      /preview|deploy|upload|wrangler|git|npm publish|--force|--update-checksums|[;&|`$<>]/i,
+      /\b(?:preview|deploy|upload|wrangler|git)\b|npm publish|--force|--update-checksums|[;&|`$<>]/i,
     );
   });
 });
@@ -1528,7 +1405,7 @@ test("the pnpm verifier preserves only derived Volta tool resolution with an iso
     });
     const calls = await fakePnpm.readCalls();
     const canonicalVoltaHome = await realpath(fakePnpm.voltaHome);
-    assert.equal(calls.length, 9);
+    assert.equal(calls.length, 12);
     for (const { cwd, environment } of calls) {
       assert.equal(environment.VOLTA_HOME, canonicalVoltaHome);
       assert.equal(environment.VOLTA_FEATURE_PNPM, "1");
@@ -1719,15 +1596,7 @@ test("portfolio and site generation writes exact state-last repositories", async
       assert.equal(fake.roots[0], fake.roots[1]);
       assert.equal(await exists(fake.roots[0]), false);
       assert.equal(generated.destination, join(await realpath(owner), profile));
-      assert.deepEqual(
-        await listFiles(destination),
-        [
-          ...(profile === "portfolio"
-            ? portfolioRenderedPaths
-            : siteRenderedPaths),
-          ...controlPaths,
-        ].sort(),
-      );
+      await assertRenderedFiles(destination, request(profile));
 
       const state = core.parseStateJson(
         await readFile(join(destination, ".egeria/state.json"), "utf8"),
@@ -1746,29 +1615,26 @@ test("portfolio and site generation writes exact state-last repositories", async
       });
       assert.equal(
         generated.state.origin.recipeVersion,
-        profile === "portfolio" ? "0.11.7" : "0.12.7",
+        profile === "portfolio" ? "0.12.0" : "0.13.0",
       );
-      assert.equal(
-        generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 107 : 124,
-      );
+      assert.equal(new Set(generated.state.managedSurfaces.map(surface => surface.identifier)).size, generated.state.managedSurfaces.length);
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "deployment-cloudflare",
         )?.version,
-        "0.3.1",
+        "0.9.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "observability",
         )?.version,
-        "0.3.0",
+        "0.4.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "standards",
         )?.version,
-        "0.5.1",
+        "0.9.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(
@@ -1786,10 +1652,10 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "site-routing",
         )?.version,
-        profile === "site" ? "0.4.0" : undefined,
+        profile === "site" ? "0.5.0" : undefined,
       );
 
-      const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
+      const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot));
       const resolved = assertSuccess(
         core.resolveCapabilities({ profile }, catalog, core.profileRecipes),
       );
@@ -1977,7 +1843,6 @@ test("generation rejects caller version overrides before creating a destination"
 test("generation accepts only the exact optional Calendly request key", async () => {
   await withTestRoot(async (owner) => {
     const bookingCalendly = {
-      destination: "https://calendly.com/acme/intro",
       mode: "popup",
     };
     const acceptedDestination = join(owner, "accepted-selection");
@@ -1995,14 +1860,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
       "verify-isolated-copy",
     ]);
     assert.equal(await exists(acceptedDestination), true);
-    assert.deepEqual(
-      await listFiles(acceptedDestination),
-      [
-        ...portfolioRenderedPaths,
-        ...bookingCalendlyRenderedPaths,
-        ...controlPaths,
-      ].sort(),
-    );
+    await assertRenderedFiles(acceptedDestination, { ...request(), bookingCalendly });
 
     const project = assertSuccess(
       core.parseProjectYaml(
@@ -2017,7 +1875,7 @@ test("generation accepts only the exact optional Calendly request key", async ()
     });
     assert.equal(project.selectedCapabilities.at(-1), "booking-calendly");
 
-    const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" }));
+    const catalog = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, createGenerationRenderingContext().catalogSnapshot));
     const resolved = assertSuccess(
       core.resolveCapabilities(
         {
@@ -2040,14 +1898,13 @@ test("generation accepts only the exact optional Calendly request key", async ()
       accepted.state.installedCapabilities,
       core.createInstalledManifest(resolved),
     );
-    assert.equal(accepted.state.managedSurfaces.length, 112);
     assert.equal(
       accepted.state.managedSurfaces.filter(
         ({ owner }) =>
           owner.kind === "capability" &&
           owner.identifier === "booking-calendly",
       ).length,
-      5,
+      9,
     );
     assert.deepEqual(
       accepted.state.managedSurfaces.find(
@@ -2140,14 +1997,7 @@ test("generation accepts only the exact multilingual selection value", async () 
 
     assert.equal(project.selectedCapabilities.includes("multilingual"), true);
     assert.deepEqual(project.capabilitySettings, {});
-    assert.deepEqual(
-      await listFiles(destination),
-      [
-        ...portfolioRenderedPaths,
-        ...multilingualRenderedPaths,
-        ...controlPaths,
-      ].sort(),
-    );
+    await assertRenderedFiles(destination, { ...request(), multilingual: true });
     assert.equal(
       generated.state.installedCapabilities.some(
         ({ identifier }) => identifier === "multilingual",
@@ -2170,7 +2020,7 @@ test("generation accepts only the exact multilingual selection value", async () 
   });
 });
 
-test("generation accepts only strict analytics settings and preserves public identifiers", async () => {
+test("generation accepts strict analytics selections without persisting provider identifiers", async () => {
   await withTestRoot(async (owner) => {
     const destination = join(owner, "analytics-selection");
     const fake = createFakeVerifier();
@@ -2189,14 +2039,7 @@ test("generation accepts only strict analytics settings and preserves public ide
 
     assert.equal(project.selectedCapabilities.includes("analytics"), true);
     assert.deepEqual(project.capabilitySettings.analytics, analyticsSettings);
-    assert.deepEqual(
-      await listFiles(destination),
-      [
-        ...siteRenderedPaths,
-        ...analyticsRenderedPaths,
-        ...controlPaths,
-      ].sort(),
-    );
+    await assertRenderedFiles(destination, { ...request("site"), analytics: analyticsSettings });
     assert.equal(
       generated.state.installedCapabilities.some(
         ({ identifier }) => identifier === "analytics",
@@ -2534,8 +2377,8 @@ test("the generation core has no shell, Git, provider, or overwrite surface", as
 });
 
 
-test("Current lock selection separates exact profiles and rejects declaration drift", () => {
-  for (const [originProfile, recipeVersion, eslint, lock] of [["portfolio", "0.11.7", "16.3.0", "portfolio-0.11.7"], ["site", "0.12.7", "16.3.3", "site-0.12.7"], ["app", "0.2.7", "16.3.3", "app-0.2.7"]]) {
+test("current dependency locks reject Vitest declaration drift", () => {
+  for (const [originProfile, recipeVersion, eslint, lock] of [["portfolio", "0.12.0", "16.3.0", "portfolio-0.12.0"], ["site", "0.13.0", "16.3.3", "site-0.13.0"], ["app", "0.3.0", "16.3.3", "app-0.3.0"]]) {
     const identity = { originProfile, recipeVersion };
     const manifest = { dependencies: { next: "16.4.1", ...(originProfile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.3" } };
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
@@ -2549,8 +2392,8 @@ test("Current lock selection separates exact profiles and rejects declaration dr
 });
 
 
-test("public generation validates and projects contact settings before writes", async () => {
-  const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
+test("public generation accepts only a contact selection and refuses credentials before writes", async () => {
+  const settings = true;
   await withTestRoot(async owner => {
     const destination = join(owner, "contact-valid");
     const fake = createFakeVerifier();
@@ -2558,9 +2401,10 @@ test("public generation validates and projects contact settings before writes", 
     assertSuccess(generated);
     const project = core.parseProjectYaml(await readFile(join(destination, ".egeria/project.yaml"), "utf8"));
     assertSuccess(project);
-    assert.deepEqual(project.value.capabilitySettings["contact-form-web3forms"], settings);
+    assert.equal(project.value.capabilitySettings["contact-form-web3forms"], undefined);
+    assert.ok(project.value.selectedCapabilities.includes("contact-form-web3forms"));
   });
-  for (const settings of [undefined, {accessKey: "invalid-form-identifier"}, {accessKey: "00000000-0000-4000-8000-000000000001", endpoint: "private-endpoint"}]) {
+  for (const settings of [undefined, false, { accessKey: "00000000-0000-4000-8000-000000000001" }, {accessKey: "invalid-form-identifier"}, {accessKey: "00000000-0000-4000-8000-000000000001", endpoint: "private-endpoint"}]) {
     await withTestRoot(async owner => {
       const destination = join(owner, "contact-invalid");
       const fake = createFakeVerifier();
@@ -2576,9 +2420,9 @@ test("public generation validates and projects contact settings before writes", 
 
 test("security lock selection requires complete exact recipe manifests", async () => {
   for (const [profile, options, expected] of [
-    ["portfolio", {}, "portfolio-0.11.7"],
-    ["site", {}, "site-0.12.7"],
-    ["app", {}, "app-0.2.7"],
+    ["portfolio", {}, "portfolio-0.12.0"],
+    ["site", {}, "site-0.13.0"],
+    ["app", {}, "app-0.3.0"],
     ["app", { applicationPersistence: true }, "app-0.2.7-persistence"],
     ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.7-foundation"],
     ["site", { transactionalEmailResend: true }, "app-0.2.7"],
@@ -2586,8 +2430,8 @@ test("security lock selection requires complete exact recipe manifests", async (
     const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "security-graph", displayName: "Security Graph", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
     const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
-    assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" }[profile]);
+    assert.equal(rendered.project.schemaVersion, "2.0.0");
+    assert.equal(rendered.project.recipeVersion, { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile]);
     assert.equal(manifest.dependencies.next, "16.4.1");
     assert.equal(manifest.devDependencies["eslint-config-next"], profile === "portfolio" ? "16.3.0" : "16.3.3");
     assert.equal(manifest.devDependencies.vitest, "5.0.3");
@@ -2667,5 +2511,30 @@ test("environment email generation requires Worker verification and reads the ac
         assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
       });
     }
+  }
+});
+
+
+test("the current verifier refuses missing environment controls and scripts before child commands", async () => {
+  for (const mutation of ["missing-project", "retired-project", "missing-scripts", "wrong-script"]) {
+    await withTestRoot(async owner => {
+      const fakePnpm = await createFakePnpmExecutable(owner);
+      const source = await createVerifierSource(owner);
+      const rendered = assertSuccess(await core.renderSkeleton({ profile: "portfolio", projectName: "verifier-contract", displayName: "Verifier Contract", packageVersions: core.verifiedCapabilityPackageVersions }));
+      const manifest = JSON.parse(new TextDecoder().decode(rendered.files.find(({ path }) => path === "apps/web/package.json").content));
+      if (mutation === "missing-scripts") delete manifest.scripts["check:prepared-artifact"];
+      if (mutation === "wrong-script") manifest.scripts["check:prepared-artifact"] = "node unrelated.mjs";
+      await writeFile(join(source, "apps/web/package.json"), JSON.stringify(manifest));
+      if (mutation === "missing-project") {
+        await rm(join(source, ".egeria/project.yaml"));
+      } else {
+        await writeFile(join(source, ".egeria/project.yaml"), JSON.stringify({ ...rendered.project, ...(mutation === "retired-project" ? { schemaVersion: "1.0.0" } : {}) }));
+      }
+      const before = await snapshotFileBytes(source);
+      const verifier = core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fakePnpm.executable });
+      assertFailure(await verifier.verifyInIsolatedCopy(source), "WORKER_INTEGRATION_INVALID");
+      assert.deepEqual(await fakePnpm.readCalls(), [], mutation);
+      assert.deepEqual(await snapshotFileBytes(source), before, mutation);
+    });
   }
 });

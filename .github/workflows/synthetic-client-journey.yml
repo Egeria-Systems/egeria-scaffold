@@ -16,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: test-deploy
+  group: synthetic-client-staging
   cancel-in-progress: false
   queue: max
 
@@ -26,8 +26,13 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 60
     environment:
-      name: test-deploy
+      name: synthetic-client-staging
       url: ${{ vars.DEPLOY_URL }}
+    env:
+      APPLICATION_ENVIRONMENT: development
+      NEXT_PUBLIC_SITE_URL: http://localhost:3000
+      BUILD_SOURCE_REVISION: ${{ github.sha }}
+      EXPECTED_REVISION: ${{ inputs.expected_revision }}
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -51,6 +56,25 @@ jobs:
 
       - name: Verify approved predecessor
         run: git merge-base --is-ancestor af3e927e542d322edd1b8200507de43276d02375 "$GITHUB_SHA"
+
+      - name: Verify protected staging inputs
+        env:
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          node --input-type=module -e '
+            try {
+              const origin = process.env.DEPLOY_URL;
+              const target = new URL(origin);
+              const hostnamePattern = /^(?=.{1,253}$)(?!.*(?:^|\.)workers\.dev$)(?!.*\.(?:localhost|local|internal)$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
+              if (target.port !== "" || target.protocol !== "https:" || target.origin !== origin || !hostnamePattern.test(target.hostname)) process.exit(1);
+              for (const name of ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"]) {
+                const value = process.env[name];
+                if (!value || /\s/u.test(value)) process.exit(1);
+              }
+            } catch { process.exit(1); }
+          '
 
       - name: Install builder dependencies
         run: pnpm install --frozen-lockfile
@@ -83,7 +107,7 @@ jobs:
             --display-name "Harbour Light Studio" \
             --directory "$JOURNEY_ROOT" \
             --multilingual \
-            --cloudflare-web-analytics-token "$CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN"
+            --cloudflare-web-analytics
           printf 'CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN=\n' >> "$GITHUB_ENV"
           unset CLOUDFLARE_WEB_ANALYTICS_SITE_TOKEN
 
@@ -128,7 +152,7 @@ jobs:
             if (diff.ok !== true || diff.result?.equal !== true || diff.result?.differences?.length !== 0) fail("DIFF_STATE_INVALID");
             const state = infer.result.state.value;
             const capabilities = state.installedCapabilities.map(({ identifier, version }) => ({ identifier, version }));
-            for (const expected of [{ identifier: "site-routing", version: "0.4.0" }, { identifier: "multilingual", version: "0.1.0" }, { identifier: "analytics", version: "0.1.0" }]) {
+            for (const expected of [{ identifier: "site-routing", version: "0.5.0" }, { identifier: "multilingual", version: "0.1.0" }, { identifier: "analytics", version: "0.2.0" }]) {
               if (!capabilities.some((value) => isDeepStrictEqual(value, expected))) process.exit(1);
             }
             const requireFromBuilderCore = createRequire(resolve("packages/builder-core/package.json"));
@@ -136,7 +160,7 @@ jobs:
             const project = parse(readFileSync(`${process.env.JOURNEY_ROOT}/.egeria/project.yaml`, "utf8"));
             const providers = project.capabilitySettings?.analytics?.providers;
             if (!isDeepStrictEqual(Object.keys(providers ?? {}), ["cloudflareWebAnalytics"])) process.exit(1);
-            if (!/^[0-9a-f]{32}$/u.test(providers.cloudflareWebAnalytics.siteToken)) process.exit(1);
+            if (providers.cloudflareWebAnalytics !== true) process.exit(1);
             if (project.capabilitySettings.analytics.consent?.policy !== "explicit-opt-in") process.exit(1);
             const summary = { schemaVersion: "1.0.0", synthetic: true, state: "valid", diagnostics: "healthy", diff: "equal", capabilities: capabilities.filter(({ identifier }) => ["site-routing", "multilingual", "analytics"].includes(identifier)) };
             writeFileSync(`${process.env.RECEIPT_ROOT}/generated-verification.json`, `${JSON.stringify(summary)}\n`, { encoding: "utf8", flag: "wx", mode: 0o600 });
@@ -165,9 +189,18 @@ jobs:
           pnpm --dir "$JOURNEY_ROOT" run test:unit
           pnpm --dir "$JOURNEY_ROOT" run test:component
 
+      - name: Record applied synthetic packet
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+        run: |
+          git -C "$JOURNEY_ROOT" add .
+          git -C "$JOURNEY_ROOT" commit -m "Record applied synthetic packet"
+
       - name: Build and prepare generated project
         env:
           JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "true"
+          NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
         run: |
           pnpm --dir "$JOURNEY_ROOT" run build
           pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare build --skipNextBuild
@@ -176,6 +209,15 @@ jobs:
       - name: Run generated local browser checks
         env:
           JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "true"
+          NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
+          ANALYTICS_TEST_BUILD_FLAG: "true"
+          ANALYTICS_TEST_TARGET: development
+          ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: http://localhost:3000
+          ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
+          ANALYTICS_TEST_EXPECTED_GA4_ID: ""
+          ANALYTICS_TEST_EXPECTED_CLARITY_ID: ""
+          ANALYTICS_TEST_EXPECTED_VERIFICATION: ""
         run: |
           pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:dev
           pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:preview
@@ -183,26 +225,65 @@ jobs:
       - name: Add deployed-only journey specification
         env:
           JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
-        run: cp tests/client-journey/synthetic-client-deployed.spec.ts "$JOURNEY_ROOT/apps/web/tests/e2e/synthetic-client-deployed.spec.ts"
+        run: |
+          test -z "$(git -C "$JOURNEY_ROOT" status --porcelain=v1 --untracked-files=all)"
+          cp tests/client-journey/synthetic-client-deployed.spec.ts "$JOURNEY_ROOT/apps/web/tests/e2e/synthetic-client-deployed.spec.ts"
+          git -C "$JOURNEY_ROOT" add apps/web/tests/e2e/synthetic-client-deployed.spec.ts
+          git -C "$JOURNEY_ROOT" commit -m "Record deployed synthetic journey specification"
+          printf 'SYNTHETIC_GENERATED_REVISION=%s\n' "$(git -C "$JOURNEY_ROOT" rev-parse HEAD)" >> "$GITHUB_ENV"
+
+      - name: Prepare protected staging artifact
+        env:
+          JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          APPLICATION_ENVIRONMENT: staging
+          CLOUDFLARE_ENV: staging
+          NEXT_PUBLIC_SITE_URL: ${{ vars.DEPLOY_URL }}
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "true"
+          NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
+          ANALYTICS_TEST_BUILD_FLAG: "true"
+          ANALYTICS_TEST_TARGET: staging
+          ANALYTICS_TEST_EXPECTED_SITE_ORIGIN: ${{ vars.DEPLOY_URL }}
+          ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
+          ANALYTICS_TEST_EXPECTED_GA4_ID: ""
+          ANALYTICS_TEST_EXPECTED_CLARITY_ID: ""
+          ANALYTICS_TEST_EXPECTED_VERIFICATION: ""
+        run: |
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run check:environment:deployment
+          pnpm --dir "$JOURNEY_ROOT" run build
+          pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare build --skipNextBuild
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run check:prepared-artifact record staging "$EXPECTED_REVISION" --builder-generated="$SYNTHETIC_GENERATED_REVISION"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run check:prepared-artifact verify staging "$EXPECTED_REVISION" --builder-generated="$SYNTHETIC_GENERATED_REVISION"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:preview '/tests/e2e/(?!synthetic-client-deployed[.]spec[.]ts$)'
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run check:prepared-artifact verify staging "$EXPECTED_REVISION" --builder-generated="$SYNTHETIC_GENERATED_REVISION"
 
       - name: Deploy synthetic client Worker
         env:
+          APPLICATION_ENVIRONMENT: staging
+          CLOUDFLARE_ENV: staging
+          NEXT_PUBLIC_SITE_URL: ${{ vars.DEPLOY_URL }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
+          NEXT_PUBLIC_ANALYTICS_ENABLED: "true"
+          NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ inputs.cloudflare_web_analytics_site_token }}
         run: |
           test -n "$CLOUDFLARE_ACCOUNT_ID"
           test -n "$CLOUDFLARE_API_TOKEN"
-          pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare deploy --name test-deploy
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run check:prepared-artifact verify staging "$EXPECTED_REVISION" --builder-generated="$SYNTHETIC_GENERATED_REVISION"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" exec opennextjs-cloudflare deploy --env staging --name synthetic-client-staging -- --x-provision=false --x-auto-create=false
 
       - name: Test deployed synthetic client journey
         env:
           JOURNEY_ROOT: ${{ runner.temp }}/synthetic-client-journey/project
-          PLAYWRIGHT_DEPLOYED_URL: ${{ vars.DEPLOY_URL }}
+          APPLICATION_ENVIRONMENT: staging
+          NEXT_PUBLIC_SITE_URL: ${{ vars.DEPLOY_URL }}
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           SYNTHETIC_CLIENT_BROWSER_RECEIPT_PATH: ${{ runner.temp }}/synthetic-client-journey-receipts/deployed-browser.json
         run: |
-          test -n "$PLAYWRIGHT_DEPLOYED_URL"
-          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:deployed -- tests/e2e/synthetic-client-deployed.spec.ts
+          test -n "$DEPLOY_URL"
+          pnpm --dir "$JOURNEY_ROOT/apps/web" run test:e2e:deployed tests/e2e/synthetic-client-deployed.spec.ts
 
       - name: Validate content-safe receipts
         env:

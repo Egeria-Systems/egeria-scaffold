@@ -5,6 +5,8 @@ import { dirname, join, resolve } from "node:path";
 import { isDeepStrictEqual, promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 
+import { parseProjectYaml } from "../../packages/builder-core/dist/index.js";
+
 import { verifyGeneratedProject } from "../verify-generated-skeletons.mjs";
 import {
   cleanupOwnedDirectory,
@@ -109,7 +111,8 @@ function requireInferenceResult(configuration, value) {
   const installedCapabilities = state?.value?.installedCapabilities;
   const capabilities = value.result?.capabilities;
   if (
-    state?.kind !== "valid" ||
+    state?.kind !== "valid" || state.value?.schemaVersion !== "2.0.0" ||
+    !isDeepStrictEqual(state.value.origin, { profile: configuration.profile, recipeVersion: configuration.expectedRecipeVersion }) ||
     !Array.isArray(installedCapabilities) ||
     !installedCapabilities.some(
       (capability) =>
@@ -168,25 +171,15 @@ async function requireRecipeVersion(configuration, projectRoot) {
   } catch {
     fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
   }
-  if (configuration.expectedInstalledCapabilities !== undefined) {
-    const { parseProjectYaml } = await import("../../packages/builder-core/dist/index.js");
-    const project = parseProjectYaml(source);
-    if (
-      !project.ok || project.value.originProfile !== configuration.profile ||
-      project.value.project.name !== configuration.projectName ||
-      project.value.project.displayName !== configuration.displayName ||
-      !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
-      !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings)
-    ) {
-      fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
-    }
-  }
-  const recipeLines = source
-    .split("\n")
-    .filter((line) => line.startsWith("recipeVersion:"));
+  const project = parseProjectYaml(source);
   if (
-    recipeLines.length !== 1 ||
-    recipeLines[0] !== `recipeVersion: ${configuration.expectedRecipeVersion}`
+    !project.ok || project.value.schemaVersion !== "2.0.0" ||
+    project.value.originProfile !== configuration.profile ||
+    project.value.recipeVersion !== configuration.expectedRecipeVersion ||
+    project.value.project.name !== configuration.projectName ||
+    project.value.project.displayName !== configuration.displayName ||
+    !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
+    !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings ?? {})
   ) {
     fail(configuration, "FRESH_SCAFFOLD_RECIPE_INVALID");
   }

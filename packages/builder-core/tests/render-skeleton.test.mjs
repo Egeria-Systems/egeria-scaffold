@@ -24,9 +24,9 @@ test("current recipes own the lint patch and select exact optional dependency fa
   const core = await import("../dist/index.js");
   const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  const recipes = { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" };
   const patchPath = "patches/next-eslint-plugin-next.patch";
   const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
-  const recipes = { portfolio: "0.11.7", site: "0.12.7", app: "0.2.7" };
   for (const profile of ["portfolio", "site", "app"]) {
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const context = createGenerationRenderingContext(options.applicationPersistence === true, options.transactionalEmailResend === true, options.backgroundJobDelivery === true);
@@ -46,7 +46,8 @@ test("current recipes own the lint patch and select exact optional dependency fa
       assert.equal(manifest.dependencies.next, "16.4.1");
       const foundation = manifest.dependencies.effect !== undefined;
       const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence"
-        : profile === "app" || (profile === "site" && foundation) ? "app-0.2.7"
+        : profile === "app" ? "app-0.3.0"
+        : profile === "site" && foundation ? "app-0.2.7"
         : profile === "portfolio" && foundation ? "portfolio-0.11.7-foundation"
         : profile + "-" + recipes[profile];
       assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
@@ -58,7 +59,7 @@ test("current recipes own the lint patch and select exact optional dependency fa
       }
       const lockfile = parseDocument(await readFile(new URL("../lockfiles/web-recipe-" + expectedLock + "/pnpm-lock.yaml", import.meta.url), "utf8")).toJS();
       assert.deepEqual(lockfile.overrides, policy.overrides);
-      assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(current.project, renderingState(core, current))).renderingContext, context);
+      assert.deepEqual(assertSuccess(createVerifiedProjectSnapshot(current.project, renderingState(core, current))).renderingContext, createGenerationRenderingContext(options.applicationPersistence === true, foundation, options.backgroundJobDelivery === true));
     }
     const candidate = assertSuccess(await core.renderSkeleton({ profile, projectName: "internal-example", displayName: "Internal Example", packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext()));
     assert.equal(candidate.project.schemaVersion, "2.0.0");
@@ -72,7 +73,7 @@ function renderingState(core, rendered) {
     ? core.persistenceGenerationVerificationChecks
     : rendered.project.selectedCapabilities.includes("app-foundation") ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
   return {
-    schemaVersion: "1.0.0", builderVersion: "0.0.0", projectSchemaVersion: "1.0.0",
+    schemaVersion: "2.0.0", builderVersion: "0.0.0", projectSchemaVersion: "2.0.0",
     origin: { profile: rendered.project.originProfile, recipeVersion: rendered.project.recipeVersion },
     installedCapabilities: core.createInstalledManifest(rendered.resolved), managedSurfaces, appliedMigrations: [], ejections: [],
     compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
@@ -93,19 +94,12 @@ test("frozen retired rendering controls remain inert and refuse executable selec
 const analyticsSettings = {
   consent: { policy: "explicit-opt-in" },
   providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "0123456789abcdef0123456789abcdef",
-    },
-    googleAnalytics4: { measurementId: "G-TEST123456" },
-    microsoftClarity: {
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    },
+    cloudflareWebAnalytics: true,
+    googleAnalytics4: true,
+    microsoftClarity: { audience: "not-directed-to-minors" },
   },
   operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
+    googleSearchConsole: true,
     lookerStudio: { connector: "google-analytics-4" },
   },
 };
@@ -116,6 +110,7 @@ const visualBaselinePaths = [
 ];
 
 const appFoundationPaths = [
+  "apps/web/src/infrastructure/cloudflare/application-environment.ts",
   "apps/web/app/api/health/route.ts",
   "apps/web/src/domain/build-information.ts",
   "apps/web/src/application/build-information-reader.ts",
@@ -138,16 +133,15 @@ const appFoundationPaths = [
 test("app generation preserves production-site bytes across all optional subsets", async () => {
   const core = await import("../dist/index.js");
   for (const generation of [
-    { context: undefined, recipe: "0.2.7", standards: "0.5.1", appVitest: "5.0.3", siteVitest: "5.0.3" },
-  ]) {
-    const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
+    { context: undefined, recipe: "0.3.0", standards: "0.9.0", appVitest: "5.0.3", siteVitest: "5.0.3" },
+  ]) {    const renderSkeleton = (request) => core.renderSkeleton(request, generation.context);
     for (let subset = 0; subset < 8; subset += 1) {
       const request = {
         projectName: "acme-app",
         displayName: "Acme App",
         packageVersions: { standards: "0.1.0", observability: "0.3.0" },
         ...(subset & 1 ? { bookingCalendly: {
-          destination: "https://calendly.com/acme/intro", mode: "popup",
+          mode: "popup",
         } } : {}),
         ...(subset & 2 ? { multilingual: true } : {}),
         ...(subset & 4 ? { analytics: analyticsSettings } : {}),
@@ -213,14 +207,13 @@ test("Worker integration workflows run after OpenNext and before credentials", a
     for (const path of [".github/workflows/quality.yml", ".github/workflows/deploy.yml"]) {
       const workflow = parseGeneratedYaml(rendered.files, path);
       const steps = Object.values(workflow.jobs)[0].steps;
-      const integration = steps.findIndex(({ run }) => run ===
-        "pnpm --dir apps/web run --if-present test:integration:cloudflare");
-      const build = steps.findIndex(({ run }) => run ===
-        "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
+      const commands = steps.flatMap(({ run }) => (run ?? "").split("\n"));
+      const integration = commands.indexOf("pnpm --dir apps/web run --if-present test:integration:cloudflare");
+      const build = commands.indexOf("pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
+      assert.ok(build >= 0);
       assert.equal(integration, build + 1);
-      for (const [index, step] of steps.entries()) {
-        if (JSON.stringify(step.env ?? {}).includes("secrets.")) assert.ok(index > integration);
-      }
+      assert.equal(steps.some(step => JSON.stringify(step.env ?? {}).includes("secrets.CLOUDFLARE_")), false);
+
     }
     const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
     if (profile !== "app") {
@@ -284,7 +277,29 @@ const portfolioPaths = [
   "package.json",
   "patches/next-eslint-plugin-next.patch",
   "pnpm-workspace.yaml",
-];
+  "apps/web/.dev.vars.example",
+  "apps/web/.env.example",
+  "apps/web/playwright.transport.config.ts",
+  "apps/web/scripts/browser-development-server.ts",
+  "apps/web/scripts/check-application-environment.mjs",
+  "apps/web/scripts/check-deployment-protection.mjs",
+  "apps/web/scripts/check-prepared-artifact.mjs",
+  "apps/web/scripts/prepare-ci-git.sh",
+  "apps/web/src/configuration/application-build.ts",
+  "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/site-origin.ts",
+  "apps/web/tests/e2e/application-test.ts",
+  "apps/web/tests/e2e/application-transport.ts",
+  "apps/web/tests/scripts/deployment-protection.test.mjs",
+  "apps/web/tests/scripts/prepared-artifact.test.mjs",
+  "apps/web/tests/transport/application-transport.spec.ts",
+  "apps/web/tests/unit/application-build.test.ts",
+  "apps/web/tests/unit/application-environment.test.ts",
+  "apps/web/tests/unit/observability-environment.test.ts",
+  "apps/web/tests/unit/site-origin.test.ts",
+  "docs/environments.md",
+  "docs/observability.md",
+].sort();
 
 const sitePaths = [
   ".github/workflows/deploy.yml",
@@ -312,7 +327,6 @@ const sitePaths = [
   "apps/web/content/en-CA/long-form/introduction.md",
   "apps/web/content/en-CA/not-found.yaml",
   "apps/web/content/en-CA/observability.yaml",
-  "apps/web/content/en-CA/routing.yaml",
   "apps/web/content/en-CA/site.yaml",
   "apps/web/content/en-CA/work-featured.yaml",
   "apps/web/eslint.config.mjs",
@@ -357,9 +371,35 @@ const sitePaths = [
   "package.json",
   "patches/next-eslint-plugin-next.patch",
   "pnpm-workspace.yaml",
-];
+  "apps/web/.dev.vars.example",
+  "apps/web/.env.example",
+  "apps/web/playwright.transport.config.ts",
+  "apps/web/scripts/browser-development-server.ts",
+  "apps/web/scripts/check-application-environment.mjs",
+  "apps/web/scripts/check-deployment-protection.mjs",
+  "apps/web/scripts/check-prepared-artifact.mjs",
+  "apps/web/scripts/prepare-ci-git.sh",
+  "apps/web/src/configuration/application-build.ts",
+  "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/site-origin.ts",
+  "apps/web/tests/e2e/application-test.ts",
+  "apps/web/tests/e2e/application-transport.ts",
+  "apps/web/tests/scripts/deployment-protection.test.mjs",
+  "apps/web/tests/scripts/prepared-artifact.test.mjs",
+  "apps/web/tests/transport/application-transport.spec.ts",
+  "apps/web/tests/unit/application-build.test.ts",
+  "apps/web/tests/unit/application-environment.test.ts",
+  "apps/web/tests/unit/observability-environment.test.ts",
+  "apps/web/tests/unit/site-origin.test.ts",
+  "docs/environments.md",
+  "docs/observability.md",
+].sort();
 
 const bookingCalendlyPaths = [
+  "apps/web/content/fr-CA/booking-calendly.yaml",
+  "apps/web/tests/component/booking-availability.test.tsx",
+  "apps/web/tests/unit/booking-configuration.test.ts",
+  "docs/booking-calendly.md",
   "apps/web/content/en-CA/booking-calendly.yaml",
   "apps/web/src/integrations/booking-calendly/booking-content.ts",
   "apps/web/src/integrations/booking-calendly/booking-settings.ts",
@@ -387,6 +427,8 @@ const multilingualPaths = [
 ];
 
 const analyticsPaths = [
+  "apps/web/src/integrations/analytics/analytics-configuration.ts",
+  "apps/web/tests/unit/analytics-configuration.test.ts",
   "apps/web/content/en-CA/analytics.yaml",
   "apps/web/content/fr-CA/analytics.yaml",
   "apps/web/src/integrations/analytics/analytics-consent-state.ts",
@@ -411,6 +453,7 @@ const bookingCalendlyCopy = {
   frameTitle: "Calendly scheduling page",
   popupHeading: "Choose a time",
   closeLabel: "Close scheduling",
+  unavailable: "Online booking is currently unavailable. Please use the contact details below.",
 };
 
 const packageVersions = {
@@ -643,6 +686,9 @@ async function loadGeneratedBookingContentModule(files) {
   const withSource = transpiled.replace(
     'import bookingContentSource from "../../../content/en-CA/booking-calendly.yaml";',
     `const bookingContentSource = ${JSON.stringify(bookingContentSource)};`,
+  ).replace(
+    'import frenchBookingContentSource from "../../../content/fr-CA/booking-calendly.yaml";',
+    `const frenchBookingContentSource = ${JSON.stringify(indexedFiles.get("apps/web/content/fr-CA/booking-calendly.yaml"))};`,
   );
   const executable = withSource.replace(
     'from "../../content/content-schema"',
@@ -737,42 +783,37 @@ async function loadGeneratedPresentationModule(files) {
 let deployedConfigurationLoad = 0;
 
 async function loadGeneratedDeployedConfigurationModule(files, deployedURL) {
-  const source = indexFiles(files).get(
-    "apps/web/playwright.deployed.config.ts",
-  );
-  assert.notEqual(source, undefined);
-  const executableSource = source
-    .replace(
-      'import { createBrowserQualityConfig } from "./playwright.config.shared";',
-      "const createBrowserQualityConfig = (options: unknown) => options;",
-    );
-  assert.notEqual(executableSource, source);
+  const indexed = indexFiles(files);
+  const source = indexed.get("apps/web/playwright.deployed.config.ts");
   const typescriptModule = await import("typescript");
   const typescript = typescriptModule.default ?? typescriptModule;
-  const executable = typescript.transpileModule(executableSource, {
-    compilerOptions: {
-      module: typescript.ModuleKind.ESNext,
-      target: typescript.ScriptTarget.ES2022,
-    },
+  const compile = source => typescript.transpileModule(source, {
+    compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ES2022 },
   }).outputText;
-
-  const previousDeployedURL = process.env.PLAYWRIGHT_DEPLOYED_URL;
-  if (deployedURL === undefined) {
-    delete process.env.PLAYWRIGHT_DEPLOYED_URL;
-  } else {
-    process.env.PLAYWRIGHT_DEPLOYED_URL = deployedURL;
+  const developmentServerURL = `data:text/javascript;base64,${Buffer.from(compile(indexed.get("apps/web/scripts/browser-development-server.ts"))).toString("base64")}`;
+  const transportSource = compile(indexed.get("apps/web/tests/e2e/application-transport.ts"));
+  const executableTransport = transportSource.replace(
+    'from "../../scripts/browser-development-server.ts"',
+    `from ${JSON.stringify(developmentServerURL)}`,
+  );
+  assert.notEqual(executableTransport, transportSource);
+  const transportURL = `data:text/javascript;base64,${Buffer.from(executableTransport).toString("base64")}`;
+  const executable = compile(source.replace(
+    'import { createBrowserQualityConfig } from "./playwright.config.shared";',
+    `import { readTransportSettings } from ${JSON.stringify(transportURL)};
+const createBrowserQualityConfig = options => { readTransportSettings(options.baseURL, process.env); return options; };`,
+  ));
+  const inputs = { DEPLOY_URL: deployedURL, NEXT_PUBLIC_SITE_URL: deployedURL, APPLICATION_ENVIRONMENT: "production" };
+  const original = Object.fromEntries(Object.keys(inputs).map(key => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(inputs)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
   }
-
   try {
     deployedConfigurationLoad += 1;
-    return await import(
-      `data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#load-${deployedConfigurationLoad}`
-    );
+    return await import(`data:text/javascript;base64,${Buffer.from(executable).toString("base64")}#load-${deployedConfigurationLoad}`);
   } finally {
-    if (previousDeployedURL === undefined) {
-      delete process.env.PLAYWRIGHT_DEPLOYED_URL;
-    } else {
-      process.env.PLAYWRIGHT_DEPLOYED_URL = previousDeployedURL;
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
     }
   }
 }
@@ -1173,8 +1214,8 @@ async function loadGeneratedServerReporter(
   const reporterRootModule = rejectErrorDispatch
     ? `data:text/javascript;base64,${Buffer.from(
         [
-          `import { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory } from ${JSON.stringify(rootModule)};`,
-          "export { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory };",
+          `import { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory, reconstructOperationalErrorReport } from ${JSON.stringify(rootModule)};`,
+          "export { createOperationalErrorReport, createOperationalEvent, dispatchOperationalEvent, normalizeErrorCategory, reconstructOperationalErrorReport };",
           'export async function dispatchOperationalErrorReport() { throw new Error("synthetic dispatch rejection"); }',
         ].join("\n"),
       ).toString("base64")}`
@@ -1380,7 +1421,7 @@ test("analytics settings are one JSON token scoped to the managed settings templ
     }),
   );
 
-  assert.match(rendered, /"measurementId": "G-TEST123456"/u);
+  assert.match(rendered, /"googleAnalytics4": true/u);
   const unavailable = renderTemplateSource({
     source: "common/README.md.template",
     text: "{{analyticsSettingsJson}}",
@@ -1643,7 +1684,6 @@ test("multilingual selection renders deterministic locale-prefixed portfolio and
 test("multilingual and Calendly compose without changing either capability setting", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const bookingCalendly = {
-    destination: "https://calendly.com/acme/intro",
     mode: "popup",
   };
   const rendered = assertSuccess(
@@ -1729,7 +1769,7 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
       );
       assert.match(
         files.get("apps/web/src/integrations/analytics/analytics-settings.ts"),
-        /G-TEST123456/u,
+        /"googleAnalytics4": true/u,
       );
       const analyticsProviderContract = files.get(
         "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
@@ -1790,27 +1830,27 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
       );
       assert.match(
         analyticsGuide,
-        /automatic.*Page.*one-click.*injection/iu,
+        /automatic setup\/Pages injection/iu,
       );
       assert.match(
         analyticsGuide,
-        /Disable.*not.*repair/iu,
+        /Disable.*not.*replacement/iu,
       );
       assert.match(
         analyticsGuide,
-        /cookie-free.*manual/iu,
+        /separate manual Web Analytics site for nonproduction and production/iu,
       );
       assert.match(
         analyticsGuide,
-        /configured masking.*prevents masked content.*uploaded/iu,
+        /Review masking, retention, audience eligibility/iu,
       );
       assert.match(
         analyticsGuide,
-        /structural.*layout.*unmasked content.*transmitted/iu,
+        /structural.*layout.*unmasked content.*leave the browser/iu,
       );
       assert.match(
         analyticsGuide,
-        /masking.*provider-account controlled/iu,
+        /Masking is provider controlled/iu,
       );
       assert.match(files.get("apps/web/app/layout.tsx"), /AnalyticsConsent/u);
       assert.match(files.get("apps/web/app/layout.tsx"), /verification/u);
@@ -1845,18 +1885,18 @@ test("analytics renders deterministic provider-neutral contracts and composes wi
   }
 });
 
-test("current site rendering uses the patched framework and refuses historical controls", async () => {
-  const renderSkeleton = await loadRenderSkeleton();
-  const request = { profile: "site", projectName: "acme-studio", displayName: "Acme Studio", packageVersions };
-  const current = assertSuccess(await renderSkeleton(request));
-  const manifest = parseGeneratedJson(current.files, "apps/web/package.json");
-  assert.equal(current.project.recipeVersion, "0.12.7");
-  assert.equal(manifest.dependencies.next, "16.4.1");
-  assert.equal(manifest.devDependencies["eslint-config-next"], "16.3.3");
-  assert.equal((await renderSkeleton(request, {
-    catalogSnapshot: { standards: "0.4.0", siteRouting: "0.3.0" },
-    profiles: [{ identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.10.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] }],
-  })).ok, false);
+test("current rendering refuses retired recipe contexts", async () => {
+  const core = await import("../dist/index.js");
+  for (const profile of ["portfolio", "site", "app"]) {
+    const request = { profile, projectName: "current-recipe", displayName: "Current Recipe", packageVersions: core.verifiedCapabilityPackageVersions };
+    for (const recipeVersion of ["0.10.0", "0.11.1", "0.12.2", "0.2.2"]) {
+      const context = core.createGenerationRenderingContext();
+      const profiles = context.profiles.map(recipe => recipe.identifier === profile ? { ...recipe, recipeVersion } : recipe);
+      const refused = await core.renderSkeleton(request, { ...context, profiles });
+      assert.equal(refused.ok, false);
+      assert.equal(Object.hasOwn(refused, "value"), false);
+    }
+  }
 });
 
 test("production site rendering materializes route metadata and browser contracts without changing portfolio", async () => {
@@ -1945,7 +1985,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
   );
 
   assert.deepEqual(portfolio.project, {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderCompatibility: "0.0.0",
     project: {
       name: "acme-studio",
@@ -1953,7 +1993,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.7",
+    recipeVersion: "0.12.0",
     platformAdapter: "cloudflare-workers",
     selectedCapabilities: [
       "standards",
@@ -2011,6 +2051,11 @@ test("rendered manifests and desired project match the approved resolved recipe"
       "build:cloudflare": "opennextjs-cloudflare build",
       "cf-typegen":
         "wrangler types --env-interface CloudflareEnv --include-runtime=false cloudflare-env.d.ts",
+      "check:environment": "node scripts/check-application-environment.mjs --local",
+      "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
+      "check:prepared-artifact": "node --experimental-strip-types scripts/check-prepared-artifact.mjs",
+      "test:deployment-contracts": "node --experimental-strip-types --test tests/scripts/prepared-artifact.test.mjs tests/scripts/deployment-protection.test.mjs",
+      "test:transport": "playwright test --config playwright.transport.config.ts",
       dev: "next dev",
       lint: "eslint . --max-warnings 0",
       preview:
@@ -2202,7 +2247,7 @@ test("production observability renders bounded Next and Cloudflare composition",
   );
 
   const generatedSources = [...files.entries()]
-    .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
+    .filter(([path]) => !path.includes("/tests/") && (path.endsWith(".ts") || path.endsWith(".tsx")))
     .map(([, source]) => source)
     .join("\n");
   assert.doesNotMatch(
@@ -2249,7 +2294,8 @@ test("browser instrumentation passes actual error and rejection values", async (
   );
 });
 
-test("browser reporting creates bounded diagnostic envelopes and suppresses duplicate objects", async () => {
+test("browser reporting creates bounded diagnostic envelopes and suppresses duplicate objects", async (testContext) => {
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_APPLICATION_ENVIRONMENT", "staging");
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
     await renderSkeleton({
@@ -2262,6 +2308,9 @@ test("browser reporting creates bounded diagnostic envelopes and suppresses dupl
   const loaded = await loadGeneratedBrowserReporter(rendered.files);
   const requests = [];
   const originalFetch = globalThis.fetch;
+  const originalWindow = globalThis.window;
+  globalThis.window = { location: { origin: "https://portfolio.example" } };
+  setEnvironmentInput(testContext, "NEXT_PUBLIC_SITE_URL", undefined);
   globalThis.fetch = async (input, init) => {
     requests.push({ input, init });
     return { ok: true };
@@ -2296,11 +2345,12 @@ test("browser reporting creates bounded diagnostic envelopes and suppresses dupl
     await new Promise((resolve) => setImmediate(resolve));
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
   }
 
   assert.equal(requests.length, 5);
   for (const { input, init } of requests) {
-    assert.equal(input, "/api/observability");
+    assert.equal(input, "https://portfolio.example/api/observability");
     assert.equal(init.method, "POST");
     assert.deepEqual(init.headers, { "Content-Type": "application/json" });
     assert.equal(init.credentials, "omit");
@@ -2351,6 +2401,7 @@ test("browser reporting creates bounded diagnostic envelopes and suppresses dupl
     });
   } finally {
     globalThis.fetch = originalFetch;
+    if (originalWindow === undefined) delete globalThis.window; else globalThis.window = originalWindow;
   }
 });
 
@@ -3344,8 +3395,7 @@ test("rendering conditionally overlays the home route and materializes each Cale
 
   for (const mode of ["link", "inline", "popup"]) {
     const bookingCalendly = {
-      destination: "https://calendly.com/acme/intro",
-      mode,
+        mode,
     };
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -3357,8 +3407,8 @@ test("rendering conditionally overlays the home route and materializes each Cale
       }),
     );
 
-    assert.equal(rendered.project.schemaVersion, "1.0.0");
-    assert.equal(rendered.project.recipeVersion, "0.11.7");
+    assert.equal(rendered.project.schemaVersion, "2.0.0");
+    assert.equal(rendered.project.recipeVersion, "0.12.0");
     assert.equal(
       rendered.project.selectedCapabilities.at(-1),
       "booking-calendly",
@@ -3375,23 +3425,11 @@ test("rendering conditionally overlays the home route and materializes each Cale
       [...portfolioPaths, ...bookingCalendlyPaths].toSorted(),
     );
     const files = indexFiles(rendered.files);
-    assert.equal(
-      files.get(
-        "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-      ),
-      [
-        "export type CalendlyBookingSettings = Readonly<{",
-        "  destination: string;",
-        '  mode: "link" | "inline" | "popup";',
-        "}>;",
-        "",
-        "export const bookingCalendlySettings = {",
-        '  destination: "https://calendly.com/acme/intro",',
-        `  mode: ${JSON.stringify(mode)},`,
-        "} as const satisfies CalendlyBookingSettings;",
-        "",
-      ].join("\n"),
-    );
+    const bookingSource = files.get("apps/web/src/integrations/booking-calendly/booking-settings.ts");
+    assert.match(bookingSource, new RegExp(`mode: ${JSON.stringify(mode)}`));
+    assert.match(bookingSource, /NEXT_PUBLIC_CALENDLY_URL/u);
+    assert.match(bookingSource, /destination: string \| undefined/u);
+    assert.doesNotMatch(bookingSource, /https:\/\/calendly\.com\/acme/u);
     assert.match(
       files.get("apps/web/app/page.tsx"),
       /<CalendlyBooking settings=\{bookingCalendlySettings\} copy=\{bookingContent\} \/>/u,
@@ -3408,7 +3446,6 @@ test("rendering conditionally overlays the home route and materializes each Cale
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://www.calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -3428,8 +3465,7 @@ test("generated Calendly copy is strict externalized YAML", async () => {
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
-        mode: "inline",
+            mode: "inline",
       },
       packageVersions,
     }),
@@ -3468,7 +3504,7 @@ test("generated Calendly copy is strict externalized YAML", async () => {
   for (const value of Object.values(bookingCalendlyCopy)) {
     assert.equal(
       [...files]
-        .filter(([path]) => path.endsWith(".ts") || path.endsWith(".tsx"))
+        .filter(([path]) => !path.includes("/tests/") && (path.endsWith(".ts") || path.endsWith(".tsx")))
         .some(([, source]) => source.includes(value)),
       false,
       value,
@@ -3484,7 +3520,6 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -3542,31 +3577,25 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   assert.doesNotMatch(component, /<script|Calendly\.init|fetch\(/u);
 
   for (const contract of [
-    /const configuredProviderUrl = new URL\(\s*bookingCalendlySettings\.destination,\s*\)\.href/u,
-    /new URL\(bookingCalendlySettings\.destination\)\.origin/u,
-    /target\.route\(\s*\(url\) => url\.origin === providerOrigin/u,
-    /requestUrl === configuredProviderUrl/u,
-    /unexpectedRequestUrls\.push\(requestUrl\)/u,
+    /BOOKING_TEST_EXPECTED_URL/u,
+    /BOOKING_TEST_MODE/u,
+    /context\.route\("\*\*\/\*"/u,
+    /request\.url\(\) === expectedRequestUrl/u,
+    /unexpected\.push\(request\.url\(\)\)/u,
     /route\.abort\("blockedbyclient"\)/u,
     /route\.fulfill/u,
-    /<link rel="icon" href="data:,">/u,
-    /stubSchedulingDocument\(page\)/u,
-    /stubSchedulingDocument\(context\)/u,
-    /expect\(providerAudit\.unexpectedRequestUrls\(\)\)\.toEqual\(\[\]\)/u,
+    /expect\(audit\.unexpected\)\.toEqual\(\[\]\)/u,
     /javaScriptEnabled: false/u,
-    /CalendlyBookingSettings\["mode"\]/u,
     /bookingMode === "link"/u,
     /bookingMode === "inline"/u,
-    /test\.skip\(bookingMode !== "inline"\)/u,
-    /test\.skip\(bookingMode !== "popup"\)/u,
-    /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
-    /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
-    /toHaveCount\(0\)[\s\S]+toHaveCount\(1\)/u,
+    /bookingMode !== "inline"/u,
+    /bookingMode !== "popup"/u,
+    /toHaveAttribute\("href", expectedUrl/u,
+    /toHaveAttribute\("src", expectedUrl/u,
+    /toHaveCount\(0\)/u,
     /keyboard\.press\("Escape"\)/u,
     /document\.activeElement/u,
     /width: 320/u,
-    /getBoundingClientRect\(\)/u,
-    /dialogBounds\.right\)\.toBeLessThanOrEqual\(dialogBounds\.innerWidth\)/u,
     /scrollWidth/u,
     /AxeBuilder/u,
     /wcag22aa/u,
@@ -3577,54 +3606,14 @@ test("generated Calendly presentation preserves link, lazy inline, and native di
   assert.doesNotMatch(browserSpecification, /page\.goto\(bookingCalendlySettings\.destination/u);
 });
 
-test("rendered explicit HTTPS port remains raw while browser requests use its canonical URL", async () => {
+test("rendering refuses literal Calendly destinations without disclosing them", async () => {
   const renderSkeleton = await loadRenderSkeleton();
-  const destination = "https://calendly.com:443/acme/intro";
-  const rendered = assertSuccess(
-    await renderSkeleton({
-      profile: "portfolio",
-      projectName: "acme-studio",
-      displayName: "Acme Studio",
-      bookingCalendly: { destination, mode: "popup" },
-      packageVersions,
-    }),
-  );
-  const files = indexFiles(rendered.files);
-  const settings = files.get(
-    "apps/web/src/integrations/booking-calendly/booking-settings.ts",
-  );
-  const component = files.get(
-    "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
-  );
-  const browserSpecification = files.get(
-    "apps/web/tests/e2e/calendly-booking.spec.ts",
-  );
-
-  assert.equal(
-    rendered.project.capabilitySettings["booking-calendly"]?.destination,
-    destination,
-  );
-  assert.match(settings, /destination: "https:\/\/calendly\.com:443\/acme\/intro"/u);
-  assert.match(component, /href=\{settings\.destination\}/u);
-  assert.match(component, /src=\{settings\.destination\}/u);
-  assert.match(
-    browserSpecification,
-    /const configuredProviderUrl = new URL\(\s*bookingCalendlySettings\.destination,\s*\)\.href/u,
-  );
-  assert.match(browserSpecification, /requestUrl === configuredProviderUrl/u);
-  assert.equal(
-    browserSpecification.match(/page\.waitForURL\(configuredProviderUrl\)/gu)
-      ?.length,
-    2,
-  );
-  assert.match(
-    browserSpecification,
-    /toHaveAttribute\(\s*"href",\s*bookingCalendlySettings\.destination/u,
-  );
-  assert.match(
-    browserSpecification,
-    /toHaveAttribute\(\s*"src",\s*bookingCalendlySettings\.destination/u,
-  );
+  for (const destination of ["https://calendly.com:443/private-sentinel/intro", "https://calendly.com/private-sentinel/intro"]) {
+    const result = await renderSkeleton({ profile: "portfolio", projectName: "literal-refusal", displayName: "Literal Refusal", bookingCalendly: { destination, mode: "popup" }, packageVersions });
+    assert.equal(result.ok, false);
+    assert.equal(Object.hasOwn(result, "value"), false);
+    assert.doesNotMatch(JSON.stringify(result), /private-sentinel/u);
+  }
 });
 
 test("rendering rejects Calendly query data before desired state or settings are materialized", async () => {
@@ -3664,7 +3653,6 @@ test("generated Calendly browser behavior covers unavailable platform APIs", asy
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -3676,14 +3664,13 @@ test("generated Calendly browser behavior covers unavailable platform APIs", asy
   assert.notEqual(browserSpecification, undefined);
 
   for (const contract of [
-    /test\("activates inline fallback when IntersectionObserver is unavailable"/u,
+    /test\("inline fallback works without IntersectionObserver"/u,
     /page\.addInitScript/u,
     /Object\.defineProperty\(window, "IntersectionObserver"/u,
-    /test\("preserves popup navigation when native modal support is unavailable"/u,
+    /test\("popup falls back to navigation without native modal support"/u,
     /Object\.defineProperty\(\s*HTMLDialogElement\.prototype,\s*"showModal"/u,
-    /dialogOpen: dialog instanceof HTMLDialogElement && dialog\.open/u,
-    /frameCount: document\.querySelectorAll/u,
-    /request\.frame\(\) === page\.mainFrame\(\)/u,
+    /page\.waitForURL\(expectedRequestUrl\)/u,
+    /audit\.requests\[0\]\?\.frame\(\)/u,
   ]) {
     assert.match(browserSpecification, contract);
   }
@@ -3697,7 +3684,6 @@ test("generated popup Calendly browser specification keeps every configured mode
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -3714,302 +3700,72 @@ test("generated popup Calendly browser specification keeps every configured mode
   );
 });
 
-test("generated deployment is manual, revision-bound, least-privilege, and deploys only verified output", async () => {
+test("generated deployment binds staging and production to reviewed source and prepared artifacts", async () => {
   const renderSkeleton = await loadRenderSkeleton();
-  const rendered = assertSuccess(
-    await renderSkeleton({
-      profile: "portfolio",
-      projectName: "acme-studio",
-      displayName: "Acme Studio",
-      packageVersions,
-    }),
-  );
-  const workflow = parseGeneratedYaml(
-    rendered.files,
-    ".github/workflows/deploy.yml",
-  );
-  const readme = indexFiles(rendered.files).get("README.md");
-
-  assert.deepEqual(workflow.on, {
-    workflow_dispatch: {
-      inputs: {
-        expected_revision: {
-          description: "Exact main revision approved for deployment",
-          required: true,
-          type: "string",
-        },
-      },
-    },
-  });
+  const rendered = assertSuccess(await renderSkeleton({ profile: "portfolio", projectName: "release-contract", displayName: "Release Contract", packageVersions }));
+  const workflow = parseGeneratedYaml(rendered.files, ".github/workflows/deploy.yml");
+  assert.deepEqual(workflow.on, { workflow_dispatch: { inputs: { expected_revision: {
+    description: "Exact reviewed main revision for both target builds", required: true, type: "string",
+  } } } });
   assert.deepEqual(workflow.permissions, { contents: "read" });
-  assert.deepEqual(workflow.concurrency, {
-    group: "production-deploy",
-    queue: "max",
-    "cancel-in-progress": false,
-  });
-  assert.match(
-    readme,
-    /prevent self-review[^.]+GitHub plan and environment controls support it/iu,
-  );
-  assert.match(
-    readme,
-    /when unavailable[^.]+record that limitation[^.]+reviewer other than the workflow initiator/iu,
-  );
-
-  const job = workflow.jobs["verify-and-deploy"];
-  assert.equal(job.if, "github.ref == 'refs/heads/main'");
-  assert.equal(job["runs-on"], "ubuntu-24.04");
-  assert.deepEqual(job.container, {
-    image:
-      "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
-    options: "--shm-size=1g",
-  });
-  assert.equal(job["timeout-minutes"], 45);
-  assert.deepEqual(job.environment, {
-    name: "production",
-    url: "${{ vars.DEPLOY_URL }}",
-  });
-
-  const steps = Object.fromEntries(job.steps.map((step) => [step.name, step]));
-  assert.deepEqual(Object.keys(steps), [
-    "Check out repository",
-    "Set up pnpm and Node.js",
-    "Verify approved revision",
-    "Install dependencies",
-    "Lint generated project",
-    "Typecheck generated project",
-    "Test generated unit behavior",
-    "Test generated components",
-    "Build Next.js application",
-    "Build OpenNext application",
-    "Test built Worker when installed",
-    "Install Chromium",
-    "Test Next.js development",
-    "Test OpenNext workerd preview",
-    "Verify deployment target configured",
-    "Deploy Cloudflare Worker",
-    "Wait for deployed application",
-    "Test deployed application",
-    "Upload deployment browser failure artifacts",
-  ]);
-  assert.deepEqual(steps["Check out repository"], {
-    name: "Check out repository",
-    uses: "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
-    with: {
+  assert.deepEqual(workflow.concurrency, { group: "application-release", queue: "max", "cancel-in-progress": false });
+  assert.deepEqual(Object.keys(workflow.jobs), ["verify-source", "staging", "production"]);
+  assert.equal(workflow.jobs["verify-source"].if, "github.ref == 'refs/heads/main'");
+  assert.equal(workflow.jobs.staging.needs, "verify-source");
+  assert.deepEqual(workflow.jobs.production.needs, ["verify-source", "staging"]);
+  for (const [name, job] of Object.entries(workflow.jobs)) {
+    assert.equal(job["runs-on"], "ubuntu-24.04");
+    assert.equal(job["timeout-minutes"], 45);
+    assert.deepEqual(job.container, {
+      image: "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
+      options: "--shm-size=1g",
+    });
+    assert.deepEqual(job.permissions, name === "staging" ? { contents: "read" } : { contents: "read", actions: "read" });
+    const steps = Object.fromEntries(job.steps.map(step => [step.name, step]));
+    assert.deepEqual(steps["Check out frozen source"].with, {
       "fetch-depth": 0,
-      ref: "${{ github.sha }}",
+      ref: name === "verify-source" ? "${{ github.sha }}" : "${{ needs.verify-source.outputs.revision }}",
       "persist-credentials": false,
-    },
-  });
-  assert.deepEqual(steps["Set up pnpm and Node.js"].with, {
-    version: "11.28.1",
-    runtime: "node@22.23.2",
-    cache: false,
-    install: false,
-  });
-
-  const revisionGuard = steps["Verify approved revision"];
-  assert.equal(revisionGuard.shell, "bash");
-  assert.deepEqual(revisionGuard.env, {
-    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
-  });
-  const approvedRevision = "a".repeat(40);
-  const runGuard = (environment) =>
-    spawnSync(
-      "bash",
-      ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c", revisionGuard.run],
-      {
-        encoding: "utf8",
-        env: {
-          EXPECTED_REVISION: environment.EXPECTED_REVISION,
-          GITHUB_SHA: environment.GITHUB_SHA,
-          GITHUB_REF: environment.GITHUB_REF,
-        },
-      },
-    );
-  assert.equal(
-    runGuard({
-      EXPECTED_REVISION: approvedRevision,
-      GITHUB_SHA: approvedRevision,
-      GITHUB_REF: "refs/heads/main",
-    }).status,
-    0,
-  );
-  for (const environment of [
-    {
-      EXPECTED_REVISION: "A".repeat(40),
-      GITHUB_SHA: "A".repeat(40),
-      GITHUB_REF: "refs/heads/main",
-    },
-    {
-      EXPECTED_REVISION: "a".repeat(39),
-      GITHUB_SHA: "a".repeat(39),
-      GITHUB_REF: "refs/heads/main",
-    },
-    {
-      EXPECTED_REVISION: approvedRevision,
-      GITHUB_SHA: "b".repeat(40),
-      GITHUB_REF: "refs/heads/main",
-    },
-    {
-      EXPECTED_REVISION: approvedRevision,
-      GITHUB_SHA: approvedRevision,
-      GITHUB_REF: "refs/heads/release",
-    },
-  ]) {
-    assert.notEqual(
-      runGuard(environment).status,
-      0,
-      JSON.stringify(environment),
-    );
+    });
+    assert.deepEqual(steps["Set up pnpm and Node.js"].with, { version: "11.28.1", runtime: "node@22.23.2", cache: false, install: false });
+    assert.equal(steps["Install frozen dependencies"].run, "pnpm install --frozen-lockfile");
+    assert.equal(job.env.WRANGLER_SEND_METRICS, "false");
+    if (name === "verify-source") {
+      assert.equal(job.environment, undefined);
+      assert.equal(steps["Check native deployment protections"].run, "node scripts/check-deployment-protection.mjs preflight");
+      continue;
+    }
+    assert.deepEqual(job.environment, { name, url: "${{ vars.DEPLOY_URL }}" });
+    assert.equal(job.env.APPLICATION_ENVIRONMENT, name);
+    assert.equal(job.env.BUILD_SOURCE_REVISION, "${{ needs.verify-source.outputs.revision }}");
+    const prepare = job.steps.indexOf(steps["Prepare target application"]);
+    const record = job.steps.indexOf(steps["Record prepared target artifact"]);
+    const preview = job.steps.indexOf(steps["Test prepared local preview"]);
+    const deploy = job.steps.indexOf(steps["Deploy prepared Cloudflare Worker"]);
+    assert.ok(prepare >= 0 && record > prepare && preview > record && deploy > preview);
+    assert.match(steps["Record prepared target artifact"].run, /check:prepared-artifact record/u);
+    assert.equal((steps["Test prepared local preview"].run.match(/check:prepared-artifact verify/gu) ?? []).length, 2);
+    const deployStep = steps["Deploy prepared Cloudflare Worker"];
+    assert.deepEqual(deployStep.env, { CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}", CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}" });
+    assert.ok(deployStep.run.indexOf("check:prepared-artifact verify") < deployStep.run.indexOf("opennextjs-cloudflare deploy"));
+    assert.match(deployStep.run, new RegExp(`deploy --env ${name} -- --x-provision=false --x-auto-create=false`));
+    assert.doesNotMatch(deployStep.run, /\b(?:build|install|preview)\b/u);
+    assert.equal(job.steps.filter(step => JSON.stringify(step.env ?? {}).includes("secrets.CLOUDFLARE_")).length, 1);
   }
+  assert.equal(workflow.jobs.production.steps.find(step => step.name === "Recheck native protections and this run's human approval").run, "node scripts/check-deployment-protection.mjs production");
+  assert.equal(workflow.jobs.staging.steps.at(-1).run, "pnpm --dir apps/web run test:e2e:deployed");
+  assert.equal(workflow.jobs.staging.steps.some(step => step.uses?.startsWith("actions/upload-artifact")), false);
 
-  assert.equal(
-    steps["Install dependencies"].run,
-    "pnpm install --frozen-lockfile",
-  );
-  assert.equal(steps["Lint generated project"].run, "pnpm run lint");
-  assert.equal(
-    steps["Typecheck generated project"].run,
-    "pnpm run typecheck",
-  );
-  assert.equal(
-    steps["Test generated unit behavior"].run,
-    "pnpm run test:unit",
-  );
-  assert.equal(
-    steps["Test generated components"].run,
-    "pnpm run test:component",
-  );
-  assert.equal(steps["Build Next.js application"].run, "pnpm run build");
-  assert.equal(
-    steps["Build OpenNext application"].run,
-    "pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild",
-  );
-  assert.equal(
-    steps["Install Chromium"].run,
-    "pnpm --dir apps/web exec playwright install chromium",
-  );
-  assert.equal(
-    steps["Test Next.js development"].run,
-    "pnpm --dir apps/web run test:e2e:dev",
-  );
-  assert.equal(
-    steps["Test OpenNext workerd preview"].run,
-    "pnpm --dir apps/web run test:e2e:preview",
-  );
-  assert.deepEqual(steps["Verify deployment target configured"].env, {
-    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
+  const guard = workflow.jobs["verify-source"].steps.find(step => step.name === "Verify reviewed clean main revision");
+  const revision = "a".repeat(40);
+  const runGuard = overrides => spawnSync("bash", ["--noprofile", "--norc", "-e", "-o", "pipefail", "-c",
+    `git() { case "$1" in rev-parse) printf '%s' "$TEST_HEAD" ;; status) printf '%s' "$TEST_STATUS" ;; *) return 1 ;; esac; }\n${guard.run}`], {
+    encoding: "utf8", env: { EXPECTED_REVISION: revision, GITHUB_SHA: revision, TEST_HEAD: revision, TEST_STATUS: "", GITHUB_REF: "refs/heads/main", GITHUB_RUN_ATTEMPT: "1", GITHUB_OUTPUT: "/dev/null", ...overrides },
   });
-  assert.equal(
-    steps["Verify deployment target configured"].run,
-    "pnpm --dir apps/web exec playwright test --config playwright.deployed.config.ts --list",
-  );
-
-  const deployStep = steps["Deploy Cloudflare Worker"];
-  assert.deepEqual(deployStep.env, {
-    CLOUDFLARE_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}",
-    CLOUDFLARE_API_TOKEN: "${{ secrets.CLOUDFLARE_API_TOKEN }}",
-  });
-  assert.match(
-    deployStep.run,
-    /^test -n "\$CLOUDFLARE_ACCOUNT_ID"$/mu,
-  );
-  assert.match(
-    deployStep.run,
-    /^test -n "\$CLOUDFLARE_API_TOKEN"$/mu,
-  );
-  assert.match(deployStep.run, /opennextjs-cloudflare deploy/u);
-  assert.doesNotMatch(
-    deployStep.run,
-    /(?:pnpm|opennextjs-cloudflare)[^\n]*\b(?:build|install|test|preview)\b|\bwrangler\b/iu,
-  );
-  assert.equal(
-    job.steps.filter((step) =>
-      Object.values(step.env ?? {}).some((value) =>
-        String(value).includes("secrets."),
-      ),
-    ).length,
-    1,
-  );
-  assert.deepEqual(steps["Wait for deployed application"].env, {
-    DEPLOY_URL: "${{ vars.DEPLOY_URL }}",
-  });
-  assert.equal(
-    steps["Wait for deployed application"].run,
-    `attempt=1
-while [ "$attempt" -le 12 ]; do
-  status="$(curl --connect-timeout 5 --max-time 10 --silent --output /dev/null --write-out '%{http_code}' "$DEPLOY_URL" || true)"
-  case "$status" in
-    2??) exit 0 ;;
-  esac
-  if [ "$attempt" -eq 12 ]; then
-    echo "Deployment did not become ready" >&2
-    exit 1
-  fi
-  sleep 5
-  attempt=$((attempt + 1))
-done
-`,
-  );
-  const runReadinessProbe = (curlFunction) =>
-    spawnSync(
-      "sh",
-      [
-        "-e",
-        "-c",
-        `${curlFunction}
-sleep() { :; }
-${steps["Wait for deployed application"].run}`,
-      ],
-      {
-        encoding: "utf8",
-        env: { DEPLOY_URL: "https://example.invalid" },
-      },
-    );
-  assert.equal(
-    runReadinessProbe(
-      'curl() { if [ "$attempt" -lt 3 ]; then printf 404; else printf 200; fi; }',
-    ).status,
-    0,
-  );
-  assert.equal(
-    runReadinessProbe(
-      'curl() { if [ "$attempt" -lt 3 ]; then return 28; else printf 200; fi; }',
-    ).status,
-    0,
-  );
-  const unavailableDeployment = runReadinessProbe(
-    "curl() { printf 404; }",
-  );
-  assert.notEqual(unavailableDeployment.status, 0);
-  assert.equal(
-    unavailableDeployment.stderr,
-    "Deployment did not become ready\n",
-  );
-  assert.ok(
-    job.steps.indexOf(steps["Deploy Cloudflare Worker"]) <
-      job.steps.indexOf(steps["Wait for deployed application"]),
-  );
-  assert.ok(
-    job.steps.indexOf(steps["Wait for deployed application"]) <
-      job.steps.indexOf(steps["Test deployed application"]),
-  );
-  assert.deepEqual(steps["Test deployed application"].env, {
-    PLAYWRIGHT_DEPLOYED_URL: "${{ vars.DEPLOY_URL }}",
-  });
-  assert.equal(
-    steps["Test deployed application"].run,
-    "pnpm --dir apps/web run test:e2e:deployed",
-  );
-  assert.equal(
-    steps["Upload deployment browser failure artifacts"].if,
-    "failure()",
-  );
-  assert.equal(
-    steps["Upload deployment browser failure artifacts"].uses,
-    "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
-  );
+  assert.equal(runGuard({}).status, 0);
+  for (const inputs of [{ EXPECTED_REVISION: "A".repeat(40) }, { EXPECTED_REVISION: "a".repeat(39) }, { GITHUB_SHA: "b".repeat(40) }, { TEST_HEAD: "b".repeat(40) }, { TEST_STATUS: " M changed.ts" }, { GITHUB_REF: "refs/heads/release" }, { GITHUB_RUN_ATTEMPT: "2" }]) {
+    assert.notEqual(runGuard(inputs).status, 0, JSON.stringify(inputs));
+  }
 });
 
 test("generated browser quality is environment-specific and content-agnostic", async () => {
@@ -4025,6 +3781,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
   const files = indexFiles(rendered.files);
   const shared = files.get("apps/web/playwright.config.shared.ts");
   const development = files.get("apps/web/playwright.dev.config.ts");
+  const developmentServer = files.get("apps/web/scripts/browser-development-server.ts");
   const preview = files.get("apps/web/playwright.preview.config.ts");
   const deployed = files.get("apps/web/playwright.deployed.config.ts");
   const nextConfiguration = files.get("apps/web/next.config.ts");
@@ -4042,17 +3799,18 @@ test("generated browser quality is environment-specific and content-agnostic", a
   assert.match(shared, /forbidOnly: Boolean\(process\.env\.CI\)/u);
   assert.match(shared, /process\.env\.CI \? \{ workers: 1 \} : \{\}/u);
   assert.match(shared, /name: "chromium"/u);
-  assert.match(shared, /trace: "retain-on-failure"/u);
-  assert.match(shared, /screenshot: "only-on-failure"/u);
-  assert.match(shared, /video: "retain-on-failure"/u);
+  assert.match(shared, /trace: protectedStaging \? "off" : "retain-on-failure"/u);
+  assert.match(shared, /screenshot: protectedStaging \? "off" : "only-on-failure"/u);
+  assert.match(shared, /video: protectedStaging \? "off" : "retain-on-failure"/u);
 
-  assert.match(development, /http:\/\/127\.0\.0\.1:3100/u);
-  assert.match(development, /pnpm run dev --hostname 127\.0\.0\.1 --port 3100/u);
-  assert.match(development, /reuseExistingServer: false/u);
-  assert.match(preview, /http:\/\/127\.0\.0\.1:3101/u);
+  assert.match(development, /baseURL: guardedDevelopmentOrigin, webServer: guardedDevelopmentServer/u);
+  assert.match(developmentServer, /http:\/\/127\.0\.0\.1:3100/u);
+  assert.match(developmentServer, /node --experimental-strip-types scripts\/browser-development-server\.ts --hostname 127\.0\.0\.1 --port 3100/u);
+  assert.match(developmentServer, /reuseExistingServer: false/u);
+  assert.match(preview, /http:\/\/localhost:3101/u);
   assert.match(
     preview,
-    /pnpm exec opennextjs-cloudflare preview -- --ip 127\.0\.0\.1 --port 3101/u,
+    /pnpm exec opennextjs-cloudflare preview\$\{selection\} -- --ip 127\.0\.0\.1 --port 3101/u,
   );
   assert.doesNotMatch(preview, /pnpm run preview/u);
   assert.match(preview, /reuseExistingServer: false/u);
@@ -4062,56 +3820,17 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /outputFileTracingRoot: fileURLToPath\(new URL\("\.\.\/\.\.\/", import\.meta\.url\)\)/u,
   );
 
-  assert.match(deployed, /PLAYWRIGHT_DEPLOYED_URL/u);
-  assert.match(deployed, /protocol !== "https:"/u);
-  assert.match(deployed, /url\.username !== "" \|\| url\.password !== ""/u);
-  assert.match(deployed, /url\.hash !== ""/u);
+  assert.match(deployed, /process\.env\.DEPLOY_URL/u);
   assert.match(deployed, /DEPLOYED_URL_REQUIRED/u);
-  assert.match(deployed, /DEPLOYED_URL_INVALID/u);
-  assert.doesNotMatch(deployed, /COMPATIBILITY_URL/u);
-
-  await assert.rejects(
-    loadGeneratedDeployedConfigurationModule(rendered.files, undefined),
-    { name: "Error", message: "DEPLOYED_URL_REQUIRED" },
-  );
-  await assert.rejects(
-    loadGeneratedDeployedConfigurationModule(
-      rendered.files,
-      "http://example.com",
-    ),
-    { name: "Error", message: "DEPLOYED_URL_INVALID" },
-  );
-  const deployedModule = await loadGeneratedDeployedConfigurationModule(
-    rendered.files,
-    "https://example.com/quality/",
-  );
-  assert.deepEqual(deployedModule.default, {
-    baseURL: "https://example.com/quality/",
-  });
-  assert.equal(
-    deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
-    "https://example.com/quality/",
-  );
-  assert.equal(
-    new URL(
-      "./",
-      deployedModule.parseDeployedBaseURL("https://example.com/quality/"),
-    ).href,
-    "https://example.com/quality/",
-  );
+  assert.doesNotMatch(deployed, /PLAYWRIGHT_DEPLOYED_URL|COMPATIBILITY_URL/u);
+  const deployedModule = await loadGeneratedDeployedConfigurationModule(rendered.files, "https://example.com");
+  assert.deepEqual(deployedModule.default, { baseURL: "https://example.com" });
   for (const [value, message] of [
-    [undefined, "DEPLOYED_URL_REQUIRED"],
-    ["", "DEPLOYED_URL_REQUIRED"],
-    ["not a url", "DEPLOYED_URL_INVALID"],
-    ["http://example.com", "DEPLOYED_URL_INVALID"],
-    ["https://user@example.com", "DEPLOYED_URL_INVALID"],
-    ["https://example.com?token=private", "DEPLOYED_URL_INVALID"],
-    ["https://example.com#fragment", "DEPLOYED_URL_INVALID"],
+    [undefined, "DEPLOYED_URL_REQUIRED"], ["", "DEPLOYED_URL_REQUIRED"],
+    ...["not a url", "http://example.com", "https://user@example.com", "https://example.com/quality/", "https://example.com?token=private", "https://example.com#fragment"]
+      .map(value => [value, "APPLICATION_TRANSPORT_ORIGIN_INVALID"]),
   ]) {
-    assert.throws(() => deployedModule.parseDeployedBaseURL(value), {
-      name: "Error",
-      message,
-    });
+    await assert.rejects(loadGeneratedDeployedConfigurationModule(rendered.files, value), { name: "Error", message });
   }
 
   for (const contract of [
@@ -4123,7 +3842,7 @@ test("generated browser quality is environment-specific and content-agnostic", a
     /keyboard\.press\("Tab"\)/u,
     /const LANDING_PATH = "\.\/"/u,
     /element\.hasAttribute\("download"\)/u,
-    /const paths = await discoverContentPaths\(page\);/u,
+    /const paths = await discoverContentPaths\(page, openApplicationPage\);/u,
     /for \(const path of paths\)/u,
     /outlineColor/u,
     /isPerceptibleColor/u,
@@ -4146,11 +3865,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
   );
   assert.match(
     focusContract,
-    /const paths = await discoverContentPaths\(page\);[\s\S]+for \(const path of paths\)/u,
+    /const paths = await discoverContentPaths\(page, openApplicationPage\);[\s\S]+for \(const path of paths\)/u,
   );
   assert.match(
     reducedMotionContract,
-    /const paths = await discoverContentPaths\(page\);[\s\S]+for \(const path of paths\)/u,
+    /const paths = await discoverContentPaths\(page, openApplicationPage\);[\s\S]+for \(const path of paths\)/u,
   );
   assert.doesNotMatch(specification, /Acme|Portfolio|About|Contact/u);
 
@@ -4193,6 +3912,11 @@ test("generated browser quality is environment-specific and content-agnostic", a
   });
   assert.deepEqual(workflowConfiguration.jobs, {
     verify: {
+      env: {
+        APPLICATION_ENVIRONMENT: "development",
+        NEXT_PUBLIC_SITE_URL: "http://localhost:3000",
+        BUILD_SOURCE_REVISION: "${{ github.sha }}",
+      },
       "runs-on": "ubuntu-24.04",
       container: {
         image:
@@ -4295,7 +4019,6 @@ test("generated visual regression owns four deterministic preview baselines", as
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -4442,7 +4165,6 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -4466,7 +4188,7 @@ test("rendered files satisfy every inference probe in their resolved recipes", a
   );
   assert.notEqual(bookingCalendly, undefined);
   assert.equal(bookingCalendly.category, "probable");
-  assert.equal(bookingCalendly.probes.length, 5);
+  assert.equal(bookingCalendly.probes.length, 9);
   assert.ok(
     bookingCalendly.probes.every(({ status }) => status === "present"),
   );
@@ -5643,7 +5365,6 @@ test("Cloudflare imports and types stay in generated configuration boundaries", 
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
@@ -5653,6 +5374,7 @@ test("Cloudflare imports and types stay in generated configuration boundaries", 
     "apps/web/next.config.ts",
     "apps/web/open-next.config.ts",
     "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+    "apps/web/tests/unit/observability-environment.test.ts",
   ]);
 
   for (const [path, source] of indexFiles(rendered.files)) {
@@ -5728,7 +5450,7 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       /(?:apps\/jobs|packages\/|\.egeria|pnpm-lock\.yaml|middleware)/,
     );
     const output = [...indexFiles(rendered.files)]
-      .filter(([path]) => !path.startsWith(".github/workflows/"))
+      .filter(([path]) => /\.(?:ts|tsx|jsonc)$/u.test(path) && !path.includes("/tests/"))
       .map(([, content]) => content)
       .join("\n")
       .toLowerCase();
@@ -5746,7 +5468,7 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
       "totp",
       "passkey",
     ]) {
-      assert.equal(output.includes(marker), false, marker);
+      assert.doesNotMatch(output, new RegExp(`\\b${marker}\\b`, "u"), marker);
     }
   }
 });
@@ -5754,8 +5476,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 104],
-    ["site", 121],
+    ["portfolio", 131],
+    ["site", 147],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -5867,15 +5589,20 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       "/scripts/build",
       "/scripts/build:cloudflare",
       "/scripts/cf-typegen",
+      "/scripts/check:environment",
+      "/scripts/check:environment:deployment",
+      "/scripts/check:prepared-artifact",
       "/scripts/dev",
       "/scripts/lint",
       "/scripts/preview",
       "/scripts/test",
       "/scripts/test:component",
       "/scripts/test:component:watch",
+      "/scripts/test:deployment-contracts",
       "/scripts/test:e2e:deployed",
       "/scripts/test:e2e:dev",
       "/scripts/test:e2e:preview",
+      "/scripts/test:transport",
       "/scripts/test:unit",
       "/scripts/test:unit:watch",
       "/scripts/test:visual",
@@ -5892,13 +5619,12 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       projectName: "acme-studio",
       displayName: "Acme Studio",
       bookingCalendly: {
-        destination: "https://calendly.com/acme/intro",
         mode: "popup",
       },
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 109);
+  assert.equal(selected.surfaces.length, 140);
   assert.deepEqual(
     selected.surfaces
       .filter(
@@ -5908,10 +5634,14 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       )
       .map(({ identifier }) => identifier),
     [
+      "booking-calendly-availability-tests",
       "booking-calendly-browser-specification",
       "booking-calendly-client-component",
+      "booking-calendly-configuration-tests",
       "booking-calendly-content",
       "booking-calendly-content-reader",
+      "booking-calendly-french-content",
+      "booking-calendly-operator-guide",
       "booking-calendly-settings",
     ],
   );
@@ -6041,6 +5771,8 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 });
 
 
+
+
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
   catalogSnapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.9.0", transactionalEmailResend: "0.2.0" },
@@ -6056,14 +5788,14 @@ async function renderApplicationEnvironment(profile, options = {}) {
   return core.renderSkeleton({ profile, projectName: "environment-example", displayName: "Environment Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options }, applicationEnvironmentContext);
 }
 
-test("candidate README follows staged release controls while public README remains unchanged", async () => {
+test("public README follows the current staged release controls", async () => {
   const core = await import("../dist/index.js");
   const candidate = indexFiles(assertSuccess(await renderApplicationEnvironment("portfolio")).files).get("README.md");
   assert.match(candidate, /APPLICATION_ENVIRONMENT=production NEXT_PUBLIC_SITE_URL=https:\/\/example.com DEPLOY_URL=https:\/\/example.com/u);
   assert.match(candidate, /missing or unverifiable controls refuse deployment/u);
   assert.doesNotMatch(candidate, /PLAYWRIGHT_DEPLOYED_URL/u);
   const current = assertSuccess(await core.renderSkeleton({ profile: "portfolio", projectName: "readme-contract", displayName: "Readme Contract", packageVersions: core.verifiedCapabilityPackageVersions }));
-  assert.match(indexFiles(current.files).get("README.md"), /PLAYWRIGHT_DEPLOYED_URL/u);
+  assert.doesNotMatch(indexFiles(current.files).get("README.md"), /PLAYWRIGHT_DEPLOYED_URL/u);
 });
 
 test("environment build compositions bind target and revision while preserving native public origin replacement", async () => {
@@ -6311,6 +6043,7 @@ test("environment analytics rendering composes every profile with selection-only
 
 
 
+
 test("fresh security declarations match their locked Next across supported dependency families", async () => {
   const core = await import("../dist/index.js");
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
@@ -6328,18 +6061,13 @@ test("fresh security declarations match their locked Next across supported depen
   }
 });
 
-
-
-test("security recipes remain outside environment schema controls", async () => {
-  const core = await import("../dist/index.js");
-  const { createGenerationRenderingContext, createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.7"], ["site", "0.12.7"], ["app", "0.2.7"]]) {
-    const request = { profile, projectName: "security-cohort", displayName: "Security Cohort", packageVersions: core.verifiedCapabilityPackageVersions };
-    const historical = assertSuccess(await core.renderSkeleton(request, { ...createGenerationRenderingContext(), profiles: core.createCurrentProfileRecipes() }));
-    assert.equal(core.projectConfigurationSchema.safeParse({ ...historical.project, recipeVersion }).success, true);
-    const candidate = assertSuccess(await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext()));
-    assert.equal(core.applicationEnvironmentProjectConfigurationSchema.safeParse(candidate.project).success, true);
-    assert.equal(core.applicationEnvironmentProjectConfigurationSchema.safeParse({ ...candidate.project, recipeVersion }).success, false);
+test("historical installed controls refuse instead of selecting fresh generation", async () => {
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  for (const fixture of ["portfolio-0.11.7", "portfolio-email-0.11.7", "site-0.12.7", "app-0.2.7", "app-persistence-0.2.7"]) {
+    const source = new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url);
+    const project = parseDocument(await readFile(new URL(".egeria/project.yaml", source), "utf8")).toJS();
+    const state = JSON.parse(await readFile(new URL(".egeria/state.json", source), "utf8"));
+    assert.equal(createVerifiedProjectSnapshot(project, state).ok, false);
   }
 });
 
@@ -6380,7 +6108,7 @@ test("security dependency policy shares exact reviewed patches with environment 
     assert.deepEqual(policy, parseGeneratedYaml(candidate.files, "pnpm-workspace.yaml"));
     assert.equal(policy.minimumReleaseAge, 1440);
     assert.equal(policy.resolutionMode, "time-based");
-    assert.equal(current.project.schemaVersion, "1.0.0");
+    assert.equal(current.project.schemaVersion, "2.0.0");
     assert.equal(candidate.project.schemaVersion, "2.0.0");
   }
 });
@@ -6688,7 +6416,7 @@ function setEnvironmentInput(testContext, key, value) {
   testContext.after(() => { if (original === undefined) delete process.env[key]; else process.env[key] = original; });
 }
 
-test("environment observability preserves public bytes and all finite installed contexts", async () => {
+test("environment observability preserves shared bytes across finite installed contexts", async () => {
   const core = await import("../dist/index.js");
   const request = { projectName: "observability-context", displayName: "Observability Context", packageVersions: core.verifiedCapabilityPackageVersions };
   const sharedPaths = [
@@ -6699,9 +6427,12 @@ test("environment observability preserves public bytes and all finite installed 
   ];
   const current = assertSuccess(await core.renderSkeleton({ ...request, profile: "portfolio" }));
   const publicFiles = indexFiles(current.files);
-  assert.equal(current.resolved.capabilities.find(({ identifier }) => identifier === "observability").version, "0.3.0");
+  assert.equal(current.resolved.capabilities.find(({ identifier }) => identifier === "observability").version, "0.4.0");
   for (const path of sharedPaths) {
-    assert.equal(publicFiles.get(path), await readCommonWebTemplate(path.slice("apps/web/".length)), path);
+    const expected = path === "apps/web/app/api/observability/route.ts"
+      ? await readCommonWebTemplate(path.slice("apps/web/".length))
+      : await readFile(new URL(`../templates/common/application-environments/${path}`, import.meta.url), "utf8");
+    assert.equal(publicFiles.get(path), expected, path);
   }
   for (const persistence of [false, true]) {
     for (const retainedFoundation of [false, true]) {
@@ -6712,7 +6443,7 @@ test("environment observability preserves public bytes and all finite installed 
       const files = indexFiles(rendered.files);
       const capability = rendered.resolved.capabilities.find(({ identifier }) => identifier === "observability");
       assert.equal(capability.version, "0.4.0");
-      assert.equal(files.get("apps/web/app/api/observability/route.ts"), publicFiles.get("apps/web/app/api/observability/route.ts"));
+      for (const path of sharedPaths) assert.equal(files.get(path), publicFiles.get(path), path);
       for (const surface of capability.managedSurfaces) {
         if (surface.fingerprintTarget.kind === "file") assert.ok(files.has(surface.path), surface.path);
       }
@@ -6815,6 +6546,20 @@ test("environment release workflows freeze one source then gate separate staging
       }
       if (jobs) assert.equal(workflow.on.workflow_dispatch.inputs[`${target}_job_retention_reviewed`].type, "boolean");
     }
+    const helperPath = "apps/web/scripts/prepare-ci-git.sh";
+    const surface = result.surfaces.find(({ path }) => path === helperPath);
+    assert.equal(surface?.owner.identifier, "deployment-cloudflare");
+    assert.equal(surface.ownership, "managed");
+    assert.equal(surface.mergeStrategy, "replace-file");
+    const wrappedCommands = Object.entries(workflow.jobs).flatMap(([job, { steps }]) =>
+      steps.flatMap(step => (step.run ?? "").split("\n").filter(line => line.includes(helperPath))
+        .map(command => ({ job, command: command.trim(), env: step.env }))),
+    );
+    assert.deepEqual(wrappedCommands, [{
+      job: "verify-source",
+      command: `sh ${helperPath} pnpm --dir apps/web run test:deployment-contracts`,
+      env: undefined,
+    }]);
     const manifest = parseGeneratedJson(result.files, "apps/web/package.json");
     assert.equal(manifest.scripts["check:prepared-artifact"], "node --experimental-strip-types scripts/check-prepared-artifact.mjs");
     assert.ok(manifest.scripts["test:deployment-contracts"]);
@@ -6827,4 +6572,35 @@ test("environment release workflows freeze one source then gate separate staging
       assert.equal(wrangler.env[target].preview_urls, false);
     }
   });
+});
+
+
+test("current generation owns literal lint patches across foundation and persistence combinations", async () => {
+  const core = await import("../dist/index.js");
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  const patchPath = "patches/next-eslint-plugin-next.patch";
+  const patch = await readFile(new URL("../templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch", import.meta.url));
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
+      const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "literal-lint-example", displayName: "Literal Lint Example", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
+      const fileMap = new Map(rendered.files.map(({ path, content }) => [path, content]));
+      assert.deepEqual(Buffer.from(fileMap.get(patchPath)), patch);
+      const plugin = `@next/eslint-plugin-next@${profile === "portfolio" ? "16.3.0" : "16.3.3"}`;
+      const policy = parseGeneratedYaml(rendered.files, "pnpm-workspace.yaml");
+      assert.equal(policy.overrides[`${plugin}>fast-glob`], "-");
+      assert.deepEqual(policy.patchedDependencies, { [plugin]: patchPath });
+      const ownedPatch = rendered.surfaces.find(({ path }) => path === patchPath);
+      assert.equal(ownedPatch.ownership, "managed");
+      assert.deepEqual(ownedPatch.owner, { kind: "builder-kernel" });
+      const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
+      const foundation = manifest.dependencies.effect !== undefined;
+      const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence"
+        : profile === "app" ? "app-0.3.0"
+        : foundation ? profile === "portfolio" ? "portfolio-0.11.7-foundation" : "app-0.2.7"
+        : profile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
+      assert.equal(resolveRecipeLockfileVersion(rendered.project, manifest), expectedLock);
+      const lock = parseDocument(await readFile(new URL(`../lockfiles/web-recipe-${expectedLock}/pnpm-lock.yaml`, import.meta.url), "utf8")).toJS();
+      assert.equal(lock.patchedDependencies[plugin], createHash("sha256").update(patch).digest("hex"));
+    }
+  }
 });

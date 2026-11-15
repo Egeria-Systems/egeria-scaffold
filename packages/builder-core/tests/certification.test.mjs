@@ -5,55 +5,40 @@ import test from "node:test";
 import * as core from "../dist/index.js";
 import { requiredEvidence } from "./certification-contracts.mjs";
 
-const coordinatedPlanPath =
-  "docs/superpowers/plans/2026-09-05-effect-app-foundation-certification.md";
-const persistencePlanPath =
-  "docs/superpowers/plans/2026-10-22-persistence-worker-types-certification-renewal.md";
 const evidencePath =
   "docs/implementation-evidence/example-certification-verification.md";
 const evidenceRevision = "636df53958c0e3421b7f493d83493724b67b41f3";
 const descriptorDigests = Object.freeze({
-  "background-job-delivery": "sha256:3f32ead42124def6fb624efd276d42231dba2d1424a18635a7d6081fbe449e1c",
-  analytics:
-    "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba",
-  "app-foundation":
-    "sha256:16eb4a047176fead1fbada2f8b6b0ca3cda8e7faa57ca228763ee3392c14d47a",
-  "application-persistence":
-    "sha256:2174167ad3550bda8adaf7e7d046ccf3885d43604c31e57b23cbfadbf1ea6869",
-  "booking-calendly":
-    "sha256:f9ee03e776da520af1bef7079a12454fd5339205f04d9836a424d5011da1bdca",
-  "contact-form-web3forms": "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9",
-  "content-files":
-    "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
-  "deployment-cloudflare":
-    "sha256:c3ce5750bf4fd47d4c32320625210df6af601e81584b07c78e6f40fbbd44d5b3",
-  multilingual:
-    "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
-  observability:
-    "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
-  "section-composition":
-    "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
-  "site-routing":
-    "sha256:a8bd53e9b32546266efd3dde9dc96fc3914cb06e9e811b8bf96ebd42822e2dac",
-  standards:
-    "sha256:36f8c505fe048250bdf064f194608e94486df232b131c3ebf689436ec8a95b9c",
-  "transactional-email-resend": "sha256:558ff80dacef968fecf3e8a34e52ecd6672f0619a8fee1b73dcbb9d094a04ff3",
+  "analytics": "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b",
+  "app-foundation": "sha256:2557256a72b6a62257298dcbafd587430b899285ef999141f45c1b9da91a749f",
+  "application-persistence": "sha256:07740afcd637972b0de5cf5c538e697ae09a901eb52409eac30533a04d8374c7",
+  "background-job-delivery": "sha256:a47e895e683f6880c0175ce79c4d113c5aa8078b916e0730c51b4d3074fbad76",
+  "booking-calendly": "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08",
+  "contact-form-web3forms": "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
+  "content-files": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
+  "deployment-cloudflare": "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6",
+  "multilingual": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
+  "observability": "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
+  "section-composition": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
+  "site-routing": "sha256:989b092f5d02af02fecde9cd06545119588bd2c6e684c4df52e85dc3ffc62ebb",
+  "standards": "sha256:109efca6d92a045a6e3fb8b70d7f25d34b80a4b3911d23d722ff3196566df188",
+  "transactional-email-resend": "sha256:77f32ddd9faf0886553ae2f40a9f5b19e16dd8b4cf9b8864169fbf7ebfc5a85f"
 });
 const descriptorVersions = Object.freeze({
-  "background-job-delivery": "0.2.0",
-  analytics: "0.1.0",
-  "app-foundation": "0.2.0",
-  "application-persistence": "0.1.1",
-  "booking-calendly": "0.1.0",
-  "contact-form-web3forms": "0.1.0",
+  "analytics": "0.2.0",
+  "app-foundation": "0.3.0",
+  "application-persistence": "0.2.0",
+  "background-job-delivery": "0.3.0",
+  "booking-calendly": "0.2.0",
+  "contact-form-web3forms": "0.2.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.6.1",
-  multilingual: "0.1.0",
-  observability: "0.3.0",
+  "deployment-cloudflare": "0.12.0",
+  "multilingual": "0.1.0",
+  "observability": "0.4.0",
   "section-composition": "0.3.0",
-  "site-routing": "0.4.0",
-  standards: "0.6.1",
-  "transactional-email-resend": "0.1.0",
+  "site-routing": "0.5.0",
+  "standards": "0.10.0",
+  "transactional-email-resend": "0.2.0"
 });
 const expectedIdentifiers = Object.freeze([
   "analytics",
@@ -96,11 +81,7 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: identifier === "deployment-cloudflare" ? "docs/superpowers/plans/2026-10-22-deployment-adapter-certification-renewal.md" : identifier === "background-job-delivery" ? "docs/superpowers/plans/2026-09-24-job-lifecycle-operator-certification.md" : identifier === "contact-form-web3forms" ? "docs/superpowers/plans/2026-09-22-contact-delivery-certification-amendment.md" : ["app-foundation", "transactional-email-resend"].includes(identifier)
-      ? "docs/superpowers/plans/2026-09-22-transactional-email-certification.md"
-      : ["application-persistence", "deployment-cloudflare", "standards"].includes(identifier)
-      ? persistencePlanPath
-      : coordinatedPlanPath,
+    taskPlan: "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
     evidence: [],
   };
 }
@@ -201,17 +182,22 @@ test("certification subjects bind the descriptor and required evidence", () => {
   }).ok, false);
 
   const defaultCatalog = assertSuccess(core.createCapabilityCatalogSnapshot(
-    core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" },
+    core.verifiedCapabilityPackageVersions, core.createGenerationRenderingContext().catalogSnapshot,
   ));
   assert.equal(defaultCatalog.some(({ identifier }) => identifier === "application-persistence"), false);
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards), {
-    descriptorVersion: "0.5.1",
-    behaviorContractDigest: "sha256:936eaba6040e0736ccf630b775ab91f92d67f4e5a65332b829378e2a491cc168",
+    descriptorVersion: "0.9.0",
+    behaviorContractDigest: "sha256:278d07e3e3d57cff287b3fefed0e067f6023c530401dd901b3bdb31c91e1551c",
   });
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare"), requiredEvidence["deployment-cloudflare"]), {
-    descriptorVersion: "0.3.1",
-    behaviorContractDigest: "sha256:4ae7bb0360716408426ba0271eeff824f99781378bae1be6cab5bb8d69da9352",
+    descriptorVersion: "0.9.0",
+    behaviorContractDigest: "sha256:8868b0a7241f9891d2e03ec676fbfc31c80d1bbddfc0b9c0ee16b642104afd5f",
   });
+  assert.equal(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
+  assert.notDeepEqual(
+    core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards),
+    registry.records.standards.subject,
+  );
 
   const bookingDescriptor = descriptorsByIdentifier.get("booking-calendly");
   assert.notEqual(bookingDescriptor, undefined);
@@ -222,49 +208,11 @@ test("certification subjects bind the descriptor and required evidence", () => {
   );
 });
 
-test("current certification preserves accepted evidence and keeps other subjects pending", () => {
+test("current certification requires renewal for every changed generation consumer", () => {
   assert.deepEqual(Object.keys(committedRegistry.records), expectedIdentifiers);
   assert.deepEqual(Object.keys(requiredEvidence), expectedIdentifiers);
-  const acceptedLocalSubjects = new Set([
-    "content-files", "multilingual",
-    "section-composition", "site-routing",
-  ]);
-
   for (const [identifier, record] of Object.entries(committedRegistry.records)) {
-    const expected = createRecord(identifier);
-    if (identifier === "standards") {
-      expected.taskPlan = "docs/superpowers/plans/2026-10-21-patched-standards-certification.md";
-    } else if (acceptedLocalSubjects.has(identifier)) {
-      expected.status = "certified";
-      expected.taskPlan = "docs/superpowers/plans/2026-09-13-app-foundation-certification.md";
-      expected.evidence = expected.requiredEvidence.map((kind) => ({
-        kind,
-        path: `docs/implementation-evidence/2026-09-13-${identifier}-app-certification-receipt.md`,
-        outcome: "passed",
-        revision: "fe16ae41153f89242cdf48c0f899c3720f511557",
-        subject: structuredClone(expected.subject),
-      }));
-    } else if (identifier === "contact-form-web3forms") {
-      expected.status = "certified";
-      expected.taskPlan = "docs/superpowers/plans/2026-09-23-web3forms-certification-execution.md";
-      expected.evidence = expected.requiredEvidence.map((kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-09-23-web3forms-certification-receipt.md",
-        outcome: "passed",
-        revision: "94c28901fb4388f771df53cc18cf2eec24b76215",
-        subject: structuredClone(expected.subject),
-      }));
-    } else if (identifier === "observability") {
-      expected.status = "certified";
-      expected.evidence = expected.requiredEvidence.map((kind) => ({
-        kind,
-        path: "docs/implementation-evidence/2026-09-15-observability-app-certification-receipt.md",
-        outcome: "passed",
-        revision: "9ea5dce328a9a065f71e168cb2c82ea515f54ae1",
-        subject: structuredClone(expected.subject),
-      }));
-    }
-    assert.deepEqual(record, expected, identifier);
+    assert.deepEqual(record, createRecord(identifier), identifier);
   }
 });
 
@@ -323,13 +271,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   const booking = recorded.records["booking-calendly"];
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
   const artifacts = {
-    [coordinatedPlanPath]: "# approved plan",
-    [registry.records.standards.taskPlan]: "# approved standards migration plan",
-    [registry.records["deployment-cloudflare"].taskPlan]: "# synthetic deployment renewal plan",
-    [registry.records["application-persistence"].taskPlan]: "# synthetic persistence renewal plan",
-    [registry.records["transactional-email-resend"].taskPlan]: "# separate email certification plan",
-    [registry.records["contact-form-web3forms"].taskPlan]: "# separate hosted contact certification plan",
-    [registry.records["background-job-delivery"].taskPlan]: "# separate background job certification plan",
+    [registry.records.standards.taskPlan]: "# current generation certification renewal",
     [evidencePath]: createEvidenceDocument(),
   };
 

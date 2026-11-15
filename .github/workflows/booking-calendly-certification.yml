@@ -15,13 +15,22 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: test-deploy
-  cancel-in-progress: false
-  queue: max
-
 jobs:
+  check-hosted-eligibility:
+    runs-on: ubuntu-24.04
+    permissions: {}
+    steps:
+      - name: Refuse shared hosted certification
+        run: |
+          printf '%s\n' 'Shared hosted certification is unavailable for booking-calendly@0.2.0. See docs/governance/shared-test-deployment.md for protected staging requirements.' >&2
+          exit 1
+
   verify-and-deploy:
+    needs: check-hosted-eligibility
+    concurrency:
+      group: test-deploy
+      cancel-in-progress: false
+      queue: max
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 60

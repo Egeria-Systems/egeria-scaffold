@@ -39,9 +39,9 @@ export async function createSyntheticAppTransitionAdmission(context) {
   const preparedProjects = new Map();
   for (let bits = 0; bits < 8; bits += 1) {
     const subset = ["analytics", "booking-calendly", "multilingual"].filter((_, index) => bits & (1 << index));
-    const prepared = await sourceProducer.prepareProject(sourceRoot, subset, "0.2.7");
-    assert.equal(prepared.sourceProject.recipeVersion, "0.11.7");
-    assert.equal(prepared.targetProject.recipeVersion, "0.2.7");
+    const prepared = await sourceProducer.prepareProject(sourceRoot, subset, "0.3.0");
+    assert.equal(prepared.sourceProject.recipeVersion, "0.12.0");
+    assert.equal(prepared.targetProject.recipeVersion, "0.3.0");
     preparedProjects.set(subsetKey(subset), prepared);
   }
   const sourcePaths = historicalPolicy.record.originalSourceFiles
@@ -65,7 +65,7 @@ export async function createSyntheticAppTransitionAdmission(context) {
     assert.deepEqual(await readFile(join(root, path)), await readFile(join(sourceRoot, path)), path);
   }
   const originalSourceFiles = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha256(await readFile(join(root, path))) })));
-  const targetLockfileFingerprint = `sha256:${sha256(await readFile(join(root, "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml")))}`;
+  const targetLockfileFingerprint = `sha256:${sha256(await readFile(join(root, "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml")))}`;
   for (const prepared of preparedProjects.values()) {
     const locks = prepared.files.filter(({ path }) => path === "pnpm-lock.yaml");
     assert.equal(locks.length, 1);
@@ -75,8 +75,8 @@ export async function createSyntheticAppTransitionAdmission(context) {
     ...structuredClone(historicalPolicy.record),
     syntheticUnitFixture: true,
     anchorMeaning: "manifestSha256 and sourceRevision are historical unit sentinels; no current or human admission",
-    sourceProfile: { name: "portfolio", version: "0.11.7" },
-    targetProfile: { name: "app", version: "0.2.7" },
+    sourceProfile: { name: "portfolio", version: "0.12.0" },
+    targetProfile: { name: "app", version: "0.3.0" },
     targetLockfileFingerprint,
     originalSourceFiles,
     bridgeSourceFiles: Object.fromEntries(Object.keys(historicalPolicy.record.bridgeSourceFiles)

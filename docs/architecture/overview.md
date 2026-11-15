@@ -1,5 +1,9 @@
 # Architecture Overview
 
+## Current environment integration
+
+The [current environment generation](capability-model.md#current-environment-generation) owns the schema-2 source candidate and exact runtime/acceptance limits. Its current tuple and lifecycle definitions supersede only earlier executable generation/edge statements below under [ADR-0020](../adr/0020-application-environments.md#public-environment-generation-activation). Historical accepted decisions and evidence retain their original identities. This candidate is not complete or releasable; source integration, complete generated runtime/security admission, four exact visual approvals, hosted consumer reconciliation and fourteen separate certification renewals remain open.
+
 **Status:** Controlling architecture summary for the approved builder baseline and current app generation boundary
 
 **Source:** [Approved reconciled program plan](../roadmaps/2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md)

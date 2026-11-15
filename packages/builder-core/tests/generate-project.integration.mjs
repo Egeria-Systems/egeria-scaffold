@@ -606,6 +606,7 @@ function createLiveEnvironment(supportRoot) {
     TEMP: join(supportRoot, "temporary"),
     NPM_CONFIG_REGISTRY: publicRegistry,
     NPM_CONFIG_USERCONFIG: join(supportRoot, ".npmrc"),
+    pnpm_config_verify_deps_before_run: "error",
   };
 
   for (const key of ["PATH", "LANG", "SystemRoot", "ComSpec", "PATHEXT"]) {
@@ -721,7 +722,7 @@ test("public portfolio and site projects install, build, audit, and infer", asyn
       );
       assert.equal(
         generated.state.managedSurfaces.length,
-        profile === "portfolio" ? 107 : 124,
+        profile === "portfolio" ? 134 : 150,
       );
 
       const lockfile = await readFile(join(destination, "pnpm-lock.yaml"));
@@ -1218,6 +1219,10 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
     const project = join(owner, "browser-proof");
     await cp(destination, project, { recursive: true, force: false, errorOnExist: true, dereference: false });
     const app = join(project, "apps/web");
+    const compositionPath = "apps/web/tests/e2e/environment-composition.spec.ts";
+    if (name === "composed-site") {
+      await writeFile(join(project, compositionPath), await readFile(new URL("../../../tests/client-journey/environment-composition.spec.ts", import.meta.url)), { flag: "wx" });
+    }
     async function run(label, arguments_, additions = {}, succeeds = true) {
       let result;
       try {
@@ -1234,6 +1239,7 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
     }
     const entries = await readdir(destination, { recursive: true, withFileTypes: true });
     const sourcePaths = entries.filter(entry => entry.isFile()).map(entry => join(entry.parentPath, entry.name).slice(destination.length + 1)).sort();
+    if (name === "composed-site") sourcePaths.push(compositionPath);
     async function sourceDigest() {
       const hash = createHash("sha256");
       for (const path of sourcePaths) { hash.update(path); hash.update(await readFile(join(project, path))); }
@@ -1253,7 +1259,8 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       const screenshotOverride = screenshotsOff ? ', screenshot: "off"' : "";
       await writeFile(configPath, `import config from "./playwright.${mode}.config";\nexport default { ...config, retries: 0, use: { ...config.use, baseURL: ${JSON.stringify(expectedOrigin)}${screenshotOverride} } };\n`);
       const warningJourney = "failed storage retains an honest incomplete choice in en-CA";
-      const selection = screenshotsOff ? ["--grep", `${warningJourney}$`] : [];
+      const selection = screenshotsOff ? ["--grep", `${warningJourney}$`] :
+        name === "composed-site" ? ["tests/e2e/environment-composition.spec.ts"] : [];
       const reportPath = join(owner, `${label}.json`);
       await run(label, ["--dir", "apps/web", "exec", "playwright", "test", "--config", configPath, "tests/e2e/analytics-consent.spec.ts", ...selection, "--reporter=json", "--output", join(owner, `${label}-results`)], {
         ...runtime,
@@ -1277,7 +1284,8 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
         ? analytics.providers.microsoftClarity === undefined ? 1 : 2
         : 0;
       const expected = searchOnly ? 1 : 14 + (multilingual ? 2 : 1) * (active ? 2 : 1) + (active ? 1 : 0) + (contact || booking !== undefined ? 1 : 0) + storedDenialCaseCount;
-      assert.equal(report.stats.expected, screenshotsOff ? 1 : expected, label);
+      const composed = name === "composed-site" ? (build.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY === "" ? 2 : 4) : 0;
+      assert.equal(report.stats.expected, screenshotsOff ? 1 : expected + composed, label);
       assert.equal(report.stats.skipped, 0, label);
       assert.equal(report.stats.unexpected, 0, label);
       assert.equal(report.stats.flaky, 0, label);
@@ -1327,8 +1335,14 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       const label = `${target}-${flag}`;
       const build = { ...identifiers, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: flag };
       const runtime = { ...contradiction, APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_ANALYTICS_ENABLED: flag === "true" ? "false" : "true" };
+      await rm(join(app, ".open-next/prepared-artifact.json"), { force: true }); // this proof's prior target receipt was preserved below
       await run(`${label}-next`, ["--dir", "apps/web", "run", "build"], build);
       await run(`${label}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], { ...build, ...(target === "development" ? {} : { CLOUDFLARE_ENV: target }) });
+      const prepared = mode => ["--dir", "apps/web", "run", "check:prepared-artifact", mode, target, environment.BUILD_SOURCE_REVISION, "--local"];
+      await run(`${label}-prepared-record`, prepared("record"), build);
+      const preparedReceipt = await readFile(join(app, ".open-next/prepared-artifact.json"));
+      await writeFile(join(owner, `${label}-prepared-artifact.json`), preparedReceipt, { flag: "wx" });
+      await run(`${label}-prepared-before`, prepared("verify"), build);
       const before = await artifactDigest();
       const staticEntries = await readdir(join(app, ".open-next/assets"), { recursive: true, withFileTypes: true });
       const chunks = [];
@@ -1346,6 +1360,8 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       if (name === "composed-site" && target === "staging") {
         await browser("staging-warning-screenshots-off", "preview", build, runtime, true);
       }
+      await run(`${label}-prepared-after`, prepared("verify"), runtime);
+      assert.deepEqual(await readFile(join(app, ".open-next/prepared-artifact.json")), preparedReceipt);
       assert.deepEqual(await artifactDigest(), before);
       assert.equal(await sourceDigest(), sourceHash);
       artifacts.push({ name, profile, target, sourceHash, rawBuildFlag: flag, build, runtime, ...before, ...observed });
@@ -1361,6 +1377,8 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
         assert.equal(report.stats.skipped, 6); // four unavailable/inline Booking cases and two unavailable Contact cases
         assert.equal(report.stats.unexpected, 0);
         assert.equal(report.stats.flaky, 0);
+        await run(`${label}-prepared-neighbors`, prepared("verify"), runtime);
+        assert.deepEqual(await readFile(join(app, ".open-next/prepared-artifact.json")), preparedReceipt);
         assert.deepEqual(await artifactDigest(), before);
       }
     }
@@ -1689,7 +1707,63 @@ for (const [profile, selection] of [
       destination: join(owner, "project"), renderingContext: createApplicationEnvironmentRenderingContext(selection.applicationPersistence === true),
       verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
     }));
-    const { verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
+    const { syntheticApplicationEnvironment, verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
+    if (profile === "site") {
+      const browserProject = join(owner, "development-metadata-project");
+      await cp(result.destination, browserProject, { recursive: true, force: false, errorOnExist: true, dereference: false });
+      const supportRoot = join(owner, "development-metadata-support");
+      await mkdir(supportRoot);
+      const support = await prepareLiveSupport(supportRoot);
+      const explicitOrigin = "https://development.metadata-test.invalid";
+      const environment = {
+        ...support.environment,
+        ...await derivePnpmToolEnvironment("pnpm"),
+        ...syntheticApplicationEnvironment(
+          result.state.installedCapabilities.map(({ identifier }) => identifier),
+          { analytics: selection.analytics, "booking-calendly": selection.bookingCalendly },
+          "development", explicitOrigin,
+        ),
+      };
+      const commands = [];
+      async function runDevelopmentMetadataCommand(label, arguments_, commandEnvironment = environment) {
+        const startedAt = new Date().toISOString();
+        let result;
+        let failure;
+        try {
+          result = await runPnpm(arguments_, { cwd: browserProject, env: commandEnvironment });
+        } catch (error) {
+          result = error;
+          failure = error;
+        }
+        await writeFile(join(owner, `development-origin-${label}.stdout`), result.stdout ?? "", { flag: "wx" });
+        await writeFile(join(owner, `development-origin-${label}.stderr`), result.stderr ?? "", { flag: "wx" });
+        commands.push({
+          label, arguments: arguments_, startedAt, completedAt: new Date().toISOString(),
+          nativeExit: failure === undefined ? 0 : typeof failure.code === "number" ? failure.code : null,
+          signal: failure?.signal ?? null, captureExit: 0,
+        });
+        await writeFile(join(owner, "development-origin-commands.json"), JSON.stringify(commands, null, 2));
+        if (failure !== undefined) throw failure;
+      }
+      await runDevelopmentMetadataCommand("install", ["install", "--frozen-lockfile", "--store-dir", support.store]);
+      await runDevelopmentMetadataCommand("browser-install", ["--dir", "apps/web", "run", "browser:install"]);
+      for (const [label, origin] of [["explicit", explicitOrigin], ["unset", undefined], ["empty", ""]]) {
+        const reportPath = join(owner, `development-origin-${label}.json`);
+        const browserEnvironment = { ...environment, PLAYWRIGHT_JSON_OUTPUT_FILE: reportPath, WATCHPACK_POLLING: "true" };
+        if (origin === undefined) delete browserEnvironment.NEXT_PUBLIC_SITE_URL;
+        else browserEnvironment.NEXT_PUBLIC_SITE_URL = origin;
+        await runDevelopmentMetadataCommand(label, [
+          "--dir", "apps/web", "exec", "playwright", "test", "--config", "playwright.dev.config.ts",
+          "tests/e2e/site-quality.spec.ts", "--grep", "uses the configured origin and target for every emitted page metadata$",
+          "--retries=0", "--reporter=json", "--output", join(owner, `development-origin-${label}-results`),
+        ], browserEnvironment);
+        const report = JSON.parse(await readFile(reportPath, "utf8"));
+        assert.equal(report.stats.expected, 1, label);
+        assert.equal(report.stats.skipped, 0, label);
+        assert.equal(report.stats.unexpected, 0, label);
+        assert.equal(report.stats.flaky, 0, label);
+      }
+    }
     const verification = await verifyApplicationEnvironmentProject(result.destination);
     assert.deepEqual(verification.targets.map(({ target }) => target), ["development", "staging", "production"]);
     assert.equal(new Set(verification.targets.map(({ receiptSha256 }) => receiptSha256)).size, 3);

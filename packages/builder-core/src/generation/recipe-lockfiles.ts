@@ -1,4 +1,4 @@
-import { applicationEnvironmentRecipeVersions, publicRecipeVersions } from "../contracts/profile.js";
+import { applicationEnvironmentRecipeVersions } from "../contracts/profile.js";
 
 const recipeLockfileVersions = [
   "portfolio-0.11.7", "portfolio-0.11.7-foundation", "site-0.12.7", "app-0.2.7", "app-0.2.7-persistence",
@@ -20,7 +20,7 @@ export function resolveRecipeLockfileVersion(
   const profile = identity.originProfile;
   if (profile !== "portfolio" && profile !== "site" && profile !== "app") return undefined;
   const environment = identity.recipeVersion === applicationEnvironmentRecipeVersions[profile];
-  if (!environment && identity.recipeVersion !== publicRecipeVersions[profile]) return undefined;
+  if (!environment) return undefined;
   const dependencies = manifest.dependencies;
   const development = manifest.devDependencies;
   if (dependencies.next !== "16.4.1" || development.vitest !== "5.0.3" ||
@@ -32,15 +32,9 @@ export function resolveRecipeLockfileVersion(
       development["drizzle-kit"] === "0.31.10" && development["@cloudflare/workers-types"] === "5.20261006.1"
       ? "app-0.2.7-persistence" : undefined;
   }
-  if (environment) {
-    if (profile === "app") return "app-0.3.0";
-    if (foundation) return profile === "portfolio" ? "portfolio-0.11.7-foundation" : "app-0.2.7";
-    return profile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
-  }
-  if (profile === "app" || (profile === "site" && foundation)) return "app-0.2.7";
-  return profile === "portfolio"
-    ? foundation ? "portfolio-0.11.7-foundation" : "portfolio-0.11.7"
-    : "site-0.12.7";
+  if (profile === "app") return "app-0.3.0";
+  if (foundation) return profile === "portfolio" ? "portfolio-0.11.7-foundation" : "app-0.2.7";
+  return profile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
 }
 
 export function createRecipeLockfileUrl(version: string): URL {

@@ -1,4 +1,3 @@
-import { publicRecipeVersions } from "./profile.js";
 import { z } from "zod";
 
 import {
@@ -110,34 +109,6 @@ export const capabilityRemovalVerificationChecks = [
   "post-state-inference",
 ] as const;
 
-export const capabilityUpgradePersistedVerificationChecks = [
-  "contracts",
-  "plan-approval",
-  "pre-state-inference",
-  ...ordinaryGenerationVerificationChecks,
-  "post-change-inference",
-] as const;
-
-export const capabilityUpgradeVerificationChecks = [
-  ...capabilityUpgradePersistedVerificationChecks,
-  "migration-record",
-  "post-state-inference",
-] as const;
-
-export const profileTransitionPersistedVerificationChecks = [
-  "contracts",
-  "plan-approval",
-  "pre-state-inference",
-  ...ordinaryGenerationVerificationChecks,
-  "post-change-inference",
-] as const;
-
-export const profileTransitionVerificationChecks = [
-  ...profileTransitionPersistedVerificationChecks,
-  "migration-record",
-  "post-state-inference",
-] as const;
-
 export const appCapabilityAdditionPersistedVerificationChecks = [
   "contracts",
   "plan-approval",
@@ -208,20 +179,6 @@ export const appProfileTransitionVerificationChecks = [
   "post-state-inference",
 ] as const;
 
-const legacyVerificationChecksSchema = z
-  .tuple([
-    z.literal("contracts"),
-    z.literal("pre-state-inference"),
-    z.literal("lockfile"),
-    z.literal("frozen-install"),
-    z.literal("lint"),
-    z.literal("typecheck"),
-    z.literal("next-build"),
-    z.literal("opennext-build"),
-    z.literal("post-state-inference"),
-  ])
-  .readonly();
-
 function createLiteralTupleSchema<
   const Values extends readonly [string, ...string[]],
 >(values: Values) {
@@ -248,18 +205,8 @@ const capabilityRemovalVerificationChecksSchema = z.union([
   createLiteralTupleSchema(persistenceCapabilityRemovalPersistedVerificationChecks),
 ]).readonly();
 
-const capabilityUpgradeVerificationChecksSchema = createLiteralTupleSchema(
-  capabilityUpgradePersistedVerificationChecks,
-).readonly();
-
-const profileTransitionVerificationChecksSchema = z.union([
-  createLiteralTupleSchema(profileTransitionPersistedVerificationChecks),
-  createLiteralTupleSchema(appProfileTransitionPersistedVerificationChecks),
-]).readonly();
-
 const verificationChecksSchema = z
   .union([
-    legacyVerificationChecksSchema,
     currentVerificationChecksSchema,
     createLiteralTupleSchema(appVerificationChecks),
     createLiteralTupleSchema(persistenceVerificationChecks),
@@ -285,46 +232,25 @@ function validateStateVerification(
   }>,
   context: z.RefinementCtx,
 ): void {
-    const hasFoundation = state.schemaVersion === "2.0.0"
-      ? state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.3.0")
-      : state.origin.profile === "app" ||
-        state.installedCapabilities.some(({ identifier, version }) => identifier === "app-foundation" && version === "0.2.0");
+    const hasFoundation = state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation");
     const hasPersistence = state.installedCapabilities.some(
       ({ identifier }) => identifier === "application-persistence",
     );
-    const supportsPersistence = state.origin.profile === "app" &&
-      ((state.schemaVersion === "1.0.0" && state.origin.recipeVersion === publicRecipeVersions.app) ||
-        (state.schemaVersion === "2.0.0" && state.origin.recipeVersion === "0.3.0"));
-    const expectedChecks = state.lastSuccessfulVerification.kind ===
-      "capability-addition"
-      ? hasPersistence
-        ? persistenceCapabilityAdditionPersistedVerificationChecks
-        : hasFoundation
-        ? appCapabilityAdditionPersistedVerificationChecks
-        : capabilityAdditionPersistedVerificationChecks
+    const expectedChecks = state.lastSuccessfulVerification.kind === "capability-addition"
+      ? hasPersistence ? persistenceCapabilityAdditionPersistedVerificationChecks
+        : hasFoundation ? appCapabilityAdditionPersistedVerificationChecks : capabilityAdditionPersistedVerificationChecks
       : state.lastSuccessfulVerification.kind === "capability-removal"
-        ? hasPersistence
-          ? persistenceCapabilityRemovalPersistedVerificationChecks
-          : hasFoundation
-          ? appCapabilityRemovalPersistedVerificationChecks
-          : capabilityRemovalPersistedVerificationChecks
-        : state.lastSuccessfulVerification.kind === "capability-upgrade"
-          ? capabilityUpgradePersistedVerificationChecks
-          : state.lastSuccessfulVerification.kind === "profile-transition"
-            ? hasFoundation
-              ? appProfileTransitionPersistedVerificationChecks
-              : profileTransitionPersistedVerificationChecks
-            : hasPersistence
-              ? persistenceVerificationChecks
-              : hasFoundation
-              ? appVerificationChecks
-              : currentVerificationChecks;
+        ? hasPersistence ? persistenceCapabilityRemovalPersistedVerificationChecks
+          : hasFoundation ? appCapabilityRemovalPersistedVerificationChecks : capabilityRemovalPersistedVerificationChecks
+        : state.lastSuccessfulVerification.kind === "profile-transition"
+          ? appProfileTransitionPersistedVerificationChecks
+          : hasPersistence ? persistenceVerificationChecks
+            : hasFoundation ? appVerificationChecks : currentVerificationChecks;
 
     if (
-      (hasPersistence && (!supportsPersistence ||
+      (hasPersistence && (state.origin.profile !== "app" ||
         state.lastSuccessfulVerification.kind === "profile-transition")) ||
-      (state.origin.profile === "app" &&
-        state.lastSuccessfulVerification.kind === "capability-upgrade") ||
+      (state.lastSuccessfulVerification.kind === "profile-transition" && state.origin.profile !== "app") ||
       !hasExactChecks(state.lastSuccessfulVerification.checks, expectedChecks)
     ) {
       context.addIssue({
@@ -337,9 +263,9 @@ function validateStateVerification(
 
 export const installedStateSchema = z
   .strictObject({
-    schemaVersion: z.literal("1.0.0"),
+    schemaVersion: z.literal("2.0.0"),
     builderVersion: z.literal("0.0.0"),
-    projectSchemaVersion: z.literal("1.0.0"),
+    projectSchemaVersion: z.literal("2.0.0"),
     origin: z
       .strictObject({
         profile: profileIdentifierSchema,
@@ -378,46 +304,14 @@ export const installedStateSchema = z
           checks: capabilityRemovalVerificationChecksSchema,
         }),
         z.strictObject({
-          kind: z.literal("capability-upgrade"),
-          checks: capabilityUpgradeVerificationChecksSchema,
-        }),
-        z.strictObject({
           kind: z.literal("profile-transition"),
-          checks: profileTransitionVerificationChecksSchema,
+          checks: createLiteralTupleSchema(appProfileTransitionPersistedVerificationChecks).readonly(),
         }),
       ])
       .readonly(),
   })
   .superRefine(validateStateVerification)
   .superRefine((state, context) => {
-    const persistence = state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence");
-    const standards = state.installedCapabilities.find(({ identifier }) => identifier === "standards");
-    const deployment = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
-    const backgroundJobs = state.installedCapabilities.some(({ identifier }) => identifier === "background-job-delivery");
-    const expectedDeploymentVersion = backgroundJobs
-      ? persistence ? "0.6.1" : "0.5.1"
-      : persistence ? "0.4.1" : "0.3.1";
-    if (state.origin.recipeVersion !== publicRecipeVersions[state.origin.profile] ||
-        standards?.version !== (persistence ? "0.6.1" : "0.5.1") ||
-        (deployment !== undefined && deployment.version !== expectedDeploymentVersion)) {
-      context.addIssue({ code: "custom", message: "public installed tuple must match recipe", path: ["installedCapabilities"] });
-    }
-  })
-  .readonly()
-  .meta({
-    id: "urn:egeria-systems:schema:state:1.0.0",
-    title: "Egeria installed state",
-  });
-
-export type InstalledCapability = z.infer<typeof installedCapabilitySchema>;
-export type InstalledSurface = z.infer<typeof installedSurfaceSchema>;
-export type InstalledState = z.infer<typeof installedStateSchema>;
-
-export const applicationEnvironmentInstalledStateSchema = z.strictObject({
-  ...installedStateSchema.unwrap().shape,
-  schemaVersion: z.literal("2.0.0"),
-  projectSchemaVersion: z.literal("2.0.0"),
-}).superRefine(validateStateVerification).superRefine((state, context) => {
   const persistence = state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence");
   const foundation = state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation");
   const email = state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend");
@@ -443,9 +337,16 @@ export const applicationEnvironmentInstalledStateSchema = z.strictObject({
     state.installedCapabilities.some(({ identifier, version }) => versions[identifier] !== version)) {
     context.addIssue({ code: "custom", message: "application environment installed tuple must match recipe", path: ["installedCapabilities"] });
   }
-}).readonly().meta({
-  id: "urn:egeria-systems:schema:state:2.0.0",
-  title: "Egeria application environment installed state",
-});
+})
+  .readonly()
+  .meta({
+    id: "urn:egeria-systems:schema:state:2.0.0",
+    title: "Egeria installed state",
+  });
 
-export type ApplicationEnvironmentInstalledState = z.infer<typeof applicationEnvironmentInstalledStateSchema>;
+export type InstalledCapability = z.infer<typeof installedCapabilitySchema>;
+export type InstalledSurface = z.infer<typeof installedSurfaceSchema>;
+export type InstalledState = z.infer<typeof installedStateSchema>;
+
+export const applicationEnvironmentInstalledStateSchema = installedStateSchema;
+export type ApplicationEnvironmentInstalledState = InstalledState;

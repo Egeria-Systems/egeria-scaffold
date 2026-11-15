@@ -589,7 +589,7 @@ test("native fetch cancellation requires successful headers and preserves every 
   });
 });
 
-test("guarded development rendering is candidate-only with standards ownership", async () => {
+test("guarded development rendering uses standards ownership for both current entry points", async () => {
   const core = await import("../dist/index.js");
   const request = { profile: "portfolio", projectName: "guarded-development", displayName: "Guarded Development", packageVersions: core.verifiedCapabilityPackageVersions };
   const candidate = await core.renderSkeleton(request, core.createApplicationEnvironmentRenderingContext());
@@ -599,8 +599,8 @@ test("guarded development rendering is candidate-only with standards ownership",
     assert.equal(candidate.value.surfaces.find(surface => surface.path === path)?.owner.identifier, "standards");
     assert.equal(Buffer.from(candidate.value.files.find(file => file.path === path).content).toString("utf8"), await readFile(new URL(`common/application-environments/${path}`, templates), "utf8"));
   }
-  assert.equal(current.value.files.some(file => file.path === "apps/web/scripts/browser-development-server.ts"), false);
-  assert.equal(Buffer.from(current.value.files.find(file => file.path === "apps/web/playwright.dev.config.ts").content).toString("utf8"), await readFile(new URL("common/apps/web/playwright.dev.config.ts", templates), "utf8"));
+  assert.deepEqual(current.value.files, candidate.value.files);
+  assert.deepEqual(current.value.surfaces, candidate.value.surfaces);
 });
 
 

@@ -14,7 +14,7 @@ import {
   createIsolatedProcessEnvironment,
   isolatedProcessOptions,
 } from "./lib/isolated-process.mjs";
-import { verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
+import { syntheticApplicationEnvironment, verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -26,42 +26,25 @@ const aggregateCreateTimeoutMilliseconds = 45 * 60 * 1000;
 const lifecycleCommandTimeoutMilliseconds = 45 * 60 * 1000;
 const profiles = Object.freeze(["portfolio", "site"]);
 const subject = Object.freeze({
-  descriptorVersion: "0.1.0",
-  behaviorContractDigest:
-    "sha256:ca2e69a35e935eab011f0543fdf140e644a0dec490650298bdfba730e2e9d378",
+  "descriptorVersion": "0.2.0",
+  "behaviorContractDigest": "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b"
 });
 const expectedAnalyticsSettings = Object.freeze({
   consent: Object.freeze({ policy: "explicit-opt-in" }),
   providers: Object.freeze({
-    cloudflareWebAnalytics: Object.freeze({
-      siteToken: "0123456789abcdef0123456789abcdef",
-    }),
-    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
-    microsoftClarity: Object.freeze({
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    }),
+    cloudflareWebAnalytics: true,
+    googleAnalytics4: true,
+    microsoftClarity: Object.freeze({ audience: "not-directed-to-minors" }),
   }),
   operationalIntegrations: Object.freeze({
-    googleSearchConsole: Object.freeze({
-      verificationToken: "search-console-verification-token",
-    }),
+    googleSearchConsole: true,
     lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
   }),
 });
 const providerArguments = Object.freeze([
-  "--cloudflare-web-analytics-token",
-  expectedAnalyticsSettings.providers.cloudflareWebAnalytics.siteToken,
-  "--google-analytics-id",
-  expectedAnalyticsSettings.providers.googleAnalytics4.measurementId,
-  "--microsoft-clarity-id",
-  expectedAnalyticsSettings.providers.microsoftClarity.projectId,
-  "--microsoft-clarity-audience",
-  expectedAnalyticsSettings.providers.microsoftClarity.audience,
-  "--search-console-verification",
-  expectedAnalyticsSettings.operationalIntegrations.googleSearchConsole
-    .verificationToken,
-  "--looker-studio",
+  "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
+  "--microsoft-clarity-audience", "not-directed-to-minors",
+  "--google-search-console", "--looker-studio",
 ]);
 const analyticsSettingsPath =
   "apps/web/src/integrations/analytics/analytics-settings.ts";
@@ -87,8 +70,12 @@ const generatedChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -208,28 +195,31 @@ function configurationFor(profile, revision) {
     profile,
     projectName: isPortfolio
       ? "acme-portfolio-analytics"
-      : "acme-site-multilingual-analytics",
+      : "acme-site-public-integrations",
     displayName: isPortfolio
       ? "Acme Portfolio Analytics"
-      : "Acme Site Multilingual Analytics",
+      : "Acme Site Public Integrations",
     createArguments: Object.freeze([
       ...providerArguments,
-      ...(isPortfolio ? [] : ["--multilingual"]),
+      ...(isPortfolio ? [] : ["--multilingual", "--booking-calendly", "--calendly-mode", "popup", "--contact-form-web3forms"]),
     ]),
     expectedCapabilities: isPortfolio
       ? Object.freeze([...commonCapabilities, "analytics"])
       : Object.freeze([
           ...commonCapabilities,
           "site-routing",
+          "contact-form-web3forms",
+          "booking-calendly",
           "analytics",
           "multilingual",
         ]),
+    expectedCapabilitySettings: { analytics: expectedAnalyticsSettings, ...(isPortfolio ? {} : { "booking-calendly": { mode: "popup" } }) },
     capabilityIdentifier: "analytics",
-    capabilityVersion: "0.1.0",
-    expectedRecipeVersion: isPortfolio ? "0.10.0" : "0.11.0",
+    capabilityVersion: "0.2.0",
+    expectedRecipeVersion: isPortfolio ? "0.12.0" : "0.13.0",
     verifierIdentifier: isPortfolio
       ? "portfolio-analytics"
-      : "site-multilingual-analytics",
+      : "site-public-integrations",
     expectedVerificationChecks: generatedChecks,
     expectedFixtureChecks: Object.freeze([
       "exact-generated-analytics-settings",
@@ -314,6 +304,7 @@ export async function verifyAnalyticsPortfolioForTesting({
 
   const childEnvironment = createIsolatedProcessEnvironment({
     ...(typeof environment.PATH === "string" ? { PATH: environment.PATH } : {}),
+    ...syntheticApplicationEnvironment(["analytics"], { analytics: expectedAnalyticsSettings }, "development", "http://localhost:3000"),
     HOME: home,
     USERPROFILE: home,
     TMPDIR: temporary,
@@ -360,6 +351,8 @@ export async function verifyAnalyticsPortfolioForTesting({
       arguments: ["run", "test:component"],
       failureCode: "COMPONENT_TESTS_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], failureCode: "DEPLOYMENT_CONTRACTS_FAILED" },
+    { arguments: ["--dir", "apps/web", "run", "check:environment"], failureCode: "APPLICATION_ENVIRONMENT_FAILED" },
     { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
     {
       arguments: [
@@ -372,10 +365,13 @@ export async function verifyAnalyticsPortfolioForTesting({
       ],
       failureCode: "OPENNEXT_BUILD_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
     {
       arguments: ["--dir", "apps/web", "run", "browser:install"],
       failureCode: "BROWSER_INSTALL_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "test:transport"], failureCode: "TRANSPORT_CONTRACTS_FAILED" },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
     {
       arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
       failureCode: "BROWSER_DEVELOPMENT_FAILED",
@@ -384,6 +380,7 @@ export async function verifyAnalyticsPortfolioForTesting({
       arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
       failureCode: "BROWSER_PREVIEW_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
   ];
 
   for (const command of commands) {
@@ -452,7 +449,7 @@ function requireJourneyResult(configuration, result) {
   if (
     result?.ok !== true ||
     result.capability !== "analytics" ||
-    result.version !== "0.1.0" ||
+    result.version !== "0.2.0" ||
     result.profile !== configuration.profile ||
     result.subject?.descriptorVersion !== subject.descriptorVersion ||
     result.subject?.behaviorContractDigest !== subject.behaviorContractDigest ||
@@ -566,7 +563,7 @@ async function certifyWithAuthority(input, adapters) {
   return Object.freeze({
     ok: true,
     capability: "analytics",
-    version: "0.1.0",
+    version: "0.2.0",
     profiles,
     subject,
     evidenceRevision: revision,

@@ -11,7 +11,7 @@ import {
 
 const decoder = new TextDecoder();
 
-test("environment contact controls require explicit schema selection and reject mixed controls", async () => {
+test("current contact controls select the canonical schema and reject retired controls", async () => {
   const rendered = await core.renderSkeleton({ profile: "portfolio", projectName: "contact-controls", displayName: "Contact Controls", contactFormWeb3Forms: true, packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext());
   assert.equal(rendered.ok, true);
   const state = {
@@ -22,12 +22,11 @@ test("environment contact controls require explicit schema selection and reject 
   };
   const files = new Map([[".egeria/project.yaml", core.serializeProjectYaml(rendered.value.project)], [".egeria/state.json", core.serializeStateJson(state)], [".egeria/migrations.jsonl", ""]]);
   const reader = { async readText(path) { return files.has(path) ? { kind: "file", content: files.get(path) } : { kind: "missing" }; } };
-  assert.equal(await readControlSnapshot(reader), undefined);
-  const controls = await readControlSnapshot(reader, "2.0.0");
+  const controls = await readControlSnapshot(reader);
   assert.equal(controls?.project.value.schemaVersion, "2.0.0");
   assert.equal(controls?.state.value.schemaVersion, "2.0.0");
-  files.set(".egeria/state.json", core.serializeStateJson(installedState));
-  assert.equal(await readControlSnapshot(reader, "2.0.0"), undefined);
+  files.set(".egeria/state.json", JSON.stringify({ ...state, schemaVersion: "1.0.0" }));
+  assert.equal(await readControlSnapshot(reader), undefined);
 });
 
 const previousMigrationSource =
@@ -49,11 +48,17 @@ const migrationRecord = {
 };
 
 const installedState = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "2.0.0",
   builderVersion: "0.0.0",
-  projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
-  installedCapabilities: [{ identifier: "standards", version: "0.5.1", deliveryMode: "hybrid", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" }],
+  projectSchemaVersion: "2.0.0",
+  origin: { profile: "portfolio", recipeVersion: "0.12.0" },
+  installedCapabilities: [
+    ["standards", "0.9.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+    ["deployment-cloudflare", "0.9.0"], ["observability", "0.4.0"],
+  ].map(([identifier, version]) => ({ identifier, version,
+    deliveryMode: ["standards", "observability"].includes(identifier) ? "package-backed" : "source-generated",
+    stateClassifications: ["repository-stateful"], removalPolicy: "reviewed",
+  })),
   appliedMigrations: ["current-migration"],
   managedSurfaces: [],
   ejections: [],
@@ -93,13 +98,49 @@ const installedStateSource = `{
   "ejections": [],
   "installedCapabilities": [
     {
-      "deliveryMode": "hybrid",
+      "deliveryMode": "package-backed",
       "identifier": "standards",
       "removalPolicy": "reviewed",
       "stateClassifications": [
         "repository-stateful"
       ],
-      "version": "0.5.1"
+      "version": "0.9.0"
+    },
+    {
+      "deliveryMode": "source-generated",
+      "identifier": "content-files",
+      "removalPolicy": "reviewed",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "version": "0.4.0"
+    },
+    {
+      "deliveryMode": "source-generated",
+      "identifier": "section-composition",
+      "removalPolicy": "reviewed",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "version": "0.3.0"
+    },
+    {
+      "deliveryMode": "source-generated",
+      "identifier": "deployment-cloudflare",
+      "removalPolicy": "reviewed",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "version": "0.9.0"
+    },
+    {
+      "deliveryMode": "package-backed",
+      "identifier": "observability",
+      "removalPolicy": "reviewed",
+      "stateClassifications": [
+        "repository-stateful"
+      ],
+      "version": "0.4.0"
     }
   ],
   "lastSuccessfulVerification": {
@@ -121,10 +162,10 @@ const installedStateSource = `{
   "managedSurfaces": [],
   "origin": {
     "profile": "portfolio",
-    "recipeVersion": "0.11.7"
+    "recipeVersion": "0.12.0"
   },
-  "projectSchemaVersion": "1.0.0",
-  "schemaVersion": "1.0.0"
+  "projectSchemaVersion": "2.0.0",
+  "schemaVersion": "2.0.0"
 }
 `;
 

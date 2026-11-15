@@ -26,28 +26,11 @@ const persistedVerificationChecks = [
   "post-change-inference",
 ];
 const root = "/generated/project";
-const settings = Object.freeze({
-  destination: "https://calendly.com/private/discovery",
-  mode: "popup",
-});
+const settings = Object.freeze({ mode: "popup" });
 const analyticsSettings = Object.freeze({
-  consent: Object.freeze({ policy: "explicit-opt-in" }),
-  providers: Object.freeze({
-    cloudflareWebAnalytics: Object.freeze({
-      siteToken: "0123456789abcdef0123456789abcdef",
-    }),
-    googleAnalytics4: Object.freeze({ measurementId: "G-ABCDEF1234" }),
-    microsoftClarity: Object.freeze({
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    }),
-  }),
-  operationalIntegrations: Object.freeze({
-    googleSearchConsole: Object.freeze({
-      verificationToken: "search-console-verification-token",
-    }),
-    lookerStudio: Object.freeze({ connector: "google-analytics-4" }),
-  }),
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 });
 const git = Object.freeze({
   ok: true,
@@ -80,7 +63,7 @@ async function loadTextEntries(directory) {
 }
 
 async function fixtureEntries(profile = "portfolio") {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${profile}-${profile.startsWith("portfolio") ? "0.11.7" : profile.startsWith("site") ? "0.12.7" : "0.2.7"}`));
+  return environmentContactEntries(profile.startsWith("site") ? "site" : profile.startsWith("app") ? "app" : "portfolio", { multilingual: profile.includes("multilingual") });
 }
 
 function createRepository(entries, failBatch, afterWrite) {
@@ -213,8 +196,8 @@ test("capability addition applies, verifies, re-infers, and persists migration t
     assert.deepEqual(result.value, {
       status: "verified-final-diff-approval-required",
       baseRevision: git.identity.revision,
-      capability: { identifier: "booking-calendly", version: "0.1.0" },
-      migration: "add-booking-calendly-0-1-0",
+      capability: { identifier: "booking-calendly", version: "0.2.0" },
+      migration: "add-booking-calendly-0-2-0",
       changedPaths: [
         ...plan.actions.map(({ path }) => path),
         ".egeria/migrations.jsonl",
@@ -236,14 +219,14 @@ test("capability addition applies, verifies, re-infers, and persists migration t
     assert.equal(state.ok, true, JSON.stringify(state.issues));
     assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
     assert.deepEqual(state.value.appliedMigrations, [
-      "add-booking-calendly-0-1-0",
+      "add-booking-calendly-0-2-0",
     ]);
     assert.deepEqual(state.value.lastSuccessfulVerification, {
       kind: "capability-addition",
       checks: persistedVerificationChecks,
     });
     assert.equal(migrations.value.length, 1);
-    assert.equal(migrations.value[0].identifier, "add-booking-calendly-0-1-0");
+    assert.equal(migrations.value[0].identifier, "add-booking-calendly-0-2-0");
     assert.deepEqual(
       migrations.value[0].verificationChecks,
       persistedVerificationChecks,
@@ -277,7 +260,7 @@ test("Calendly addition accepts the planned multilingual booking-composition rep
   assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
   assert.deepEqual(state.value.appliedMigrations, [
     "add-multilingual-0-1-0",
-    "add-booking-calendly-0-1-0",
+    "add-booking-calendly-0-2-0",
   ]);
   assert.deepEqual(
     migrations.value.map(({ identifier }) => identifier),
@@ -522,9 +505,9 @@ test("analytics addition composes with multilingual and persists only public set
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value.capability, {
     identifier: "analytics",
-    version: "0.1.0",
+    version: "0.2.0",
   });
-  assert.equal(result.value.migration, "add-analytics-0-1-0");
+  assert.equal(result.value.migration, "add-analytics-0-2-0");
   assert.deepEqual(verifierCalls, [root]);
   assert.deepEqual(
     result.value.changedPaths,
@@ -550,7 +533,7 @@ test("analytics addition composes with multilingual and persists only public set
     ),
     true,
   );
-  assert.equal(state.value.appliedMigrations.at(-1), "add-analytics-0-1-0");
+  assert.equal(state.value.appliedMigrations.at(-1), "add-analytics-0-2-0");
   assert.match(
     repository.files.get("apps/web/app/layout.tsx"),
     /AnalyticsConsent/u,
@@ -564,8 +547,7 @@ test("analytics addition binds transformation to the approved settings snapshot"
   const reader = {
     async readText(path) {
       if (path === ".egeria/project.yaml" && ++projectReads === 2) {
-        mutableSettings.providers.googleAnalytics4.measurementId =
-          "G-MUTATED1234";
+        delete mutableSettings.providers.microsoftClarity;
       }
       return repository.reader.readText(path);
     },
@@ -609,6 +591,13 @@ test("capability addition refuses an unapproved plan before writes or verificati
 test("capability addition leaves apply-time control read rejections for caller containment", async () => {
   const repository = createRepository(await fixtureEntries());
   const readFailure = new Error("private control read failure");
+  let planningProjectReads = 0;
+  await approvedPlan({
+    async readText(path) {
+      if (path === ".egeria/project.yaml") planningProjectReads += 1;
+      return repository.reader.readText(path);
+    },
+  });
   let projectReads = 0;
 
   await assert.rejects(
@@ -618,7 +607,7 @@ test("capability addition leaves apply-time control read rejections for caller c
         readText(path) {
           if (
             path === ".egeria/project.yaml" &&
-            ++projectReads === 3
+            ++projectReads === planningProjectReads + 1
           ) {
             return Promise.reject(readFailure);
           }
@@ -884,7 +873,7 @@ test("analytics addition retains failure prefixes and final authority", async ()
   assert.equal(persistedMigrations.ok, true);
   assert.equal(
     persistedMigrations.value.at(-1).identifier,
-    "add-analytics-0-1-0",
+    "add-analytics-0-2-0",
   );
   assert.equal(stateRepository.files.get(".egeria/state.json"), initialState);
 
@@ -1118,13 +1107,13 @@ test("application persistence addition preserves custom scripts and installs the
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   const state = JSON.parse(repository.files.get(".egeria/state.json"));
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.1");
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.4.1");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.10.0");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.10.0");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.equal(JSON.parse(repository.files.get("apps/web/package.json")).scripts.custom, "node custom.mjs");
   assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"), "utf8"));
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.1.1");
-  assert.equal(result.value.migration, "add-application-persistence-0-1-1");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
+  assert.equal(result.value.migration, "add-application-persistence-0-2-0");
   assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
 });
 
@@ -1180,7 +1169,7 @@ test("optional addition to a persistent app retains the binding verification lan
   });
   assert.equal(result.ok, true, JSON.stringify(result));
   const state = JSON.parse(repository.files.get(".egeria/state.json"));
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.6.1");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.10.0");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
 });
@@ -1317,7 +1306,7 @@ test("environment contact apply refuses forged or unsupported input before adapt
   for (const operation of ["add", "remove"]) {
     for (const invalid of [
       { renderingContext: { ...renderingContext, profiles: [] } },
-      { capability: "multilingual" },
+      { capability: "background-job-delivery" },
       operation === "add" ? { settings: { accessKey: "private-sentinel" } } : { persistenceRemoval: {} },
     ]) {
       const result = await (operation === "add" ? core.applyCapabilityAddition : core.applyCapabilityRemoval)({

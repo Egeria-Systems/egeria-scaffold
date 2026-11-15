@@ -1,7 +1,8 @@
+import { createVerifiedProjectSnapshot } from "../catalog/verified-package-versions.js";
+import { renderProjectTemplates } from "../generation/render-skeleton.js";
 import type { CapabilityDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type {
-  ApplicationEnvironmentInstalledState,
   InstalledCapability,
   InstalledState,
   InstalledSurface,
@@ -17,7 +18,7 @@ import {
   resolveJsonPointer,
   type JsonValue,
 } from "../serialization/canonical-json.js";
-import { parseStateJson } from "../state/codecs.js";
+import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
   evaluateInferenceProbes,
   type ProbeEvidence,
@@ -89,7 +90,7 @@ function capabilityEvidence(
 }
 
 function surfaceEvidence(
-  surface: InstalledSurface,
+  surface: Pick<InstalledSurface, "identifier" | "path">,
   status: SurfaceEvidenceStatus,
   code?: string,
 ): SurfaceEvidence {
@@ -101,8 +102,7 @@ function surfaceEvidence(
 
 async function inferState(
   reader: RepositoryReader,
-  projectSchemaVersion?: "2.0.0",
-): Promise<RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>> {
+): Promise<RepositoryStateEvidence> {
   const result = await reader.readText(".egeria/state.json");
 
   switch (result.kind) {
@@ -113,9 +113,7 @@ async function inferState(
     case "error":
       return { kind: "ambiguous", code: result.code };
     case "file": {
-      const parsed = projectSchemaVersion === "2.0.0"
-        ? parseStateJson(result.content, "2.0.0")
-        : parseStateJson(result.content);
+      const parsed = parseStateJson(result.content);
       return parsed.ok
         ? { kind: "valid", value: parsed.value }
         : { kind: "invalid", issues: parsed.issues };
@@ -146,7 +144,7 @@ function installedMetadataMatches(
 async function inferCapabilities(
   reader: RepositoryReader,
   catalog: readonly CapabilityDescriptor[],
-  state: RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>,
+  state: RepositoryStateEvidence,
 ): Promise<readonly CapabilityEvidence[]> {
   const sortedCatalog = [...catalog].sort((left, right) =>
     compareText(left.identifier, right.identifier),
@@ -301,27 +299,74 @@ async function inferManagedSurface(
   }
 }
 
+async function verifyDeploymentSurfaces(
+  reader: RepositoryReader,
+  state: InstalledState,
+  catalog: readonly CapabilityDescriptor[],
+  evidence: Map<string, SurfaceEvidence>,
+): Promise<void> {
+  const deployment = catalog.find(({ identifier }) => identifier === "deployment-cloudflare");
+  const installed = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
+  if (deployment === undefined || deployment.version !== installed?.version) return;
+  const required = deployment.managedSurfaces.filter(({ identifier }) =>
+    identifier === "deployment-cloudflare-workflow" || identifier === "deployment-cloudflare-ci-git",
+  );
+  if (required.length === 0) return;
+
+  const projectFile = await reader.readText(".egeria/project.yaml");
+  if (projectFile.kind !== "file") return;
+  const project = parseProjectYaml(projectFile.content);
+  if (!project.ok || !createVerifiedProjectSnapshot(project.value, state).ok) return;
+  const templates = await renderProjectTemplates(project.value, new Set(required.map(surface => surface.path)));
+  for (const descriptor of required) {
+    const record = state.managedSurfaces.find(surface => surface.identifier === descriptor.identifier);
+    let result: SurfaceEvidence;
+    if (record === undefined) {
+      result = surfaceEvidence(descriptor, "missing", "DEPLOYMENT_SURFACE_DECLARATION_MISSING");
+    } else if (
+      record.path !== descriptor.path || record.ownership !== descriptor.ownership ||
+      record.owner.kind !== "capability" || record.owner.identifier !== deployment.identifier ||
+      record.fingerprintTarget.kind !== "file" || record.mergeStrategy !== descriptor.mergeStrategy
+    ) {
+      result = surfaceEvidence(descriptor, "drifted", "DEPLOYMENT_SURFACE_DECLARATION_MISMATCH");
+    } else {
+      if (evidence.get(record.identifier)?.status !== "confirmed") continue;
+      const expected = templates.ok ? templates.value.find(file => file.path === descriptor.path) : undefined;
+      if (expected === undefined) {
+        result = surfaceEvidence(descriptor, "ambiguous", "DEPLOYMENT_TEMPLATE_UNAVAILABLE");
+      } else if (record.fingerprint !== fingerprintFileContent(expected.content)) {
+        result = surfaceEvidence(descriptor, "drifted");
+      } else {
+        continue;
+      }
+    }
+    evidence.set(descriptor.identifier, result);
+  }
+}
+
 async function inferSurfaces(
   reader: RepositoryReader,
-  state: RepositoryStateEvidence<InstalledState | ApplicationEnvironmentInstalledState>,
+  state: RepositoryStateEvidence,
+  catalog: readonly CapabilityDescriptor[],
 ): Promise<readonly SurfaceEvidence[]> {
   if (state.kind !== "valid") {
     return [];
   }
 
-  const results: SurfaceEvidence[] = [];
+  const results = new Map<string, SurfaceEvidence>();
 
   for (const surface of state.value.managedSurfaces) {
     if (surface.ownership === "application-owned") {
-      results.push(surfaceEvidence(surface, "application-owned"));
+      results.set(surface.identifier, surfaceEvidence(surface, "application-owned"));
     } else if (surface.ownership === "ejected") {
-      results.push(surfaceEvidence(surface, "ejected"));
+      results.set(surface.identifier, surfaceEvidence(surface, "ejected"));
     } else {
-      results.push(await inferManagedSurface(reader, surface));
+      results.set(surface.identifier, await inferManagedSurface(reader, surface));
     }
   }
 
-  return results.sort((left, right) => {
+  await verifyDeploymentSurfaces(reader, state.value, catalog, results);
+  return [...results.values()].sort((left, right) => {
     const identifierComparison = compareText(left.identifier, right.identifier);
     return identifierComparison === 0
       ? compareText(left.path, right.path)
@@ -329,15 +374,13 @@ async function inferSurfaces(
   });
 }
 
-export function inferRepository(request: InferRepositoryRequest & Readonly<{ projectSchemaVersion: "2.0.0" }>): Promise<RepositoryInference<ApplicationEnvironmentInstalledState>>;
-export function inferRepository(request: InferRepositoryRequest): Promise<RepositoryInference>;
 export async function inferRepository(
-  request: InferRepositoryRequest & Readonly<{ projectSchemaVersion?: "2.0.0" }>,
-): Promise<RepositoryInference<InstalledState | ApplicationEnvironmentInstalledState>> {
+  request: InferRepositoryRequest,
+): Promise<RepositoryInference> {
   const reader = createCachingRepositoryReader(request.reader);
-  const state = await inferState(reader, request.projectSchemaVersion);
+  const state = await inferState(reader);
   const capabilities = await inferCapabilities(reader, request.catalog, state);
-  const surfaces = await inferSurfaces(reader, state);
+  const surfaces = await inferSurfaces(reader, state, request.catalog);
 
   return { state, capabilities, surfaces };
 }

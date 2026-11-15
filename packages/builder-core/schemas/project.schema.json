@@ -1,6 +1,6 @@
 {
   "$defs": {
-    "urn:egeria-systems:schema:project:1.0.0": {
+    "urn:egeria-systems:schema:project:2.0.0": {
       "additionalProperties": false,
       "properties": {
         "builderCompatibility": {
@@ -31,18 +31,8 @@
                   "additionalProperties": false,
                   "properties": {
                     "googleSearchConsole": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "verificationToken": {
-                          "pattern": "^[A-Za-z0-9_-]{16,128}$",
-                          "type": "string"
-                        }
-                      },
-                      "readOnly": true,
-                      "required": [
-                        "verificationToken"
-                      ],
-                      "type": "object"
+                      "const": true,
+                      "type": "boolean"
                     },
                     "lookerStudio": {
                       "additionalProperties": false,
@@ -66,32 +56,12 @@
                   "additionalProperties": false,
                   "properties": {
                     "cloudflareWebAnalytics": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "siteToken": {
-                          "pattern": "^[A-Fa-f0-9]{32}$",
-                          "type": "string"
-                        }
-                      },
-                      "readOnly": true,
-                      "required": [
-                        "siteToken"
-                      ],
-                      "type": "object"
+                      "const": true,
+                      "type": "boolean"
                     },
                     "googleAnalytics4": {
-                      "additionalProperties": false,
-                      "properties": {
-                        "measurementId": {
-                          "pattern": "^G-[A-Z0-9]{6,20}$",
-                          "type": "string"
-                        }
-                      },
-                      "readOnly": true,
-                      "required": [
-                        "measurementId"
-                      ],
-                      "type": "object"
+                      "const": true,
+                      "type": "boolean"
                     },
                     "microsoftClarity": {
                       "additionalProperties": false,
@@ -99,15 +69,10 @@
                         "audience": {
                           "const": "not-directed-to-minors",
                           "type": "string"
-                        },
-                        "projectId": {
-                          "pattern": "^[a-z0-9]{8,32}$",
-                          "type": "string"
                         }
                       },
                       "readOnly": true,
                       "required": [
-                        "projectId",
                         "audience"
                       ],
                       "type": "object"
@@ -128,12 +93,6 @@
             "booking-calendly": {
               "additionalProperties": false,
               "properties": {
-                "destination": {
-                  "maxLength": 2048,
-                  "minLength": 1,
-                  "pattern": "^https:\\/\\/(?:www\\.)?calendly\\.com(?::443)?\\/[^\\s/?#][^\\s?#]*$",
-                  "type": "string"
-                },
                 "mode": {
                   "enum": [
                     "link",
@@ -145,22 +104,7 @@
               },
               "readOnly": true,
               "required": [
-                "destination",
                 "mode"
-              ],
-              "type": "object"
-            },
-            "contact-form-web3forms": {
-              "additionalProperties": false,
-              "properties": {
-                "accessKey": {
-                  "pattern": "^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$",
-                  "type": "string"
-                }
-              },
-              "readOnly": true,
-              "required": [
-                "accessKey"
               ],
               "type": "object"
             }
@@ -212,9 +156,6 @@
         },
         "recipeVersion": {
           "enum": [
-            "0.11.7",
-            "0.12.7",
-            "0.2.7",
             "0.12.0",
             "0.13.0",
             "0.3.0"
@@ -222,7 +163,7 @@
           "type": "string"
         },
         "schemaVersion": {
-          "const": "1.0.0",
+          "const": "2.0.0",
           "type": "string"
         },
         "selectedCapabilities": {
@@ -262,6 +203,6 @@
       "type": "string"
     }
   },
-  "$ref": "#/$defs/urn:egeria-systems:schema:project:1.0.0",
+  "$ref": "#/$defs/urn:egeria-systems:schema:project:2.0.0",
   "$schema": "https://json-schema.org/draft/2020-12/schema"
 }

@@ -1,0 +1,37 @@
+metadata:
+  title: "Acme Site Multilingual"
+  description: A multi-page public website.
+accessibility:
+  skipToContent: Skip to content
+home:
+  sections:
+    - id: introduction
+      type: hero
+      variant: default
+      enabled: true
+      content:
+        heading: "Acme Site Multilingual"
+        summary: A clear starting point for this website.
+    - id: welcome
+      type: text
+      variant: default
+      enabled: true
+      content:
+        heading: Welcome
+        body: Explore the work, background, and ways to connect.
+    - id: contact
+      type: call-to-action
+      variant: default
+      enabled: true
+      content:
+        heading: Get in touch
+        summary: Start a conversation about your next project.
+        label: Send an email
+        href: mailto:hello@example.com
+navigation:
+  - href: /
+    label: Home
+  - href: /about
+    label: About
+  - href: /work/featured
+    label: Work

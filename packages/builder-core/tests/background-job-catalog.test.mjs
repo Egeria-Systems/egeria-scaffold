@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createHash } from "node:crypto";
+import { parseDocument } from "yaml";
 import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -9,12 +9,13 @@ import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 import { createGenerationRenderingContext, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 
-import { createCurrentProfileRecipes } from "../dist/profiles/profile-recipes.js";
 
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
 import { createApplicationEnvironmentRenderingContext, isApplicationEnvironmentRenderingContext } from "../dist/catalog/verified-package-versions.js";
 
 const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example", displayName: "Jobs example", packageVersions: verifiedCapabilityPackageVersions, ...extra });
+
+const excludedOperatorFiles = ["apps/web/scripts/job-operator.mjs", "apps/web/src/infrastructure/cloudflare/job-operations.ts", "apps/web/tests/unit/job-operations.test.ts"];
 
 test("application environment catalog admits exactly the four deployment compositions", () => {
   for (const [persistence, jobs, standards, deployment] of [
@@ -35,9 +36,12 @@ test("application environment catalog admits exactly the four deployment composi
     assert.equal(descriptor?.version, jobs ? "0.3.0" : undefined);
     if (jobs) {
       assert.deepEqual(descriptor.migrationPlanners, []);
-      assert.equal(descriptor.managedSurfaces.some(({ path }) => path === "apps/web/scripts/job-operator.mjs"), false);
-      for (const operation of ["inspect-terminal-job", "replay-terminal-job", "observe-job-drain"]) {
-        assert.equal(descriptor.privilegedOperations.includes(operation), false);
+      assert.deepEqual(descriptor.privilegedOperations, ["dispatch-background-job", "consume-background-job"]);
+      for (const path of excludedOperatorFiles) {
+        assert.equal(descriptor.managedSurfaces.some(surface => surface.path === path), false, path);
+      }
+      for (const check of ["bounded-replay-and-drain", "uncertain-acknowledgement-resumption"]) {
+        assert.equal(descriptor.verificationPlan.includes(check), false, check);
       }
       assert.ok(descriptor.removalAndRecoveryRequirements.includes("unsupported-lifecycle-refusal"));
     }
@@ -63,7 +67,7 @@ test("optional jobs preserves current profile recipes and installs no implicit p
     assert.equal(project.originProfile, profile);
     assert.equal(project.selectedCapabilities.includes("application-persistence"), false);
     assert.equal(project.selectedCapabilities.includes("transactional-email-resend"), false);
-    assert.equal(resolved.capabilities.find(({identifier}) => identifier === "app-foundation").version, "0.2.0");
+    assert.equal(resolved.capabilities.find(({identifier}) => identifier === "app-foundation").version, "0.3.0");
     assert.ok(files.some(({path}) => path === "apps/web/src/application/job-delivery.ts"));
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({path}) => path === "apps/web/package.json").content));
     assert.ok(resolveRecipeLockfileVersion(project, manifest));
@@ -96,7 +100,7 @@ test("application environment jobs render matching manifests and independent ser
         const generated = new Map(files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
         const manifest = JSON.parse(generated.get("apps/web/package.json"));
         assert.ok(resolveRecipeLockfileVersion(project, manifest));
-        for (const path of ["apps/web/scripts/job-operator.mjs", "apps/web/src/infrastructure/cloudflare/job-operations.ts", "apps/web/tests/unit/job-operations.test.ts"]) {
+        for (const path of excludedOperatorFiles) {
           assert.equal(generated.has(path), false, path);
         }
         assert.match(generated.get("apps/web/worker.mjs"), /\.open-next\/assets\/BUILD_ID/u);
@@ -128,7 +132,7 @@ test("jobs and persistence share the selected Worker entry without weakening dat
   assert.equal(result.ok, true, JSON.stringify(result));
   const root = await mkdtemp(join(tmpdir(), "jobs-database-preflight-"));
   try {
-    for (const file of result.value.files.filter(({path})=>["apps/web/wrangler.jsonc","apps/web/scripts/check-application-database.mjs"].includes(path))) {
+    for (const file of result.value.files.filter(({path})=>["apps/web/wrangler.jsonc","apps/web/scripts/check-application-database.mjs","apps/web/src/configuration/application-environment.ts","apps/web/src/configuration/application-database.ts"].includes(path))) {
       const destination = join(root, file.path); await mkdir(dirname(destination), {recursive:true}); await writeFile(destination,file.content);
     }
     const output = execFileSync(process.execPath, ["scripts/check-application-database.mjs", "local"], { cwd: join(root,"apps/web"),encoding:"utf8" });
@@ -150,7 +154,7 @@ test("remote jobs preflight requires explicit review of the Free-tier retention 
         await writeFile(destination, file.content);
       }
       const invoke = (environment, reviewed) => execFileSync(process.execPath, ["scripts/check-job-delivery.mjs", environment], {
-        cwd: join(root, "apps/web"), encoding: "utf8", stdio: "pipe", env: { JOB_RETENTION_REVIEWED: reviewed },
+        cwd: join(root, "apps/web"), encoding: "utf8", stdio: "pipe", env: { APPLICATION_ENVIRONMENT: environment === "local" ? "development" : environment, JOB_RETENTION_REVIEWED: reviewed },
       });
       assert.equal(invoke("local", ""), "JOB_CONFIGURATION_VALID\n");
       for (const environment of ["staging", "production"]) {
@@ -175,46 +179,51 @@ test("remote jobs preflight requires explicit review of the Free-tier retention 
       await writeFile(join(root, "apps/web/wrangler.jsonc"), JSON.stringify(config));
       assert.throws(() => invoke("production", "true"), { status: 1 });
       const workflow = new TextDecoder().decode(result.value.files.find(({ path }) => path === ".github/workflows/deploy.yml").content);
-      assert.match(workflow, /job_retention_reviewed:\n\s+description:.*24-hour.*\n\s+required: true\n\s+type: boolean\n\s+default: false/u);
-      assert.match(workflow, /JOB_RETENTION_REVIEWED: \$\{\{ inputs\.job_retention_reviewed \}\}/u);
+      const deployment = parseDocument(workflow).toJS();
+      for (const target of ["staging", "production"]) {
+        const input = deployment.on.workflow_dispatch.inputs[`${target}_job_retention_reviewed`];
+        assert.deepEqual({ required: input.required, type: input.type, default: input.default }, { required: true, type: "boolean", default: false });
+        assert.match(input.description, /86400-second retention/u);
+        assert.equal(deployment.jobs[target].env.JOB_RETENTION_REVIEWED, "${{ inputs." + target + "_job_retention_reviewed }}");
+      }
     } finally { await rm(root, { recursive: true, force: true }); }
   }
 });
 
 
-test("new jobs generation materializes the operator capability version", async () => {
+test("default jobs generation omits credentialed operator tools", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true }));
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.value.resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.2.0");
-    for (const path of ["apps/web/scripts/job-operator.mjs", "apps/web/src/infrastructure/cloudflare/job-operations.ts", "apps/web/tests/unit/job-operations.test.ts"]) {
-      assert.ok(result.value.files.some((file) => file.path === path), path);
+    assert.equal(result.value.resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.3.0");
+    for (const path of excludedOperatorFiles) {
+      assert.equal(result.value.files.some(file => file.path === path), false, path);
     }
   }
 });
 
-test("retained jobs keeps its accepted descriptor on current public recipes", async () => {
-  const cases = [["portfolio", false], ["site", false], ["app", false], ["app", true]];
-  for (const [profile, persistence] of cases) {
-    const context = { ...createGenerationRenderingContext(persistence, true, true, "0.1.0"), profiles: createCurrentProfileRecipes() };
-    const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true, ...(persistence ? { applicationPersistence: true } : {}) }), context);
-    assert.equal(result.ok, true, JSON.stringify(result));
-    const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
-    assert.equal(catalog.ok, true);
-    const descriptor = catalog.value.find(({ identifier }) => identifier === "background-job-delivery");
-    assert.equal(createHash("sha256").update(JSON.stringify(descriptor)).digest("hex"), "1b1cc9768391e6193409b8ea95cd2fd8cfaccf65da86be59b9828c5445a719c4");
+test("jobs generation refuses retired jobs contexts", async () => {
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const version of ["0.1.0", "0.2.0"]) {
+      const context = createGenerationRenderingContext(false, false, true);
+      const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true }), {
+        ...context, catalogSnapshot: { ...context.catalogSnapshot, backgroundJobDelivery: version },
+      });
+      assert.equal(result.ok, false);
+      assert.equal(Object.hasOwn(result, "value"), false);
+    }
   }
 });
 
-
-test("jobs catalog rejects mixed and unknown tuples for both real versions", () => {
-  for (const version of ["0.1.0", "0.2.0"]) {
-    const snapshot = createGenerationRenderingContext(false, true, true, version).catalogSnapshot;
+test("jobs catalog rejects mixed and unknown current tuples", () => {
+  for (const persistence of [false, true]) {
+    const snapshot = createGenerationRenderingContext(persistence, false, true).catalogSnapshot;
     assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, snapshot).ok, true);
     for (const changed of [
-      { backgroundJobDelivery: "0.3.0" }, { deploymentCloudflare: "0.3.1" },
-      { deploymentCloudflare: "0.6.1" }, { appFoundation: "0.1.0" },
-      { standards: "0.4.0" }, { siteRouting: "0.3.0" },
+      { backgroundJobDelivery: "0.1.0" }, { backgroundJobDelivery: "0.2.0" },
+      { deploymentCloudflare: "0.3.0" }, { deploymentCloudflare: "0.6.0" },
+      { deploymentCloudflare: "0.3.1" }, { deploymentCloudflare: "0.6.1" },
+      { appFoundation: "0.1.0" }, { standards: "0.4.0" }, { siteRouting: "0.3.0" },
       { applicationPersistence: "0.1.1" },
     ]) assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, { ...snapshot, ...changed }).ok, false, JSON.stringify(changed));
   }

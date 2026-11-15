@@ -30,12 +30,103 @@ const browserFixturePath = resolve(
 );
 const exactRevision = "0123456789abcdef0123456789abcdef01234567";
 const exactDigest =
-  "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
-const exactHostname = "integration-test-deploy.example-account.workers.dev";
+  "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b";
+const exactHostname = "integration-test-deploy.qa.example.com";
 const exactSiteTag = "site-tag-0123456789abcdef";
 const exactSiteTokenDigest = "a".repeat(64);
 const exactDeploymentId = "11111111-2222-4333-8444-555555555555";
 const exactVersionId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+
+test("protected staging receipts retain exact identities and refuse unsupported hostnames", async () => {
+  const { createAnalyticsCertificationProviderReceiptForTesting: createReceipt } = await import(receiptBuilderPath);
+  for (const mode of ["exercise", "cleanup"]) {
+    assert.equal(createReceipt(measuredEvidence(mode)).mode, mode);
+    for (const hostname of ["localhost", "qa.localhost", "qa.local", "127.0.0.1", "[::1]", "worker.account.workers.dev", "version-worker.account.workers.dev", "qa.example.com.", "QA.example.com", "*.example.com", "qa.example.com/path"]) {
+      const evidence = measuredEvidence(mode);
+      for (const value of [evidence.context.resources, evidence.siteIdentity, evidence.workerIdentity, evidence.siteReadback, evidence.deploymentReadback, evidence.readiness, evidence.cleanup]) {
+        if (value !== null) value.hostname = hostname;
+      }
+      assert.throws(() => createReceipt(evidence), { code: "ANALYTICS_PROVIDER_EVIDENCE_INVALID" }, `${mode}: ${hostname}`);
+    }
+    const legacy = measuredEvidence(mode);
+    legacy.context.resources.target = "dedicated-non-production-workers-dev";
+    assert.throws(() => createReceipt(legacy), { code: "ANALYTICS_PROVIDER_EVIDENCE_INVALID" });
+  }
+});
+
+test("analytics protected staging admission refuses invalid origins and incomplete Access pairs", async () => {
+  const workflow = parseYaml(await readFile(workflowPath, "utf8"));
+  const step = workflow.jobs.certify.steps.find(({ name }) => name === "Verify protected staging inputs");
+  assert.ok(step, "protected staging admission must precede provider effects");
+  const program = /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(step.run)?.[1];
+  assert.equal(typeof program, "string");
+  const environment = { PATH: process.env.PATH, DEPLOY_URL: `https://${exactHostname}`, CF_ACCESS_CLIENT_ID: "synthetic-client.access", CF_ACCESS_CLIENT_SECRET: "cfast_synthetic-secret" };
+  const verify = (overrides, expected) => {
+    const result = spawnSync(process.execPath, ["--input-type=module", "--eval", `globalThis.fetch = () => { throw new Error("UNEXPECTED_NETWORK_REQUEST"); };\n${program}`], {
+      cwd: repositoryRoot, env: { ...environment, ...overrides }, encoding: "utf8", timeout: 5000, maxBuffer: 8192,
+    });
+    assert.equal(result.error, undefined);
+    assert.equal(result.signal, null);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+    assert.equal(result.status, expected, JSON.stringify(overrides));
+  };
+  verify({}, 0);
+  for (const value of ["", "http://qa.example.com", `https://${exactHostname}/`, "https://qa.example.com/path", "https://qa.example.com?query=1", "https://qa.example.com#fragment", "https://user:password@qa.example.com", "https://qa.example.com:8443", "https://localhost", "https://qa.local", "https://127.0.0.1", "https://[::1]", "https://worker.account.workers.dev", " https://qa.example.com"]) verify({ DEPLOY_URL: value }, 1);
+  for (const name of ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"]) {
+    verify({ [name]: "" }, 1);
+    verify({ [name]: " " }, 1);
+  }
+});
+
+test("readiness sends the Access pair only to the admitted origin and writes no credentials", async () => {
+  const workflow = parseYaml(await readFile(workflowPath, "utf8"));
+  const step = workflow.jobs.certify.steps.find(({ name }) => name === "Wait for dedicated Worker readiness");
+  const program = /node --input-type=module -e '\n([\s\S]*?)\n\s*'/u.exec(step.run)?.[1];
+  assert.equal(typeof program, "string");
+  for (const missing of [null, "CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET"]) {
+    const directory = await mkdtemp(join(tmpdir(), "analytics-private-readiness-"));
+    try {
+      const environment = {
+        PATH: process.env.PATH, EVIDENCE_DIRECTORY: directory, HEAD_SHA: exactRevision,
+        DEPLOY_URL: `https://${exactHostname}`, CF_ACCESS_CLIENT_ID: "synthetic-client.access",
+        CF_ACCESS_CLIENT_SECRET: "cfast_synthetic-secret", MAXIMUM_ATTEMPTS: "20",
+        INTERVAL_MILLISECONDS: "15000", REQUEST_TIMEOUT_MILLISECONDS: "5000", MAXIMUM_ELAPSED_MILLISECONDS: "300000",
+        ...(missing === null ? {} : { [missing]: "" }),
+      };
+      const stub = `import { writeFileSync as recordRequest } from "node:fs";
+        globalThis.fetch = async (url, options) => {
+          recordRequest(process.env.EVIDENCE_DIRECTORY + "/request.json", JSON.stringify({
+            url: String(url), headers: options.headers, redirect: options.redirect,
+            deadline: options.signal instanceof AbortSignal,
+          }));
+          return { ok: true, status: 200 };
+        };\n`;
+      const result = spawnSync(process.execPath, ["--input-type=module", "--eval", stub + program], {
+        cwd: repositoryRoot, env: environment, encoding: "utf8", timeout: 5000, maxBuffer: 8192,
+      });
+      assert.equal(result.error, undefined);
+      assert.equal(result.signal, null);
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, "");
+      assert.equal(result.status, missing === null ? 0 : 1);
+      if (missing !== null) {
+        await assert.rejects(readFile(join(directory, "request.json")), { code: "ENOENT" });
+        await assert.rejects(readFile(join(directory, "readiness.json")), { code: "ENOENT" });
+        continue;
+      }
+      assert.deepEqual(JSON.parse(await readFile(join(directory, "request.json"), "utf8")), {
+        url: `https://${exactHostname}/en-CA`, redirect: "error", deadline: true,
+        headers: { "User-Agent": "egeria-analytics-certification-synthetic", "CF-Access-Client-Id": environment.CF_ACCESS_CLIENT_ID, "CF-Access-Client-Secret": environment.CF_ACCESS_CLIENT_SECRET },
+      });
+      const receipt = await readFile(join(directory, "readiness.json"), "utf8");
+      assert.equal(JSON.parse(receipt).attempts, 1);
+      assert.doesNotMatch(receipt, /CF-Access|synthetic-client|cfast_/u);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }
+});
 
 function measuredEvidence(mode = "exercise") {
   const context = {
@@ -52,13 +143,13 @@ function measuredEvidence(mode = "exercise") {
     },
     subject: {
       identifier: "analytics",
-      version: "0.1.0",
+      version: "0.2.0",
       behaviorContractDigest: exactDigest,
     },
     environment: "integration-test-deploy",
     resources: {
       worker: "integration-test-deploy",
-      target: "dedicated-non-production-workers-dev",
+      target: "dedicated-protected-staging",
       hostname: exactHostname,
       production: false,
     },
@@ -128,7 +219,7 @@ function measuredEvidence(mode = "exercise") {
       schemaVersion: "1.0.0",
       headSha: exactRevision,
       profile: "app",
-      recipeVersion: "0.2.7",
+      recipeVersion: "0.3.0",
       workerIntegration: { executed: ["app-analytics"], skipped: [] },
       appBuildEvidence: [{
         fixture: "app-analytics",
@@ -204,7 +295,7 @@ function measuredEvidence(mode = "exercise") {
         providerRequests: 0,
         unexpectedExternalRequests: 0,
         consentRecordPersisted: true,
-        consentRecordSchemaVersion: 2,
+        consentRecordSchemaVersion: 3,
         deniedPurposeCount: 3,
         providerCookieCount: 0,
       },
@@ -398,11 +489,11 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(steps["Verify checked out subject"].run, new RegExp(exactDigest, "u"));
   assert.match(
     steps["Verify and prepare analytics candidate"].run,
-    /installedCapabilities[\s\S]+identifier === "analytics"[\s\S]+version === "0\.1\.0"/u,
+    /installedCapabilities[\s\S]+identifier === "analytics"[\s\S]+version === "0\.2\.0"/u,
   );
   assert.match(
     steps["Verify and prepare analytics candidate"].run,
-    /analytics-settings\.ts/u,
+    /\.egeria\/project\.yaml/u,
   );
   assert.match(steps["Generate exact analytics candidate"].run, /create --profile app /u);
   const preparation = steps["Verify and prepare analytics candidate"].run;
@@ -410,6 +501,32 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(preparation, /inspectAppEffectBuild/u);
   assert.match(preparation, /requireAppRuntimeEvidence/u);
   assert.match(preparation, /app-build\.json/u);
+  assert.deepEqual(job.env, {
+    APPLICATION_ENVIRONMENT: "staging",
+    CLOUDFLARE_ENV: "staging",
+    NEXT_PUBLIC_SITE_URL: "${{ vars.DEPLOY_URL }}",
+    BUILD_SOURCE_REVISION: "${{ github.sha }}",
+    EXPECTED_REVISION: "${{ inputs.expected_revision }}",
+  });
+  const admission = steps["Verify protected staging inputs"];
+  assert.equal(admission.if, "env.CERTIFICATION_MODE == 'exercise'");
+  assert.ok(job.steps.indexOf(admission) < job.steps.indexOf(steps["Install and build trusted source"]));
+  for (const name of ["Verify protected staging inputs", "Wait for dedicated Worker readiness", "Exercise deployed consent behavior"]) {
+    assert.equal(steps[name].env.CF_ACCESS_CLIENT_ID, "${{ secrets.CF_ACCESS_CLIENT_ID }}");
+    assert.equal(steps[name].env.CF_ACCESS_CLIENT_SECRET, "${{ secrets.CF_ACCESS_CLIENT_SECRET }}");
+  }
+  for (const name of ["ANALYTICS_TEST_BUILD_FLAG", "ANALYTICS_TEST_TARGET", "ANALYTICS_TEST_EXPECTED_SITE_ORIGIN", "ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN", "ANALYTICS_TEST_EXPECTED_GA4_ID", "ANALYTICS_TEST_EXPECTED_CLARITY_ID", "ANALYTICS_TEST_EXPECTED_VERIFICATION"]) {
+    assert.match(preparation, new RegExp(`export ${name}=` , "u"));
+  }
+  const sourceCommit = preparation.indexOf('commit -m "Record analytics certification source"');
+  const artifactRecord = preparation.indexOf('run check:prepared-artifact record staging');
+  const preview = preparation.indexOf('run test:e2e:preview');
+  assert.ok(sourceCommit >= 0 && artifactRecord > sourceCommit && preview > artifactRecord);
+  assert.equal((preparation.match(/run check:prepared-artifact verify staging/gu) ?? []).length, 2);
+  assert.match(preparation, /--builder-generated="\$ANALYTICS_GENERATED_REVISION"/u);
+  const deployment = steps["Deploy dedicated certification Worker"].run;
+  assert.ok(deployment.indexOf('run check:prepared-artifact verify staging') < deployment.indexOf('opennextjs-cloudflare deploy'));
+  assert.match(deployment, /deploy --env staging --name integration-test-deploy -- --x-provision=false --x-auto-create=false/u);
   assert.ok(job.steps.indexOf(steps["Verify and prepare analytics candidate"]) < job.steps.indexOf(steps["Deploy dedicated certification Worker"]));
   assert.match(steps["Exercise deployed consent behavior"].run, /--retries=0/u);
   assert.match(steps["Exercise deployed consent behavior"].run, /synthetic/iu);
@@ -418,7 +535,7 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.match(steps["Create and read back Web Analytics site"].run, /false/u);
   assert.match(
     steps["Prepare private identity envelopes"].run,
-    /integration-test-deploy\\\.[\s\S]+workers\\\.dev[\s\S]+target\.href !== `https:\/\/\$\{target\.hostname\}\//u,
+    /target\.protocol !== "https:" \|\| target\.origin !== process\.env\.DEPLOY_URL/u,
   );
   assert.match(
     steps["Create and read back Web Analytics site"].run,
@@ -524,6 +641,8 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   assert.deepEqual(
     [...new Set(secretReferences.map(({ name }) => name))].sort(),
     [
+      "CF_ACCESS_CLIENT_ID",
+      "CF_ACCESS_CLIENT_SECRET",
       "CLOUDFLARE_ACCOUNT_ID",
       "CLOUDFLARE_DEPLOY_API_TOKEN",
       "CLOUDFLARE_WEB_ANALYTICS_API_TOKEN",
@@ -563,11 +682,27 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
   );
   assert.match(
     browserFixture,
-    /reloadedDocumentResources[\s\S]+classifyUrl\(url, applicationRoot\.hostname\)[\s\S]+providerRequests\(withdrawalRequests\)/u,
+    /reloadedDocumentResources[\s\S]+classifyUrl\(url, applicationRoot\.origin\)[\s\S]+providerRequests\(withdrawalRequests\)/u,
   );
   assert.doesNotMatch(browserFixture, /withdrawal(?:Reload)?StartIndex/u);
   assert.doesNotMatch(browserFixture, /requests\s*=\s*\[\]/u);
-  assert.doesNotMatch(browserFixture, /page\.route|route\.fulfill/u);
+  const providerRelay = /^async function relayProviderRequest\([^\n]+\n[\s\S]*?^\}/mu.exec(browserFixture)?.[0];
+  assert.equal(typeof providerRelay, "string");
+  assert.match(
+    providerRelay,
+    /Object\.entries\(route\.request\(\)\.headers\(\)\)\.filter\(\(\[name\]\) =>\s*!\["cf-access-client-id", "cf-access-client-secret", "authorization", "proxy-authorization"\]\.includes\(name\.toLowerCase\(\)\)/u,
+  );
+  assert.match(
+    providerRelay,
+    /response = await route\.fetch\(\{ headers, maxRedirects: 0, maxRetries: 0, timeout: 10000 \}\)/u,
+  );
+  assert.match(
+    providerRelay,
+    /if \(\[301, 302, 303, 307, 308\]\.includes\(response\.status\(\)\)\) \{\s*await route\.abort\("blockedbyclient"\);\s*return;\s*\}\s*await route\.fulfill\(\{ response \}\);/u,
+  );
+  assert.match(providerRelay, /finally \{\s*await response\?\.dispose\(\);/u);
+  assert.equal((browserFixture.match(/route\.fulfill\(/gu) ?? []).length, 1);
+  assert.doesNotMatch(browserFixture, /route\.fulfill\(\{[^}]*\b(?:body|status|json)\s*:/u);
 
   const inlinePrograms = job.steps.flatMap((step) =>
     [...String(step.run ?? "").matchAll(/node --input-type=module -e '\n([\s\S]*?)\n\s*'/gu)].map(
@@ -602,53 +737,51 @@ test("analytics candidate preparation executes the current recipe guard and dete
     MICROSOFT_CLARITY_PROJECT_ID: "synthetic-clarity",
     GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN: "synthetic-verification-token",
   };
-  const settingsDirectory = join(candidate, "apps/web/src/integrations/analytics");
   const settings = {
     consent: { policy: "explicit-opt-in" },
     providers: {
-      cloudflareWebAnalytics: { siteToken: "synthetic-public-site-token" },
-      googleAnalytics4: { measurementId: environment.GOOGLE_ANALYTICS_MEASUREMENT_ID },
-      microsoftClarity: { projectId: environment.MICROSOFT_CLARITY_PROJECT_ID, audience: "not-directed-to-minors" },
+      cloudflareWebAnalytics: true,
+      googleAnalytics4: true,
+      microsoftClarity: { audience: "not-directed-to-minors" },
     },
     operationalIntegrations: {
-      googleSearchConsole: { verificationToken: environment.GOOGLE_SEARCH_CONSOLE_VERIFICATION_TOKEN },
+      googleSearchConsole: true,
       lookerStudio: { connector: "google-analytics-4" },
     },
   };
   const verifyAdmission = async (program) => {
     for (const recipeVersion of ["0.2.7", "0.2.5", "0.2.3", "0.2.2", "0.2.1", "0.2.0", "0.3.0"]) {
       await writeFile(join(directory, "analytics-certification-infer.json"), JSON.stringify({
-        result: { state: { kind: "valid", value: {
+        ok: true, result: { state: { kind: "valid", value: {
           origin: { profile: "app", recipeVersion },
           installedCapabilities: [
-            { identifier: "app-foundation", version: "0.1.0" },
-            { identifier: "analytics", version: "0.1.0" },
+            { identifier: "app-foundation", version: "0.3.0" },
+            { identifier: "site-routing", version: "0.5.0" },
+            { identifier: "analytics", version: "0.2.0" },
             { identifier: "multilingual", version: "0.1.0" },
           ],
         } } },
       }));
       const result = spawnSync(process.execPath, ["--input-type=module", "--eval", program], {
-        cwd: directory, encoding: "utf8", env: environment, timeout: 10_000, maxBuffer: 32_768,
+        cwd: repositoryRoot, encoding: "utf8", env: environment, timeout: 10_000, maxBuffer: 32_768,
       });
       assert.equal(result.error, undefined);
       assert.equal(result.signal, null);
       assert.equal(result.stdout, "");
       assert.equal(result.stderr, "");
-      assert.equal(result.status, recipeVersion === "0.2.7" ? 0 : 1, recipeVersion);
+      assert.equal(result.status, recipeVersion === "0.3.0" ? 0 : 1, recipeVersion);
     }
   };
   try {
-    await mkdir(settingsDirectory, { recursive: true });
-    await writeFile(join(directory, "analytics-certification-doctor.json"), JSON.stringify({ result: { healthy: true, diagnostics: [] } }));
-    await writeFile(join(directory, "analytics-certification-diff.json"), JSON.stringify({ result: { equal: true, differences: [] } }));
-    await writeFile(join(directory, "analytics-certification-site-token"), settings.providers.cloudflareWebAnalytics.siteToken);
-    await writeFile(join(settingsDirectory, "analytics-settings.ts"),
-      `import type { AnalyticsSettings } from "./analytics-provider-contract";\n\nexport const analyticsSettings = ${JSON.stringify(settings)} as const satisfies AnalyticsSettings;\n`);
+    await mkdir(join(candidate, ".egeria"), { recursive: true });
+    await writeFile(join(directory, "analytics-certification-doctor.json"), JSON.stringify({ ok: true, result: { healthy: true, diagnostics: [] } }));
+    await writeFile(join(directory, "analytics-certification-diff.json"), JSON.stringify({ ok: true, result: { equal: true, differences: [] } }));
+    await writeFile(join(candidate, ".egeria/project.yaml"), JSON.stringify({ capabilitySettings: { analytics: settings } }));
     await verifyAdmission(source);
-    const staleGuard = source.replace('recipeVersion !== "0.2.7"', 'recipeVersion !== "0.2.2"');
+    const staleGuard = source.replace('recipeVersion !== "0.3.0"', 'recipeVersion !== "0.2.7"');
     assert.notEqual(staleGuard, source);
     await assert.rejects(() => verifyAdmission(staleGuard), {
-      code: "ERR_ASSERTION", actual: 1, expected: 0,
+      code: "ERR_ASSERTION", actual: 0, expected: 1,
     });
     assert.equal(await readFile(workflowPath, "utf8"), workflowSource);
   } finally {
@@ -876,7 +1009,7 @@ test("exercise reuses only the recorded manual site and disabled Worker deployme
       `;
       const environment = {
         HEAD_SHA: exactRevision, REUSE_REVISION: ["fresh", "fresh-refuses-existing", "incomplete-fresh-list"].includes(scenario) ? "" : "b".repeat(40),
-        EVIDENCE_DIRECTORY: directory, RUNNER_TEMP: directory, DEPLOY_URL: `https://${exactHostname}/`,
+        EVIDENCE_DIRECTORY: directory, RUNNER_TEMP: directory, DEPLOY_URL: `https://${exactHostname}`,
         CLOUDFLARE_ACCOUNT_ID: "synthetic-account", CLOUDFLARE_DEPLOY_API_TOKEN: "synthetic-deploy-token", CLOUDFLARE_WEB_ANALYTICS_API_TOKEN: "synthetic-analytics-token",
       };
       const site = spawnSync(process.execPath, ["--input-type=module", "--eval", provider + program("Create and read back Web Analytics site")], { cwd: repositoryRoot, encoding: "utf8", env: environment });
@@ -907,7 +1040,7 @@ test("recovery retains exact resources and verifies both Worker URL controls wit
   for (const scenario of ["retained", "absent", "replacement-worker", "replacement-site", "unknown-worker", "unknown-site", "post-change-worker", "post-change-site", "still-enabled", "preview-enabled", "write-failure", "read-failure", "incomplete-known-list", "incomplete-unknown-list"]) {
     const directory = await mkdtemp(join(tmpdir(), "analytics-recovery-execution-"));
     const environment = {
-      EVIDENCE_DIRECTORY: directory, DEPLOY_URL: `https://${exactHostname}/`,
+      EVIDENCE_DIRECTORY: directory, DEPLOY_URL: `https://${exactHostname}`,
       CERTIFICATION_MODE: "cleanup", GITHUB_EVENT_NAME: "workflow_dispatch",
       GITHUB_REPOSITORY: "Egeria-Systems/egeria-scaffold", GITHUB_REF: "refs/heads/main",
       GITHUB_SHA: executorRevision, EXPECTED_REVISION: executorRevision, EXERCISE_REVISION: exactRevision,
@@ -1248,8 +1381,9 @@ test("the redacted receipt is derived only from reconciled private measurements"
     ["site build", (value) => { value.appBuild.profile = "site"; }],
     ["historical app recipe", (value) => { value.appBuild.recipeVersion = "0.2.0"; }],
     ["prior security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.1"; }],
-    ["prior dependency security app recipe", (value) => { value.appBuild.recipeVersion = "0.2.2"; }],
-    ["environment candidate recipe", (value) => { value.appBuild.recipeVersion = "0.3.0"; }],
+    ["prior app recipe", (value) => { value.appBuild.recipeVersion = "0.2.2"; }],
+    ["prior descriptor version", (value) => { value.context.subject.version = "0.1.0"; }],
+    ["prior consent schema", (value) => { value.browserJourney.persistedDenialReload.consentRecordSchemaVersion = 2; }],
     ["different build revision", (value) => { value.appBuild.headSha = "f".repeat(40); }],
     ["skipped Worker integration", (value) => { value.appBuild.workerIntegration = { executed: [], skipped: ["app-analytics"] }; }],
     ["wrong Effect version", (value) => { value.appBuild.appBuildEvidence[0].effect.version = "0.0.0"; }],

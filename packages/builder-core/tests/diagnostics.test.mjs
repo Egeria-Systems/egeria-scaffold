@@ -42,12 +42,12 @@ const verificationChecks = [
 ];
 
 function createDescriptor(
-  identifier = "sample",
+  identifier = "multilingual",
   probes = [{ kind: "file", path: "managed.txt" }],
 ) {
   return {
     identifier,
-    version: "0.1.0",
+    version: ["analytics", "booking-calendly"].includes(identifier) ? "0.2.0" : "0.1.0",
     deliveryMode: "source-generated",
     stateClassifications: ["repository-stateful"],
     removalPolicy: "reviewed",
@@ -76,10 +76,10 @@ function createDescriptor(
   };
 }
 
-const requiredStandards = {
-  ...createDescriptor("standards", [{ kind: "file", path: "required-standards.txt" }]),
-  version: "0.5.1",
-};
+const baselineCatalog = [
+  ["standards", "0.9.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+  ["deployment-cloudflare", "0.9.0"], ["observability", "0.4.0"],
+].map(([identifier, version]) => ({ ...createDescriptor(identifier, [{ kind: "file", path: "baseline.txt" }]), version }));
 
 function installCapability(descriptor, overrides = {}) {
   return {
@@ -92,18 +92,18 @@ function installCapability(descriptor, overrides = {}) {
   };
 }
 
-function profile(defaultCapabilities = ["sample"]) {
+function profile(defaultCapabilities = ["multilingual"]) {
   return {
     identifier: "portfolio",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.11.7",
+    recipeVersion: "0.12.0",
     defaultCapabilities,
   };
 }
 
-function project(selectedCapabilities = ["sample"], overrides = {}) {
+function project(selectedCapabilities = ["multilingual"], overrides = {}) {
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderCompatibility: "0.0.0",
     project: {
       name: "diagnostic-fixture",
@@ -111,10 +111,13 @@ function project(selectedCapabilities = ["sample"], overrides = {}) {
       defaultLocale: "en-CA",
     },
     originProfile: "portfolio",
-    recipeVersion: "0.11.7",
+    recipeVersion: "0.12.0",
     platformAdapter: "cloudflare-workers",
-    selectedCapabilities: ["standards", ...selectedCapabilities],
-    capabilitySettings: {},
+    selectedCapabilities: [...baselineCatalog.map(value => value.identifier), ...selectedCapabilities],
+    capabilitySettings: {
+      ...(selectedCapabilities.includes("analytics") ? { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } } : {}),
+      ...(selectedCapabilities.includes("booking-calendly") ? { "booking-calendly": { mode: "link" } } : {}),
+    },
     ejectedAreas: [],
     ...overrides,
   };
@@ -122,12 +125,11 @@ function project(selectedCapabilities = ["sample"], overrides = {}) {
 
 function state(installedCapabilities, managedSurfaces = [], overrides = {}) {
   return {
-    schemaVersion: "1.0.0",
+    schemaVersion: "2.0.0",
     builderVersion: "0.0.0",
-    projectSchemaVersion: "1.0.0",
-    origin: { profile: "portfolio", recipeVersion: "0.11.7" },
-    installedCapabilities: installedCapabilities.some(({ identifier }) => identifier === "standards")
-      ? installedCapabilities : [installCapability(requiredStandards), ...installedCapabilities],
+    projectSchemaVersion: "2.0.0",
+    origin: { profile: "portfolio", recipeVersion: "0.12.0" },
+    installedCapabilities: [...baselineCatalog.filter(descriptor => !installedCapabilities.some(value => value.identifier === descriptor.identifier)).map(descriptor => installCapability(descriptor)), ...installedCapabilities],
     appliedMigrations: [],
     managedSurfaces,
     ejections: [],
@@ -147,14 +149,14 @@ function state(installedCapabilities, managedSurfaces = [], overrides = {}) {
 function controlFiles(projectValue, stateValue, migrationSource = "") {
   return {
     ".egeria/project.yaml": core.serializeProjectYaml(projectValue),
-    ".egeria/state.json": core.serializeStateJson(stateValue),
+    ".egeria/state.json": JSON.stringify(stateValue),
     ".egeria/migrations.jsonl": migrationSource,
   };
 }
 
 function createSurface({
   identifier = "managed-surface",
-  capability = "sample",
+  capability = "multilingual",
   path = "managed.txt",
   ownership = "managed",
   fingerprint = core.fingerprintFileContent(encoder.encode("expected")),
@@ -176,13 +178,14 @@ function minimalFixture(overrides = {}) {
   const stateValue = overrides.stateValue ?? state([installCapability(descriptor)]);
   const files = {
     ...controlFiles(projectValue, stateValue),
+    "baseline.txt": "present",
     "managed.txt": "present",
     "required-standards.txt": "present",
     ...overrides.files,
   };
 
   return {
-    catalog: [requiredStandards, ...(overrides.catalog ?? [descriptor])],
+    catalog: [...baselineCatalog, ...(overrides.catalog ?? [descriptor])],
     profiles: overrides.profiles ?? [profile()],
     files,
   };
@@ -245,8 +248,8 @@ test("builder-core exports the approved read-only doctor and diff API", () => {
 });
 
 test("doctor and diff share neutral capability and managed-surface discrepancy facts", () => {
-  const standards = createDescriptor("sample");
-  const installedOnly = createDescriptor("installed-only");
+  const standards = createDescriptor("multilingual");
+  const installedOnly = createDescriptor("analytics");
   const unknownInstalled = {
     ...installCapability(standards),
     identifier: "unknown-installed",
@@ -270,6 +273,7 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
     ],
     [capabilitySurface, builderSurface],
   );
+  installedState.installedCapabilities = [installCapability(standards), installCapability(installedOnly), unknownInstalled];
 
   assert.deepEqual(
     projectInspection.deriveProjectDiscrepancies({
@@ -285,7 +289,7 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
         state: { kind: "valid", value: installedState },
         capabilities: [
           {
-            identifier: "sample",
+            identifier: "multilingual",
             category: "contradictory",
             probes: [],
           },
@@ -295,7 +299,7 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
             probes: [],
           },
           {
-            identifier: "installed-only",
+            identifier: "analytics",
             category: "confirmed",
             probes: [],
           },
@@ -329,6 +333,13 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
     {
       capabilities: [
         {
+          identifier: "analytics",
+          desired: false,
+          installed: true,
+          descriptorMissing: false,
+          inferenceCategory: "confirmed",
+        },
+        {
           identifier: "desired-only",
           desired: true,
           installed: false,
@@ -341,25 +352,13 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
           descriptorMissing: false,
           inferenceCategory: "probable",
         },
+
         {
-          identifier: "installed-only",
-          desired: false,
-          installed: true,
-          descriptorMissing: false,
-          inferenceCategory: "confirmed",
-        },
-        {
-          identifier: "sample",
+          identifier: "multilingual",
           desired: true,
           installed: true,
           descriptorMissing: false,
           inferenceCategory: "contradictory",
-        },
-        {
-          identifier: "standards",
-          desired: false,
-          installed: true,
-          descriptorMissing: false,
         },
         {
           identifier: "unknown-installed",
@@ -381,7 +380,7 @@ test("doctor and diff share neutral capability and managed-surface discrepancy f
           identifier: "capability-missing",
           path: "missing.txt",
           status: "missing",
-          capability: "sample",
+          capability: "multilingual",
         },
       ],
     },
@@ -510,7 +509,7 @@ test("doctor and diff report a healthy minimal repository", async () => {
 });
 
 test("doctor and diff agree across the rendered portfolio composition", async () => {
-  const catalogResult = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, { standards: "0.5.1", siteRouting: "0.4.0", appFoundation: "0.1.0" });
+  const catalogResult = core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, core.createGenerationRenderingContext().catalogSnapshot);
   assert.equal(catalogResult.ok, true);
   const renderedResult = await core.renderSkeleton({
     profile: "portfolio",
@@ -699,7 +698,7 @@ test("doctor maps builder-version issues without returning rejected values", asy
   );
 });
 
-test("doctor distinguishes unknown project and state capabilities and suppresses duplicate state findings", async () => {
+test("doctor distinguishes unknown project selection from an invalid installed capability tuple", async () => {
   const descriptor = createDescriptor();
   const unknownInstalled = {
     ...installCapability(descriptor),
@@ -707,7 +706,7 @@ test("doctor distinguishes unknown project and state capabilities and suppresses
   };
   const projectFixture = minimalFixture({
     descriptor,
-    projectValue: project(["sample", "unknown-selected"]),
+    projectValue: project(["multilingual", "unknown-selected"]),
   });
   const stateFixture = minimalFixture({
     descriptor,
@@ -728,20 +727,10 @@ test("doctor distinguishes unknown project and state capabilities and suppresses
   ]);
 
   const stateResult = await core.doctorRepository(requestFromFixture(stateFixture));
-  assert.deepEqual(
-    stateResult.diagnostics.filter(
-      ({ capability }) => capability === "unknown-installed",
-    ),
-    [
-      {
-        code: "STATE_CAPABILITY_UNKNOWN",
-        severity: "error",
-        capability: "unknown-installed",
-        path: ".egeria/state.json",
-        context: {},
-      },
-    ],
-  );
+  assert.deepEqual(stateResult.diagnostics.filter(({ code }) => code === "STATE_INVALID"), [
+    { code: "STATE_INVALID", severity: "error", path: ".egeria/state.json", context: { reason: "invalid" } },
+  ]);
+  assert.equal(stateResult.diagnostics.some(({ code }) => code === "STATE_CAPABILITY_UNKNOWN"), false);
 });
 
 test("doctor treats other resolution failures as an invalid project contract", async () => {
@@ -759,10 +748,10 @@ test("doctor treats other resolution failures as an invalid project contract", a
 });
 
 test("doctor does not attribute an unknown profile default to project selection", async () => {
-  const selected = createDescriptor("selected-existing");
+  const selected = createDescriptor("multilingual");
   const fixture = minimalFixture({
     descriptor: selected,
-    projectValue: project(["selected-existing"]),
+    projectValue: project(["multilingual"]),
     profiles: [profile(["profile-default-missing"])],
   });
   const result = await core.doctorRepository(requestFromFixture(fixture));
@@ -800,11 +789,11 @@ test("doctor and diff reject a malformed runtime catalog without throwing", asyn
 });
 
 test("doctor reports desired-only and installed-only capabilities in lexical order independent of input order", async () => {
-  const standards = createDescriptor("sample", [
+  const standards = createDescriptor("multilingual", [
     { kind: "file", path: "standards.txt" },
   ]);
-  const alpha = createDescriptor("alpha", [{ kind: "file", path: "alpha.txt" }]);
-  const zulu = createDescriptor("zulu", [{ kind: "file", path: "zulu.txt" }]);
+  const alpha = createDescriptor("analytics", [{ kind: "file", path: "alpha.txt" }]);
+  const zulu = createDescriptor("booking-calendly", [{ kind: "file", path: "zulu.txt" }]);
   const fixture = minimalFixture({
     descriptor: standards,
     catalog: [zulu, standards, alpha],
@@ -827,13 +816,13 @@ test("doctor reports desired-only and installed-only capabilities in lexical ord
     {
       code: "DESIRED_INSTALLED_MISMATCH",
       severity: "error",
-      capability: "alpha",
+      capability: "analytics",
       context: { relation: "installed-only" },
     },
     {
       code: "DESIRED_INSTALLED_MISMATCH",
       severity: "error",
-      capability: "zulu",
+      capability: "booking-calendly",
       context: { relation: "installed-only" },
     },
   ]);
@@ -870,14 +859,14 @@ test("doctor reports desired-only and installed-only capabilities in lexical ord
     {
       code: "DESIRED_INSTALLED_MISMATCH",
       severity: "error",
-      capability: "sample",
+      capability: "multilingual",
       context: { relation: "desired-only" },
     },
   ]);
 });
 
 test("doctor preserves probable, partial, contradictory, and ambiguous inference policy", async () => {
-  const probable = createDescriptor("sample", [
+  const probable = createDescriptor("multilingual", [
     { kind: "file", path: "probable.txt" },
   ]);
   const probableFixture = minimalFixture({
@@ -895,13 +884,13 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
       {
         code: "INSTALLED_INFERENCE_CONTRADICTION",
         severity: "warning",
-        capability: "sample",
+        capability: "multilingual",
         context: { category: "probable" },
       },
     ],
   );
 
-  const partial = createDescriptor("sample", [
+  const partial = createDescriptor("multilingual", [
     { kind: "file", path: "present.txt" },
     { kind: "file", path: "missing.txt" },
   ]);
@@ -920,7 +909,7 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
       {
         code: "INSTALLED_INFERENCE_CONTRADICTION",
         severity: "warning",
-        capability: "sample",
+        capability: "multilingual",
         context: { category: "partial" },
       },
     ],
@@ -940,13 +929,13 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
       {
         code: "INSTALLED_INFERENCE_CONTRADICTION",
         severity: "error",
-        capability: "sample",
+        capability: "multilingual",
         context: { category: "contradictory" },
       },
     ],
   );
 
-  const ambiguous = createDescriptor("sample", [
+  const ambiguous = createDescriptor("multilingual", [
     { kind: "json-value", path: "private.json", pointer: "/enabled", expected: true },
   ]);
   const ambiguousFixture = minimalFixture({
@@ -961,7 +950,7 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
     {
       code: "INFERENCE_AMBIGUOUS",
       severity: "warning",
-      capability: "sample",
+      capability: "multilingual",
       context: { category: "ambiguous" },
     },
   ]);
@@ -969,10 +958,10 @@ test("doctor preserves probable, partial, contradictory, and ambiguous inference
 });
 
 test("doctor sorts errors before lexically earlier warnings", async () => {
-  const contradictory = createDescriptor("contradictory", [
+  const contradictory = createDescriptor("booking-calendly", [
     { kind: "file", path: "missing.txt" },
   ]);
-  const ambiguous = createDescriptor("ambiguous", [
+  const ambiguous = createDescriptor("analytics", [
     {
       kind: "json-value",
       path: "ambiguous.json",
@@ -983,8 +972,8 @@ test("doctor sorts errors before lexically earlier warnings", async () => {
   const fixture = minimalFixture({
     descriptor: contradictory,
     catalog: [ambiguous, contradictory],
-    projectValue: project(["contradictory", "ambiguous"]),
-    profiles: [profile(["contradictory", "ambiguous"])],
+    projectValue: project(["booking-calendly", "analytics"]),
+    profiles: [profile(["booking-calendly", "analytics"])],
     stateValue: state([
       installCapability(ambiguous),
       installCapability(contradictory),
@@ -1002,13 +991,13 @@ test("doctor sorts errors before lexically earlier warnings", async () => {
       {
         code: "INSTALLED_INFERENCE_CONTRADICTION",
         severity: "error",
-        capability: "contradictory",
+        capability: "booking-calendly",
         context: { category: "contradictory" },
       },
       {
         code: "INFERENCE_AMBIGUOUS",
         severity: "warning",
-        capability: "ambiguous",
+        capability: "analytics",
         context: { category: "ambiguous" },
       },
     ],
@@ -1016,7 +1005,7 @@ test("doctor sorts errors before lexically earlier warnings", async () => {
 });
 
 test("diagnostics do not return rejected package values or source excerpts", async () => {
-  const descriptor = createDescriptor("sample", [
+  const descriptor = createDescriptor("multilingual", [
     {
       kind: "package",
       path: "apps/web/package.json",
@@ -1044,7 +1033,7 @@ test("diagnostics do not return rejected package values or source excerpts", asy
       {
         code: "INSTALLED_INFERENCE_CONTRADICTION",
         severity: "error",
-        capability: "sample",
+        capability: "multilingual",
         context: { category: "contradictory" },
       },
     ],
@@ -1056,7 +1045,7 @@ test("diagnostics do not return rejected package values or source excerpts", asy
 });
 
 test("doctor reports managed drift, isolates ambiguous surfaces, and ignores application-owned or ejected surfaces", async () => {
-  const descriptor = createDescriptor("sample", [
+  const descriptor = createDescriptor("multilingual", [
     { kind: "file", path: "probe.txt" },
   ]);
   const drifted = createSurface({ path: "drifted.txt" });
@@ -1090,14 +1079,14 @@ test("doctor reports managed drift, isolates ambiguous surfaces, and ignores app
     {
       code: "MANAGED_SURFACE_DRIFT",
       severity: "warning",
-      capability: "sample",
+      capability: "multilingual",
       path: "drifted.txt",
       context: { status: "drifted" },
     },
     {
       code: "MANAGED_SURFACE_DRIFT",
       severity: "warning",
-      capability: "sample",
+      capability: "multilingual",
       path: "missing.txt",
       context: { status: "missing" },
     },
@@ -1120,7 +1109,7 @@ test("doctor reports managed drift, isolates ambiguous surfaces, and ignores app
       {
         code: "INFERENCE_AMBIGUOUS",
         severity: "warning",
-        capability: "sample",
+        capability: "multilingual",
         path: "missing.txt",
         context: { reason: "PATH_SYMLINK" },
       },
@@ -1197,7 +1186,7 @@ test("diff short-circuits invalid control files and resolution failures", async 
   assert.doesNotMatch(JSON.stringify(malformedStateResult), /private-state-token/);
 
   const combinedControlFailure = minimalFixture({
-    projectValue: project(["sample", "unknown-selected"]),
+    projectValue: project(["multilingual", "unknown-selected"]),
     files: { ".egeria/state.json": "{ private-state-token" },
   });
   assert.deepEqual(
@@ -1230,16 +1219,16 @@ test("diff short-circuits invalid control files and resolution failures", async 
 });
 
 test("diff maps desired, installed, inferred, and mismatch evidence without duplicates", async () => {
-  const standards = createDescriptor("sample", [
+  const standards = createDescriptor("multilingual", [
     { kind: "file", path: "standards.txt" },
   ]);
   const probable = createDescriptor("probable", [
     { kind: "file", path: "probable.txt" },
   ]);
-  const contradictory = createDescriptor("contradictory", [
+  const contradictory = createDescriptor("booking-calendly", [
     { kind: "file", path: "contradictory.txt" },
   ]);
-  const installedOnly = createDescriptor("installed-only", [
+  const installedOnly = createDescriptor("analytics", [
     { kind: "file", path: "installed-only.txt" },
   ]);
   const fixture = minimalFixture({
@@ -1260,17 +1249,17 @@ test("diff maps desired, installed, inferred, and mismatch evidence without dupl
   assert.deepEqual(await core.diffProject(requestFromFixture(fixture)), {
     equal: false,
     differences: [
-      { kind: "desired-only", capability: "sample" },
-      { kind: "inference-mismatch", capability: "contradictory" },
+      { kind: "desired-only", capability: "multilingual" },
+      { kind: "inference-mismatch", capability: "booking-calendly" },
       { kind: "inferred-only", capability: "probable" },
-      { kind: "installed-only", capability: "contradictory" },
-      { kind: "installed-only", capability: "installed-only" },
+      { kind: "installed-only", capability: "analytics" },
+      { kind: "installed-only", capability: "booking-calendly" },
     ],
   });
 });
 
 test("diff independently maps partial and ambiguous capability evidence", async () => {
-  const standards = createDescriptor("sample", [
+  const standards = createDescriptor("multilingual", [
     { kind: "file", path: "standards.txt" },
   ]);
   const partial = createDescriptor("partial", [
@@ -1292,7 +1281,7 @@ test("diff independently maps partial and ambiguous capability evidence", async 
     differences: [{ kind: "inferred-only", capability: "partial" }],
   });
 
-  const ambiguous = createDescriptor("ambiguous", [
+  const ambiguous = createDescriptor("analytics", [
     {
       kind: "json-value",
       path: "ambiguous.json",
@@ -1315,19 +1304,19 @@ test("diff independently maps partial and ambiguous capability evidence", async 
   );
   assert.deepEqual(ambiguousResult, {
     equal: false,
-    differences: [{ kind: "inference-mismatch", capability: "ambiguous" }],
+    differences: [{ kind: "inference-mismatch", capability: "analytics" }],
   });
   assert.doesNotMatch(JSON.stringify(ambiguousResult), /private-token/);
 });
 
 test("diff maps missing, drifted, and ambiguous managed surfaces with capability owners", async () => {
-  const descriptor = createDescriptor("sample", [
+  const descriptor = createDescriptor("multilingual", [
     { kind: "file", path: "probe.txt" },
   ]);
   const surfaces = [
     createSurface({ identifier: "missing", path: "missing.txt" }),
     createSurface({ identifier: "drifted", path: "drifted.txt" }),
-    createSurface({ identifier: "ambiguous", path: "ambiguous.txt" }),
+    createSurface({ identifier: "analytics", path: "ambiguous.txt" }),
     createSurface({
       identifier: "application",
       path: "application.txt",
@@ -1357,17 +1346,17 @@ test("diff maps missing, drifted, and ambiguous managed surfaces with capability
     differences: [
       {
         kind: "managed-surface-drift",
-        capability: "sample",
+        capability: "multilingual",
         path: "ambiguous.txt",
       },
       {
         kind: "managed-surface-drift",
-        capability: "sample",
+        capability: "multilingual",
         path: "drifted.txt",
       },
       {
         kind: "managed-surface-drift",
-        capability: "sample",
+        capability: "multilingual",
         path: "missing.txt",
       },
     ],
@@ -1375,7 +1364,7 @@ test("diff maps missing, drifted, and ambiguous managed surfaces with capability
 });
 
 test("doctor and diff use a read-once cache for every repository path per operation", async () => {
-  const descriptor = createDescriptor("sample", [
+  const descriptor = createDescriptor("multilingual", [
     { kind: "file", path: ".egeria/project.yaml" },
   ]);
   const fixture = minimalFixture({ descriptor });

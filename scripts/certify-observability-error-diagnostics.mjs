@@ -1,3 +1,4 @@
+import { syntheticApplicationEnvironment } from "./verify-generated-skeletons.mjs";
 import { createHash } from "node:crypto";
 import {
   constants,
@@ -22,7 +23,7 @@ import {
   createInstalledManifest,
   createCapabilityCatalogSnapshot,
   verifiedCapabilityPackageVersions,
-  vitestFiveCapabilityCatalogSnapshot,
+  applicationEnvironmentCatalogSnapshot,
   profileRecipes,
   parseProjectYaml,
   resolveCapabilities,
@@ -36,14 +37,14 @@ const exactRevisionPattern = /^[0-9a-f]{40}$/u;
 const publicRegistry = "https://registry.npmjs.org/";
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const subject = Object.freeze({
-  descriptorVersion: "0.3.0",
-  behaviorContractDigest:
-    "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43",
+  descriptorVersion: "0.4.0",
+  behaviorContractDigest: "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
 });
 const expectedVerificationChecks = Object.freeze([
   "pnpm-version", "frozen-install", "peer-dependencies", "dependency-audit",
   "registry-signatures", "lint", "cloudflare-types", "typecheck", "unit-tests",
-  "component-tests", "next-build", "opennext-build", "browser-install",
+  "component-tests", "deployment-contracts", "transport-contracts", "application-environment",
+  "next-build", "opennext-build", "prepared-artifact", "browser-install",
   "browser-development", "browser-preview",
 ]);
 const expectedFixtureChecks = Object.freeze([
@@ -144,13 +145,13 @@ function configurationFor(revision) {
     throw createError("CERTIFICATION_REVISION_INVALID");
   }
   const catalog = createCapabilityCatalogSnapshot(
-    verifiedCapabilityPackageVersions, vitestFiveCapabilityCatalogSnapshot,
+    verifiedCapabilityPackageVersions, applicationEnvironmentCatalogSnapshot,
   );
   const fixture = generatedFixtureContracts.find(({ identifier }) => identifier === "app");
   if (!catalog.ok || !fixture) throw createError("CERTIFICATION_SUBJECT_INVALID");
   const resolved = resolveCapabilities({ profile: "app", requestedCapabilities: [] }, catalog.value, profileRecipes);
   const descriptor = catalog.value.find(({ identifier }) => identifier === "observability");
-  if (!resolved.ok || resolved.value.recipeVersion !== "0.2.7" || !descriptor ||
+  if (!resolved.ok || resolved.value.recipeVersion !== "0.3.0" || !descriptor ||
       !isDeepStrictEqual(createCertificationSubject(descriptor, ["cleanup-recovery", "deployed-application", "fresh-scaffold"]), subject)) {
     throw createError("CERTIFICATION_SUBJECT_INVALID");
   }
@@ -167,14 +168,14 @@ function configurationFor(revision) {
     expectedInstalledCapabilities: installed,
     expectedCapabilitySettings: fixture.expectedCapabilitySettings,
     capabilityIdentifier: "observability",
-    capabilityVersion: "0.3.0",
-    expectedRecipeVersion: "0.2.7",
+    capabilityVersion: "0.4.0",
+    expectedRecipeVersion: "0.3.0",
     verifierIdentifier: "app",
     expectedVerificationChecks,
     expectedFixtureChecks,
     receipt: Object.freeze({
       subject,
-      recipeVersion: "0.2.7",
+      recipeVersion: "0.3.0",
       evidenceRevision: revision,
       cleanup: "identity-checked",
     }),
@@ -190,12 +191,12 @@ export function validateObservabilityDeploymentCandidate(input) {
     const project = parseProjectYaml(input.projectSource);
     const state = input.infer?.result?.state;
     const capabilities = input.infer?.result?.capabilities;
-    if (!project.ok || project.value.originProfile !== "app" || project.value.recipeVersion !== "0.2.7" ||
+    if (!project.ok || project.value.originProfile !== "app" || project.value.recipeVersion !== "0.3.0" ||
         project.value.project.name !== configuration.projectName || project.value.project.displayName !== configuration.displayName ||
         !isDeepStrictEqual(project.value.selectedCapabilities, configuration.expectedCapabilities) ||
         !isDeepStrictEqual(project.value.capabilitySettings, configuration.expectedCapabilitySettings) ||
         input.infer?.ok !== true || input.infer.command !== "infer" || state?.kind !== "valid" ||
-        !isDeepStrictEqual(state.value?.origin, { profile: "app", recipeVersion: "0.2.7" }) ||
+        !isDeepStrictEqual(state.value?.origin, { profile: "app", recipeVersion: "0.3.0" }) ||
         !isDeepStrictEqual(state.value?.installedCapabilities, configuration.expectedInstalledCapabilities) ||
         !Array.isArray(capabilities) || !isDeepStrictEqual(capabilities.map(({ identifier }) => identifier).sort(), [...configuration.expectedCapabilities].sort()) ||
         capabilities.some(({ category }) => category !== "confirmed") ||
@@ -208,8 +209,8 @@ export function validateObservabilityDeploymentCandidate(input) {
       throw createError("CERTIFICATION_CANDIDATE_INVALID");
     }
     return {
-      ok: true, capability: "observability", version: "0.3.0", subject,
-      profile: "app", recipeVersion: "0.2.7", revision: input.revision,
+      ok: true, capability: "observability", version: subject.descriptorVersion, subject,
+      profile: "app", recipeVersion: "0.3.0", revision: input.revision,
       checks: ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff", "complete-installed-manifest", "current-app-subject"],
     };
   } catch (error) {
@@ -298,7 +299,22 @@ async function copyCertificationFixtures(projectRoot) {
     const destination = join(projectRoot, mapping.destination);
     await mkdir(dirname(destination), { recursive: true });
     try {
-      await copyFile(source, destination, constants.COPYFILE_EXCL);
+      if (mapping.source === "observability-error-diagnostics.spec.ts") {
+        // Preserve the historical fixture. The disposable overlay runs the same cases for the current subject.
+        const historical = await readFile(source, "utf8");
+        const oldSubjectDigest = "sha256:0fa9530d9b2b6de0438cadd400a80909e8f55a5cb6c3d7b3ecc59724088c5f43";
+        if (historical.split(oldSubjectDigest).length !== 2 ||
+            historical.split('descriptorVersion: "0.3.0"').length !== 2 ||
+            historical.split('version: "0.3.0"').length !== 2) {
+          throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
+        }
+        const current = historical.replace(oldSubjectDigest, subject.behaviorContractDigest)
+          .replace('descriptorVersion: "0.3.0"', `descriptorVersion: "${subject.descriptorVersion}"`)
+          .replace('version: "0.3.0"', `version: "${subject.descriptorVersion}"`);
+        await writeFile(destination, current, { flag: "wx" });
+      } else {
+        await copyFile(source, destination, constants.COPYFILE_EXCL);
+      }
     } catch {
       throw createError("CERTIFICATION_FIXTURE_OVERLAY_FAILED");
     }
@@ -329,7 +345,7 @@ function requireLocalReceipt(receipt, revision) {
   if (
     receipt?.ok !== true ||
     receipt.capability !== "observability" ||
-    receipt.version !== "0.3.0" ||
+    receipt.version !== subject.descriptorVersion ||
     !isDeepStrictEqual(receipt.subject, subject) ||
     receipt.revision !== revision ||
     receipt.scope !== "local-full" ||
@@ -388,7 +404,8 @@ function fixtureVerifierFor(revision) {
 
     const childEnvironment = {
       ...environment,
-      HOME: home,
+    ...syntheticApplicationEnvironment([], {}, "development", "http://localhost:3000"),
+    HOME: home,
       USERPROFILE: home,
       TMPDIR: temporary,
       TMP: temporary,

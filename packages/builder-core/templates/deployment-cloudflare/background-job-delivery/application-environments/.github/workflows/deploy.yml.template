@@ -84,7 +84,7 @@ jobs:
         run: |
           pnpm run test:unit
           pnpm run test:component
-          pnpm --dir apps/web run test:deployment-contracts
+          sh apps/web/scripts/prepare-ci-git.sh pnpm --dir apps/web run test:deployment-contracts
       - name: Install Chromium
         run: pnpm --dir apps/web exec playwright install chromium
       - name: Test development browser behavior and protected transport canaries

@@ -2,7 +2,6 @@ import {
   applyCapabilityAddition as applyCapabilityAdditionDefault,
   applyCapabilityRemoval as applyCapabilityRemovalDefault,
   applyProfileTransition as applyProfileTransitionDefault,
-  createApplicationEnvironmentRenderingContext,
   type ApplicationEnvironmentRenderingContext,
   createFileSystemRepositoryReader,
   createPnpmGeneratedProjectVerifier,
@@ -44,7 +43,7 @@ import { constants } from "node:fs";
 import { open } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { parseCliArguments, type ApplicationEnvironmentCliCommand, type CliCommand } from "./arguments.js";
+import { parseCliArguments, type CliCommand } from "./arguments.js";
 
 export type CliOutput = Readonly<{
   write(value: string): void;
@@ -252,7 +251,7 @@ function createCliRepositoryReader(root: string): RepositoryReader {
   };
 }
 
-function createRequest<C extends Extract<CliCommand | ApplicationEnvironmentCliCommand, { kind: "create" }>>(command: C): Omit<C, "kind" | "directory"> {
+function createRequest<C extends Extract<CliCommand, { kind: "create" }>>(command: C): Omit<C, "kind" | "directory"> {
   const request = { ...command };
   Reflect.deleteProperty(request, "kind");
   Reflect.deleteProperty(request, "directory");
@@ -261,7 +260,7 @@ function createRequest<C extends Extract<CliCommand | ApplicationEnvironmentCliC
 
 async function runCreate(
   input: Readonly<{ command: Extract<CliCommand, { kind: "create" }>; renderingContext?: never }> |
-    Readonly<{ command: Extract<ApplicationEnvironmentCliCommand, { kind: "create" }>; renderingContext: ApplicationEnvironmentRenderingContext }>,
+    Readonly<{ command: Extract<CliCommand, { kind: "create" }>; renderingContext: ApplicationEnvironmentRenderingContext }>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
@@ -298,23 +297,18 @@ async function runReadOnly(
   command: Extract<CliCommand, Readonly<{ kind: "infer" | "doctor" | "diff" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
-  projectSchemaVersion?: "2.0.0",
 ): Promise<0 | 1> {
   try {
     const reader = (dependencies.createReader ??
       createCliRepositoryReader)(resolve(command.directory));
-    const snapshot = projectSchemaVersion === "2.0.0"
-      ? await readVerifiedProjectSnapshot(reader, createApplicationEnvironmentRenderingContext())
-      : await readVerifiedProjectSnapshot(reader);
+    const snapshot = await readVerifiedProjectSnapshot(reader);
     if (!snapshot.ok) {
-      writeJson(output.writeError, { ok: false, code: projectSchemaVersion === "2.0.0" ? "PROJECT_INSPECTION_INVALID" : "VERIFIED_CATALOG_INVALID" });
+      writeJson(output.writeError, { ok: false, code: "PROJECT_INSPECTION_INVALID" });
       return 1;
     }
     if (command.kind === "infer") {
       const request = { reader: snapshot.value.reader, catalog: snapshot.value.catalog };
-      const result = projectSchemaVersion === "2.0.0"
-        ? await inferRepository({ ...request, projectSchemaVersion: "2.0.0" })
-        : await inferRepository(request);
+      const result = await inferRepository(request);
       writeJson(output.write, { ok: true, command: "infer", result });
       return 0;
     }
@@ -324,7 +318,6 @@ async function runReadOnly(
         reader: snapshot.value.reader,
         catalog: snapshot.value.catalog,
         profiles: snapshot.value.profiles,
-        ...(projectSchemaVersion === "2.0.0" ? { projectSchemaVersion } : {}),
       });
       writeJson(output.write, { ok: true, command: "doctor", result });
       return result.healthy ? 0 : 1;
@@ -430,7 +423,7 @@ async function inspectCreateTargetsForPlan(
 }
 
 async function runPlanAdd(
-  command: Extract<CliCommand | ApplicationEnvironmentCliCommand, Readonly<{ kind: "plan-add" }>>,
+  command: Extract<CliCommand, Readonly<{ kind: "plan-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
   renderingContext?: ApplicationEnvironmentRenderingContext,
@@ -676,7 +669,7 @@ async function runPlanProfileTransition(
 }
 
 async function runApplyAdd(
-  command: Extract<CliCommand | ApplicationEnvironmentCliCommand, Readonly<{ kind: "apply-add" }>>,
+  command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
   renderingContext?: ApplicationEnvironmentRenderingContext,
@@ -829,31 +822,8 @@ async function runApplyProfileTransition(
   return 0;
 }
 
-export function createCliRunner(
-  dependencies: CliRunnerDependencies,
-  projectSchemaVersion?: "2.0.0",
-): CliRunner {
+export function createCliRunner(dependencies: CliRunnerDependencies): CliRunner {
   return async (arguments_, output) => {
-    if (projectSchemaVersion === "2.0.0") {
-      const parsed = parseCliArguments(arguments_, "2.0.0");
-      if (!parsed.ok) return writeInvalidArguments(output);
-      const renderingContext = createApplicationEnvironmentRenderingContext(
-        parsed.value.kind === "create" && parsed.value.applicationPersistence === true,
-        false,
-        parsed.value.kind === "create" && parsed.value.backgroundJobDelivery === true,
-      );
-      if (parsed.value.kind === "plan-add") return runPlanAdd(parsed.value, output, dependencies, renderingContext);
-      if (parsed.value.kind === "plan-remove") return runPlanRemove(parsed.value, output, dependencies, renderingContext);
-      if (parsed.value.kind === "apply-add") return runApplyAdd(parsed.value, output, dependencies, renderingContext);
-      if (parsed.value.kind === "apply-remove") return runApplyRemove(parsed.value, output, dependencies, renderingContext);
-      if (parsed.value.kind !== "create") return runReadOnly(parsed.value, output, dependencies, "2.0.0");
-      try {
-        return await runCreate({ command: parsed.value, renderingContext }, output, dependencies);
-      } catch {
-        writeJson(output.writeError, { ok: false, code: "PROJECT_GENERATION_FAILED" });
-        return 1;
-      }
-    }
     const parsed = parseCliArguments(arguments_);
 
     if (!parsed.ok) {

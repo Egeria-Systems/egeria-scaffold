@@ -36,9 +36,7 @@ const schemaArtifactNames = [
   "migration-record.schema.json",
   "profile.schema.json",
   "project.schema.json",
-  "project-environment.schema.json",
   "state.schema.json",
-  "state-environment.schema.json",
 ];
 
 const schemaArtifactRootIdentifiers = {
@@ -48,10 +46,8 @@ const schemaArtifactRootIdentifiers = {
   "migration-record.schema.json":
     "urn:egeria-systems:schema:migration-record:1.0.0",
   "profile.schema.json": "urn:egeria-systems:schema:profile:1.0.0",
-  "project.schema.json": "urn:egeria-systems:schema:project:1.0.0",
-  "project-environment.schema.json": "urn:egeria-systems:schema:project:2.0.0",
-  "state.schema.json": "urn:egeria-systems:schema:state:1.0.0",
-  "state-environment.schema.json": "urn:egeria-systems:schema:state:2.0.0",
+  "project.schema.json": "urn:egeria-systems:schema:project:2.0.0",
+  "state.schema.json": "urn:egeria-systems:schema:state:2.0.0",
 };
 
 function resolveSchemaArtifactRoot(artifactName, artifact) {
@@ -103,12 +99,12 @@ const validCapability = {
 const validProfile = {
   identifier: "portfolio",
   schemaVersion: "1.0.0",
-  recipeVersion: "0.11.7",
+  recipeVersion: "0.12.0",
   defaultCapabilities: ["standards"],
 };
 
 const validProject = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "2.0.0",
   builderCompatibility: "0.0.0",
   project: {
     name: "sample-portfolio",
@@ -116,7 +112,7 @@ const validProject = {
     defaultLocale: "en-CA",
   },
   originProfile: "portfolio",
-  recipeVersion: "0.11.7",
+  recipeVersion: "0.12.0",
   platformAdapter: "cloudflare-workers",
   selectedCapabilities: ["standards"],
   capabilitySettings: {},
@@ -124,28 +120,13 @@ const validProject = {
 };
 
 const validCalendlyBookingSettings = {
-  destination: "https://calendly.com/acme/intro",
   mode: "popup",
 };
 
 const validAnalyticsSettings = {
   consent: { policy: "explicit-opt-in" },
-  providers: {
-    cloudflareWebAnalytics: {
-      siteToken: "0123456789abcdef0123456789abcdef",
-    },
-    googleAnalytics4: { measurementId: "G-TEST123456" },
-    microsoftClarity: {
-      projectId: "clarity123",
-      audience: "not-directed-to-minors",
-    },
-  },
-  operationalIntegrations: {
-    googleSearchConsole: {
-      verificationToken: "search-console-verification-token",
-    },
-    lookerStudio: { connector: "google-analytics-4" },
-  },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 };
 
 const validInstalledSurface = {
@@ -242,22 +223,17 @@ const profileTransitionVerificationChecks = [
   "post-state-inference",
 ];
 
-const readableRecipeVersions = ["0.11.7", "0.12.7", "0.2.7", "0.12.0", "0.13.0", "0.3.0"];
+const readableRecipeVersions = ["0.12.0", "0.13.0", "0.3.0"];
 
 const validState = {
-  schemaVersion: "1.0.0",
+  schemaVersion: "2.0.0",
   builderVersion: "0.0.0",
-  projectSchemaVersion: "1.0.0",
-  origin: { profile: "portfolio", recipeVersion: "0.11.7" },
+  projectSchemaVersion: "2.0.0",
+  origin: { profile: "portfolio", recipeVersion: "0.12.0" },
   installedCapabilities: [
-    {
-      identifier: "standards",
-      version: "0.5.1",
-      deliveryMode: "package-backed",
-      stateClassifications: ["repository-stateful"],
-      removalPolicy: "reviewed",
-    },
-  ],
+    ["standards", "0.9.0"], ["content-files", "0.4.0"], ["section-composition", "0.3.0"],
+    ["deployment-cloudflare", "0.9.0"], ["observability", "0.4.0"],
+  ].map(([identifier, version]) => ({ identifier, version, deliveryMode: "source-generated", stateClassifications: ["repository-stateful"], removalPolicy: "reviewed" })),
   appliedMigrations: [],
   managedSurfaces: [validInstalledSurface],
   ejections: [],
@@ -271,6 +247,16 @@ const validState = {
     checks: currentVerificationChecks,
   },
 };
+
+function currentState(profile) {
+  const state = structuredClone(validState);
+  state.origin = { profile, recipeVersion: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile] };
+  for (const [identifier, version] of [...(profile === "portfolio" ? [] : [["site-routing", "0.5.0"]]), ...(profile === "app" ? [["app-foundation", "0.3.0"]] : [])]) {
+    state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier, version });
+  }
+  if (profile === "app") state.lastSuccessfulVerification.checks.splice(-1, 0, "worker-integration");
+  return state;
+}
 
 const validMigrationRecord = {
   schemaVersion: "1.0.0",
@@ -348,10 +334,6 @@ test("managed-surface constructors bind target and merge policy without changing
 test("builder-core exports the executable contract boundary", () => {
   for (const exportName of [
     "capabilityDeliveryModeSchema",
-    "capabilityUpgradePersistedVerificationChecks",
-    "capabilityUpgradeVerificationChecks",
-    "profileTransitionPersistedVerificationChecks",
-    "profileTransitionVerificationChecks",
     "capabilityDescriptorSchema",
     "capabilityRemovalPolicySchema",
     "capabilityStateClassificationSchema",
@@ -536,9 +518,13 @@ test("probe and managed-surface unions reject mismatched or unsafe structures", 
 });
 
 test("project configuration is strict and materializes safe capability identifiers", () => {
-  for (const [profile, recipeVersion] of Object.entries(contracts.publicRecipeVersions)) {
+  for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
     assertAccepts(contracts.projectConfigurationSchema, { ...validProject, originProfile: profile, recipeVersion });
     assertAccepts(contracts.profileRecipeSchema, { ...validProfile, identifier: profile, recipeVersion });
+    for (const mismatch of readableRecipeVersions.filter(value => value !== recipeVersion)) {
+      assertRejects(contracts.projectConfigurationSchema, { ...validProject, originProfile: profile, recipeVersion: mismatch });
+      assertRejects(contracts.profileRecipeSchema, { ...validProfile, identifier: profile, recipeVersion: mismatch });
+    }
   }
 
   assertRejects(contracts.projectConfigurationSchema, {
@@ -557,7 +543,7 @@ test("project configuration is strict and materializes safe capability identifie
     ...validProject,
     secret: "must-not-exist",
   });
-  for (const recipeVersion of ["0.14.0", "0.10", "latest"]) {
+  for (const recipeVersion of ["0.1.0", "0.11.2", "0.12.2", "0.2.2", "0.14.0", "0.10", "latest"]) {
     assertRejects(contracts.projectConfigurationSchema, {
       ...validProject,
       recipeVersion,
@@ -573,7 +559,7 @@ test("app profile shares recipe, project, and state identifiers", () => {
   const appRecipe = {
     identifier: "app",
     schemaVersion: "1.0.0",
-    recipeVersion: "0.2.7",
+    recipeVersion: "0.3.0",
     defaultCapabilities: ["app-foundation", "site-routing"],
   };
 
@@ -589,12 +575,11 @@ test("app profile shares recipe, project, and state identifiers", () => {
   assertAccepts(contracts.projectConfigurationSchema, {
     ...validProject,
     originProfile: "app",
-    recipeVersion: "0.2.7",
+    recipeVersion: "0.3.0",
     selectedCapabilities: ["app-foundation", "site-routing"],
   });
   assertAccepts(contracts.installedStateSchema, {
-    ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.7" },
+    ...currentState("app"),
     lastSuccessfulVerification: {
       kind: "generation",
       checks: [
@@ -606,7 +591,7 @@ test("app profile shares recipe, project, and state identifiers", () => {
   });
 });
 
-test("app generation verification requires the exact Worker receipt and refuses obsolete vectors", () => {
+test("app generation verification requires the exact Worker receipt and rejects retired vectors", () => {
   const ordinaryChecks = [
     "lockfile",
     "frozen-install",
@@ -621,8 +606,7 @@ test("app generation verification requires the exact Worker receipt and refuses 
   assert.deepEqual(contracts.ordinaryGenerationVerificationChecks, ordinaryChecks);
   assert.deepEqual(contracts.appGenerationVerificationChecks, appChecks);
   const appState = {
-    ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.7" },
+    ...currentState("app"),
   };
   const generationChecks = [
     "contracts",
@@ -647,11 +631,10 @@ test("app generation verification requires the exact Worker receipt and refuses 
     lastSuccessfulVerification: { kind: "generation", checks: generationChecks },
   });
   for (const profile of ["portfolio", "site"]) {
-    const ordinary = { ...validState, origin: { profile, recipeVersion: contracts.publicRecipeVersions[profile] } };
-    assertAccepts(contracts.installedStateSchema, ordinary);
-    assertRejects(contracts.installedStateSchema, { ...ordinary, lastSuccessfulVerification: { kind: "generation", checks: generationChecks } });
+    assertAccepts(contracts.installedStateSchema, currentState(profile));
+    assertRejects(contracts.installedStateSchema, { ...currentState(profile), lastSuccessfulVerification: { kind: "generation", checks: generationChecks } });
   }
-  for (const recipeVersion of readableRecipeVersions.filter(version => version !== "0.2.7")) {
+  for (const recipeVersion of ["0.1.0", "0.2.0", "0.2.1", "0.2.2", "0.2.3", "0.2.7", "0.12.0", "0.13.0"]) {
     assertRejects(contracts.installedStateSchema, { ...appState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind: "generation", checks: generationChecks } });
   }
 });
@@ -674,8 +657,7 @@ test("app generation verification supplies only supported persisted and full lif
   ];
   const appFullChecks = [...appPersistedChecks, "migration-record", "post-state-inference"];
   const appState = {
-    ...validState,
-    origin: { profile: "app", recipeVersion: "0.2.7" },
+    ...currentState("app"),
   };
   for (const [kind, persistedExport, fullExport, ordinaryPersisted, ordinaryFull] of [
     ["capability-addition", "appCapabilityAdditionPersistedVerificationChecks", "appCapabilityAdditionVerificationChecks", persistedVerificationChecks, capabilityAdditionVerificationChecks],
@@ -695,20 +677,16 @@ test("app generation verification supplies only supported persisted and full lif
       });
     }
     for (const profile of ["portfolio", "site"]) {
-      assertAccepts(contracts.installedStateSchema, {
-        ...validState,
-        origin: { profile, recipeVersion: contracts.publicRecipeVersions[profile] },
+      (kind === "profile-transition" ? assertRejects : assertAccepts)(contracts.installedStateSchema, {
+        ...currentState(profile),
         lastSuccessfulVerification: { kind, checks: ordinaryPersisted },
       });
       assertRejects(contracts.installedStateSchema, {
-        ...validState,
-        origin: { profile, recipeVersion: contracts.publicRecipeVersions[profile] },
+        ...currentState(profile),
         lastSuccessfulVerification: { kind, checks: appPersistedChecks },
       });
     }
   }
-  assert.deepEqual(contracts.capabilityUpgradePersistedVerificationChecks, capabilityUpgradePersistedVerificationChecks);
-  assert.deepEqual(contracts.capabilityUpgradeVerificationChecks, capabilityUpgradeVerificationChecks);
   for (const checks of [capabilityUpgradePersistedVerificationChecks, appPersistedChecks]) {
     assertRejects(contracts.installedStateSchema, {
       ...appState,
@@ -717,18 +695,16 @@ test("app generation verification supplies only supported persisted and full lif
   }
 });
 
-test("Calendly settings enforce paired capability state and sanitized destinations", () => {
+test("Calendly settings enforce paired mode selection and reject persisted destinations", () => {
   const maximumDestination = "https://calendly.com/".padEnd(2_048, "a");
 
   assertAccepts(contracts.calendlyBookingSettingsSchema, {
-    destination: "https://www.calendly.com/acme/intro",
     mode: "link",
   });
 
   for (const mode of ["link", "inline", "popup"]) {
     const capabilitySettings = {
       "booking-calendly": {
-        destination: maximumDestination,
         mode,
       },
     };
@@ -816,14 +792,9 @@ test("Calendly settings enforce paired capability state and sanitized destinatio
   }
 });
 
-test("Calendly settings accept only the default explicit HTTPS port", () => {
-  assertAccepts(contracts.calendlyBookingSettingsSchema, {
-    destination: "https://calendly.com:443/acme/intro",
-    mode: "popup",
-  });
-  assertRejects(contracts.calendlyBookingSettingsSchema, {
-    destination: "https://calendly.com:444/acme/intro",
-    mode: "popup",
+test("Calendly settings reject literal destinations regardless of HTTPS port", () => {
+  for (const port of ["443", "444"]) assertRejects(contracts.calendlyBookingSettingsSchema, {
+    destination: `https://calendly.com:${port}/acme/intro`, mode: "popup",
   });
 });
 
@@ -1076,7 +1047,7 @@ test("installed state records only the exact capability-addition verification re
   const capabilityAdditionState = {
     ...validState,
     origin: validState.origin,
-    appliedMigrations: ["add-booking-calendly-0-1-0"],
+    appliedMigrations: ["add-booking-calendly-0-2-0"],
     lastSuccessfulVerification: {
       kind: "capability-addition",
       checks: persistedVerificationChecks,
@@ -1104,7 +1075,7 @@ test("installed state records only the exact capability-removal verification rec
   const capabilityRemovalState = {
     ...validState,
     origin: validState.origin,
-    appliedMigrations: ["remove-booking-calendly-0-1-0"],
+    appliedMigrations: ["remove-booking-calendly-0-2-0"],
     lastSuccessfulVerification: {
       kind: "capability-removal",
       checks: persistedVerificationChecks,
@@ -1157,51 +1128,11 @@ test("installed state records only the exact capability-removal verification rec
   });
 });
 
-test("installed state records only the exact capability-upgrade verification receipt", () => {
-  const capabilityUpgradeState = {
-    ...validState,
-    origin: validState.origin,
-    appliedMigrations: ["upgrade-standards-0-3-0-to-0-4-0"],
-    lastSuccessfulVerification: {
-      kind: "capability-upgrade",
-      checks: capabilityUpgradePersistedVerificationChecks,
-    },
-  };
-
-  assert.deepEqual(
-    contracts.capabilityUpgradePersistedVerificationChecks,
-    capabilityUpgradePersistedVerificationChecks,
-  );
-  assert.deepEqual(
-    contracts.capabilityUpgradeVerificationChecks,
-    capabilityUpgradeVerificationChecks,
-  );
-  assertAccepts(contracts.installedStateSchema, capabilityUpgradeState);
-  for (const checks of [
-    capabilityUpgradePersistedVerificationChecks.slice(0, -1),
-    [
-      capabilityUpgradePersistedVerificationChecks[1],
-      capabilityUpgradePersistedVerificationChecks[0],
-      ...capabilityUpgradePersistedVerificationChecks.slice(2),
-    ],
-    [
-      capabilityUpgradePersistedVerificationChecks[0],
-      capabilityUpgradePersistedVerificationChecks[0],
-      ...capabilityUpgradePersistedVerificationChecks.slice(2),
-    ],
-    [...capabilityUpgradePersistedVerificationChecks, "unexpected-check"],
-    currentVerificationChecks,
-    capabilityAdditionVerificationChecks,
-    capabilityRemovalVerificationChecks,
-  ]) {
-    assertRejects(contracts.installedStateSchema, {
-      ...capabilityUpgradeState,
-      lastSuccessfulVerification: {
-        kind: "capability-upgrade",
-        checks,
-      },
-    });
-  }
+test("current installed state refuses retired upgrade receipts while provenance remains readable", () => {
+  for (const profile of ["portfolio", "site", "app"]) assertRejects(contracts.installedStateSchema, {
+    ...currentState(profile), lastSuccessfulVerification: { kind: "capability-upgrade", checks: capabilityUpgradePersistedVerificationChecks },
+  });
+  assertAccepts(contracts.migrationRecordSchema, { ...validMigrationRecord, identifier: "upgrade-standards-0-3-0-to-0-4-0" });
 });
 
 test("migration records describe only completed migration or reconciliation work", () => {
@@ -1280,7 +1211,7 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
     assert.deepEqual(
       recipeVersionSchema.enum,
       readableRecipeVersions,
-      `${artifactName} must retain every readable recipe version`,
+      `${artifactName} must name exactly the current recipe versions`,
     );
   }
   const verificationCheckTuples =
@@ -1288,46 +1219,18 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
       .flatMap(({ properties }) =>
         properties.checks.anyOf ?? [properties.checks],
       );
-  assert.equal(
-    generatedRoots["state.schema.json"].properties.schemaVersion.const,
-    "1.0.0",
-  );
+  assert.equal(generatedRoots["state.schema.json"].properties.schemaVersion.const, "2.0.0");
   assert.deepEqual(
-    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(
-      ({ properties }) => properties.kind.const,
-    ),
-    [
-      "generation",
-      "capability-addition",
-      "capability-removal",
-      "capability-upgrade",
-      "profile-transition",
-    ],
-  );
-  const capabilityUpgradeSchema =
-    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
-      ({ properties }) => properties.kind.const === "capability-upgrade",
-    );
-  assert.deepEqual(
-    capabilityUpgradeSchema.properties.checks.prefixItems.map(({ const: value }) => value),
-    capabilityUpgradePersistedVerificationChecks,
+    generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.map(({ properties }) => properties.kind.const),
+    ["generation", "capability-addition", "capability-removal", "profile-transition"],
   );
   const profileTransitionSchema =
     generatedRoots["state.schema.json"].properties.lastSuccessfulVerification.oneOf.find(
       ({ properties }) => properties.kind.const === "profile-transition",
     );
   assert.deepEqual(
-    profileTransitionSchema.properties.checks.anyOf.map(({ prefixItems }) =>
-      prefixItems.map(({ const: value }) => value),
-    ),
-    [
-      profileTransitionPersistedVerificationChecks,
-      [
-        ...profileTransitionPersistedVerificationChecks.slice(0, -1),
-        "worker-integration",
-        "post-change-inference",
-      ],
-    ],
+    profileTransitionSchema.properties.checks.prefixItems.map(({ const: value }) => value),
+    [...profileTransitionPersistedVerificationChecks.slice(0, -1), "worker-integration", "post-change-inference"],
   );
   for (const tuple of verificationCheckTuples) {
     assert.equal(tuple.minItems, tuple.prefixItems.length);
@@ -1337,57 +1240,12 @@ test("checked JSON Schema artifacts match the executable Draft 2020-12 contracts
   const projectDisplayNamePattern =
     generatedRoots["project.schema.json"].properties.project.properties.displayName
       .pattern;
-  const calendlyDestinationContract =
-    generatedRoots["project.schema.json"].properties.capabilitySettings.properties[
-      "booking-calendly"
-    ].properties.destination;
-  const cloudflareWebAnalyticsTokenContract =
-    generatedRoots["project.schema.json"].properties.capabilitySettings.properties
-      .analytics.properties.providers.properties.cloudflareWebAnalytics
-      .properties.siteToken;
-
-  assert.deepEqual(
-    Object.keys(
-      generatedRoots["project.schema.json"].properties.capabilitySettings
-        .properties,
-    ),
-    ["analytics", "booking-calendly", "contact-form-web3forms"],
-  );
-  assert.equal(
-    generatedRoots["project.schema.json"].properties.capabilitySettings
-      .additionalProperties,
-    false,
-  );
-  assert.equal(calendlyDestinationContract.maxLength, 2_048);
-  assert.equal(typeof calendlyDestinationContract.pattern, "string");
-  assert.match(
-    "0123456789ABCDEF0123456789ABCDEF",
-    new RegExp(cloudflareWebAnalyticsTokenContract.pattern, "u"),
-  );
-  const calendlyDestinationPattern = new RegExp(
-    calendlyDestinationContract.pattern,
-    "u",
-  );
-  for (const destination of [
-    "https://calendly.com/acme/intro",
-    "https://calendly.com:443/acme/intro",
-    "https://www.calendly.com/acme/intro",
-  ]) {
-    assert.match(destination, calendlyDestinationPattern);
-  }
-  for (const destination of [
-    "http://calendly.com/acme/intro",
-    "https://calendar.example/calendly.com/acme/intro",
-    "https://calendly.com/",
-    "https://calendly.com:444/acme/intro",
-    "https://user@calendly.com/acme/intro",
-    "https://www.calendly.com/acme/intro?month=2026-08",
-    "https://calendly.com/acme/intro?email=person%40example.com&token=private-token",
-    "https://calendly.com/acme/intro#booking",
-    " https://calendly.com/acme/intro",
-  ]) {
-    assert.doesNotMatch(destination, calendlyDestinationPattern);
-  }
+  const settingsContract = generatedRoots["project.schema.json"].properties.capabilitySettings;
+  assert.deepEqual(Object.keys(settingsContract.properties), ["analytics", "booking-calendly"]);
+  assert.equal(settingsContract.additionalProperties, false);
+  assert.deepEqual(Object.keys(settingsContract.properties["booking-calendly"].properties), ["mode"]);
+  assert.equal(settingsContract.properties.analytics.properties.providers.properties.cloudflareWebAnalytics.const, true);
+  assert.equal(settingsContract.properties.analytics.properties.providers.properties.googleAnalytics4.const, true);
 
   assert.equal(projectDisplayNamePattern, displayNamePattern.source);
   const schemaDisplayNamePattern = new RegExp(projectDisplayNamePattern, "u");
@@ -1441,12 +1299,10 @@ test("the schema generator checks artifacts without rewriting them", async () =>
 });
 
 
-test("Vitest five app receipts require Worker integration for generation and each supported lifecycle", () => {
-  for (const recipeVersion of ["0.2.7"]) {
-    for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
-      assertAccepts(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks } });
-      assertRejects(contracts.installedStateSchema, { ...validState, origin: { profile: "app", recipeVersion }, lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
-    }
+test("current app receipts require Worker integration for every supported lifecycle", () => {
+  for (const [kind, checks] of [["generation", [...currentVerificationChecks.slice(0, -1), "worker-integration", "post-state-inference"]], ["capability-addition", contracts.appCapabilityAdditionPersistedVerificationChecks], ["capability-removal", contracts.appCapabilityRemovalPersistedVerificationChecks], ["profile-transition", contracts.appProfileTransitionPersistedVerificationChecks]]) {
+    assertAccepts(contracts.installedStateSchema, { ...currentState("app"), lastSuccessfulVerification: { kind, checks } });
+    assertRejects(contracts.installedStateSchema, { ...currentState("app"), lastSuccessfulVerification: { kind, checks: checks.filter(check => check !== "worker-integration") } });
   }
 });
 
@@ -1465,12 +1321,12 @@ const environmentProject = {
   },
 };
 
-test("application environment project parser requires exact selection-only schema without changing public parsing", () => {
+test("default project parser requires the exact selection-only schema", () => {
   const parsed = contracts.parseProjectYaml(JSON.stringify(environmentProject), "2.0.0");
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
   assert.deepEqual(parsed.value, environmentProject);
-  assert.equal(contracts.parseProjectYaml(JSON.stringify(environmentProject)).ok, false);
-  assert.equal(contracts.parseProjectYaml(JSON.stringify(validProject), "2.0.0").ok, false);
+  assert.equal(contracts.parseProjectYaml(JSON.stringify(environmentProject)).ok, true);
+  assert.equal(contracts.parseProjectYaml(JSON.stringify({ ...validProject, schemaVersion: "1.0.0" })).ok, false);
   assert.equal(contracts.parseProjectYaml(JSON.stringify(validProject)).ok, true);
   assert.equal(contracts.parseProjectYaml(contracts.serializeProjectYaml(parsed.value), "2.0.0").ok, true);
 });
@@ -1534,7 +1390,7 @@ test("environment persistence state requires the complete optional tuple and bin
   };
   const parsed = contracts.parseStateJson(JSON.stringify(state), "2.0.0");
   assert.equal(parsed.ok, true, JSON.stringify(parsed));
-  assert.equal(contracts.parseStateJson(JSON.stringify(state)).ok, false);
+  assert.equal(contracts.parseStateJson(JSON.stringify(state)).ok, true);
   for (const mutate of [
     (value) => { value.installedCapabilities[0].version = "0.7.1"; },
     (value) => { value.installedCapabilities[3].version = "0.7.1"; },
@@ -1550,12 +1406,12 @@ test("environment persistence state requires the complete optional tuple and bin
   }
 });
 
-test("application environment state parsing enforces the exact candidate tuple and verification vector", () => {
+test("default state parsing enforces the exact current tuple and verification vector", () => {
   const result = contracts.parseStateJson(JSON.stringify(environmentState), "2.0.0");
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value, environmentState);
-  assert.equal(contracts.parseStateJson(JSON.stringify(environmentState)).ok, false);
-  assert.equal(contracts.parseStateJson(JSON.stringify(validState), "2.0.0").ok, false);
+  assert.equal(contracts.parseStateJson(JSON.stringify(environmentState)).ok, true);
+  assert.equal(contracts.parseStateJson(JSON.stringify({ ...validState, schemaVersion: "1.0.0" })).ok, false);
   assert.equal(contracts.parseStateJson(contracts.serializeStateJson(result.value), "2.0.0").ok, true);
   for (const mutate of [
     (state) => { state.projectSchemaVersion = "1.0.0"; },
@@ -1591,8 +1447,8 @@ test("application environment catalog admits only the complete common tuple with
   const publicCatalog = contracts.createCapabilityCatalog(contracts.verifiedCapabilityPackageVersions);
   assert.equal(publicCatalog.ok, true, JSON.stringify(publicCatalog));
   const publicStandards = publicCatalog.value.find(({ identifier }) => identifier === "standards");
-  assert.deepEqual(publicStandards.environmentVariables, ["PLAYWRIGHT_DEPLOYED_URL"]);
-  assert.deepEqual(publicStandards.secrets, []);
+  assert.deepEqual(publicStandards.environmentVariables, ["DEPLOY_URL", "EXPECTED_REVISION"]);
+  assert.deepEqual(publicStandards.secrets, ["CF_ACCESS_CLIENT_ID", "CF_ACCESS_CLIENT_SECRET", "GITHUB_TOKEN"]);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1603,10 +1459,10 @@ test("application environment catalog admits only the complete common tuple with
 });
 
 
-test("current public state recipes retain exact verification vectors", () => {
-  for (const [profile, recipeVersion] of [["portfolio", "0.11.7"], ["site", "0.12.7"]]) {
+test("retired public state recipes remain unsupported", () => {
+  for (const [profile, recipeVersion] of [["portfolio", "0.11.1"], ["site", "0.12.1"], ["portfolio", "0.11.2"], ["site", "0.12.2"]]) {
     const state = { ...validState, origin: { profile, recipeVersion } };
-    assertAccepts(contracts.installedStateSchema, state);
+    assertRejects(contracts.installedStateSchema, state);
     assertRejects(contracts.installedStateSchema, { ...state, lastSuccessfulVerification: { kind: "generation", checks: legacyVerificationChecks } });
   }
 });
@@ -1630,19 +1486,19 @@ test("unused public generations refuse raw and structured controls", async () =>
   }
 });
 
-test("public successors select patched standards independently of internal environments", () => {
+test("public generation selects the exact environment tuple", () => {
   assert.deepEqual(contracts.profileRecipes.map(({ identifier, recipeVersion }) => [identifier, recipeVersion]), [
-    ["portfolio", "0.11.7"], ["site", "0.12.7"], ["app", "0.2.7"],
+    ["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"],
   ]);
   const publicContext = snapshots.createGenerationRenderingContext();
-  assert.equal(publicContext.catalogSnapshot.standards, "0.5.1");
-  assert.equal(snapshots.createGenerationRenderingContext(true).catalogSnapshot.standards, "0.6.1");
+  assert.equal(publicContext.catalogSnapshot.standards, "0.9.0");
+  assert.equal(snapshots.createGenerationRenderingContext(true).catalogSnapshot.standards, "0.10.0");
   const internal = contracts.createApplicationEnvironmentRenderingContext();
   assert.equal(internal.catalogSnapshot.standards, "0.9.0");
   assert.equal(internal.profiles.find(({ identifier }) => identifier === "portfolio").recipeVersion, "0.12.0");
 });
 
-test("public deployment families preserve supported installed combinations and reject mixed deployment versions", async (context) => {
+test("current deployment families preserve supported installed combinations and reject mixed deployment versions", async (context) => {
   const scenarios = [];
   for (const profile of ["portfolio", "site", "app"]) {
     for (const foundation of ["default", "retained", "email"]) {
@@ -1652,7 +1508,7 @@ test("public deployment families preserve supported installed combinations and r
   for (const foundation of ["default", "retained", "email"]) {
     scenarios.push({ profile: "app", foundation, persistence: true });
   }
-  for (const jobsVersion of ["0.1.0", "0.2.0"]) {
+  for (const jobsVersion of ["0.3.0"]) {
     for (const profile of ["portfolio", "site", "app"]) {
       for (const foundation of ["retained", "email"]) {
         scenarios.push({ profile, foundation, persistence: false, jobsVersion });
@@ -1676,7 +1532,7 @@ test("public deployment families preserve supported installed combinations and r
         ...(foundation === "email" ? { transactionalEmailResend: true } : {}),
         ...(jobsVersion === undefined ? {} : { backgroundJobDelivery: true }),
       }, snapshots.createGenerationRenderingContext(
-        persistence, foundation !== "default", jobsVersion !== undefined, jobsVersion,
+        persistence, foundation !== "default", jobsVersion !== undefined,
       ));
       assert.equal(rendered.ok, true, JSON.stringify(rendered));
       const project = rendered.value.project;
@@ -1705,7 +1561,7 @@ test("public deployment families preserve supported installed combinations and r
 
       for (const version of [
         "0.3.1", "0.4.1", "0.5.1", "0.6.1",
-        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "9.9.9",
+        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "9.9.9",
       ].filter(version => version !== deploymentVersion)) {
         const changed = {
           ...state,
@@ -1723,9 +1579,9 @@ test("public deployment families preserve supported installed combinations and r
       assert.equal(snapshots.createVerifiedProjectSnapshot(project, missingDeployment).ok, false);
       for (const [identifier, version] of [
         ["standards", "0.7.1"],
-        ["app-foundation", "0.3.0"],
+        ["app-foundation", "0.2.0"],
         ["application-persistence", "0.1.0"],
-        ["background-job-delivery", "0.3.0"],
+        ["background-job-delivery", "0.2.0"],
       ]) {
         if (!installedCapabilities.some(capability => capability.identifier === identifier)) continue;
         const changed = {
@@ -1738,14 +1594,14 @@ test("public deployment families preserve supported installed combinations and r
       assert.equal(snapshots.createVerifiedProjectSnapshot({
         ...project, originProfile: profile === "portfolio" ? "site" : "portfolio",
       }, state).ok, false);
-      const internalSchema = { ...state, schemaVersion: "2.0.0", projectSchemaVersion: "2.0.0" };
-      assert.equal(contracts.parseStateJson(JSON.stringify(internalSchema)).ok, false);
-      assert.equal(snapshots.createVerifiedProjectSnapshot(project, internalSchema).ok, false);
+      const retiredSchema = { ...state, schemaVersion: "1.0.0", projectSchemaVersion: "1.0.0" };
+      assert.equal(contracts.parseStateJson(JSON.stringify(retiredSchema)).ok, false);
+      assert.equal(snapshots.createVerifiedProjectSnapshot(project, retiredSchema).ok, false);
     });
   }
 });
 
-test("environment contact installed state admits only its exact candidate version", () => {
+test("environment contact installed state admits only its exact current version", () => {
   for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
     const state = structuredClone(environmentState);
     state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "contact-form-web3forms", version });
@@ -1754,7 +1610,7 @@ test("environment contact installed state admits only its exact candidate versio
 });
 
 
-test("environment booking installed state and catalog admit only the mode-only candidate subject", () => {
+test("environment booking installed state and catalog admit only the mode-only current subject", () => {
   for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
     const state = structuredClone(environmentState);
     state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "booking-calendly", version });
@@ -1772,7 +1628,7 @@ test("environment booking installed state and catalog admit only the mode-only c
   assert.equal(booking.managedSurfaces.find(({ path }) => path === "docs/booking-calendly.md")?.ownership, "application-owned");
 });
 
-test("environment analytics admits only its exact selection-only candidate subject and ownership", () => {
+test("environment analytics admits only its exact selection-only current subject and ownership", () => {
   const context = contracts.createApplicationEnvironmentRenderingContext();
   const catalog = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, context.catalogSnapshot);
   assert.equal(catalog.ok, true);
@@ -1790,7 +1646,7 @@ test("environment analytics admits only its exact selection-only candidate subje
   }
   const publicCatalog = contracts.createVerifiedCapabilityCatalog();
   assert.equal(publicCatalog.ok, true);
-  assert.equal(publicCatalog.value.find(({ identifier }) => identifier === "analytics").version, "0.1.0");
+  assert.equal(publicCatalog.value.find(({ identifier }) => identifier === "analytics").version, "0.2.0");
 });
 
 

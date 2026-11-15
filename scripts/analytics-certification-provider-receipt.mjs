@@ -9,10 +9,10 @@ const exactHeadRef = "refs/heads/main";
 const exactEnvironment = "integration-test-deploy";
 const exactWorker = "integration-test-deploy";
 const exactDigest =
-  "sha256:6c562317c6888a0c4a1b14bb2d7320f309b7c6ac3927a4b94cb3e9365ae01bba";
+  "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b";
 const exactRevisionPattern = /^[0-9a-f]{40}$/u;
-const exactDedicatedHostnamePattern =
-  /^integration-test-deploy\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.workers\.dev$/u;
+const dedicatedStagingHostnamePattern =
+  /^(?=.{1,253}$)(?!.*(?:^|\.)workers\.dev$)(?!.*\.(?:localhost|local|internal)$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?$/u;
 const uuidPattern =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const sha256HexPattern = /^[0-9a-f]{64}$/u;
@@ -62,7 +62,7 @@ function requireCleanupContext(context) {
     !hasExactKeys(context, ["headSha", "environment", "hostname", "worker"]) ||
     !exactRevisionPattern.test(context.headSha) ||
     context.environment !== exactEnvironment ||
-    !exactDedicatedHostnamePattern.test(context.hostname) ||
+    !dedicatedStagingHostnamePattern.test(context.hostname) ||
     context.worker !== exactWorker
   ) {
     reject();
@@ -288,7 +288,7 @@ function requireMeasuredContext(context) {
       "behaviorContractDigest",
     ]) ||
     context.subject.identifier !== "analytics" ||
-    context.subject.version !== "0.1.0" ||
+    context.subject.version !== "0.2.0" ||
     context.subject.behaviorContractDigest !== exactDigest ||
     context.environment !== exactEnvironment ||
     !hasExactKeys(context.resources, [
@@ -298,8 +298,8 @@ function requireMeasuredContext(context) {
       "production",
     ]) ||
     context.resources.worker !== exactWorker ||
-    context.resources.target !== "dedicated-non-production-workers-dev" ||
-    !exactDedicatedHostnamePattern.test(context.resources.hostname) ||
+    context.resources.target !== "dedicated-protected-staging" ||
+    !dedicatedStagingHostnamePattern.test(context.resources.hostname) ||
     context.resources.production !== false ||
     containsUnsafeContent(context)
   ) {
@@ -325,7 +325,7 @@ function requireAppBuild(measurement, context) {
     measurement.schemaVersion !== "1.0.0" ||
     measurement.headSha !== context.source.revision ||
     measurement.profile !== "app" ||
-    measurement.recipeVersion !== "0.2.7"
+    measurement.recipeVersion !== "0.3.0"
   ) reject();
   try {
     requireAppRuntimeEvidence(measurement, "app-analytics");
@@ -525,7 +525,7 @@ function requireBrowserJourney(measurement) {
     ]) ||
     measurement.persistedDenialReload.providerRequests !== 0 ||
     measurement.persistedDenialReload.consentRecordPersisted !== true ||
-    measurement.persistedDenialReload.consentRecordSchemaVersion !== 2 ||
+    measurement.persistedDenialReload.consentRecordSchemaVersion !== 3 ||
     measurement.persistedDenialReload.deniedPurposeCount !== 3 ||
     measurement.persistedDenialReload.providerCookieCount !== 0 ||
     !requireRequestPhase(measurement.partialGrant, [

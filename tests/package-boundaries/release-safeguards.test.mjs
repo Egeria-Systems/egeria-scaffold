@@ -396,7 +396,7 @@ test("public package dry runs contain only approved files", async () => {
   await execFileAsync(
     "pnpm",
     [
-      "--config.verify-deps-before-run=warn",
+      "--config.verify-deps-before-run=error",
       "--filter",
       "@egeria-systems/observability",
       "run",

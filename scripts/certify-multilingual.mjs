@@ -14,7 +14,7 @@ import {
   createIsolatedProcessEnvironment,
   isolatedProcessOptions,
 } from "./lib/isolated-process.mjs";
-import { verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
+import { syntheticApplicationEnvironment, verifyGeneratedProject } from "./verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -24,9 +24,8 @@ const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const lifecycleCommandTimeoutMilliseconds = 45 * 60 * 1000;
 const profiles = Object.freeze(["portfolio", "site"]);
 const subject = Object.freeze({
-  descriptorVersion: "0.1.0",
-  behaviorContractDigest:
-    "sha256:016afd467349fde8ffeb821fe672cf60004f8e10916141c4f3837a81afcb1d41",
+  "descriptorVersion": "0.1.0",
+  "behaviorContractDigest": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891"
 });
 const commonCapabilities = Object.freeze([
   "standards",
@@ -46,8 +45,12 @@ const fixedVerificationChecks = Object.freeze([
   "typecheck",
   "unit-tests",
   "component-tests",
+  "deployment-contracts",
+  "transport-contracts",
+  "application-environment",
   "next-build",
   "opennext-build",
+  "prepared-artifact",
   "browser-install",
   "browser-development",
   "browser-preview",
@@ -176,8 +179,7 @@ function configurationFor(profile, revision) {
       "--multilingual",
       ...(isPortfolio
         ? [
-            "--calendly-url",
-            "https://calendly.com/example/intro",
+            "--booking-calendly",
             "--calendly-mode",
             "popup",
           ]
@@ -190,9 +192,10 @@ function configurationFor(profile, revision) {
           "multilingual",
         ])
       : Object.freeze([...commonCapabilities, "site-routing", "multilingual"]),
+    expectedCapabilitySettings: isPortfolio ? { "booking-calendly": { mode: "popup" } } : {},
     capabilityIdentifier: "multilingual",
     capabilityVersion: "0.1.0",
-    expectedRecipeVersion: isPortfolio ? "0.10.0" : "0.11.0",
+    expectedRecipeVersion: isPortfolio ? "0.12.0" : "0.13.0",
     verifierIdentifier: isPortfolio
       ? "portfolio-multilingual-calendly"
       : "site-multilingual",
@@ -273,6 +276,7 @@ export async function verifyMultilingualPortfolioForTesting({
 
   const childEnvironment = {
     ...environment,
+    ...syntheticApplicationEnvironment(["booking-calendly", "multilingual"], { "booking-calendly": { mode: "popup" } }, "development", "http://localhost:3000"),
     HOME: home,
     USERPROFILE: home,
     TMPDIR: temporary,
@@ -322,6 +326,8 @@ export async function verifyMultilingualPortfolioForTesting({
       arguments: ["run", "test:component"],
       failureCode: "COMPONENT_TESTS_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "test:deployment-contracts"], failureCode: "DEPLOYMENT_CONTRACTS_FAILED" },
+    { arguments: ["--dir", "apps/web", "run", "check:environment"], failureCode: "APPLICATION_ENVIRONMENT_FAILED" },
     { arguments: ["run", "build"], failureCode: "NEXT_BUILD_FAILED" },
     {
       arguments: [
@@ -334,10 +340,13 @@ export async function verifyMultilingualPortfolioForTesting({
       ],
       failureCode: "OPENNEXT_BUILD_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
     {
       arguments: ["--dir", "apps/web", "run", "browser:install"],
       failureCode: "BROWSER_INSTALL_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "test:transport"], failureCode: "TRANSPORT_CONTRACTS_FAILED" },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
     {
       arguments: ["--dir", "apps/web", "run", "test:e2e:dev"],
       failureCode: "BROWSER_DEVELOPMENT_FAILED",
@@ -346,6 +355,7 @@ export async function verifyMultilingualPortfolioForTesting({
       arguments: ["--dir", "apps/web", "run", "test:e2e:preview"],
       failureCode: "BROWSER_PREVIEW_FAILED",
     },
+    { arguments: ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", childEnvironment.BUILD_SOURCE_REVISION, "--local"], failureCode: "PREPARED_ARTIFACT_FAILED" },
   ];
 
   for (const command of commands) {

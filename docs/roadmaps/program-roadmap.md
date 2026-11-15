@@ -1,6 +1,8 @@
 # Program Roadmap
 
-**Current applicability:** [ADR-0020](../adr/0020-application-environments.md#early-retirement-of-unused-public-generations) retires unused public generations, historical upgrade commands and portfolio-to-site execution. Current public recipes are `portfolio@0.11.7`, `site@0.12.7` and `app@0.2.7`; exact supported contexts, refusal rules and remaining incoming edges follow the [capability model](../architecture/capability-model.md#accepted-app-architecture-boundary). Earlier acceptance and certification statements below remain historical evidence for their recorded subjects. Retirement does not activate schema 2, certify successors or transfer visual approval.
+## Current environment integration
+
+The [current environment generation](../architecture/capability-model.md#current-environment-generation) owns the schema-2 source candidate and exact runtime/acceptance limits. Its current tuple and lifecycle definitions supersede only earlier executable generation/edge statements below under [ADR-0020](../adr/0020-application-environments.md#public-environment-generation-activation). Historical accepted decisions and evidence retain their original identities. This candidate is not complete or releasable; source integration, complete generated runtime/security admission, four exact visual approvals, hosted consumer reconciliation and fourteen separate certification renewals remain open.
 
 This is the concise execution sequence. It does not supersede the [full approved source plan](2026-08-04-nextjs-boilerplate-builder-best-reconciled-plan.md) or an accepted ADR.
 

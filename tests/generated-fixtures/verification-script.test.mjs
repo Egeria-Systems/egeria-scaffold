@@ -41,6 +41,11 @@ const repositoryRoot = resolve(
 );
 const execFileAsync = promisify(execFile);
 const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+const retainedFixtureIdentifier = identifier => ({
+  "site-public-integrations": "site-multilingual-analytics",
+  "app-jobs": "app",
+  "app-persistence-jobs-email": "app-persistence-email",
+})[identifier] ?? identifier;
 
 function verifyGeneratedSkeletonsForTesting(adapters, options) {
   return verifySkeletons({ ...adapters, runAudit: adapters?.runAudit ?? (async input => {
@@ -48,6 +53,22 @@ function verifyGeneratedSkeletonsForTesting(adapters, options) {
     return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
   }) }, options);
 }
+
+test("every generated fixture selection uses the public create argument contract", async () => {
+  const { parseCliArguments } = await import("../../apps/cli/dist/arguments.js");
+  for (const contract of generatedFixtureContracts) {
+    const parsed = parseCliArguments([
+      "create",
+      ...contract.createArguments,
+      "--directory",
+      join(tmpdir(), "fixture-create-contract", contract.identifier),
+    ]);
+    assert.equal(parsed.ok, true, JSON.stringify({ identifier: contract.identifier, parsed }));
+    assert.equal(parsed.value.kind, "create");
+    assert.equal(parsed.value.profile, contract.profile);
+    assert.equal(parsed.value.projectName, contract.projectName);
+  }
+});
 
 test("the admitted skeleton audit exception never reaches strict single-project certification verification", async t => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-audit-boundary-"));
@@ -93,6 +114,7 @@ test("skeleton verification accepts below-threshold findings while preserving ra
       return { status: "passed", rawExitCode: 1, thresholdExitCode: 0 };
     },
   });
+  assert.deepEqual(result.fixtures, generatedFixtureContracts.map(contract => contract.identifier));
   assert.equal(result.auditDispositions.length, generatedFixtureContracts.length);
   assert.equal(result.auditDispositions.every(receipt => receipt.status === "passed" && receipt.rawExitCode === 1 && receipt.thresholdExitCode === 0), true);
   assert.equal(result.status, "completed");
@@ -232,7 +254,8 @@ test("persistence fixture binding verification executes separately and a failed 
         const binding = commands.findIndex((arguments_) => arguments_.at(-1) === "test:integration:bindings");
         assert.deepEqual(commands[binding], ["--dir", "apps/web", "run", "test:integration:bindings"]);
         assert.equal(commands[binding - 1].at(-1), "test:integration:cloudflare");
-        assert.equal(commands[binding + 1].at(-1), "browser:install");
+        assert.deepEqual(commands[binding + 1], ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"]);
+        assert.equal(commands[binding + 2].at(-1), "browser:install");
       }
       assert.equal(await pathExists(ownedPath), false);
     }
@@ -341,8 +364,9 @@ test("app Worker integration executes after OpenNext and records non-app absence
       );
       const worker = commands.findIndex((arguments_) => arguments_.at(-1) === "test:integration:cloudflare");
       assert.deepEqual(commands[worker], ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"]);
-      assert.equal(commands[worker - 1].at(-1), "--skipNextBuild");
-      assert.equal(commands[worker + 1].at(-1), "browser:install");
+      assert.equal(commands[worker - 2].at(-1), "--skipNextBuild");
+      assert.deepEqual(commands[worker - 1].slice(3, 5), ["check:prepared-artifact", "record"]);
+      assert.deepEqual(commands[worker + 1].slice(3, 5), ["check:prepared-artifact", "verify"]);
       assert.deepEqual(result.workerIntegration, {
         executed: identifier === "portfolio" ? [] : [identifier],
         skipped: identifier === "portfolio" ? [identifier] : [],
@@ -364,7 +388,7 @@ test("a freshly rendered Calendly app is verified without adding an immutable fi
     const rendered = await renderSkeleton({
       profile: "app", projectName: "acme-app", displayName: "Acme App",
       packageVersions: { standards: "0.1.0", observability: "0.3.0" },
-      bookingCalendly: { destination: "https://calendly.com/example/intro", mode: "popup" },
+      bookingCalendly: { mode: "popup" },
     });
     assert.equal(rendered.ok, true);
     for (const { path, content } of rendered.value.files) {
@@ -422,111 +446,93 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "portfolio",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-0.11.7",
+        relativeRoot: "fixtures/generated/portfolio-0.12.0",
       },
       {
         identifier: "portfolio-calendly",
         profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-calendly-0.11.7",
+        relativeRoot: "fixtures/generated/portfolio-calendly-0.12.0",
       },
       {
         identifier: "site",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-0.12.7",
+        relativeRoot: "fixtures/generated/site-0.13.0",
       },
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.12.7",
+        relativeRoot: "fixtures/generated/site-multilingual-0.13.0",
       },
       {
-        identifier: "site-multilingual-analytics",
+        identifier: "site-public-integrations",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-analytics-0.12.7",
+        relativeRoot: "fixtures/generated/site-public-integrations-0.13.0",
       },
       {
         identifier: "app",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-0.2.7",
+        relativeRoot: "fixtures/generated/app-0.3.0",
       },
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.2.7",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0",
       },
       {
         identifier: "app-persistence", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-0.2.7",
+        relativeRoot: "fixtures/generated/app-persistence-0.3.0",
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.11.7",
+        relativeRoot: "fixtures/generated/portfolio-email-0.12.0",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.2.7",
+        relativeRoot: "fixtures/generated/app-persistence-email-0.3.0",
       },
-      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.12.7" },
+      { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.13.0" },
+      { identifier: "app-jobs", profile: "app", relativeRoot: "fixtures/generated/app-jobs-0.3.0" },
+      { identifier: "app-persistence-jobs-email", profile: "app", relativeRoot: "fixtures/generated/app-persistence-jobs-email-0.3.0" },
     ],
   );
 
   for (const contract of generatedFixtureContracts) {
     assert.equal(
       contract.expectedRecipeVersion,
-      contract.profile === "app" ? "0.2.7" : contract.profile === "site" ? "0.12.7" : "0.11.7",
+      contract.profile === "app" ? "0.3.0" : contract.profile === "site" ? "0.13.0" : "0.12.0",
     );
-    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.6.1" : "0.5.1");
-    assert.equal(contract.expectedObservabilityVersion, "0.3.0");
+    assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"].includes(contract.identifier) ? "0.10.0" : "0.9.0");
+    assert.equal(contract.expectedObservabilityVersion, "0.4.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.4.1" : "0.3.1");
+    assert.equal(contract.expectedDeploymentCloudflareVersion, contract.identifier === "app-persistence-jobs-email" ? "0.12.0" : contract.identifier === "app-jobs" ? "0.11.0" : ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.10.0" : "0.9.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
-      contract.profile === "portfolio" ? null : "0.4.0",
+      contract.profile === "portfolio" ? null : "0.5.0",
     );
     assert.equal(
       contract.expectedBookingCalendlyVersion,
-      ["portfolio-calendly", "app-all-optional-integrations"].includes(contract.identifier) ? "0.1.0" : null,
+      ["portfolio-calendly", "site-public-integrations", "app-all-optional-integrations"].includes(contract.identifier) ? "0.2.0" : null,
     );
     assert.equal(
       contract.expectedMultilingualVersion,
       contract.identifier === "site-multilingual" ||
-        contract.identifier === "site-multilingual-analytics" ||
+        contract.identifier === "site-public-integrations" ||
         contract.identifier === "app-all-optional-integrations"
         ? "0.1.0"
         : null,
     );
     assert.equal(
       contract.expectedAnalyticsVersion,
-      ["site-multilingual-analytics", "app-all-optional-integrations"].includes(contract.identifier) ? "0.1.0" : null,
+      ["site-public-integrations", "app-all-optional-integrations"].includes(contract.identifier) ? "0.2.0" : null,
     );
-    assert.equal(
-      contract.expectedSurfaces,
-      contract.identifier === "portfolio-calendly"
-        ? 112
-        : contract.identifier === "portfolio"
-          ? 107
-          : contract.identifier === "site"
-            ? 124
-            : contract.identifier === "site-multilingual"
-              ? 140
-              : contract.identifier === "app" ? 143
-                : contract.identifier === "app-all-optional-integrations" ? 179
-                  : contract.identifier === "app-persistence" ? 162
-                    : contract.identifier === "portfolio-email" ? 135
-                      : contract.identifier === "app-persistence-email" ? 171 : contract.identifier === "site-contact-form" ? 138 : 155,
-    );
-    assert.equal(
-      contract.visualRegression,
-      ![
-        "site-multilingual",
-        "site-multilingual-analytics",
-        "app-all-optional-integrations",
-        "app-persistence",
-        "portfolio-email",
-        "app-persistence-email",
-        "site-contact-form",
-      ].includes(contract.identifier),
-    );
+    const surfaces = {
+      portfolio: 134, "portfolio-calendly": 143, site: 150, "site-multilingual": 166,
+      "site-public-integrations": 208, app: 170, "app-all-optional-integrations": 212,
+      "app-persistence": 191, "portfolio-email": 163, "app-persistence-email": 200,
+      "site-contact-form": 166, "app-jobs": 181, "app-persistence-jobs-email": 211,
+    };
+    assert.equal(contract.expectedSurfaces, surfaces[contract.identifier]);
+    assert.equal(contract.visualRegression, ["portfolio", "portfolio-calendly", "site", "app"].includes(contract.identifier));
     const snapshot = await inspectGeneratedFixture(
       resolve(repositoryRoot, contract.relativeRoot),
       contract.identifier,
@@ -551,16 +557,16 @@ test("fixture inspection accepts only the exact portable generated trees", async
     ({ identifier }) => identifier === "site-multilingual",
   );
   const analyticsSite = generatedFixtureContracts.find(
-    ({ identifier }) => identifier === "site-multilingual-analytics",
+    ({ identifier }) => identifier === "site-public-integrations",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 58);
-  assert.equal(site.expectedFiles.length, 75);
-  assert.equal(multilingualSite.expectedFiles.length, 91);
-  assert.equal(analyticsSite.expectedFiles.length, 106);
+  assert.equal(basePortfolio.expectedFiles.length, 80);
+  assert.equal(site.expectedFiles.length, 96);
+  assert.equal(multilingualSite.expectedFiles.length, 112);
+  assert.equal(analyticsSite.expectedFiles.length, 154);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
-    58 - 1 + 6,
-    "six booking sources replace one common home destination and add five distinct paths",
+    basePortfolio.expectedFiles.length - 1 + 10,
+    "ten booking sources replace one common home destination and add nine distinct paths",
   );
   assert.deepEqual(calendlyPortfolio.createArguments, [
     "--profile",
@@ -568,15 +574,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
     "--name",
     "acme-portfolio-calendly",
     "--display-name",
-    "Acme Portfolio Booking",
-    "--calendly-url",
-    "https://calendly.com/example/intro",
+    "Acme Portfolio Calendly",
+    "--booking-calendly",
     "--calendly-mode",
     "popup",
   ]);
   assert.deepEqual(calendlyPortfolio.expectedCapabilitySettings, {
     "booking-calendly": {
-      destination: "https://calendly.com/example/intro",
       mode: "popup",
     },
   });
@@ -608,24 +612,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
     "multilingual",
   ]);
   assert.deepEqual(analyticsSite.createArguments, [
-    "--profile",
-    "site",
-    "--name",
-    "acme-site-multilingual-analytics",
-    "--display-name",
-    "Acme Site Multilingual Analytics",
-    "--multilingual",
-    "--cloudflare-web-analytics-token",
-    "0123456789abcdef0123456789abcdef",
-    "--google-analytics-id",
-    "G-ABCDEF1234",
-    "--microsoft-clarity-id",
-    "clarity123",
-    "--microsoft-clarity-audience",
-    "not-directed-to-minors",
-    "--search-console-verification",
-    "search-console-verification-token",
-    "--looker-studio",
+    "--profile", "site", "--name", "acme-site-public-integrations", "--display-name", "Acme Site Public Integrations",
+    "--booking-calendly", "--calendly-mode", "popup", "--multilingual", "--contact-form-web3forms",
+    "--cloudflare-web-analytics", "--google-analytics-4", "--microsoft-clarity",
+    "--microsoft-clarity-audience", "not-directed-to-minors", "--google-search-console", "--looker-studio",
   ]);
   assert.equal(
     analyticsSite.expectedCapabilitySettings.analytics.consent.policy,
@@ -638,7 +628,9 @@ test("fixture inspection accepts only the exact portable generated trees", async
     "deployment-cloudflare",
     "observability",
     "site-routing",
+    "contact-form-web3forms",
     "analytics",
+    "booking-calendly",
     "multilingual",
   ]);
   assert.deepEqual(
@@ -665,12 +657,15 @@ test("fixture inspection accepts only the exact portable generated trees", async
     ],
   );
   assert.deepEqual(
-    analyticsSite.expectedFiles.filter(
-      (path) => !multilingualSite.expectedFiles.includes(path),
-    ),
+    analyticsSite.expectedFiles.filter(path => !multilingualSite.expectedFiles.includes(path)),
     [
       "apps/web/content/en-CA/analytics.yaml",
+      "apps/web/content/en-CA/booking-calendly.yaml",
+      "apps/web/content/en-CA/contact-form-web3forms.yaml",
       "apps/web/content/fr-CA/analytics.yaml",
+      "apps/web/content/fr-CA/booking-calendly.yaml",
+      "apps/web/content/fr-CA/contact-form-web3forms.yaml",
+      "apps/web/src/integrations/analytics/analytics-configuration.ts",
       "apps/web/src/integrations/analytics/analytics-consent-state.ts",
       "apps/web/src/integrations/analytics/analytics-consent.tsx",
       "apps/web/src/integrations/analytics/analytics-content-source.d.ts",
@@ -678,24 +673,48 @@ test("fixture inspection accepts only the exact portable generated trees", async
       "apps/web/src/integrations/analytics/analytics-provider-contract.ts",
       "apps/web/src/integrations/analytics/analytics-runtime.ts",
       "apps/web/src/integrations/analytics/analytics-settings.ts",
-      "apps/web/tests/component/analytics-consent.test.tsx",
-      "apps/web/tests/e2e/analytics-consent.spec.ts",
-      "apps/web/tests/unit/analytics-consent-state.test.ts",
-      "apps/web/tests/unit/analytics-provider-contract.test.ts",
-      "apps/web/tests/unit/analytics-runtime.test.ts",
-      "docs/analytics.md",
-    ],
-  );
-  assert.deepEqual(
-    calendlyPortfolio.expectedFiles.filter(
-      (path) => !basePortfolio.expectedFiles.includes(path),
-    ),
-    [
-      "apps/web/content/en-CA/booking-calendly.yaml",
       "apps/web/src/integrations/booking-calendly/booking-content.ts",
       "apps/web/src/integrations/booking-calendly/booking-settings.ts",
       "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+      "apps/web/src/integrations/contact-form-web3forms/contact-content-source.d.ts",
+      "apps/web/src/integrations/contact-form-web3forms/contact-content.ts",
+      "apps/web/src/integrations/contact-form-web3forms/contact-form-placement.tsx",
+      "apps/web/src/integrations/contact-form-web3forms/contact-form.tsx",
+      "apps/web/src/integrations/contact-form-web3forms/contact-settings.ts",
+      "apps/web/src/integrations/contact-form-web3forms/hcaptcha.tsx",
+      "apps/web/src/integrations/contact-form-web3forms/submit-contact.ts",
+      "apps/web/src/integrations/contact-form-web3forms/web3forms-contact.tsx",
+      "apps/web/tests/component/analytics-consent.test.tsx",
+      "apps/web/tests/component/booking-availability.test.tsx",
+      "apps/web/tests/component/contact-availability.test.tsx",
+      "apps/web/tests/component/web3forms-contact.test.tsx",
+      "apps/web/tests/e2e/analytics-consent.spec.ts",
       "apps/web/tests/e2e/calendly-booking.spec.ts",
+      "apps/web/tests/e2e/web3forms-contact.spec.ts",
+      "apps/web/tests/unit/analytics-configuration.test.ts",
+      "apps/web/tests/unit/analytics-consent-state.test.ts",
+      "apps/web/tests/unit/analytics-provider-contract.test.ts",
+      "apps/web/tests/unit/analytics-runtime.test.ts",
+      "apps/web/tests/unit/booking-configuration.test.ts",
+      "apps/web/tests/unit/contact-configuration.test.ts",
+      "apps/web/tests/unit/web3forms-contact.test.ts",
+      "docs/analytics.md",
+      "docs/booking-calendly.md",
+      "docs/contact-form-web3forms.md"
+    ],
+  );
+  assert.deepEqual(
+    calendlyPortfolio.expectedFiles.filter(path => !basePortfolio.expectedFiles.includes(path)),
+    [
+      "apps/web/content/en-CA/booking-calendly.yaml",
+      "apps/web/content/fr-CA/booking-calendly.yaml",
+      "apps/web/src/integrations/booking-calendly/booking-content.ts",
+      "apps/web/src/integrations/booking-calendly/booking-settings.ts",
+      "apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
+      "apps/web/tests/component/booking-availability.test.tsx",
+      "apps/web/tests/e2e/calendly-booking.spec.ts",
+      "apps/web/tests/unit/booking-configuration.test.ts",
+      "docs/booking-calendly.md"
     ],
   );
 });
@@ -717,30 +736,9 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.deepEqual(textAttributes.trimEnd().split("\n"), [
-    `${fixtureRoot("portfolio")}/package.json: text: set`,
-    `${fixtureRoot("portfolio")}/package.json: eol: lf`,
-    `${fixtureRoot("portfolio-calendly")}/package.json: text: set`,
-    `${fixtureRoot("portfolio-calendly")}/package.json: eol: lf`,
-    `${fixtureRoot("site")}/package.json: text: set`,
-    `${fixtureRoot("site")}/package.json: eol: lf`,
-    `${fixtureRoot("site-multilingual")}/package.json: text: set`,
-    `${fixtureRoot("site-multilingual")}/package.json: eol: lf`,
-    `${fixtureRoot("site-multilingual-analytics")}/package.json: text: set`,
-    `${fixtureRoot("site-multilingual-analytics")}/package.json: eol: lf`,
-    `${fixtureRoot("app")}/package.json: text: set`,
-    `${fixtureRoot("app")}/package.json: eol: lf`,
-    `${fixtureRoot("app-all-optional-integrations")}/package.json: text: set`,
-    `${fixtureRoot("app-all-optional-integrations")}/package.json: eol: lf`,
-    `${fixtureRoot("app-persistence")}/package.json: text: set`,
-    `${fixtureRoot("app-persistence")}/package.json: eol: lf`,
-    `${fixtureRoot("portfolio-email")}/package.json: text: set`,
-    `${fixtureRoot("portfolio-email")}/package.json: eol: lf`,
-    `${fixtureRoot("app-persistence-email")}/package.json: text: set`,
-    `${fixtureRoot("app-persistence-email")}/package.json: eol: lf`,
-    `${fixtureRoot("site-contact-form")}/package.json: text: set`,
-    `${fixtureRoot("site-contact-form")}/package.json: eol: lf`,
-  ]);
+  assert.deepEqual(textAttributes.trimEnd().split("\n"), fixturePaths.flatMap(path => [
+    `${path}: text: set`, `${path}: eol: lf`,
+  ]));
 
   const baselineDirectory =
     "apps/web/tests/visual/home-visual.spec.ts-snapshots";
@@ -769,7 +767,7 @@ test("generated fixture text and visual baseline attributes are explicit", async
     { cwd: repositoryRoot, encoding: "utf8" },
   );
 
-  assert.equal(baselinePaths.length, 26);
+  assert.equal(baselinePaths.length, 30);
   assert.deepEqual(
     binaryAttributes.trimEnd().split("\n"),
     baselinePaths.flatMap((path) => [
@@ -1000,14 +998,18 @@ test("single-root verification runs the exact fixed checks against caller output
         "typecheck",
         "unit-tests",
         "component-tests",
+        "deployment-contracts",
+        "transport-contracts",
+        "application-environment",
         "next-build",
         "opennext-build",
+        "prepared-artifact",
         "browser-install",
         "browser-development",
         "browser-preview",
       ],
     });
-    assert.equal(commands.length, 16);
+    assert.equal(commands.length, 22);
     assert.equal(commands.every(({ cwd }) => cwd.startsWith(`${ownedPath}/`)), true);
     assert.equal(await pathExists(ownedPath), false);
     assert.deepEqual(
@@ -1116,6 +1118,74 @@ test("visual verification accepts only the exact opt-in argument", () => {
   }
 });
 
+test("fixed verification accepts a known starting fixture with either visual mode", () => {
+  const selector = "--from-fixture=app-persistence";
+  assert.deepEqual(parseVerificationArguments([selector]), {
+    includeVisual: false,
+    fromFixture: "app-persistence",
+  });
+  for (const flags of [[selector, "--visual"], ["--visual", selector]]) {
+    assert.deepEqual(parseVerificationArguments(flags), { includeVisual: true, fromFixture: "app-persistence" });
+  }
+  for (const flags of [
+    ["--from-fixture="], ["--from-fixture=../app"], ["--from-fixture=APP"],
+    ["--from-fixture=app-calendly"], ["--from-fixture", "app"], [selector, selector],
+    [selector, "--from-fixture=site"], ["--visual", selector, "--visual"],
+  ]) {
+    assert.throws(() => parseVerificationArguments(flags), { code: "VERIFICATION_ARGUMENT_INVALID" });
+  }
+});
+
+test("fixed verification audits and reports only the selected fixture suffix", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-suffix-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  for (const [fromFixture, expectedVisuals] of [["app", ["app-project"]], [generatedFixtureContracts.at(-1).identifier, []]]) {
+    const expected = generatedFixtureContracts.slice(generatedFixtureContracts.findIndex(contract => contract.identifier === fromFixture));
+    const audits = [];
+    const visuals = [];
+    const result = await verifySkeletons({
+      createOwner: () => createKnownOwner(parent),
+      runAudit: async input => {
+        audits.push(basename(input.cwd));
+        assert.deepEqual(input.arguments, ["audit", "--audit-level", "info", "--json"]);
+        return { status: "passed", rawExitCode: 1, thresholdExitCode: 0 };
+      },
+      runCommand: async input => {
+        if (input.arguments.includes("test:visual")) visuals.push(basename(input.cwd));
+        return successfulCommand(input);
+      },
+    }, { includeVisual: true, fromFixture });
+    assert.deepEqual(result.fixtures, expected.map(contract => contract.identifier));
+    assert.deepEqual(result.auditDispositions.map(receipt => receipt.fixture), result.fixtures);
+    assert.deepEqual(audits, result.fixtures.map(identifier => `${identifier}-project`));
+    assert.deepEqual(result.profiles, [...new Set(expected.map(contract => contract.profile))]);
+    assert.deepEqual(visuals, expectedVisuals);
+    assert.equal(result.checks.includes("visual-regression"), expectedVisuals.length > 0);
+  }
+});
+
+test("fixed verification detects a change to a skipped prefix fixture", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-prefix-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const isolatedRoot = join(parent, "inputs");
+  await cp(resolve(repositoryRoot, "fixtures/generated"), join(isolatedRoot, "fixtures/generated"), { recursive: true });
+  const prefixReadme = join(isolatedRoot, fixtureRoot("portfolio"), "README.md");
+  const last = generatedFixtureContracts.at(-1).identifier;
+  const executed = new Set();
+  await expectFixtureError(() => verifySkeletons({
+    createOwner: async () => {
+      await writeFile(prefixReadme, "Changed after initial inspection.\n");
+      return createKnownOwner(parent);
+    },
+    runCommand: async input => {
+      executed.add(basename(input.cwd));
+      return successfulCommand(input);
+    },
+    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+  }, { includeVisual: true, fromFixture: last }, isolatedRoot), "FIXTURE_SOURCE_CHANGED");
+  assert.deepEqual([...executed], [`${last}-project`]);
+});
+
 test("visual verification runs after prepared preview behavior", async () => {
   await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
     const commands = [];
@@ -1146,21 +1216,25 @@ test("visual verification runs after prepared preview behavior", async () => {
       "typecheck",
       "unit-tests",
       "component-tests",
+      "deployment-contracts",
+      "transport-contracts",
+      "application-environment",
       "next-build",
       "opennext-build",
+      "prepared-artifact",
       "browser-install",
       "browser-development",
       "browser-preview",
       "visual-regression",
     ]);
-    assert.equal(commands.length, 17);
-    assert.deepEqual(commands.at(-2), [
+    assert.equal(commands.length, 23);
+    assert.deepEqual(commands.at(-3), [
       "--dir",
       "apps/web",
       "run",
       "test:e2e:preview",
     ]);
-    assert.deepEqual(commands.at(-1), [
+    assert.deepEqual(commands.at(-2), [
       "--dir",
       "apps/web",
       "run",
@@ -1187,6 +1261,7 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
       { includeVisual: true },
     );
 
+    assert.deepEqual(result.fixtures, generatedFixtureContracts.map(contract => contract.identifier));
     assert.equal(result.checks.includes("visual-regression"), true);
     assert.deepEqual(
       commands
@@ -1785,6 +1860,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     CLOUDFLARE_API_TOKEN: "PRIVATE_VALUE",
     NODE_OPTIONS: "--require=/private/unapproved-module.cjs",
     NPM_CONFIG_USERCONFIG: "/private/unapproved-npmrc",
+    pnpm_config_verify_deps_before_run: "install",
     NPM_TOKEN: "PRIVATE_VALUE",
     PLAYWRIGHT_BROWSERS_PATH: "/private/unapproved-browsers",
     PLAYWRIGHT_DEPLOYED_URL: "https://private.invalid",
@@ -1810,6 +1886,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         assert.equal(input.environment.CLOUDFLARE_API_TOKEN, undefined);
         assert.equal(input.environment.NODE_OPTIONS, undefined);
         assert.equal(input.environment.CI, "true");
+        assert.equal(input.environment.pnpm_config_verify_deps_before_run, "error");
         assert.equal(input.environment.NEXT_TELEMETRY_DISABLED, "1");
         assert.equal(
           input.environment.NPM_CONFIG_REGISTRY,
@@ -1837,7 +1914,16 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
             (candidate) => candidate.toLowerCase() === key.toLowerCase(),
           ),
         );
+        const contract = generatedFixtureContracts.find(({ identifier }) => basename(input.cwd) === `${identifier}-project`);
+        const applicationKeys = ["APPLICATION_ENVIRONMENT", "NEXT_PUBLIC_SITE_URL", "BUILD_SOURCE_REVISION", "WRANGLER_SEND_METRICS"];
+        if (contract.expectedContactFormVersion) applicationKeys.push("NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY", "CONTACT_TEST_EXPECTED_ACCESS_KEY");
+        if (contract.expectedBookingCalendlyVersion) applicationKeys.push("NEXT_PUBLIC_CALENDLY_URL", "BOOKING_TEST_EXPECTED_URL", "BOOKING_TEST_MODE", "BOOKING_TEST_MULTILINGUAL");
+        if (contract.expectedAnalyticsVersion) applicationKeys.push("NEXT_PUBLIC_ANALYTICS_ENABLED", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION", "ANALYTICS_TEST_BUILD_FLAG", "ANALYTICS_TEST_TARGET", "ANALYTICS_TEST_EXPECTED_SITE_ORIGIN", "ANALYTICS_TEST_EXPECTED_CLOUDFLARE_TOKEN", "ANALYTICS_TEST_EXPECTED_GA4_ID", "ANALYTICS_TEST_EXPECTED_CLARITY_ID", "ANALYTICS_TEST_EXPECTED_VERIFICATION");
+        assert.equal(input.environment.APPLICATION_ENVIRONMENT, "development");
+        assert.equal(input.environment.BUILD_SOURCE_REVISION, "a".repeat(40));
+        assert.equal(input.environment.NEXT_PUBLIC_SITE_URL, "http://localhost:3000");
         assert.deepEqual(Object.keys(input.environment).sort(), [
+          ...applicationKeys,
           ...inheritedKeys,
           ...(process.platform === "darwin" ? ["__CF_USER_TEXT_ENCODING"] : []),
           ...(input.arguments.at(-1) === "test:e2e:preview" ? ["DEBUG"] : []),
@@ -1846,6 +1932,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
           "NEXT_TELEMETRY_DISABLED",
           "NPM_CONFIG_REGISTRY",
           "NPM_CONFIG_USERCONFIG",
+          "pnpm_config_verify_deps_before_run",
           "PLAYWRIGHT_BROWSERS_PATH",
           "TEMP",
           "TMP",
@@ -1861,7 +1948,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     assert.equal(status, "completed");
     assert.deepEqual(auditDispositions.map(({ fixture }) => fixture), result.fixtures);
     assert.equal(auditDispositions.every(audit => audit.status === "passed" && audit.rawExitCode === 0), true);
-    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"]);
+    assert.deepEqual(appBuildEvidence.map(({ fixture }) => fixture), ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email", "app-jobs", "app-persistence-jobs-email"]);
     for (const build of appBuildEvidence) {
       assert.equal(build.effect.version, "4.0.0-rc.112");
       assert.equal(build.client.files.length, 1);
@@ -1876,22 +1963,24 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "portfolio-calendly",
         "site",
         "site-multilingual",
-        "site-multilingual-analytics",
+        "site-public-integrations",
         "app",
         "app-all-optional-integrations",
         "app-persistence",
         "portfolio-email",
         "app-persistence-email",
         "site-contact-form",
+        "app-jobs",
+        "app-persistence-jobs-email",
       ],
       profiles: ["portfolio", "site", "app"],
       workerIntegration: {
-        executed: ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email"],
-        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "site-contact-form"],
+        executed: ["app", "app-all-optional-integrations", "app-persistence", "portfolio-email", "app-persistence-email", "app-jobs", "app-persistence-jobs-email"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-public-integrations", "site-contact-form"],
       },
       bindingIntegration: {
-        executed: ["app-persistence", "app-persistence-email"],
-        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-multilingual-analytics", "app", "app-all-optional-integrations", "portfolio-email", "site-contact-form"],
+        executed: ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"],
+        skipped: ["portfolio", "portfolio-calendly", "site", "site-multilingual", "site-public-integrations", "app", "app-all-optional-integrations", "portfolio-email", "site-contact-form", "app-jobs"],
       },
       checks: [
         "pnpm-version",
@@ -1904,8 +1993,12 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
         "typecheck",
         "unit-tests",
         "component-tests",
+        "deployment-contracts",
+        "transport-contracts",
+        "application-environment",
         "next-build",
         "opennext-build",
+        "prepared-artifact",
         "browser-install",
         "browser-development",
         "browser-preview",
@@ -1924,7 +2017,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   const fixtureCommands = generatedFixtureContracts.map(({ identifier }) =>
     commands.filter(({ cwd }) => cwd === join(ownedPath, `${identifier}-project`)),
   );
-  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [16, 16, 16, 16, 16, 16, 16, 18, 16, 18, 16]);
+  assert.deepEqual(fixtureCommands.map((entries) => entries.length), [22, 22, 22, 22, 22, 22, 22, 24, 22, 24, 22, 24, 26]);
   const firstCommands = fixtureCommands.map(
     ([command]) => command,
   );
@@ -1955,7 +2048,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
   );
 
   const argumentLists = commands.map(({ arguments: arguments_ }) => arguments_);
-  const perFixture = argumentLists.slice(0, 16).map((arguments_) =>
+  const perFixture = argumentLists.slice(0, 22).map((arguments_) =>
     arguments_.map((argument) =>
       ownedPath !== undefined && argument.startsWith(ownedPath)
         ? "<owned-path>"
@@ -1963,11 +2056,18 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ),
   );
   for (const [fixtureIndex, arguments_] of fixtureCommands.entries()) {
-    const expected = generatedFixtureContracts[fixtureIndex].expectedApplicationPersistenceVersion === "0.1.1"
+    const hasJobs = generatedFixtureContracts[fixtureIndex].expectedBackgroundJobVersion === "0.3.0";
+    const jobCommands = arguments_.map(({ arguments: current }) => current)
+      .filter(current => current.includes("scripts/check-job-delivery.mjs") || current.includes("--dry-run"));
+    assert.deepEqual(jobCommands, hasJobs ? [
+      ["--dir", "apps/web", "exec", "node", "scripts/check-job-delivery.mjs", "local"],
+      ["--dir", "apps/web", "exec", "wrangler", "deploy", "--dry-run", "--outdir", ".open-next/jobs-bundle", "--metafile", ".open-next/jobs-inputs.json", "--x-provision=false", "--x-auto-create=false"],
+    ] : []);
+    const expected = generatedFixtureContracts[fixtureIndex].expectedApplicationPersistenceVersion === "0.2.0"
       ? [...perFixture.slice(0, 6), ["run", "typecheck"], ...perFixture.slice(6)]
       : perFixture;
     assert.deepEqual(
-      arguments_.filter(({ arguments: current }) => current.at(-1) !== "test:integration:bindings").map(({ arguments: current }) =>
+      arguments_.filter(({ arguments: current }) => current.at(-1) !== "test:integration:bindings" && !current.includes("scripts/check-job-delivery.mjs") && !current.includes("--dry-run")).map(({ arguments: current }) =>
         current.map((argument) =>
           ownedPath !== undefined && argument.startsWith(ownedPath)
             ? "<owned-path>"
@@ -1988,6 +2088,8 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ["run", "typecheck"],
     ["run", "test:unit"],
     ["run", "test:component"],
+    ["--dir", "apps/web", "run", "test:deployment-contracts"],
+    ["--dir", "apps/web", "run", "check:environment"],
     ["run", "build"],
     [
       "--dir",
@@ -1997,10 +2099,14 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
       "build",
       "--skipNextBuild",
     ],
+    ["--dir", "apps/web", "run", "check:prepared-artifact", "record", "development", "a".repeat(40), "--local"],
     ["--dir", "apps/web", "run", "--if-present", "test:integration:cloudflare"],
+    ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"],
     ["--dir", "apps/web", "run", "browser:install"],
+    ["--dir", "apps/web", "run", "test:transport"],
     ["--dir", "apps/web", "run", "test:e2e:dev"],
     ["--dir", "apps/web", "run", "test:e2e:preview"],
+    ["--dir", "apps/web", "run", "check:prepared-artifact", "verify", "development", "a".repeat(40), "--local"],
   ]);
   assert.equal(await pathExists(ownedPath), false);
 
@@ -2232,7 +2338,7 @@ test("active fixture inspection refuses the preserved predecessor Next declarati
       await t.test(contract.identifier, async () => {
         const predecessorVersion = contract.profile === "portfolio" ? "0.11.5" : contract.profile === "site" ? "0.12.5" : "0.2.5";
         const control = JSON.parse(await readFile(
-          resolve(repositoryRoot, "packages/builder-core/tests/fixtures/retired-recipes", `${contract.identifier}-${predecessorVersion}.json`), "utf8",
+          resolve(repositoryRoot, "packages/builder-core/tests/fixtures/retired-recipes", `${retainedFixtureIdentifier(contract.identifier)}-${predecessorVersion}.json`), "utf8",
         ));
         assert.equal(control.sourceCommit, "73e3cfdc4166a0d008a6c84b47b4a3a2084af71f");
         assert.equal(control.variants.published.next, "16.3.8");
@@ -2283,7 +2389,7 @@ test("active fixture inspection independently refuses retained workspace policie
       const root = await copyFixture(owner, identifier, "retained-policy");
       const policyPath = join(root, "pnpm-workspace.yaml");
       const historical = controls.retiredWorkspacePolicies.find(({ sourceFiles }) =>
-        sourceFiles.includes(`fixtures/generated/${identifier}/pnpm-workspace.yaml`));
+        sourceFiles.includes(`fixtures/generated/${retainedFixtureIdentifier(identifier)}/pnpm-workspace.yaml`));
       assert.notEqual(historical, undefined);
       const historicalPolicy = historical.workspaceYaml;
       assert.equal(createHash("sha256").update(historicalPolicy).digest("hex"), historical.sha256);

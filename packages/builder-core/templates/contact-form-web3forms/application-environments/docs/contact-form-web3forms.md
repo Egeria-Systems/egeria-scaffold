@@ -80,6 +80,6 @@ For a deployment CSP, permit the Web3Forms submission connection and hCaptcha's 
 
 ## Disable and recover
 
-Clear the key and rebuild to restore development unavailability. A release build with selected contact requires valid configuration; omit release contact through an approved generated-repository capability removal. During internal generation assembly this lifecycle is a private integration interface, not an advertised public CLI command.
+Clear the key and rebuild to restore development unavailability. A release build with selected contact requires valid configuration; omit release contact through an approved generated-repository capability removal.
 
 Removal preserves/ejects modified application-owned source and refuses conflicting shared edits or surviving references. Reconcile preserved ownership before re-addition. Source removal does not delete a form, provider submissions or inbox records: retain those resources until their separate disposition is explicitly decided. Recover source, build configuration, runtime configuration and provider/data changes independently.

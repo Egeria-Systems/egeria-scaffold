@@ -1,7 +1,6 @@
 import { isAbsolute, resolve } from "node:path";
 
 import {
-  createVerifiedProjectSnapshot,
   createApplicationEnvironmentRenderingContext,
   createGenerationRenderingContext,
   readVerifiedProjectSnapshot,
@@ -22,17 +21,11 @@ import {
 } from "../contracts/migration.js";
 import {
   analyticsSettingsSchema,
-  applicationEnvironmentAnalyticsSettingsSchema,
-  type ApplicationEnvironmentAnalyticsSettings,
-  calendlyBookingSettingsSchema,
-  applicationEnvironmentBookingSettingsSchema,
-  type ApplicationEnvironmentBookingSettings,
-  web3FormsContactSettingsSchema,
-  type Web3FormsContactSettings,
   type AnalyticsSettings,
-  type ProjectConfiguration,
-  type ApplicationEnvironmentProjectConfiguration,
+  calendlyBookingSettingsSchema,
   type CalendlyBookingSettings,
+  type Web3FormsContactSettings,
+  type ProjectConfiguration,
 } from "../contracts/project.js";
 import {
   appCapabilityAdditionPersistedVerificationChecks,
@@ -43,8 +36,6 @@ import {
   capabilityAdditionVerificationChecks,
   installedStateSchema,
   type InstalledState,
-  type ApplicationEnvironmentInstalledState,
-  applicationEnvironmentInstalledStateSchema,
   type InstalledSurface,
 } from "../contracts/state.js";
 import { createBuilderStateSurfaces } from "../generation/builder-state-surfaces.js";
@@ -89,44 +80,22 @@ import {
   type CapabilityAdditionPlan,
 } from "./plan-capability-addition.js";
 
-type LifecycleProject = ProjectConfiguration | ApplicationEnvironmentProjectConfiguration;
-type LifecycleState = InstalledState | ApplicationEnvironmentInstalledState;
+type LifecycleProject = ProjectConfiguration;
+type LifecycleState = InstalledState;
 
 const encoder = new TextEncoder();
 type AddableCapability = "analytics" | "booking-calendly" | "multilingual" | "application-persistence" | "transactional-email-resend" | "contact-form-web3forms" | "background-job-delivery";
 
-function additionMigrationIdentifier(
-  capability: AddableCapability,
-  applicationEnvironment = false,
-):
-  | "add-analytics-0-1-0"
-  | "add-analytics-0-2-0"
-  | "add-booking-calendly-0-1-0"
-  | "add-booking-calendly-0-2-0"
-  | "add-multilingual-0-1-0"
-  | "add-application-persistence-0-1-1"
-  | "add-application-persistence-0-2-0"
-  | "add-transactional-email-resend-0-1-0"
-  | "add-transactional-email-resend-0-2-0"
-  | "add-contact-form-web3forms-0-1-0"
-  | "add-contact-form-web3forms-0-2-0"
-  | "add-background-job-delivery-0-2-0" {
-  switch (capability) {
-    case "background-job-delivery":
-      return "add-background-job-delivery-0-2-0";
-    case "contact-form-web3forms":
-      return applicationEnvironment ? "add-contact-form-web3forms-0-2-0" : "add-contact-form-web3forms-0-1-0";
-    case "analytics":
-      return applicationEnvironment ? "add-analytics-0-2-0" : "add-analytics-0-1-0";
-    case "booking-calendly":
-      return applicationEnvironment ? "add-booking-calendly-0-2-0" : "add-booking-calendly-0-1-0";
-    case "multilingual":
-      return "add-multilingual-0-1-0";
-    case "transactional-email-resend":
-      return applicationEnvironment ? "add-transactional-email-resend-0-2-0" : "add-transactional-email-resend-0-1-0";
-    case "application-persistence":
-      return applicationEnvironment ? "add-application-persistence-0-2-0" : "add-application-persistence-0-1-1";
-  }
+function additionMigrationIdentifier(capability: Exclude<AddableCapability, "background-job-delivery">) {
+  const identifiers = {
+    analytics: "add-analytics-0-2-0",
+    "booking-calendly": "add-booking-calendly-0-2-0",
+    multilingual: "add-multilingual-0-1-0",
+    "application-persistence": "add-application-persistence-0-2-0",
+    "transactional-email-resend": "add-transactional-email-resend-0-2-0",
+    "contact-form-web3forms": "add-contact-form-web3forms-0-2-0",
+  } as const;
+  return identifiers[capability];
 }
 
 export type CapabilityAdditionPhase =
@@ -275,7 +244,7 @@ function sameSurfaceDescriptor(
 }
 
 function requirePendingInference(
-  inference: RepositoryInference<LifecycleState>,
+  inference: RepositoryInference,
   currentState: LifecycleState,
   desiredCapabilities: readonly string[],
   addedCapability: AddableCapability,
@@ -326,7 +295,7 @@ function requirePendingInference(
 }
 
 function requireFinalInference(
-  inference: RepositoryInference<LifecycleState>,
+  inference: RepositoryInference,
   expectedState: LifecycleState,
   desiredCapabilities: readonly string[],
 ): boolean {
@@ -347,7 +316,7 @@ function requireFinalInference(
 
 function createNextState(input: Readonly<{
   current: LifecycleState;
-  desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }>;
+  desired: Readonly<{ ok: true; value: RenderedSkeleton }>;
   actionPaths: readonly string[];
   files: ReadonlyMap<string, Uint8Array>;
   migration: MigrationRecord;
@@ -393,7 +362,7 @@ function createNextState(input: Readonly<{
     managedSurfaces.push(existing);
   }
 
-  const parsed = (input.current.schemaVersion === "2.0.0" ? applicationEnvironmentInstalledStateSchema : installedStateSchema).safeParse({
+  const parsed = (installedStateSchema).safeParse({
     ...input.current,
     installedCapabilities: createInstalledManifest(
       input.desired.value.resolved,
@@ -415,7 +384,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   root: string;
   capability: AddableCapability;
   renderingContext?: ApplicationEnvironmentRenderingContext;
-  settings?: AnalyticsSettings | ApplicationEnvironmentAnalyticsSettings | CalendlyBookingSettings | ApplicationEnvironmentBookingSettings | Web3FormsContactSettings;
+  settings?: AnalyticsSettings | CalendlyBookingSettings | Web3FormsContactSettings;
   approvedPlanFingerprint: string;
   verifier: GeneratedProjectVerifier;
   reader?: RepositoryReader;
@@ -425,17 +394,18 @@ export async function applyCapabilityAddition(input: Readonly<{
   inspectExpectedChanges?: InspectExpectedChanges;
   now?: () => string;
 }>): Promise<CapabilityAdditionExecutionResult> {
-  const environmentAnalyticsSettings = input.renderingContext !== undefined && input.capability === "analytics"
-    ? applicationEnvironmentAnalyticsSettingsSchema.safeParse(input.settings) : undefined;
-  const environmentBookingSettings = input.renderingContext !== undefined && input.capability === "booking-calendly"
-    ? applicationEnvironmentBookingSettingsSchema.safeParse(input.settings) : undefined;
-  if (input.renderingContext !== undefined && (
+  input = { ...input, renderingContext: input.renderingContext ?? createApplicationEnvironmentRenderingContext() };
+  const environmentAnalyticsSettings = (input.capability === "analytics")
+    ? analyticsSettingsSchema.safeParse(input.settings) : undefined;
+  const environmentBookingSettings = (input.capability === "booking-calendly")
+    ? calendlyBookingSettingsSchema.safeParse(input.settings) : undefined;
+  if (((
     !isApplicationEnvironmentRenderingContext(input.renderingContext) ||
-    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence" && input.capability !== "transactional-email-resend") ||
+    (input.capability !== "contact-form-web3forms" && input.capability !== "booking-calendly" && input.capability !== "analytics" && input.capability !== "application-persistence" && input.capability !== "transactional-email-resend" && input.capability !== "multilingual") ||
     (input.capability === "contact-form-web3forms" && input.settings !== undefined) ||
     (environmentAnalyticsSettings !== undefined && !environmentAnalyticsSettings.success) ||
     (environmentBookingSettings !== undefined && !environmentBookingSettings.success)
-  )) return failure("CAPABILITY_ADDITION_UNSUPPORTED", "precondition", "not-required");
+  ))) return failure("CAPABILITY_ADDITION_UNSUPPORTED", "precondition", "not-required");
   const root = resolve(input.root);
   if (!isAbsolute(input.root) || root !== input.root) {
     return failure(
@@ -472,8 +442,6 @@ export async function applyCapabilityAddition(input: Readonly<{
       ? environmentAnalyticsSettings ?? analyticsSettingsSchema.safeParse(input.settings)
       : input.capability === "booking-calendly"
         ? environmentBookingSettings ?? calendlyBookingSettingsSchema.safeParse(input.settings)
-        : input.renderingContext === undefined && input.capability === "contact-form-web3forms"
-          ? web3FormsContactSettingsSchema.safeParse(input.settings)
         : input.settings === undefined
           ? { success: true as const, data: undefined }
           : { success: false as const };
@@ -492,7 +460,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       reader,
       git: initialGit,
       capability: input.capability,
-      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
+      ...({ renderingContext: input.renderingContext }),
       ...(settingsSnapshot === undefined ? {} : { settings: settingsSnapshot }),
     });
   } catch {
@@ -518,7 +486,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const controls = input.renderingContext === undefined ? await readControlSnapshot(reader) : await readControlSnapshot(reader, "2.0.0");
+  const controls = await readControlSnapshot(reader);
   if (controls === undefined) {
     return failure(
       "PROJECT_INSPECTION_INVALID",
@@ -527,18 +495,10 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  if (input.renderingContext === undefined && (controls.project.value.schemaVersion !== "1.0.0" || controls.state.value.schemaVersion !== "1.0.0")) {
+  const snapshot = await readVerifiedProjectSnapshot(reader, input.renderingContext);
+  if (!snapshot.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
-  const snapshot = input.renderingContext !== undefined
-    ? await readVerifiedProjectSnapshot(reader, input.renderingContext)
-    : controls.project.value.schemaVersion === "1.0.0" && controls.state.value.schemaVersion === "1.0.0"
-      ? createVerifiedProjectSnapshot(controls.project.value, controls.state.value)
-      : undefined;
-  if (snapshot?.ok !== true) {
-    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  }
-  const legacyProject = controls.project.value.schemaVersion === "1.0.0" ? controls.project.value : undefined;
   const commonRenderRequest = {
     profile: controls.project.value.originProfile,
     projectName: controls.project.value.project.name,
@@ -546,49 +506,25 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
     packageVersions: verifiedCapabilityPackageVersions,
   };
-  const renderRequest = {
-    profile: controls.project.value.originProfile,
-    projectName: controls.project.value.project.name,
-    displayName: controls.project.value.project.displayName,
-    ...(legacyProject?.capabilitySettings.analytics === undefined ? {} : { analytics: legacyProject.capabilitySettings.analytics }),
-    ...(legacyProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: legacyProject.capabilitySettings["booking-calendly"] }),
-    ...(controls.project.value.selectedCapabilities.includes("multilingual") ? { multilingual: true as const } : {}),
-    ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
-    ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
-    ...(legacyProject?.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: legacyProject.capabilitySettings["contact-form-web3forms"] }),
-    packageVersions: verifiedCapabilityPackageVersions,
-  };
-  const environmentContext = isApplicationEnvironmentRenderingContext(snapshot.value.renderingContext) ? snapshot.value.renderingContext : undefined;
-  const environmentTargetContext = environmentContext === undefined ? undefined : createApplicationEnvironmentRenderingContext(input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"), controls.project.value.selectedCapabilities.includes("app-foundation"));
-  const targetContext = environmentTargetContext ?? (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery"
-    ? { ...snapshot.value.renderingContext, ...createGenerationRenderingContext(
-        input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
-        input.capability === "transactional-email-resend" || input.capability === "background-job-delivery" || snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0",
-        input.capability === "background-job-delivery",
-      ), profiles: snapshot.value.profiles } : snapshot.value.renderingContext);
-  const targetCatalog = targetContext === undefined ? { ok: true as const, value: snapshot.value.catalog }
-    : createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, targetContext.catalogSnapshot);
+  const environmentContext = snapshot.value.renderingContext;
+  const environmentTargetContext = createGenerationRenderingContext(
+    input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
+    controls.project.value.selectedCapabilities.includes("app-foundation"),
+  );
+  const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  const environmentProject = controls.project.value.schemaVersion === "2.0.0" ? controls.project.value : undefined;
+  const environmentProject = controls.project.value;
   const environmentRenderRequest = {
     ...commonRenderRequest,
     ...(controls.project.value.selectedCapabilities.includes("transactional-email-resend") ? { transactionalEmailResend: true as const } : {}),
     ...(controls.project.value.selectedCapabilities.includes("application-persistence") ? { applicationPersistence: true as const } : {}),
-    ...(environmentProject?.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
-    ...(environmentProject?.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
+    ...(environmentProject.capabilitySettings.analytics === undefined ? {} : { analytics: environmentProject.capabilitySettings.analytics }),
+    ...(environmentProject.capabilitySettings["booking-calendly"] === undefined ? {} : { bookingCalendly: environmentProject.capabilitySettings["booking-calendly"] }),
     ...(controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
   };
-  const desiredRender = environmentTargetContext === undefined ? await renderSkeleton({
-    ...renderRequest,
-    ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: settingsSnapshot as Web3FormsContactSettings } : {}),
-    ...(input.capability === "analytics" ? { analytics: settingsSnapshot as AnalyticsSettings } : {}),
-    ...(input.capability === "booking-calendly" ? { bookingCalendly: settingsSnapshot as CalendlyBookingSettings } : {}),
-    ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),
-    ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
-    ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
-    ...(input.capability === "background-job-delivery" ? { backgroundJobDelivery: true as const } : {}),
-  }, targetContext) : await renderSkeleton({
+  const desiredRender = await renderSkeleton({
     ...environmentRenderRequest,
+    ...(input.capability === "multilingual" ? { multilingual: true as const } : {}),
     ...(input.capability === "transactional-email-resend" ? { transactionalEmailResend: true as const } : {}),
     ...(input.capability === "application-persistence" ? { applicationPersistence: true as const } : {}),
     ...(input.capability === "contact-form-web3forms" ? { contactFormWeb3Forms: true as const } : {}),
@@ -596,11 +532,9 @@ export async function applyCapabilityAddition(input: Readonly<{
     ...(environmentAnalyticsSettings?.success ? { analytics: environmentAnalyticsSettings.data } : {}),
   }, environmentTargetContext);
   if (!desiredRender.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
-  let desired: Readonly<{ ok: true; value: RenderedSkeleton<LifecycleProject> }> = desiredRender;
-  if (input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
-    const current = environmentContext === undefined
-      ? await renderSkeleton(renderRequest, snapshot.value.renderingContext)
-      : await renderSkeleton(environmentRenderRequest, environmentContext);
+  let desired: Readonly<{ ok: true; value: RenderedSkeleton }> = desiredRender;
+  if ((input.capability === "application-persistence" || input.capability === "transactional-email-resend")) {
+    const current = await renderSkeleton(environmentRenderRequest, environmentContext);
     if (!current.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
     const prepared = await prepareCapabilityDependencyChange<LifecycleProject>({ reader, current: current.value, desired: desired.value });
     if (!prepared.ok) return failure("PROJECT_DRIFT_DETECTED", "precondition", "not-required");
@@ -670,10 +604,10 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  if (input.renderingContext !== undefined || input.capability === "application-persistence" || input.capability === "transactional-email-resend" || input.capability === "background-job-delivery") {
+  {
     const freshPlan = await planCapabilityAddition({ reader, git: finalCleanGit, capability: input.capability,
       ...(settingsSnapshot === undefined ? {} : { settings: settingsSnapshot }),
-      ...(input.renderingContext === undefined ? {} : { renderingContext: input.renderingContext }),
+      ...({ renderingContext: input.renderingContext }),
     });
     if (!freshPlan.ok || freshPlan.value.planFingerprint !== plan.planFingerprint) {
       return failure("CAPABILITY_PLAN_APPROVAL_INVALID", "precondition", "not-required");
@@ -706,9 +640,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     );
   }
 
-  const pendingInference = input.renderingContext === undefined
-    ? await inferRepository({ reader, catalog: targetCatalog.value })
-    : await inferRepository({ reader, catalog: targetCatalog.value, projectSchemaVersion: "2.0.0" });
+  const pendingInference = await inferRepository({ reader, catalog: targetCatalog.value, });
   if (
     !requirePendingInference(
       pendingInference,
@@ -753,7 +685,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   const migration = migrationRecordSchema.safeParse({
     schemaVersion: "1.0.0",
-    identifier: additionMigrationIdentifier(input.capability, input.renderingContext !== undefined),
+    identifier: additionMigrationIdentifier(input.capability),
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -845,9 +777,7 @@ export async function applyCapabilityAddition(input: Readonly<{
   }
   actualFiles.set(".egeria/state.json", persistedState.content);
 
-  const finalInference = input.renderingContext === undefined
-    ? await inferRepository({ reader, catalog: targetCatalog.value })
-    : await inferRepository({ reader, catalog: targetCatalog.value, projectSchemaVersion: "2.0.0" });
+  const finalInference = await inferRepository({ reader, catalog: targetCatalog.value, });
   if (
     !requireFinalInference(
       finalInference,
@@ -900,7 +830,7 @@ export async function applyCapabilityAddition(input: Readonly<{
       status: "verified-final-diff-approval-required",
       baseRevision: initialGit.identity.revision,
       capability: plan.capability,
-      migration: additionMigrationIdentifier(input.capability, input.renderingContext !== undefined),
+      migration: additionMigrationIdentifier(input.capability),
       changedPaths,
       verificationChecks: hasPersistence
         ? persistenceCapabilityAdditionVerificationChecks

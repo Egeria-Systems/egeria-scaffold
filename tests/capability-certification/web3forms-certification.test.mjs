@@ -15,14 +15,14 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..")
 const revision = "abcdef0123456789abcdef0123456789abcdef01";
 const accessKey = "00000000-0000-4000-8000-000000000001";
 const subject = {
-  descriptorVersion: "0.1.0",
-  behaviorContractDigest: "sha256:e462b6432eaac905b973d2122c122abca5fdd498e262ee63f7f2508b16978be9",
+  descriptorVersion: "0.2.0",
+  behaviorContractDigest: "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
 };
 
 async function temporaryInput(context) {
   const root = await mkdtemp(join(tmpdir(), "web3forms-preparation-test-"));
   context.after(() => rm(root, { recursive: true, force: true }));
-  return { revision, accessKey, outputRoot: join(root, "candidate") };
+  return { revision, outputRoot: join(root, "candidate") };
 }
 
 // Exercise compiled CLI generation and inference; runtime verification belongs to the deployment job.
@@ -68,14 +68,16 @@ test("preparation checks compiled site generation without exposing its public fo
   assert.equal(result.ok, true);
   assert.equal(result.capability, "contact-form-web3forms");
   assert.equal(result.profile, "site");
-  assert.equal(result.recipeVersion, "0.12.7");
+  assert.equal(result.recipeVersion, "0.13.0");
   assert.equal(result.evidenceRevision, revision);
   assert.deepEqual(result.subject, subject);
   assert.deepEqual(result.checks, ["compiled-cli-create", "state-inference", "healthy-diagnostics", "exact-diff"]);
   assert.equal(JSON.stringify(result).includes(accessKey), false);
   assert.equal(JSON.stringify(result).includes(input.outputRoot), false);
   const projectRoot = join(input.outputRoot, "project");
-  assert.match(await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8"), /recipeVersion: 0\.12\.7/u);
+  const projectSource = await readFile(join(projectRoot, ".egeria/project.yaml"), "utf8");
+  assert.match(projectSource, /recipeVersion: 0\.13\.0/u);
+  assert.doesNotMatch(projectSource, /accessKey|00000000-0000-4000-8000-000000000001/u);
   const manifest = JSON.parse(await readFile(join(projectRoot, "apps/web/package.json"), "utf8"));
   assert.equal(manifest.dependencies.next, "16.4.1");
   assert.equal(manifest.dependencies.effect, undefined);
@@ -186,13 +188,13 @@ test("malformed inference shapes produce only the stable refusal code", async co
   }
 });
 
-test("a changed provider setting is rejected even when the child reports success", async context => {
+test("a persisted provider destination is rejected even when the child reports success", async context => {
   const input = await temporaryInput(context);
   await assert.rejects(prepareWeb3FormsCertification(input, adapters(async (command, output) => {
     if (command === "diff") {
       const projectPath = join(input.outputRoot, "project/.egeria/project.yaml");
       const original = await readFile(projectPath, "utf8");
-      await writeFile(projectPath, original.replace(accessKey, "00000000-0000-4000-8000-000000000002"));
+      await writeFile(projectPath, original.replace("capabilitySettings: {}", `capabilitySettings:\n  contact-form-web3forms:\n    accessKey: ${accessKey}`));
     }
     return output;
   })), { code: "CERTIFICATION_PROJECT_INVALID" });
