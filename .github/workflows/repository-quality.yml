@@ -144,6 +144,7 @@ jobs:
           printf 'compatibility-proof=%s\n' "$compatibility_proof" >> "$GITHUB_OUTPUT"
 
   builder-and-packages:
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -204,6 +205,7 @@ jobs:
 
   cli-lifecycle:
     name: CLI lifecycle (${{ matrix.group }})
+    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -248,7 +250,9 @@ jobs:
 
   generated-projects:
     needs: [scope]
-    if: needs.scope.outputs.generated-projects == 'true'
+    if: >-
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft))
+      && needs.scope.outputs.generated-projects == 'true'
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
@@ -299,7 +303,9 @@ jobs:
 
   generated-fixtures:
     needs: [scope]
-    if: needs.scope.outputs.generated-projects == 'true'
+    if: >-
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft))
+      && needs.scope.outputs.generated-projects == 'true'
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
@@ -456,7 +462,9 @@ jobs:
   generated-jobs-profiles:
     name: Generated jobs (${{ matrix.group }})
     needs: [scope]
-    if: needs.scope.outputs.generated-projects == 'true'
+    if: >-
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft))
+      && needs.scope.outputs.generated-projects == 'true'
     runs-on: ubuntu-24.04
     container:
       image: mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e
@@ -522,7 +530,9 @@ jobs:
   generated-jobs:
     name: generated-jobs
     needs: [scope, generated-jobs-profiles]
-    if: ${{ always() }}
+    if: >-
+      ${{ always()
+      && (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:
@@ -607,7 +617,9 @@ jobs:
 
   compatibility-proof:
     needs: [scope]
-    if: needs.scope.outputs.compatibility-proof == 'true'
+    if: >-
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft))
+      && needs.scope.outputs.compatibility-proof == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
@@ -658,7 +670,7 @@ jobs:
         run: pnpm --filter @egeria-systems/nextjs-cloudflare-proof run test:e2e:preview
 
   dependency-review:
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' && !github.event.pull_request.draft
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:

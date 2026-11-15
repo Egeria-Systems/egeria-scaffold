@@ -149,6 +149,8 @@ Provide reviewers a self-contained packet and exact comparison; do not rely on i
 
 Reviewer output is evidence, not authority. The controller waits for all reports, verifies each finding against the current shared tree, reconciles duplicates or conflicts, and classifies findings as material-kept, invalid, duplicate, deferred-by-scope, or low-value churn. Repair only current, evidence-backed material findings and rerun affected checks.
 
+When external review is authorized, declare the changed authored paths and mechanically generated paths before requesting review. Record the scope requested and the coverage the service confirms, including omissions. For mechanically generated paths, propose review of the owning templates plus deterministic byte or fingerprint evidence in advance. This evidence substitutes for external review of the declared paths only with explicit human policy approval. The review exception for pull request #174 is closed. Bring any unresolved coverage gap to the human once for a decision before requesting another review.
+
 ## Final verification and packet
 
 After all relevant inputs settle:

@@ -510,10 +510,36 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "cancel-in-progress": true,
   });
   assert.deepEqual(Object.keys(workflow.jobs), expectedJobIdentifiers);
+  const readyPullRequest = "github.event_name == 'pull_request' && !github.event.pull_request.draft";
+  const ordinaryQualityEvent = "github.event_name == 'push' || (" + readyPullRequest + ")";
+  const generatedScope = "needs.scope.outputs.generated-projects == 'true'";
+  const generatedQualityEvent = "(" + ordinaryQualityEvent + ") && " + generatedScope;
+  const expectedScheduling = {
+    scope: {},
+    "builder-and-packages": { condition: ordinaryQualityEvent },
+    "cli-lifecycle": { condition: ordinaryQualityEvent },
+    "generated-projects": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-fixtures": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-jobs-profiles": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-jobs": {
+      condition: "${{ always() && (" + ordinaryQualityEvent + ") }}",
+      needs: ["scope", "generated-jobs-profiles"],
+    },
+    "app-transition-visuals": { condition: generatedScope, needs: ["scope"] },
+    "compatibility-proof": {
+      condition: "(" + ordinaryQualityEvent + ") && needs.scope.outputs.compatibility-proof == 'true'",
+      needs: ["scope"],
+    },
+    "dependency-review": { condition: readyPullRequest },
+  };
+  for (const [identifier, { condition, needs }] of Object.entries(expectedScheduling)) {
+    assert.equal(workflow.jobs[identifier].if, condition, identifier);
+    assert.deepEqual(workflow.jobs[identifier].needs, needs, identifier);
+  }
   for (const identifier of ["builder-and-packages", "cli-lifecycle"]) {
     const job = workflow.jobs[identifier];
     assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : identifier === "cli-lifecycle" ? 45 : 90);
-    for (const property of ["if", "needs", "continue-on-error", "concurrency"]) {
+    for (const property of ["continue-on-error", "concurrency"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
     for (const step of job.steps) {
@@ -596,19 +622,11 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
   }
 
-  assert.equal(
-    workflow.jobs["generated-projects"].if,
-    "needs.scope.outputs.generated-projects == 'true'",
-  );
-  assert.deepEqual(workflow.jobs["generated-projects"].needs, ["scope"]);
   assert.deepEqual(workflow.jobs["generated-projects"].container, {
     image:
       "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
     options: "--shm-size=1g",
   });
-  assert.equal(workflow.jobs["app-transition-visuals"].if,
-    "needs.scope.outputs.generated-projects == 'true'");
-  assert.deepEqual(workflow.jobs["app-transition-visuals"].needs, ["scope"]);
   assert.deepEqual(workflow.jobs["app-transition-visuals"].container,
     workflow.jobs["generated-projects"].container);
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
@@ -626,15 +644,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "${{ github.event.pull_request.head.sha || github.sha }}");
   assert.doesNotMatch(workflowCommands(workflow.jobs["app-transition-visuals"]),
     /--promote|--update-snapshots/u);
-  assert.equal(
-    workflow.jobs["compatibility-proof"].if,
-    "needs.scope.outputs.compatibility-proof == 'true'",
-  );
-  assert.deepEqual(workflow.jobs["compatibility-proof"].needs, ["scope"]);
-  assert.equal(
-    workflow.jobs["dependency-review"].if,
-    "github.event_name == 'pull_request'",
-  );
 
   const commandsByJob = Object.fromEntries(
     Object.entries(workflow.jobs).map(([identifier, job]) => [
@@ -788,8 +797,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const aggregate = workflow.jobs["generated-jobs"];
   assert.deepEqual(Object.keys(aggregate).sort(), ["if", "name", "needs", "runs-on", "steps", "timeout-minutes"]);
   assert.equal(aggregate.name, "generated-jobs");
-  assert.deepEqual(aggregate.needs, ["scope", "generated-jobs-profiles"]);
-  assert.equal(aggregate.if, "${{ always() }}");
   assert.equal(aggregate["timeout-minutes"], 2);
   assert.equal(aggregate.steps.length, 1);
   assert.deepEqual(Object.keys(aggregate.steps[0]).sort(), ["env", "name", "run", "shell"]);
@@ -807,8 +814,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   };
   for (const [identifier, commands] of Object.entries(generatedCommands)) {
     const job = workflow.jobs[identifier];
-    assert.equal(job.if, "needs.scope.outputs.generated-projects == 'true'", identifier);
-    assert.deepEqual(job.needs, ["scope"], identifier);
     assert.deepEqual(job.container, workflow.jobs["generated-projects"].container, identifier);
     assert.equal(job["timeout-minutes"], identifier === "generated-projects" ? 90 : identifier === "generated-fixtures" ? 75 : 45);
     for (const property of ["continue-on-error", "concurrency", ...(identifier === "generated-jobs-profiles" ? [] : ["strategy"])]) {
@@ -1089,7 +1094,15 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     },
     {
-      name: "conditioned builder policy lane",
+      name: "draft builder policy work",
+      mutateWorkflow(candidate) { delete candidate.jobs["builder-and-packages"].if; },
+    },
+    {
+      name: "draft dependency review",
+      mutateWorkflow(candidate) { candidate.jobs["dependency-review"].if = "github.event_name == 'pull_request'"; },
+    },
+    {
+      name: "restricted builder policy lane",
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].if =
           "github.actor != 'dependabot[bot]'";
@@ -1329,7 +1342,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     negativeCases.push({ name: `generated jobs unsafe artifact ${property}`, mutateWorkflow(candidate) { findJobsUpload(candidate).with[property] = value; } });
   }
   negativeCases.push({ name: "generated jobs non-failure upload", mutateWorkflow(candidate) { findJobsUpload(candidate).if = "success()"; } });
-  for (const [property, value] of [["name", "renamed-check"], ["if", "success()"], ["needs", ["scope"]], ["continue-on-error", true]]) {
+  for (const [property, value] of [["name", "renamed-check"], ["if", "success()"], ["if", "${{ always() }}"], ["needs", ["scope"]], ["continue-on-error", true]]) {
     negativeCases.push({ name: `generated jobs aggregate unsafe ${property}`, mutateWorkflow(candidate) { candidate.jobs["generated-jobs"][property] = value; } });
   }
   for (const { name, mutateSource, mutateWorkflow } of negativeCases) {
