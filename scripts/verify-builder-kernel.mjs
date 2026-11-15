@@ -6,11 +6,15 @@ import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 
+const fixedRootGroup = "verify:generated-skeletons";
+const fixedVisualScript = "verify:generated-visuals";
+const fixedVisualFixtures = ["app", "portfolio-calendly", "portfolio", "site"];
+
 const requiredGroups = [
   "test:constitution", "test:package-boundaries", "build:builder",
   "test:synthetic-client-journey", "test:generated-fixtures", "test:packages",
   "lint:builder", "typecheck:builder", "test:cli", "test:builder-core",
-  "verify:generated-skeletons", "test:capability-certification",
+  fixedRootGroup, "test:capability-certification",
   "check:capability-certification", "test:generated-jobs", "changeset:status",
 ];
 
@@ -44,12 +48,12 @@ const diagnosticCodes = new Set([
 const skeletonFailureCodes = new Set([
   "CLOUDFLARE_TYPE_GENERATION_FAILED", "PEER_DEPENDENCY_CHECK_FAILED",
   "DEPLOYMENT_CONTRACTS_FAILED", "BROWSER_INSTALL_FAILED", "TRANSPORT_CONTRACTS_FAILED",
-  "CLEAN_TYPECHECK_FAILED", "JOB_CONFIGURATION_FAILED",
+  "CLEAN_TYPECHECK_FAILED", "JOB_CONFIGURATION_FAILED", "VISUAL_REGRESSION_FAILED",
 ]);
 
 // Persist only bounded, recognized observations. Test names, messages, paths and
 // URLs are arbitrary child data and may contain credentials or private inputs.
-function skeletonEvidence(text) {
+function skeletonEvidence(text, withVisuals) {
   // The verifier emits one structured receipt. Keep fixed-root identities and
   // audit references without retaining arbitrary result fields or child paths.
   let result;
@@ -62,8 +66,17 @@ function skeletonEvidence(text) {
   const integration = value => ({ executed: fixtures(value?.executed), skipped: fixtures(value?.skipped) });
   const audits = Array.isArray(result.auditDispositions) ? result.auditDispositions : [];
   const builds = Array.isArray(result.appBuildEvidence) ? result.appBuildEvidence : [];
+  const verifiedFixtures = fixtures(result.fixtures);
+  const reportedComparisons = withVisuals && Array.isArray(result.visualComparisons) &&
+    result.visualComparisons.length <= fixedVisualFixtures.length ? result.visualComparisons : [];
+  const visualComparisons = fixedVisualFixtures.flatMap(fixture => {
+    const matches = reportedComparisons.filter(entry => entry?.fixture === fixture);
+    return verifiedFixtures.includes(fixture) && matches.length === 1 && matches[0].passedCases === 2
+      ? [{ fixture, passedCases: 2 }] : [];
+  });
   return {
-    fixtures: fixtures(result.fixtures),
+    fixtures: verifiedFixtures,
+    ...(visualComparisons.length ? { visualComparisons } : {}),
     workerIntegration: integration(result.workerIntegration),
     bindingIntegration: integration(result.bindingIntegration),
     auditDispositions: audits.filter(audit => fixtureNames.has(audit?.fixture) &&
@@ -93,7 +106,7 @@ function sourceLocation(file, line, column, packageRoot = "") {
   }
 }
 
-function outputObservation(line, skeletonOutput, skeletonError) {
+function outputObservation(line, skeletonOutput, skeletonError, visualOutput) {
   const text = stripVTControlCharacters(line).trim();
   const prefix = /^((?:apps|packages|proofs)\/[\w.-]+) [\w:-]+: (.+)$/u.exec(text);
   const message = prefix?.[2] ?? text;
@@ -102,8 +115,8 @@ function outputObservation(line, skeletonOutput, skeletonError) {
   const testNumber = /^not ok (\d{1,9})(?:\s|$)/u.exec(message);
   if (testNumber) return { text: "not ok " + testNumber[1], priority: 1 };
   if (skeletonOutput && text.startsWith('{"ok":true,')) {
-    const evidence = skeletonEvidence(text);
-    if (evidence) return { text: JSON.stringify(evidence) };
+    const evidence = skeletonEvidence(text, visualOutput);
+    if (evidence) return { text: JSON.stringify(evidence), deferUntilSuccess: visualOutput };
   }
   const compiler = /^(?:(.{1,600})\((\d{1,7}),(\d{1,5})\): )?error (TS\d{4,5}):/u.exec(message);
   if (compiler) {
@@ -122,15 +135,17 @@ function outputObservation(line, skeletonOutput, skeletonError) {
   const failureCode = /^\{"ok":false,"code":"([A-Z_]+)"/u.exec(message)?.[1];
   const code = failureCode ??
     /^(?:code: ['"]?|\[)?([A-Z][A-Z0-9_]{2,80})(?:['"]?$|[:\s\]])/u.exec(message)?.[1];
-  if (diagnosticCodes.has(code)) return { text: code, priority: 2 };
-  if (skeletonError && skeletonFailureCodes.has(failureCode)) {
+  const fixedVisualPreviewFailure = visualOutput && failureCode === "BROWSER_PREVIEW_FAILED";
+  if (skeletonError && (fixedVisualPreviewFailure || skeletonFailureCodes.has(failureCode))) {
     let envelope;
-    try { envelope = JSON.parse(message); } catch { return undefined; }
-    if (envelope !== null && typeof envelope === "object" &&
-        envelope.ok === false && envelope.code === failureCode) {
-      return { text: failureCode, priority: 2 };
+    try { envelope = JSON.parse(message); } catch {}
+    if (envelope?.ok === false && envelope.code === failureCode) {
+      const exportFailed = (fixedVisualPreviewFailure || failureCode === "VISUAL_REGRESSION_FAILED") &&
+        envelope.artifactExportCode === "VISUAL_ARTIFACT_EXPORT_FAILED";
+      return { text: exportFailed ? failureCode + " (VISUAL_ARTIFACT_EXPORT_FAILED)" : failureCode, priority: 2 };
     }
   }
+  if (diagnosticCodes.has(code)) return { text: code, priority: 2 };
   return undefined;
 }
 
@@ -321,18 +336,26 @@ async function runChild(step, log, setActive) {
       resolveClose();
     });
   });
+  const visualOutput = step.name === fixedVisualScript;
+  const fixedRootOutput = visualOutput || step.name === fixedRootGroup;
+  let visualEvidence;
   function record(source, line, skeletonOutput) {
     let observation;
-    const skeletonError = source === "stderr" && step.name === "verify:generated-skeletons";
-    try { observation = outputObservation(line, skeletonOutput, skeletonError); } catch { capture = "failed"; }
+    const skeletonError = source === "stderr" && fixedRootOutput;
+    try { observation = outputObservation(line, skeletonOutput, skeletonError, visualOutput); } catch { capture = "failed"; }
     if (!observation) return;
+    if (observation.deferUntilSuccess) {
+      // A second success envelope is ambiguous, even if the child exits zero.
+      visualEvidence = visualEvidence === undefined ? observation.text : null;
+      return;
+    }
     if (observation.priority > (firstDiagnostic?.priority ?? 0)) firstDiagnostic = observation;
     logLine(source + " " + observation.text);
   }
   for (const source of ["stdout", "stderr"]) {
     child[source]?.on("error", () => { capture = "failed"; });
     if (child[source]) {
-      observeStream(child[source], source, record, source === "stdout" && step.name === "verify:generated-skeletons");
+      observeStream(child[source], source, record, source === "stdout" && fixedRootOutput);
     }
   }
   await finished;
@@ -340,12 +363,14 @@ async function runChild(step, log, setActive) {
   setActive(undefined);
 
   const drainEvidence = drainExpired ? { drainExpired } : {};
+  const childSucceeded = exitCode === 0 && !launchError && !signal && !drainExpired;
+  if (childSucceeded && capture !== "failed" && visualEvidence) logLine("stdout " + visualEvidence);
   logLine(JSON.stringify({ exitCode, signal, launchError, cleanup, ...drainEvidence }));
   if (descriptor !== undefined) {
     try { fsyncSync(descriptor); } catch { capture = "failed"; }
     try { closeSync(descriptor); } catch { capture = "failed"; }
   }
-  const status = exitCode === 0 && !launchError && !signal && !drainExpired && capture !== "failed" ? "passed" : "failed";
+  const status = childSucceeded && capture !== "failed" ? "passed" : "failed";
   const diagnostic = capture === "failed" ? "Child log capture failed"
     : launchError ? "Child launch failed (" + launchError + ")"
     : drainExpired ? "Child stdio remained open after exit. Owned process cleanup could not be confirmed"
@@ -356,7 +381,8 @@ async function runChild(step, log, setActive) {
     diagnostic, log: logPublished ? log : null, capture, exitCode, signal, launchError, cleanup, ...drainEvidence };
 }
 
-async function main() {
+async function main(includeFixedVisuals) {
+  const fixedRootScript = includeFixedVisuals ? fixedVisualScript : fixedRootGroup;
   const directory = mkdtempSync(join(resolve(tmpdir()), "builder-kernel-"));
   console.log("Builder kernel report: " + directory);
   console.log("Required groups: " + requiredGroups.join(", "));
@@ -379,6 +405,7 @@ async function main() {
   process.on("SIGTERM", onTerminate);
 
   function publish(row) {
+    if (includeFixedVisuals && row.group === fixedRootGroup) row = { ...row, mode: "fixed-visuals" };
     results.push(row);
     try {
       writeFileSync(journal, JSON.stringify(row) + "\n");
@@ -391,7 +418,8 @@ async function main() {
 
   function formatRow(row) {
     const logs = row.steps.flatMap(step => step.log ? [step.log] : []);
-    return row.group + " " + row.status + " (" + row.durationMs + " ms)" +
+    const visualCommand = row.mode === "fixed-visuals" ? " [fixed visuals via pnpm run " + fixedRootScript + "]" : "";
+    return row.group + visualCommand + " " + row.status + " (" + row.durationMs + " ms)" +
       (row.diagnostic ? " — " + row.diagnostic : "") +
       " — " + (logs.length ? logs.join(", ") : journalPath);
   }
@@ -466,7 +494,7 @@ async function main() {
     await runGroup("test:builder-core", observabilityReady ? undefined : [
       blocked("test:builder-core", "observability build"),
     ]);
-    await runGroup("verify:generated-skeletons");
+    await runGroup(fixedRootGroup, [rootScript(fixedRootScript)]);
     await runGroup("test:capability-certification");
     await runGroup("check:capability-certification");
     await runGroup("test:generated-jobs");
@@ -486,10 +514,18 @@ async function main() {
 }
 
 if (import.meta.main) {
-  try {
-    process.exitCode = await main();
-  } catch {
-    console.error("Builder kernel reporting could not finish. See any completed report rows.");
+  const arguments_ = process.argv.slice(2);
+  const options = arguments_[0] === "--" ? arguments_.slice(1) : arguments_;
+  const includeFixedVisuals = options[0] === "--include-fixed-visuals";
+  if (options.length > (includeFixedVisuals ? 1 : 0)) {
+    console.error("Usage: pnpm run verify:builder-kernel [-- --include-fixed-visuals]");
     process.exitCode = 1;
+  } else {
+    try {
+      process.exitCode = await main(includeFixedVisuals);
+    } catch {
+      console.error("Builder kernel reporting could not finish. See any completed report rows.");
+      process.exitCode = 1;
+    }
   }
 }

@@ -215,6 +215,17 @@ async function writeSyntheticAppBuild(root, { effectVersion = "4.0.0-rc.112", cl
   }
 }
 
+// Match the pinned non-TTY Playwright list reporter, including the two actual case identities.
+const visualReporterOutput = [
+  "Running 2 tests using 1 worker",
+  "",
+  "  ✓  1 [chromium] › tests/visual/home-visual.spec.ts:23:1 › matches the desktop home viewport (3ms)",
+  "  ✓  2 [chromium] › tests/visual/home-visual.spec.ts:28:1 › matches the mobile home viewport (1ms)",
+  "",
+  "  2 passed (284ms)",
+  "",
+].join("\n");
+
 async function successfulCommand(input) {
   if (input.arguments.at(-1) === "--skipNextBuild") {
     const manifest = JSON.parse(await readFile(join(input.cwd, "apps/web/package.json"), "utf8"));
@@ -1255,12 +1266,18 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
         },
         async runCommand(input) {
           commands.push(input);
-          return successfulCommand(input);
+          return input.arguments.at(-1) === "test:visual" ? visualReporterOutput : successfulCommand(input);
         },
       },
       { includeVisual: true },
     );
 
+    assert.deepEqual(result.visualComparisons?.toSorted((left, right) => left.fixture.localeCompare(right.fixture)), [
+      { fixture: "app", passedCases: 2 },
+      { fixture: "portfolio", passedCases: 2 },
+      { fixture: "portfolio-calendly", passedCases: 2 },
+      { fixture: "site", passedCases: 2 },
+    ]);
     assert.deepEqual(result.fixtures, generatedFixtureContracts.map(contract => contract.identifier));
     assert.equal(result.checks.includes("visual-regression"), true);
     assert.deepEqual(
@@ -1283,6 +1300,37 @@ test("visual opt-in leaves the multilingual fixture outside the established matr
   } finally {
     await rm(ownerParent, { recursive: true, force: true });
   }
+});
+
+test("visual receipts omit incomplete or unrecognized Playwright output", async () => {
+  await withPortfolioVisualFixture(async ({ ownerParent, sourceRoot }) => {
+    const cases = {
+      missing: "",
+      footerOnly: "  2 passed (284ms)\n",
+      partial: visualReporterOutput.replace(/^.*mobile home viewport.*\n/mu, ""),
+      unknown: visualReporterOutput.replace("mobile home viewport", "unknown case"),
+      duplicate: visualReporterOutput.replace("mobile home viewport", "desktop home viewport"),
+      skipped: visualReporterOutput.replace("✓  2", "-  2").replace("2 passed", "1 skipped\n  1 passed"),
+      flaky: visualReporterOutput.replace("mobile home viewport (1ms)", "mobile home viewport (retry #1) (1ms)")
+        .replace("2 passed", "1 flaky\n  1 passed"),
+      malformed: visualReporterOutput.replace("2 passed (284ms)", "2 passed (unknown)"),
+      failed: visualReporterOutput.replace("✓  2", "✘  2"),
+    };
+    for (const [name, output] of Object.entries(cases)) {
+      const result = await verifyGeneratedProjectForTesting(
+        sourceRoot,
+        "portfolio",
+        {
+          createOwner: () => createKnownOwner(ownerParent),
+          runCommand: async input => input.arguments.at(-1) === "test:visual" ? output : successfulCommand(input),
+        },
+        undefined,
+        { includeVisual: true },
+      );
+      assert.equal(result.ok, true, name);
+      assert.equal(result.visualComparisons, undefined, name);
+    }
+  });
 });
 
 test("single-project visual opt-in reports only checks that actually run", async () => {
@@ -1720,7 +1768,7 @@ test("visual artifact export failure preserves the primary regression code", asy
             },
             async runCommand(input) {
               if (input.arguments.at(-1) === "test:visual") {
-                throw new Error("PRIVATE_VALUE");
+                throw Object.assign(new Error("PRIVATE_VALUE"), { code: 1, stdout: visualReporterOutput });
               }
               return successfulCommand(input);
             },

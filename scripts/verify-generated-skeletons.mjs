@@ -1927,6 +1927,20 @@ async function runExpectedCommand(runCommand, input, failureCode) {
   }
 }
 
+// The fixed visual spec has exactly two cases and uses Playwright's list reporter.
+function observedVisualComparisons(stdout) {
+  if (typeof stdout !== "string") return false;
+  const lines = stripVTControlCharacters(stdout).split(/\r?\n/u).map(line => line.trim()).filter(Boolean);
+  const start = lines.indexOf("Running 2 tests using 1 worker");
+  if (start === -1 || lines.length - start !== 4) return false;
+
+  const passedCase = /^(?:✓|ok) +([12]) \[chromium\] › tests\/visual\/home-visual\.spec\.ts:\d+:\d+ › matches the (desktop|mobile) home viewport \((?:\d{1,4}ms|\d{1,2}\.\d[sm])\)$/u;
+  const desktop = passedCase.exec(lines[start + 1]);
+  const mobile = passedCase.exec(lines[start + 2]);
+  return desktop?.[1] === "1" && desktop[2] === "desktop" && mobile?.[1] === "2" && mobile[2] === "mobile" &&
+    /^2 passed \((?:\d{1,4}ms|\d{1,2}\.\d[sm])\)$/u.test(lines[start + 3]);
+}
+
 async function verifySourcesWithAdapters(
   adapters,
   sourcesBefore,
@@ -1950,6 +1964,7 @@ async function verifySourcesWithAdapters(
   const bindingIntegration = { executed: [], skipped: [] };
   const appBuildEvidence = [];
   const auditDispositions = [];
+  const visualComparisons = [];
   try {
     for (const source of selectedSources) {
       const validationRoot = join(
@@ -2101,7 +2116,10 @@ async function verifySourcesWithAdapters(
             if (!auditAccepted) fail(command.failureCode);
             auditDispositions.push({ fixture: source.contract.identifier, ...audit });
           } else {
-            await runExpectedCommand(adapters.runCommand, commandInput(command.arguments), command.failureCode);
+            const output = await runExpectedCommand(adapters.runCommand, commandInput(command.arguments), command.failureCode);
+            if (command.failureCode === "VISUAL_REGRESSION_FAILED" && observedVisualComparisons(output)) {
+              visualComparisons.push({ fixture: source.contract.identifier, passedCases: 2 });
+            }
           }
           if (command.failureCode === "BINDING_INTEGRATION_FAILED") bindingIntegration.executed.push(source.contract.identifier);
           if (command.failureCode === "WORKER_INTEGRATION_FAILED") {
@@ -2192,6 +2210,7 @@ async function verifySourcesWithAdapters(
     workerIntegration,
     bindingIntegration,
     appBuildEvidence,
+    ...(visualComparisons.length ? { visualComparisons } : {}),
     profiles: [
       ...new Set(selectedSources.map(({ contract }) => contract.profile)),
     ],
