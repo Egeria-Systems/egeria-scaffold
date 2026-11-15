@@ -774,7 +774,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const destination = join(owner, "project");
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
-      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
+      request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
       verifier: {
         async prepareLockfile(root) {
@@ -844,4 +844,29 @@ test("environment booking addition rejects literal and malformed mode settings b
     assertFailure(await core.planCapabilityAddition({ reader, git, capability: "booking-calendly", settings, renderingContext: core.createApplicationEnvironmentRenderingContext() }), "CAPABILITY_ADDITION_UNSUPPORTED");
   }
   assert.equal(reads, 0);
+});
+
+const environmentAnalyticsSelection = {
+  consent: { policy: "explicit-opt-in" },
+  providers: { cloudflareWebAnalytics: true, googleAnalytics4: true, microsoftClarity: { audience: "not-directed-to-minors" } },
+  operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
+};
+
+test("environment analytics addition binds strict selection and preserves all existing neighbors", async () => {
+  const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const entries = await environmentContactEntries("site", { booking: "popup", contact: true, multilingual: true });
+  const common = { reader: createSnapshotReader(entries).reader, git, capability: "analytics", renderingContext };
+  const accepted = await core.planCapabilityAddition({ ...common, settings: environmentAnalyticsSelection });
+  assert.equal(accepted.ok, true, JSON.stringify(accepted));
+  assert.deepEqual(accepted.value.capability, { identifier: "analytics", version: "0.2.0" });
+  for (const neighbor of ["booking-calendly", "contact-form-web3forms", "multilingual"]) assert.ok(accepted.value.desiredCapabilities.includes(neighbor));
+  const changed = await core.planCapabilityAddition({ ...common, settings: { ...environmentAnalyticsSelection, providers: { googleAnalytics4: true } } });
+  assert.equal(changed.ok, true, JSON.stringify(changed));
+  assert.notEqual(changed.value.planFingerprint, accepted.value.planFingerprint);
+  for (const settings of [undefined, {}, { ...environmentAnalyticsSelection, providers: { googleAnalytics4: { measurementId: "G-PRIVATE123" } } }, { ...environmentAnalyticsSelection, enabled: true }]) {
+    let reads = 0;
+    const reader = { async readText() { reads++; throw new Error("unexpected read"); } };
+    assertFailure(await core.planCapabilityAddition({ ...common, reader, settings }), "CAPABILITY_ADDITION_UNSUPPORTED");
+    assert.equal(reads, 0);
+  }
 });

@@ -57,6 +57,8 @@ const bookingCalendlyTokenNames = new Set([
 ]);
 const analyticsSettingsSource =
   "analytics/apps/web/src/integrations/analytics/analytics-settings.ts.template";
+const applicationEnvironmentAnalyticsSettingsSource =
+  "analytics/application-environments/apps/web/src/integrations/analytics/analytics-settings.ts.template";
 const analyticsTokenNames = new Set(["analyticsSettingsJson"]);
 const fixedTemplateTokens = {
   githubWorkflowExpression: "${{ github.workflow }}",
@@ -155,7 +157,7 @@ function validateTemplateSyntax(
         (!bookingCalendlyTokenNames.has(token) ||
           source === bookingCalendlySettingsSource ||
           (token === "calendlyModeJson" && source === applicationEnvironmentBookingSettingsSource)) &&
-        (!analyticsTokenNames.has(token) || source === analyticsSettingsSource) &&
+        (!analyticsTokenNames.has(token) || source === analyticsSettingsSource || source === applicationEnvironmentAnalyticsSettingsSource) &&
         (token !== "web3FormsAccessKeyJson" || source === "contact-form-web3forms/apps/web/src/integrations/contact-form-web3forms/contact-settings.ts.template")
       ) {
         if (
@@ -171,7 +173,7 @@ function validateTemplateSyntax(
         bookingCalendlyTokenNames.has(token) &&
         source !== bookingCalendlySettingsSource
           ? "unavailable-token"
-          : analyticsTokenNames.has(token) && source !== analyticsSettingsSource
+          : analyticsTokenNames.has(token) && source !== analyticsSettingsSource && source !== applicationEnvironmentAnalyticsSettingsSource
             ? "unavailable-token"
           : /^[A-Za-z][A-Za-z0-9]*$/.test(token)
             ? "unknown-token"

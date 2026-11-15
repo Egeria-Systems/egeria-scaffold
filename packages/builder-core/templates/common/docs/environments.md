@@ -53,3 +53,5 @@ Use appropriate shared nonproduction provider resources within one project; keep
 Correct invalid local configuration and rebuild when build inputs changed. Revert source separately from runtime configuration, provider changes or persistent data. Do not reset a database, drain queues or delete reusable resources to repair a source or target mismatch.
 
 If booking is selected, see the generated `docs/booking-calendly.md` guide for isolated calendars, its fixed public build input, modes and safe recovery.
+
+If analytics is selected, see the generated `docs/analytics.md` guide for build-time activation, consent, separate provider destinations, production Search verification and a complete contact/booking example.
