@@ -1546,7 +1546,7 @@ test("application environment catalog admits only the complete common tuple with
   const snapshot = { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", deploymentCloudflare: "0.7.1" };
   const result = contracts.createCapabilityCatalogSnapshot(contracts.verifiedCapabilityPackageVersions, snapshot);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
+  assert.deepEqual(result.value.map(({ identifier }) => identifier).sort(), ["app-foundation", "contact-form-web3forms", "content-files", "deployment-cloudflare", "multilingual", "observability", "section-composition", "site-routing", "standards"]);
   const deployment = result.value.find(({ identifier }) => identifier === "deployment-cloudflare");
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/src/configuration/application-environment.ts"));
   assert.ok(deployment.managedSurfaces.some(({ path }) => path === "apps/web/scripts/check-application-environment.mjs"));
@@ -1696,5 +1696,13 @@ test("public deployment families preserve supported installed combinations and r
       assert.equal(contracts.parseStateJson(JSON.stringify(internalSchema)).ok, false);
       assert.equal(snapshots.createVerifiedProjectSnapshot(project, internalSchema).ok, false);
     });
+  }
+});
+
+test("environment contact installed state admits only its exact candidate version", () => {
+  for (const version of ["0.1.0", "0.2.0", "0.3.0"]) {
+    const state = structuredClone(environmentState);
+    state.installedCapabilities.push({ ...state.installedCapabilities[0], identifier: "contact-form-web3forms", version });
+    assert.equal(contracts.parseStateJson(JSON.stringify(state), "2.0.0").ok, version === "0.2.0");
   }
 });

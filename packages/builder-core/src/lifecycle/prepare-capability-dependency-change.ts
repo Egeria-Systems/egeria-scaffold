@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { parseDocument } from "yaml";
 
+import type { ApplicationEnvironmentProjectConfiguration, ProjectConfiguration } from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
 import type { RenderedSkeleton } from "../generation/render-skeleton.js";
@@ -51,13 +52,13 @@ function projectManifestMembers(
   return result;
 }
 
-export async function prepareCapabilityDependencyChange(input: Readonly<{
+export async function prepareCapabilityDependencyChange<P extends ProjectConfiguration | ApplicationEnvironmentProjectConfiguration>(input: Readonly<{
   reader: RepositoryReader;
-  current: RenderedSkeleton;
-  desired: RenderedSkeleton;
-}>): Promise<ValidationResult<Readonly<{ current: RenderedSkeleton; desired: RenderedSkeleton }>>> {
-  const hasPersistence = (rendered: RenderedSkeleton) => rendered.project.selectedCapabilities.includes("application-persistence");
-  const hasFoundation = (rendered: RenderedSkeleton) => rendered.project.selectedCapabilities.includes("app-foundation");
+  current: RenderedSkeleton<P>;
+  desired: RenderedSkeleton<P>;
+}>): Promise<ValidationResult<Readonly<{ current: RenderedSkeleton<P>; desired: RenderedSkeleton<P> }>>> {
+  const hasPersistence = (rendered: RenderedSkeleton<P>) => rendered.project.selectedCapabilities.includes("application-persistence");
+  const hasFoundation = (rendered: RenderedSkeleton<P>) => rendered.project.selectedCapabilities.includes("app-foundation");
   if (hasPersistence(input.current) === hasPersistence(input.desired) && hasFoundation(input.current) === hasFoundation(input.desired)) {
     return { ok: true, value: { current: input.current, desired: input.desired } };
   }
@@ -90,7 +91,7 @@ export async function prepareCapabilityDependencyChange(input: Readonly<{
     const sourceLock = await readFile(createRecipeLockfileUrl(sourceVersion), "utf8");
     const targetLock = await readFile(createRecipeLockfileUrl(targetVersion), "utf8");
     if (sourceLock !== actualLock.content) throw new Error("LOCKFILE_DRIFTED");
-    const withFiles = (rendered: RenderedSkeleton, manifest: string, lock: string): RenderedSkeleton => ({
+    const withFiles = (rendered: RenderedSkeleton<P>, manifest: string, lock: string): RenderedSkeleton<P> => ({
       ...rendered,
       files: [
         ...rendered.files.filter(({ path }) => path !== manifestPath && path !== "pnpm-lock.yaml"),

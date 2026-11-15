@@ -266,7 +266,7 @@ async function runCreate(
   dependencies: CliRunnerDependencies,
 ): Promise<0 | 1> {
   const command = input.command;
-  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.bookingCalendly !== undefined || command.contactFormWeb3Forms !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
+  if (input.renderingContext !== undefined && (command.analytics !== undefined || command.bookingCalendly !== undefined || command.applicationPersistence === true || command.transactionalEmailResend === true || command.backgroundJobDelivery === true)) {
     writeJson(output.writeError, { ok: false, command: "create", issues: [{ code: "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", path: ["request"], context: { reason: "incomplete-capability" } }] });
     return 1;
   }
@@ -436,6 +436,7 @@ async function runPlanAdd(
   command: Extract<CliCommand, Readonly<{ kind: "plan-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  renderingContext?: ApplicationEnvironmentRenderingContext,
 ): Promise<0 | 1> {
   const root = resolve(command.directory);
   const initialGit = await inspectForPlan(root, dependencies);
@@ -452,6 +453,7 @@ async function runPlanAdd(
       reader,
       git: initialGit,
       capability: command.capability,
+      ...(renderingContext === undefined ? {} : { renderingContext }),
       ...(command.settings === undefined ? {} : { settings: command.settings }),
     });
   } catch {
@@ -504,6 +506,7 @@ async function runPlanRemove(
   command: Extract<CliCommand, Readonly<{ kind: "plan-remove" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  renderingContext?: ApplicationEnvironmentRenderingContext,
 ): Promise<0 | 1 | 2> {
   let persistenceInputs;
   try {
@@ -533,6 +536,7 @@ async function runPlanRemove(
         reader,
         git: initialGit,
         capability: command.capability,
+      ...(renderingContext === undefined ? {} : { renderingContext }),
         ...persistenceInputs,
         inspectRepositoryInventory:
           dependencies.inspectGitRepositoryInventory ??
@@ -678,6 +682,7 @@ async function runApplyAdd(
   command: Extract<CliCommand, Readonly<{ kind: "apply-add" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  renderingContext?: ApplicationEnvironmentRenderingContext,
 ): Promise<0 | 1> {
   let result: CapabilityAdditionExecutionResult;
   try {
@@ -686,6 +691,7 @@ async function runApplyAdd(
     )({
       root: resolve(command.directory),
       capability: command.capability,
+      ...(renderingContext === undefined ? {} : { renderingContext }),
       ...(command.settings === undefined ? {} : { settings: command.settings }),
       approvedPlanFingerprint: command.approvedPlanFingerprint,
       verifier: dependencies.createVerifier(),
@@ -724,6 +730,7 @@ async function runApplyRemove(
   command: Extract<CliCommand, Readonly<{ kind: "apply-remove" }>>,
   output: CliOutput,
   dependencies: CliRunnerDependencies,
+  renderingContext?: ApplicationEnvironmentRenderingContext,
 ): Promise<0 | 1 | 2> {
   let persistenceInputs;
   try {
@@ -738,6 +745,7 @@ async function runApplyRemove(
     )({
       root: resolve(command.directory),
       capability: command.capability,
+      ...(renderingContext === undefined ? {} : { renderingContext }),
       ...persistenceInputs,
       approvedPlanFingerprint: command.approvedPlanFingerprint,
       verifier: dependencies.createVerifier(),
@@ -832,9 +840,14 @@ export function createCliRunner(
     if (projectSchemaVersion === "2.0.0") {
       const parsed = parseCliArguments(arguments_, "2.0.0");
       if (!parsed.ok) return writeInvalidArguments(output);
+      const renderingContext = createApplicationEnvironmentRenderingContext();
+      if (parsed.value.kind === "plan-add") return runPlanAdd(parsed.value, output, dependencies, renderingContext);
+      if (parsed.value.kind === "plan-remove") return runPlanRemove(parsed.value, output, dependencies, renderingContext);
+      if (parsed.value.kind === "apply-add") return runApplyAdd(parsed.value, output, dependencies, renderingContext);
+      if (parsed.value.kind === "apply-remove") return runApplyRemove(parsed.value, output, dependencies, renderingContext);
       if (parsed.value.kind !== "create") return runReadOnly(parsed.value, output, dependencies, "2.0.0");
       try {
-        return await runCreate({ command: parsed.value, renderingContext: createApplicationEnvironmentRenderingContext() }, output, dependencies);
+        return await runCreate({ command: parsed.value, renderingContext }, output, dependencies);
       } catch {
         writeJson(output.writeError, { ok: false, code: "PROJECT_GENERATION_FAILED" });
         return 1;

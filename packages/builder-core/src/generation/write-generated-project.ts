@@ -133,10 +133,12 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return prototype === Object.prototype || prototype === null;
 }
 
+function validateRequest(value: unknown, applicationEnvironments: true): ValidationResult<ApplicationEnvironmentProjectGenerationRequest>;
+function validateRequest(value: unknown, applicationEnvironments?: false): ValidationResult<ProjectGenerationRequest>;
 function validateRequest(
   value: unknown,
   applicationEnvironments = false,
-): ValidationResult<ProjectGenerationRequest> {
+): ValidationResult<ProjectGenerationRequest | ApplicationEnvironmentProjectGenerationRequest> {
   if (!isPlainObject(value)) {
     return issue(
       "PROJECT_GENERATION_REQUEST_INVALID",
@@ -171,7 +173,17 @@ function validateRequest(
     for (const key of ["multilingual", "applicationPersistence", "transactionalEmailResend", "backgroundJobDelivery"] as const) {
       if (Object.hasOwn(value, key) && value[key] !== true) return issue("PROJECT_GENERATION_REQUEST_INVALID", ["request", key], "invalid-selection");
     }
-    if (includesContact || includesAnalytics || includesCalendly || includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+    if (includesAnalytics || includesCalendly || includesPersistence || includesEmail || includesJobs) return issue("APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE", ["request"], "incomplete-capability");
+    return {
+      ok: true,
+      value: {
+        profile: value.profile as ApplicationEnvironmentProjectGenerationRequest["profile"],
+        projectName: value.projectName as string,
+        displayName: value.displayName as string,
+        ...(includesContact ? { contactFormWeb3Forms: true } : {}),
+        ...(includesMultilingual ? { multilingual: true } : {}),
+      },
+    };
   }
 
   let contactFormWeb3Forms: Web3FormsContactSettings | undefined;
@@ -729,22 +741,21 @@ export async function generateProject(input: GenerateProjectInput | ApplicationE
   if ("renderingContext" in input && !isApplicationEnvironmentRenderingContext(candidateContext)) {
     return issue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "unsupported-context");
   }
-  const request = validateRequest(input.request, candidateContext !== undefined);
-  if (!request.ok) {
+  const request = candidateContext === undefined ? validateRequest(input.request) : undefined;
+  const candidateRequest = candidateContext === undefined ? undefined : validateRequest(input.request, true);
+  if (request?.ok === false) {
     return request;
   }
+  if (candidateRequest?.ok === false) return candidateRequest;
 
-  const renderingContext = candidateContext ?? createGenerationRenderingContext(request.value.applicationPersistence === true, request.value.transactionalEmailResend === true, request.value.backgroundJobDelivery === true);
+  const renderingContext = candidateContext ?? createGenerationRenderingContext(request?.value.applicationPersistence === true, request?.value.transactionalEmailResend === true, request?.value.backgroundJobDelivery === true);
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) {
     return issue("VERIFIED_CATALOG_INVALID", [], "catalog-invalid");
   }
 
-  const candidateRendered = candidateContext === undefined ? undefined : await renderSkeleton({
-    profile: request.value.profile,
-    projectName: request.value.projectName,
-    displayName: request.value.displayName,
-    ...(request.value.multilingual === true ? { multilingual: true } : {}),
+  const candidateRendered = candidateContext === undefined || candidateRequest === undefined ? undefined : await renderSkeleton({
+    ...candidateRequest.value,
     packageVersions: verifiedCapabilityPackageVersions,
   }, candidateContext);
   if (candidateRendered?.ok === false) return candidateRendered;
@@ -754,10 +765,10 @@ export async function generateProject(input: GenerateProjectInput | ApplicationE
     return destination;
   }
 
-  const rendered = candidateRendered ?? await renderSkeleton({
+  const rendered = candidateRendered ?? (request === undefined ? issue("PROJECT_GENERATION_REQUEST_INVALID", ["request"], "invalid-shape") : await renderSkeleton({
     ...request.value,
     packageVersions: verifiedCapabilityPackageVersions,
-  }, renderingContext);
+  }, renderingContext));
   if (!rendered.ok) {
     return rendered;
   }

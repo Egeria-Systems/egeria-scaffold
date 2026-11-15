@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import * as core from "../dist/index.js";
+import { readControlSnapshot } from "../dist/lifecycle/lifecycle-control-snapshot.js";
 
 import {
   persistInstalledState,
@@ -8,6 +10,25 @@ import {
 } from "../dist/lifecycle/lifecycle-control-persistence.js";
 
 const decoder = new TextDecoder();
+
+test("environment contact controls require explicit schema selection and reject mixed controls", async () => {
+  const rendered = await core.renderSkeleton({ profile: "portfolio", projectName: "contact-controls", displayName: "Contact Controls", contactFormWeb3Forms: true, packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext());
+  assert.equal(rendered.ok, true);
+  const state = {
+    ...installedState, schemaVersion: "2.0.0", projectSchemaVersion: "2.0.0",
+    origin: { profile: "portfolio", recipeVersion: "0.12.0" },
+    installedCapabilities: core.createInstalledManifest(rendered.value.resolved), appliedMigrations: [],
+    lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...core.ordinaryGenerationVerificationChecks, "post-state-inference"] },
+  };
+  const files = new Map([[".egeria/project.yaml", core.serializeProjectYaml(rendered.value.project)], [".egeria/state.json", core.serializeStateJson(state)], [".egeria/migrations.jsonl", ""]]);
+  const reader = { async readText(path) { return files.has(path) ? { kind: "file", content: files.get(path) } : { kind: "missing" }; } };
+  assert.equal(await readControlSnapshot(reader), undefined);
+  const controls = await readControlSnapshot(reader, "2.0.0");
+  assert.equal(controls?.project.value.schemaVersion, "2.0.0");
+  assert.equal(controls?.state.value.schemaVersion, "2.0.0");
+  files.set(".egeria/state.json", core.serializeStateJson(installedState));
+  assert.equal(await readControlSnapshot(reader, "2.0.0"), undefined);
+});
 
 const previousMigrationSource =
   '{"capabilities":["standards"],"completedAt":"2026-08-23T12:00:00.000Z","fromBuilderVersion":"0.0.0","identifier":"previous-migration","kind":"migration","outcome":"succeeded","persistentDataAuthorizations":[],"remainingKnownDrift":[],"schemaVersion":"1.0.0","toBuilderVersion":"0.0.0","verificationChecks":["contracts"]}';
