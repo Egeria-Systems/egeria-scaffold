@@ -145,6 +145,31 @@ test("application environment generation preserves state-last verification and s
   }
 });
 
+test("application environment jobs state reconstructs its exact installed deployment context", async () => {
+  for (const persistence of [false, true]) {
+    await withTestRoot(async owner => {
+      const checks = persistence
+        ? [...generatedChecks.slice(0, 3), "cloudflare-types", ...generatedChecks.slice(3), "worker-integration", "binding-integration"]
+        : [...generatedChecks, "worker-integration"];
+      const verifier = createFakeVerifier({ verify: async () => ({ ok: true, value: { checks } }) });
+      const context = core.createApplicationEnvironmentRenderingContext(persistence, false, true);
+      const result = assertSuccess(await core.generateProject({
+        request: { profile: "app", projectName: "jobs-environment", displayName: "Jobs Environment", backgroundJobDelivery: true, ...(persistence ? { applicationPersistence: true } : {}) },
+        destination: join(owner, "jobs-environment"), verifier: verifier.verifier, renderingContext: context,
+      }));
+      const reader = core.createFileSystemRepositoryReader(result.destination);
+      const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(reader, core.createApplicationEnvironmentRenderingContext()));
+      assert.deepEqual(snapshot.renderingContext, core.createApplicationEnvironmentRenderingContext(persistence, true, true));
+      assert.deepEqual(await core.doctorRepository({ reader, catalog: snapshot.catalog, profiles: snapshot.profiles, projectSchemaVersion: "2.0.0" }), { healthy: true, diagnostics: [] });
+      for (const [identifier, version] of [["background-job-delivery", "0.2.0"], ["deployment-cloudflare", persistence ? "0.10.0" : "0.9.0"], ["site-routing", "0.4.0"]]) {
+        const mixed = { ...result.state, installedCapabilities: result.state.installedCapabilities.map(capability => capability.identifier === identifier ? { ...capability, version } : capability) };
+        assert.equal(core.parseStateJson(JSON.stringify(mixed), "2.0.0").ok, false);
+      }
+      assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
+    });
+  }
+});
+
 test("environment analytics generation verifies and infers the selected candidate on every profile", async () => {
   const context = core.createApplicationEnvironmentRenderingContext();
   const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
@@ -220,7 +245,7 @@ test("environment contact generation preserves exact installed state for every p
   }
 });
 
-test("application environment generation rejects incomplete malformed and mismatched selections before destination inspection", async () => {
+test("application environment generation rejects malformed and mismatched selections before destination inspection", async () => {
   await withTestRoot(async (owner) => {
     const before = await snapshotFileBytes(owner);
     for (const selection of [
@@ -239,7 +264,7 @@ test("application environment generation rejects incomplete malformed and mismat
       });
       assert.equal(result.ok, false);
       const malformed = JSON.stringify(selection).includes("secret-sentinel");
-      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : selection.applicationPersistence ? "APPLICATION_ENVIRONMENT_CONTEXT_INVALID" : "APPLICATION_ENVIRONMENT_CAPABILITY_INCOMPLETE");
+      assert.equal(result.issues[0].code, malformed ? "PROJECT_GENERATION_REQUEST_INVALID" : "APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
       assert.equal(JSON.stringify(result).includes("secret-sentinel"), false);
       assert.deepEqual(verifier.calls, []);
     }
@@ -270,6 +295,9 @@ for (const [profile, expectedLock] of [
             ...publicManifest.scripts,
             "check:environment": "node scripts/check-application-environment.mjs --local",
             "check:environment:deployment": "node scripts/check-application-environment.mjs --deployment",
+            "check:prepared-artifact": "node --experimental-strip-types scripts/check-prepared-artifact.mjs",
+            "test:deployment-contracts": "node --experimental-strip-types --test tests/scripts/prepared-artifact.test.mjs tests/scripts/deployment-protection.test.mjs",
+            "test:transport": "playwright test --config playwright.transport.config.ts",
           },
         } : publicManifest);
         for (const section of ["dependencies", "devDependencies", "optionalDependencies"]) {
@@ -394,6 +422,64 @@ test("Worker integration verifier records execution only for the exact owned scr
         }
       }
     });
+  }
+});
+
+for (const profile of ["portfolio", "site", "app"]) {
+  test(`current public ${profile} verification preserves an application-owned prepared-artifact script`, async () => {
+    await withTestRoot(async owner => {
+      const fake = await createFakePnpmExecutable(owner);
+      const source = await createVerifierSource(owner);
+      const rendered = assertSuccess(await core.renderSkeleton({
+        profile, projectName: "custom-script", displayName: "Custom Script", packageVersions: core.verifiedCapabilityPackageVersions,
+      }, createGenerationRenderingContext()));
+      const manifest = JSON.parse(new TextDecoder().decode(rendered.files.find(file => file.path === "apps/web/package.json").content));
+      manifest.scripts["check:prepared-artifact"] = "node scripts/application-artifact-check.mjs";
+      await writeFile(join(source, "apps/web/package.json"), JSON.stringify(manifest));
+      await writeFile(join(source, ".egeria/project.yaml"), core.serializeProjectYaml(rendered.project));
+      const before = await snapshotFileBytes(source);
+      const result = await core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fake.executable }).verifyInIsolatedCopy(source);
+      assertSuccess(result);
+      assert.deepEqual(await snapshotFileBytes(source), before);
+      const calls = await fake.readCalls();
+      assert.ok(calls.length > 0);
+      assert.equal(calls.some(call => call.arguments.includes("test:deployment-contracts")), false);
+      assert.equal(calls.some(call => call.environment.APPLICATION_ENVIRONMENT !== undefined), false);
+    });
+  });
+}
+
+test("internal verification requires valid project controls and every exact environment script", async t => {
+  for (const scenario of ["valid", "missing-prepared-script", "modified-script", "missing-project", "malformed-project", "mixed-schema", "mixed-recipe"]) {
+    await t.test(scenario, async () => withTestRoot(async owner => {
+      const fake = await createFakePnpmExecutable(owner);
+      const source = await createVerifierSource(owner);
+      const rendered = assertSuccess(await core.renderSkeleton({
+        profile: "portfolio", projectName: "internal-control", displayName: "Internal Control", packageVersions: core.verifiedCapabilityPackageVersions,
+      }, core.createApplicationEnvironmentRenderingContext()));
+      const manifest = JSON.parse(new TextDecoder().decode(rendered.files.find(file => file.path === "apps/web/package.json").content));
+      if (scenario === "missing-prepared-script") delete manifest.scripts["check:prepared-artifact"];
+      if (scenario === "modified-script") manifest.scripts["test:deployment-contracts"] = "echo skipped";
+      await writeFile(join(source, "apps/web/package.json"), JSON.stringify(manifest));
+      const projectPath = join(source, ".egeria/project.yaml");
+      if (scenario === "missing-project") await rm(projectPath);
+      else await writeFile(projectPath, scenario === "malformed-project" ? "schemaVersion: [" :
+        JSON.stringify({ ...rendered.project, ...(scenario === "mixed-schema" ? { schemaVersion: "1.0.0" } : {}),
+          ...(scenario === "mixed-recipe" ? { recipeVersion: "0.11.7" } : {}) }));
+      const before = await snapshotFileBytes(source);
+      const result = await core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fake.executable }).verifyInIsolatedCopy(source);
+      assert.deepEqual(await snapshotFileBytes(source), before);
+      const calls = await fake.readCalls();
+      if (scenario === "valid") {
+        assertSuccess(result);
+        assert.equal(calls.some(call => call.arguments.includes("test:deployment-contracts")), true);
+        assert.ok(calls.every(call => call.environment.APPLICATION_ENVIRONMENT === "development"));
+      } else {
+        assert.equal(result.ok, false);
+        assert.equal(result.issues[0].code, "WORKER_INTEGRATION_INVALID");
+        assert.deepEqual(calls, []);
+      }
+    }));
   }
 });
 
@@ -1069,6 +1155,7 @@ const entries = ${readLinuxEntry}
 const support = join(${JSON.stringify(owner)}, basename(dirname(process.cwd())), "support");
 // Persist every key, but record a value only when it matches that key's fixture expectation.
 const expectedEnvironment = {
+  APPLICATION_ENVIRONMENT: "development",
   CI: "true",
   NEXT_TELEMETRY_DISABLED: "1",
   WRANGLER_SEND_METRICS: "false",
@@ -1160,6 +1247,11 @@ async function createVerifierSource(owner, name = "source") {
       devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.3" },
     })}\n`,
   );
+  await mkdir(join(root, ".egeria"));
+  const rendered = assertSuccess(await core.renderSkeleton({
+    profile: "portfolio", projectName: "verifier-source", displayName: "Verifier Source", packageVersions: core.verifiedCapabilityPackageVersions,
+  }, createGenerationRenderingContext()));
+  await writeFile(join(root, ".egeria/project.yaml"), core.serializeProjectYaml(rendered.project));
   await writeFile(join(root, "marker"), "source-marker\n");
   return root;
 }

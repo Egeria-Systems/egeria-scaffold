@@ -4,18 +4,23 @@ import { fileURLToPath } from "node:url";
 
 import { resolveBookingDestination } from "./src/integrations/booking-calendly/booking-settings.ts";
 
-import { resolveBuildApplicationEnvironment } from "./src/configuration/application-environment.ts";
+import { resolveApplicationBuild } from "./src/configuration/application-build.ts";
 
 
-const target = resolveBuildApplicationEnvironment({
+const build = resolveApplicationBuild({
   applicationEnvironment: process.env.APPLICATION_ENVIRONMENT,
   publicApplicationEnvironment: process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT,
+  siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
+  sourceRevision: process.env.BUILD_SOURCE_REVISION,
+  deploymentId: process.env.NEXT_DEPLOYMENT_ID,
 }, "local");
-if (!target.ok) {
-  throw new Error(`APPLICATION_ENVIRONMENT_INVALID:${target.issue.field}:${target.issue.reason}`);
+if (!build.ok) {
+  throw new Error(`APPLICATION_BUILD_INVALID:${build.issue.field}:${build.issue.reason}`);
 }
+const target = build.value.target;
+const buildId = build.value.buildId;
 
-const booking = resolveBookingDestination(process.env.NEXT_PUBLIC_CALENDLY_URL, target.value);
+const booking = resolveBookingDestination(process.env.NEXT_PUBLIC_CALENDLY_URL, target);
 if (!booking.ok) {
   throw new Error(`BOOKING_CONFIGURATION_INVALID:${booking.issue.field}:${booking.issue.reason}`);
 }
@@ -23,8 +28,9 @@ if (!booking.ok) {
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
+  ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),
   env: {
-    NEXT_PUBLIC_APPLICATION_ENVIRONMENT: target.value,
+    NEXT_PUBLIC_APPLICATION_ENVIRONMENT: target,
     NEXT_PUBLIC_CALENDLY_URL: booking.destination ?? "",
   },
   output: "standalone",

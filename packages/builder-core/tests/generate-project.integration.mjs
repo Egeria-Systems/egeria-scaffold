@@ -444,7 +444,7 @@ test("environment observability generation preserves diagnostics isolation", { t
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: join(owner, "wrangler.log") };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false", WRANGLER_LOG_PATH: join(owner, "wrangler.log") };
   const commands = [];
   const receipts = [];
   const digest = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -801,7 +801,7 @@ test("application environment generation validates real target builds and the sa
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   async function run(name, arguments_, additions = {}) {
     const command = { name, arguments: arguments_, applicationEnvironment: additions.APPLICATION_ENVIRONMENT ?? "loaded-by-next-or-default" };
     try {
@@ -868,7 +868,7 @@ it("keeps the public build target and public values fixed when runtime configura
     await writeFile(join(app, ".env.local"), `APPLICATION_ENVIRONMENT=${target === "production" ? "staging" : target}\nNEXT_PUBLIC_SITE_URL=${selected}\nSERVER_ONLY_PROOF=server-secret-sentinel\n`);
     await writeFile(join(app, ".env.production"), "NEXT_PUBLIC_SITE_URL=https://other-target-public-sentinel.example\n");
     await writeFile(join(app, ".env.staging"), "NEXT_PUBLIC_SITE_URL=https://unloaded-staging-public-sentinel.example\n");
-    await run(`${target}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], { APPLICATION_ENVIRONMENT: target });
+    await run(`${target}-preflight`, ["--dir", "apps/web", "run", target === "development" ? "check:environment" : "check:environment:deployment"], { APPLICATION_ENVIRONMENT: target, NEXT_PUBLIC_SITE_URL: selected });
     const buildEnvironment = target === "production" ? { APPLICATION_ENVIRONMENT: target } : {};
     await run(`${target}-next`, ["--dir", "apps/web", "run", "build"], buildEnvironment);
     await run(`${target}-opennext`, ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"], { APPLICATION_ENVIRONMENT: target });
@@ -894,7 +894,7 @@ test("environment contact builds freeze selected public values in controlled bro
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   const commands = [];
   const artifacts = [];
   const destination = join(owner, "generated");
@@ -981,7 +981,7 @@ test("environment contact builds freeze selected public values in controlled bro
     const conflict = await run(`target-conflict-${command.replace(":", "-")}`, ["--dir", "apps/web", "run", command], {
       APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: invalidKey,
     }, false);
-    assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
+    assert.match(conflict.stderr, command === "build" ? /APPLICATION_BUILD_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch/u : /APPLICATION_ENVIRONMENT_INVALID/u);
     assert.doesNotMatch(conflict.stderr, /CONTACT_CONFIGURATION_INVALID|invalid-contact-input-sentinel/u);
   }
   await browser("development-absent", "dev", "development", "", "");
@@ -1033,7 +1033,7 @@ for (const [profile, bookingMode, contact, multilingual] of [
     const supportRoot = join(owner, "support");
     await mkdir(supportRoot);
     const support = await prepareLiveSupport(supportRoot);
-    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
     const commands = [];
     const artifacts = [];
     const destination = join(owner, "generated");
@@ -1128,7 +1128,7 @@ for (const [profile, bookingMode, contact, multilingual] of [
       const conflict = await run(`target-conflict-${command.replace(":", "-")}`, ["--dir", "apps/web", "run", command], {
         APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_APPLICATION_ENVIRONMENT: "production", NEXT_PUBLIC_CALENDLY_URL: invalidUrl, NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "invalid-contact-input-sentinel",
       }, false);
-      assert.match(conflict.stderr, /APPLICATION_ENVIRONMENT_INVALID/u);
+      assert.match(conflict.stderr, command === "build" ? /APPLICATION_BUILD_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch/u : /APPLICATION_ENVIRONMENT_INVALID/u);
       assert.doesNotMatch(conflict.stderr, /BOOKING_CONFIGURATION_INVALID|CONTACT_CONFIGURATION_INVALID|invalid-booking-input-sentinel|invalid-contact-input-sentinel/u);
     }
     // This temporary copy is the app root Next actually reads; plain preflight must not load its local file.
@@ -1184,7 +1184,7 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
     const supportRoot = join(owner, "support");
     await mkdir(supportRoot);
     const support = await prepareLiveSupport(supportRoot);
-    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+    const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
     const commands = [];
     const artifacts = [];
     const identifiersA = {
@@ -1247,12 +1247,15 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       for (const path of paths) { hash.update(path); hash.update(await readFile(join(staticRoot, path))); }
       return { workerSha256: createHash("sha256").update(await readFile(join(app, ".open-next/worker.js"))).digest("hex"), staticSha256: hash.digest("hex"), staticFiles: paths.length };
     }
-    async function browser(label, mode, build, runtime) {
+    async function browser(label, mode, build, runtime, screenshotsOff = false) {
       const expectedOrigin = build.NEXT_PUBLIC_SITE_URL || "https://qa.analytics-test.invalid";
       const configPath = join(app, "playwright.analytics-acceptance.config.ts");
-      await writeFile(configPath, `import config from "./playwright.preview.config";\nexport default { ...config, retries: 0, use: { ...config.use, baseURL: ${JSON.stringify(expectedOrigin)} }, ${mode === "dev" ? 'webServer: { command: "pnpm run dev --hostname 127.0.0.1 --port 3101", url: "http://127.0.0.1:3101", reuseExistingServer: false, timeout: 180000 },' : ""} };\n`);
+      const screenshotOverride = screenshotsOff ? ', screenshot: "off"' : "";
+      await writeFile(configPath, `import config from "./playwright.${mode}.config";\nexport default { ...config, retries: 0, use: { ...config.use, baseURL: ${JSON.stringify(expectedOrigin)}${screenshotOverride} } };\n`);
+      const warningJourney = "failed storage retains an honest incomplete choice in en-CA";
+      const selection = screenshotsOff ? ["--grep", `${warningJourney}$`] : [];
       const reportPath = join(owner, `${label}.json`);
-      await run(label, ["--dir", "apps/web", "exec", "playwright", "test", "--config", configPath, "tests/e2e/analytics-consent.spec.ts", "--reporter=json", "--output", join(owner, `${label}-results`)], {
+      await run(label, ["--dir", "apps/web", "exec", "playwright", "test", "--config", configPath, "tests/e2e/analytics-consent.spec.ts", ...selection, "--reporter=json", "--output", join(owner, `${label}-results`)], {
         ...runtime,
         ...(mode === "dev" ? { WATCHPACK_POLLING: "true" } : {}),
         ...(mode === "preview" && build.APPLICATION_ENVIRONMENT !== "development" ? { CLOUDFLARE_ENV: build.APPLICATION_ENVIRONMENT } : {}),
@@ -1274,10 +1277,20 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
         ? analytics.providers.microsoftClarity === undefined ? 1 : 2
         : 0;
       const expected = searchOnly ? 1 : 14 + (multilingual ? 2 : 1) * (active ? 2 : 1) + (active ? 1 : 0) + (contact || booking !== undefined ? 1 : 0) + storedDenialCaseCount;
-      assert.equal(report.stats.expected, expected, label);
+      assert.equal(report.stats.expected, screenshotsOff ? 1 : expected, label);
       assert.equal(report.stats.skipped, 0, label);
       assert.equal(report.stats.unexpected, 0, label);
       assert.equal(report.stats.flaky, 0, label);
+      if (name === "composed-site" && build.APPLICATION_ENVIRONMENT === "staging") {
+        const results = report.suites.flatMap(suite => suite.specs)
+          .filter(spec => spec.title === warningJourney)
+          .flatMap(spec => spec.tests.flatMap(testCase => testCase.results));
+        assert.equal(results.length, 1, label);
+        assert.equal(results[0].status, "passed", label);
+        const images = results[0].attachments.filter(value => value.contentType === "image/png" || value.name === "incomplete-withdrawal");
+        assert.deepEqual(images.map(value => [value.name, value.contentType]), screenshotsOff ? [] : [["incomplete-withdrawal", "image/png"]], label);
+        if (!screenshotsOff) assert.equal(Buffer.from(images[0].body, "base64").subarray(0, 8).toString("hex"), "89504e470d0a1a0a", label);
+      }
       return { executed: report.stats.expected, skipped: report.stats.skipped, report: reportPath };
     }
     await run("install", ["install", "--frozen-lockfile", "--store-dir", support.store]);
@@ -1291,7 +1304,7 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       ]) {
         for (const command of ["check:environment:deployment", "build"]) {
           const result = await run(`${label}-${command.replaceAll(":", "-")}`, ["--dir", "apps/web", "run", command], { ...identifiersA, APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_ANALYTICS_ENABLED: "true", ...overrides }, false);
-          assert.match(result.stderr, pattern);
+          assert.match(result.stderr, label === "target-conflict" && command === "build" ? /APPLICATION_BUILD_INVALID:NEXT_PUBLIC_APPLICATION_ENVIRONMENT:mismatch/u : pattern);
           assert.doesNotMatch(result.stdout + result.stderr, /invalid-analytics-input-sentinel/u);
         }
       }
@@ -1302,7 +1315,7 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       assert.match(rejected.stderr, /ANALYTICS_CONFIGURATION_INVALID:NEXT_PUBLIC_GA4_MEASUREMENT_ID:invalid/u);
       assert.doesNotMatch(rejected.stdout + rejected.stderr, /invalid-local-input-sentinel/u);
       await rm(join(app, ".env.local")); // this test's own deliberately invalid input
-      const partial = { ...identifiersA, APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_ANALYTICS_ENABLED: "true", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3101" };
+      const partial = { ...identifiersA, APPLICATION_ENVIRONMENT: "development", NEXT_PUBLIC_ANALYTICS_ENABLED: "true", NEXT_PUBLIC_GA4_MEASUREMENT_ID: "", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "", NEXT_PUBLIC_CALENDLY_URL: "", NEXT_PUBLIC_SITE_URL: "http://127.0.0.1:3100" };
       await browser("development-missing-local-inputs", "dev", partial, partial);
     }
     const sourceHash = await sourceDigest();
@@ -1330,6 +1343,9 @@ for (const [name, profile, contact, booking, multilingual, searchOnly] of [
       assert.equal(browserBytes.includes(identifiersA.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION), false);
       if (target !== "production") assert.equal(browserBytes.includes(identifiersB.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION), false);
       const observed = await browser(`${label}-runtime-challenge`, "preview", build, runtime);
+      if (name === "composed-site" && target === "staging") {
+        await browser("staging-warning-screenshots-off", "preview", build, runtime, true);
+      }
       assert.deepEqual(await artifactDigest(), before);
       assert.equal(await sourceDigest(), sourceHash);
       artifacts.push({ name, profile, target, sourceHash, rawBuildFlag: flag, build, runtime, ...before, ...observed });
@@ -1426,8 +1442,8 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(removed.ok, true);
   assert.equal(removed.result.status, "verified-final-diff-approval-required");
   const removedState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
-  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.7.1");
-  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.7.1");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
   assert.equal(removedState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   assert.equal(removedState.lastSuccessfulVerification.checks.includes("binding-integration"), false);
   await commitFixture("removed-persistence", linked);
@@ -1438,7 +1454,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(added.result.status, "verified-final-diff-approval-required");
   const finalState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
   assert.deepEqual(finalState.appliedMigrations, ["remove-application-persistence-0-2-0", "add-application-persistence-0-2-0"]);
-  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.8.0"], ["deployment-cloudflare", "0.8.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
+  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.10.0"], ["deployment-cloudflare", "0.10.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
   assert.ok(finalState.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.deepEqual(await readFile(join(linked, ".egeria/project.yaml")), initialProject);
   assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), initialLock);
@@ -1456,7 +1472,7 @@ test("environment email generation and lifecycle preserve recipient isolation", 
   const supportRoot = join(owner, "support");
   await mkdir(supportRoot);
   const support = await prepareLiveSupport(supportRoot);
-  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), WRANGLER_SEND_METRICS: "false" };
+  const environment = { ...support.environment, ...await derivePnpmToolEnvironment("pnpm"), NEXT_PUBLIC_SITE_URL: "https://environment.example.test", BUILD_SOURCE_REVISION: "a".repeat(40), WRANGLER_SEND_METRICS: "false" };
   const digest = bytes => createHash("sha256").update(bytes).digest("hex");
   async function command(label, executable, arguments_, cwd = owner, additions = {}) {
     const startedAt = new Date().toISOString();
@@ -1485,7 +1501,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
     assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);
     assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);
     if (email || label.includes("remove")) assert.equal(versions["app-foundation"], "0.3.0");
-    assert.equal(versions["site-routing"], state.origin.profile === "portfolio" ? undefined : "0.4.0");
+    assert.equal(versions["site-routing"], state.origin.profile === "portfolio" ? undefined : "0.5.0");
     for (const operation of ["infer", "doctor"]) assert.equal((await cli(`${label}-${operation}`, [operation, "--directory", root])).ok, true);
     receipts.push({ label, root, versions, verification: state.lastSuccessfulVerification,
       projectSha256: digest(await readFile(join(root, ".egeria/project.yaml"))), lockSha256: digest(await readFile(join(root, "pnpm-lock.yaml"))) });
@@ -1656,3 +1672,27 @@ it("optional absence and invalid independent queue configuration cause no extern
   await command("independent-consumers", "pnpm", ["--dir", "apps/web", "run", "test:unit", "job-delivery.test.ts", "independent-email-jobs.test.ts"], workerProject);
   context.diagnostic(JSON.stringify({ owner, generationReceipts: receipts.length, builtTargets: artifactEvidence.length, transport: "intercepted-only", persistenceBindingChecks: "app generation and lifecycle receipts", jobsCandidateAdmitted: false }));
 });
+
+
+for (const [profile, selection] of [
+  ["portfolio", {}],
+  ["site", { multilingual: true, contactFormWeb3Forms: true, bookingCalendly: { mode: "popup" }, analytics: {
+    consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {},
+  } }],
+  ["app", { applicationPersistence: true, transactionalEmailResend: true }],
+]) {
+  test(`${profile} environment metadata and prepared artifacts retain identity across all targets`, { timeout: 90 * 60 * 1000 }, async context => {
+    const owner = await mkdtemp(join(tmpdir(), "egeria-environment-prepared-generation-"));
+    context.diagnostic(`Retained prepared target evidence: ${owner}`);
+    const result = assertSuccess(await generateProject({
+      request: { profile, projectName: `prepared-${profile}`, displayName: `Prepared ${profile}`, ...selection },
+      destination: join(owner, "project"), renderingContext: createApplicationEnvironmentRenderingContext(selection.applicationPersistence === true),
+      verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+    }));
+    const { verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
+    const verification = await verifyApplicationEnvironmentProject(result.destination);
+    assert.deepEqual(verification.targets.map(({ target }) => target), ["development", "staging", "production"]);
+    assert.equal(new Set(verification.targets.map(({ receiptSha256 }) => receiptSha256)).size, 3);
+    await writeFile(join(owner, "prepared-target-evidence.json"), JSON.stringify(verification, null, 2));
+  });
+}

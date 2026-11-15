@@ -1,5 +1,7 @@
 # Hosted contact form
 
+Follow [Application environments](environments.md) for the single origin, source build identity, prepared receipts, protected test transport and GitHub release setup. Service configuration below supplements those requirements.
+
 Selected contact uses `NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY` as a public build input. A missing or empty key in development leaves the home-page form unavailable, with localized copy and the existing contact links as fallback. There is no form, challenge or provider request in that state. Staging and production require a valid UUID; malformed nonempty values refuse every target. Diagnostics name the field and reason without printing its value.
 
 The key identifies the receiving form; it is not a secret. Never put private API credentials in a `NEXT_PUBLIC_` variable, source, `.egeria`, logs or examples. Public browser values are fixed at compilation: changing Worker runtime configuration cannot change a built destination. See [Next environment variables](https://nextjs.org/docs/app/guides/environment-variables) and the generated `docs/environments.md` guide.
@@ -40,10 +42,10 @@ Copy comes from `apps/web/content/en-CA/contact-form-web3forms.yaml` and, when m
 Replace the following placeholders with the appropriate public form UUID before execution. These commands validate and build locally; they do not deploy:
 
 ```sh
-APPLICATION_ENVIRONMENT=staging NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<nonproduction-form-uuid>' pnpm --dir apps/web run check:environment:deployment
-APPLICATION_ENVIRONMENT=staging NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<nonproduction-form-uuid>' pnpm --dir apps/web run build
-APPLICATION_ENVIRONMENT=production NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<production-form-uuid>' pnpm --dir apps/web run check:environment:deployment
-APPLICATION_ENVIRONMENT=production NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<production-form-uuid>' pnpm --dir apps/web run build
+APPLICATION_ENVIRONMENT=staging BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa NEXT_PUBLIC_SITE_URL=https://staging.example.test NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<nonproduction-form-uuid>' pnpm --dir apps/web run check:environment:deployment
+APPLICATION_ENVIRONMENT=staging BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa NEXT_PUBLIC_SITE_URL=https://staging.example.test NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<nonproduction-form-uuid>' pnpm --dir apps/web run build
+APPLICATION_ENVIRONMENT=production BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa NEXT_PUBLIC_SITE_URL=https://production.example.test NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<production-form-uuid>' pnpm --dir apps/web run check:environment:deployment
+APPLICATION_ENVIRONMENT=production BUILD_SOURCE_REVISION=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa NEXT_PUBLIC_SITE_URL=https://production.example.test NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY='<production-form-uuid>' pnpm --dir apps/web run build
 ```
 
 Build both targets separately from the same reviewed source. Runtime substitutions cannot retarget either artifact. A project without selected contact does not require this key. Target conflicts retain the common environment error priority; inspect the named field rather than dumping environment values.

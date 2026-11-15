@@ -1,0 +1,53 @@
+# Background job delivery
+
+The [common environment guide](environments.md) owns build origins, source identity, prepared artifacts and the protected release sequence.
+
+This optional capability generates one shared primary OpenNext Worker. Its ordinary HTTP handler remains intact; a separate Queue module handles jobs. It adds no application workflow, database, email/contact integration, scheduler or public endpoint. Current portfolio/site/app profiles can select it without changing profile or selecting persistence.
+
+## Using the contract
+
+Application code obtains `JobDispatcher` through Effect and the server composition layer. Supply a version-1 envelope with the intended environment, caller-created opaque UUID `operationId`, named job type/version and payload. A successful dispatch reports `accepted`, which means enqueue acceptance only. Store the operation identity before dispatch if your use case needs durable reconciliation. A cancelled, rejected or timed-out send can have been accepted; deliberate recovery must reuse the original operation identity and payload.
+
+Define real handlers in the application-owned `src/application/job-handlers.ts`. Each definition supplies a unique type/version, explicit payload allowlist, repeat-safety declaration and Effect handler. There is no default business handler. Prefer opaque record references to message bodies or personal data. Envelope JSON is limited to 16,384 UTF-8 bytes. Payloads allow at most 64 entries per object or array, 2,048 characters per string and nesting through depth five; object keys are bounded identifiers. The registry admits at most 32 unique type/version pairs, with type names up to 64 characters and versions from 1 to 65,535. Application validation must further restrict the concrete fields. Do not put secrets or unnecessary personal information in a payload.
+
+Handlers must tolerate duplicate and out-of-order delivery, including a timeout after their side effect and before acknowledgement. Use naturally idempotent operations, monotonic updates, or consumer-owned durable state for the actual business requirement. The declaration is an obligation to prove, not runtime deduplication. A process-local set, transport ID or acknowledgement is not durable exactly-once processing. A Queue transport ID changes on re-enqueue; `operationId` must not.
+
+## Failure and inspection
+
+The consumer has a ten-second attempt deadline. Expected retry failures and uncertain execution request native retry with bounded backoff. Configuration allows three retries after the first attempt; native exhaustion transfers the original envelope to the same environment's dead-letter Queue. Missing handler versions, invalid handler registration or thrown payload-validator errors request native retry so exhaustion preserves the original envelope for recovery after the consumer is repaired. Explicit terminal/cancelled handler outcomes and malformed input create bounded terminal records; invalid bodies are omitted. A terminal-record enqueue is acknowledged only after it succeeds. A failed or ambiguous terminal enqueue retries the original delivery and can duplicate a terminal record.
+
+Keep the dead-letter Queue unconsumed until an authorized operator handles it. Native exhaustion can retain an original malformed body if terminal quarantine itself repeatedly fails; apply the same restricted access and privacy policy to all queued work. Custom diagnostics contain only fixed outcome/error codes, never payloads, raw errors, identities or bodies. Source/configuration changes neither inspect nor delete remote data.
+
+`inspectTerminalJob` identifies a locally recoverable original envelope; `prepareJobRecovery` revalidates its exact schema, handler and environment and preserves the operation identity. They perform no provider I/O, authorization, dispatch, acknowledgement or drain. Before any later operator replay, reconcile whether the side effect already happened and obtain the required authorization. Repair the actual consumer cause first; replaying a poison job without a repair repeats failure. Restore missing handler versions or correct registration before recovering an accepted job. Invalid data requires human disposition and is never fabricated into another job.
+
+## Configuration and authority
+
+`wrangler.jsonc` declares separate local, staging and production queue names, producer/DLQ bindings and mandatory native dead-letter target. Queue names must be 1–63 characters, use letters/numbers/dashes and start and end with a letter or number. Generated names append up to 21 characters, so choose a project name of at most 42 characters when selecting jobs. `APPLICATION_ENVIRONMENT=development node scripts/check-job-delivery.mjs local` validates the repository map. This check cannot prove remote resource existence, account permissions or provider retention. The approved retention contract is the Workers Free maximum: **24 hours (86,400 seconds)** on both primary and dead-letter queues. Before a staging or production deployment, an operator must verify those exact resources and their retention, assign an inspection owner, and arrange inspection and authorized recovery before expiry. Set `JOB_RETENTION_REVIEWED=true` for the selected environment's preflight only after that review. The manual deployment workflow requires separate `staging_job_retention_reviewed` and `production_job_retention_reviewed` checkboxes, each defaulting to false and bound to the separately approved exact revision. This is an operator attestation, not automated provider readback, resource provisioning or deployment authorization.
+
+A provider Queue is bounded retention, not indefinite archival storage. Workers Free fixes retention at 24 hours; messages that expire are deleted by the provider. Do not assume that a DLQ transfer gives an additional 24-hour recovery window: inspect the provider's actual message age/expiry and act within the remaining time. No code here extends retention, archives expired messages or adds paid capacity. Source rollback does not recover expired work or reverse side effects. Never lower retention or discard queued data as part of source recovery.
+
+This internal jobs 0.3.0 candidate supports generation and verification only; its jobs lifecycle remains closed. Retained public jobs 0.1.0/0.2.0 keep their separately approved lifecycle and evidence safeguards. In-place jobs upgrades, profile transitions and unrelated operations on jobs-bearing repositories remain unsupported. This candidate contains no operator command, replay or drain tool; source selection is not permission for remote drain, purge or deletion. Preserve the worktree and queued resources during recovery.
+
+## Local evidence and limits
+
+Unit tests exercise the real application contracts and memory adapter. The memory adapter is explicitly local/test-only, limited to 100 pending or terminal entries, four attempts and non-durable; restart loses all its work. The existing whole-built-Worker command also executes synthetic Queue integration tests, including native retries/exhaustion, HTTP preservation and side-effect ambiguity. The test fixture has private synthetic endpoints and an observation DLQ consumer; neither is the production entry point or a retention implementation. Controlled local tests re-enqueue the pure recovery result through the real generated Worker and verify that the synthetic monotonic handler converges under the original operation identity. The observed terminal copy remains intact. This supplies no operator, remote replay, targeted deletion or provider purge evidence.
+
+The pinned topology proof observed redelivery of an explicitly acknowledged message when a later batch message throws. Its characterization remains negative evidence against parity with Cloudflare's documented guarantee. Repeat-safe handlers are required regardless of that discrepancy. Local tests establish exercised local behavior, not deployed delivery, throughput, crash durability, permissions, exactly-once processing or capability certification.
+
+## Provider references
+
+- [Queue JavaScript API](https://developers.cloudflare.com/queues/configuration/javascript-apis/) and [native batching/retries](https://developers.cloudflare.com/queues/configuration/batching-retries/).
+- [Dead-letter Queues](https://developers.cloudflare.com/queues/configuration/dead-letter-queues/) and [retention limits](https://developers.cloudflare.com/queues/platform/limits/).
+- [OpenNext custom Worker composition](https://opennext.js.org/cloudflare/howtos/custom-worker).
+- [Non-leasing peek](https://developers.cloudflare.com/api/resources/queues/subresources/messages/methods/peek/), [JSON message push](https://developers.cloudflare.com/api/resources/queues/subresources/messages/methods/push/), [targeted reference purge](https://developers.cloudflare.com/api/resources/queues/subresources/messages/methods/purge/), [queue details](https://developers.cloudflare.com/api/resources/queues/methods/get/) and [approximate backlog metrics](https://developers.cloudflare.com/api/resources/queues/methods/get_metrics/).
+- [Pinned Node module hooks and type stripping](https://nodejs.org/download/release/v22.23.2/docs/api/module.html).
+
+Provider documentation describes production contracts; the local acknowledgement characterization above remains contrary evidence for the tested emulator.
+
+## Common target and prepared queue identity
+
+`APPLICATION_ENVIRONMENT` and the compiled build target must agree before dispatch or consumption. Development maps only to `JOB_ENVIRONMENT=local`; staging and production retain their names. The queue wrapper reads the copied build identity through its Text module and passes that target explicitly. A target mismatch fails before send, acknowledgement or handler effects. Correct the target and rebuild in a new local checkout; never relabel an existing artifact.
+
+Generate each target's native Wrangler dry-run bundle and metadata before recording its artifact, as shown in the common guide. The receipt covers bundler inputs and every emitted module. Actual local Wrangler verification is required; static source checks do not establish the pinned Text import or output layout. Jobs selection is independent of persistence and email. Internal candidate jobs lifecycle remains closed; this does not change retained public lifecycle support.
+
+Release requires separate staging and production retention attestations after reviewing their actual queue resources. These attestations do not provision queues or authorize replay, drain, migration or other provider actions. Source rollback cannot undo accepted or delivered messages; retain recovery evidence and reconcile those effects separately.

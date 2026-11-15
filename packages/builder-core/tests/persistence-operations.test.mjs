@@ -224,19 +224,26 @@ for (const [workflowPath, mode, environment, operation, applicationEnvironments 
   ["deployment-cloudflare/application-persistence/.github/workflows/deploy.yml.template", "remote-deploy", "production", "opennextjs-cloudflare"],
   ["application-persistence/.github/workflows/migrate-application-database.yml.template", "remote-migrate", "staging", "wrangler"],
   ["deployment-cloudflare/application-persistence/application-environments/.github/workflows/deploy.yml.template", "remote-deploy", "production", "opennextjs-cloudflare", true],
+  ["deployment-cloudflare/application-persistence/application-environments/.github/workflows/deploy.yml.template", "remote-deploy", "staging", "opennextjs-cloudflare", true],
   ["application-persistence/application-environments/.github/workflows/migrate-application-database.yml.template", "remote-migrate", "staging", "wrangler", true],
 ]) {
-  test(`${applicationEnvironments ? "environment persistence " : ""}${mode} workflow refuses invalid target before reaching its provider command`, async (context) => {
+  test(`${applicationEnvironments ? "environment persistence " : ""}${mode} ${environment} workflow refuses invalid target before reaching its provider command`, async (context) => {
     const subject = await fixture(context, applicationEnvironments);
     const workflow = parse((await readFile(new URL(workflowPath, templateRoot), "utf8")).replaceAll(/{{[A-Za-z0-9]+}}/g, "expression"));
     assert.deepEqual(workflow.permissions, { contents: "read" });
     assert.equal(workflow.concurrency["cancel-in-progress"], false);
-    const job = Object.values(workflow.jobs)[0];
+    const job = applicationEnvironments && mode === "remote-deploy" ? workflow.jobs[environment] : Object.values(workflow.jobs)[0];
+    if (applicationEnvironments && mode === "remote-deploy") {
+      assert.equal(job.environment.name, environment);
+      assert.equal(job.env.APPLICATION_ENVIRONMENT, environment);
+      assert.equal(workflow.jobs["verify-source"].steps.some(step => "CLOUDFLARE_API_TOKEN" in (step.env ?? {})), false);
+    }
     const credentialSteps = job.steps.filter((step) => "CLOUDFLARE_API_TOKEN" in (step.env ?? {}));
     assert.equal(credentialSteps.length, 1);
     assert.deepEqual(Object.keys(credentialSteps[0].env).sort(), ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN"]);
     const providerStep = credentialSteps[0];
-    assert(job.steps.slice(0, job.steps.indexOf(providerStep)).some((step) => step.run === `node scripts/check-application-database.mjs ${mode}`));
+    const stripTypes = applicationEnvironments && mode === "remote-deploy" ? " --experimental-strip-types" : "";
+    assert(job.steps.slice(0, job.steps.indexOf(providerStep)).some((step) => step.run === `node${stripTypes} scripts/check-application-database.mjs ${mode}`));
     await mkdir(path.join(subject.web, "migrations"));
     await writeFile(path.join(subject.web, "migrations/0000_example.sql"), "SELECT 1;\n");
     commitFixture(subject);

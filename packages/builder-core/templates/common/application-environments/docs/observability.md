@@ -1,5 +1,7 @@
 # Observability and browser diagnostics
 
+The [common environment guide](environments.md) owns build origins, source identity, prepared artifacts and the protected release sequence.
+
 The application records bounded operational events in Workers Logs without a Better Stack account. Optional Better Stack delivery adds restricted error diagnostics. Analytics remains a separate capability with its own consent and provider configuration.
 
 Follow [application environments][environment-guide] for build targets, ignored private inputs and runtime target agreement. Build and runtime `APPLICATION_ENVIRONMENT` must match before reporting. Each accepted server, browser and independent transactional-email event carries that authoritative environment label.

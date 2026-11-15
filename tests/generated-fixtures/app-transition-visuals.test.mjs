@@ -339,8 +339,8 @@ test("visual capture stabilizes and saves before screenshot comparison and prese
   }
 });
 
-for (const preparation of ["synthetic", "current"])
-test(`${preparation} visual targets use exact production files, run non-update captures twice, and preserve process receipts`, async (t) => {
+for (const [preparation, mode] of [["synthetic", "candidates"], ["current", "candidates"], ["synthetic", "compare"]])
+test(`${preparation} visual ${mode} preserve captures and receipts without retaining traces`, async (t) => {
   const h = await harness(t);
   const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url), "utf8");
   const artifactDirectory = join(h.root, "artifacts");
@@ -348,7 +348,7 @@ test(`${preparation} visual targets use exact production files, run non-update c
   const commands = [];
   let ownedProject;
   const repositoryRoot = preparation !== "synthetic" ? fileURLToPath(new URL("../", producer)) : h.root;
-  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode: "candidates", baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.7" }, {
+  const result = await h.module.executeAppTransitionVisualCase({ subset: [], mode, baselines: {}, repositoryRoot, artifactDirectory, recipeVersion: "0.2.7" }, {
     ...(preparation === "synthetic" ? { prepareProject: async () => ({ request: {}, sourceProject: {}, targetProject: {}, files: [
       { path: "apps/web/tests/visual/home-visual.spec.ts", content: Buffer.from(spec) },
       ...Object.entries(h.images).map(([viewport, content]) => ({ path: `apps/web/tests/visual/home-visual.spec.ts-snapshots/home-${viewport}-chromium-linux.png`, content })),
@@ -367,8 +367,14 @@ test(`${preparation} visual targets use exact production files, run non-update c
           const path = join(input.cwd, "apps/web/test-results", viewport, `${viewport}-captured.png`);
           await mkdir(dirname(path), { recursive: true });
           await writeFile(path, content);
+          await writeFile(join(dirname(path), "trace.zip"), Buffer.alloc(8 * 1024 * 1024 + 1));
         }
-        await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify({ suites: [{ specs: ["desktop", "mobile"].map(() => ({ tests: [{ results: [{ status: "passed" }] }] })) }] }));
+        const expectedMismatch = mode === "candidates" && commands.filter(({ arguments: args }) => args.includes("test:visual")).length === 1;
+        const result = expectedMismatch
+          ? { status: "failed", errors: [{ message: "toHaveScreenshot expected candidate mismatch" }] }
+          : { status: "passed" };
+        await writeFile(input.environment.PLAYWRIGHT_JSON_OUTPUT_FILE, JSON.stringify({ suites: [{ specs: ["desktop", "mobile"].map(() => ({ tests: [{ results: [result] }] })) }] }));
+        return { exitCode: expectedMismatch ? 1 : 0, stdout: "synthetic visual adapter", stderr: "" };
       }
       return { exitCode: 0, stdout: "synthetic adapter", stderr: "" };
     },
@@ -381,13 +387,24 @@ test(`${preparation} visual targets use exact production files, run non-update c
     assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
-  assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, 2);
+  const passes = mode === "candidates" ? ["candidate", "reproduction"] : ["comparison"];
+  assert.equal(commands.filter(({ arguments: args }) => args.includes("test:visual")).length, passes.length);
   assert.equal(commands.some(({ arguments: args }) => args.some(value => value.includes("update-snapshots"))), false);
   assert.equal(commands.every(({ environment }) => environment.NPM_CONFIG_REGISTRY === "https://registry.npmjs.org/" && !environment.GITHUB_TOKEN), true);
   assert.deepEqual(result.images.desktop, h.images.desktop);
   await assert.rejects(access(ownedProject), { code: "ENOENT" });
-  await access(join(artifactDirectory, "candidate/report.json"));
-  await access(join(artifactDirectory, "reproduction/report.json"));
+  for (const pass of passes) {
+    await access(join(artifactDirectory, pass, "report.json"));
+    await access(join(artifactDirectory, pass, "process.log"));
+    const check = result.checks.find(({ name }) => name === pass);
+    assert.equal(check.exitCode, pass === "candidate" ? 1 : 0);
+    assert.equal(check.artifacts.some(({ path }) => path.endsWith("/trace.zip")), false);
+    for (const [viewport, content] of Object.entries(h.images)) {
+      const directory = join(artifactDirectory, pass, "apps/web/test-results", viewport);
+      assert.deepEqual(await readFile(join(directory, `${viewport}-captured.png`)), content);
+      await assert.rejects(access(join(directory, "trace.zip")), { code: "ENOENT" });
+    }
+  }
 });
 
 test("visual prerequisites retain raw and threshold audit results and reject incoherent dispositions", async t => {
@@ -850,4 +867,153 @@ test("comparison baseline export refuses replacement of its captured artifact ro
   assert.deepEqual(await readdir(replacement), [], "a replacement run must receive no baseline directory, files or failure artifacts");
   assert.deepEqual(h.calls, []);
   await assert.rejects(access(join(replacement, "comparison-manifest.json")), { code: "ENOENT" });
+});
+
+for (const scenario of ["retained trace", "oversized trace", "combined trace limit", "symlinked trace"])
+test(`preview diagnostics preserve the initiating failure with ${scenario}`, async t => {
+  const h = await harness(t);
+  const artifactDirectory = join(h.root, "preview-artifacts");
+  await mkdir(artifactDirectory);
+  const spec = await readFile(new URL("../../packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts", import.meta.url));
+  const trace = Buffer.from("synthetic opaque Playwright trace bytes");
+  const tracePath = "apps/web/test-results/first-failure/trace.zip";
+  let ownedProject;
+  let previewCalls = 0;
+  const retentionRefused = scenario !== "retained trace";
+  await assert.rejects(h.module.executeAppTransitionVisualCase({
+    subset: ["analytics"], mode: "compare", baselines: {}, repositoryRoot: h.root, artifactDirectory,
+  }, {
+    filesystem: { ...filesystem, mkdtemp: () => mkdtemp(join(h.root, "preview-project-")) },
+    prepareProject: async () => ({ files: [{ path: "apps/web/tests/visual/home-visual.spec.ts", content: spec }], influencingFingerprints: [] }),
+    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+    inspectBuild: async () => ({ synthetic: true }),
+    inspectBrowser: async () => assert.fail("failed preview must prevent screenshot comparison"),
+    runCommand: async input => {
+      ownedProject = input.cwd;
+      const preview = input.arguments.includes("test:e2e:preview");
+      assert.equal(input.environment.DEBUG, preview ? "pw:webserver" : undefined);
+      assert.equal(Object.hasOwn(input.environment, "GITHUB_TOKEN"), false);
+      if (!preview) return { exitCode: 0, stdout: "synthetic prerequisite", stderr: "" };
+      previewCalls++;
+      const target = join(input.cwd, tracePath);
+      await mkdir(dirname(target), { recursive: true });
+      await writeFile(join(dirname(target), "unrelated.zip"), "must not be retained");
+      if (scenario === "symlinked trace") {
+        const outside = join(h.root, "outside-trace.zip");
+        await writeFile(outside, trace);
+        await filesystem.symlink(outside, target);
+      } else if (scenario === "oversized trace") {
+        await writeFile(target, Buffer.alloc(16 * 1024 * 1024 + 1));
+      } else if (scenario === "combined trace limit") {
+        await writeFile(target, Buffer.alloc(8 * 1024 * 1024 + 1));
+        const second = join(input.cwd, "apps/web/test-results/second-failure/trace.zip");
+        await mkdir(dirname(second), { recursive: true });
+        await writeFile(second, Buffer.alloc(8 * 1024 * 1024 + 1));
+      } else await writeFile(target, trace);
+      return { exitCode: 1, stdout: "preview stdout marker", stderr: "workerd stderr marker" };
+    },
+  }), error => {
+    assert.equal(error.message, "VISUAL_PROJECT_CHECK_FAILED");
+    assert.equal(error.failureRecordUnavailable, retentionRefused ? true : undefined);
+    return true;
+  });
+  assert.equal(previewCalls, 1);
+  assert.equal(await readFile(join(artifactDirectory, "browser-preview.log"), "utf8"), "preview stdout marker\nworkerd stderr marker");
+  await assert.rejects(access(ownedProject), { code: "ENOENT" });
+  const failureRoot = join(artifactDirectory, "failure");
+  await assert.rejects(access(join(failureRoot, "apps/web/test-results/first-failure/unrelated.zip")), { code: "ENOENT" });
+  if (!retentionRefused) {
+    assert.deepEqual(await readFile(join(failureRoot, tracePath)), trace);
+    const failure = JSON.parse(await readFile(join(failureRoot, "failure.json")));
+    assert.equal(failure.code, "VISUAL_PROJECT_CHECK_FAILED");
+    assert.deepEqual(failure.checks.at(-1), { name: "browser-preview", exitCode: 1 });
+    assert.deepEqual(failure.artifacts, [{ path: tracePath, sha256: createHash("sha256").update(trace).digest("hex") }]);
+  } else {
+    await assert.rejects(access(join(failureRoot, "failure.json")), { code: "ENOENT" });
+    const refusedPath = scenario === "combined trace limit"
+      ? "apps/web/test-results/second-failure/trace.zip" : tracePath;
+    await assert.rejects(access(join(failureRoot, refusedPath)), { code: "ENOENT" });
+    if (scenario === "combined trace limit") assert.equal((await filesystem.stat(join(failureRoot, tracePath))).size, 8 * 1024 * 1024 + 1);
+    if (scenario === "symlinked trace") assert.deepEqual(await readFile(join(h.root, "outside-trace.zip")), trace);
+  }
+});
+
+test("producer failure records expose incomplete artifact retention", async t => {
+  for (const unavailable of [undefined, false, true]) {
+    const h = await harness(t);
+    const failure = Object.assign(new Error("VISUAL_PROJECT_CHECK_FAILED"), { failureRecordUnavailable: unavailable });
+    await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "candidates" }, {
+      ...h.adapters,
+      executeCase: async () => { throw failure; },
+    }), error => error === failure);
+    const directory = join(h.root, "generated-visual-artifacts/app-transitions");
+    const runs = await readdir(directory);
+    assert.equal(runs.length, 1);
+    assert.deepEqual(JSON.parse(await readFile(join(directory, runs[0], "failure.json"))), {
+      code: "VISUAL_PROJECT_CHECK_FAILED", sourceUnchanged: true, cases: [],
+      ...(unavailable ? { failureRecordUnavailable: true } : {}),
+    });
+  }
+});
+
+for (const stage of ["open", "write"]) {
+  for (const sourceChanged of [false, true]) {
+    test(`producer failure record ${stage} errors preserve ${sourceChanged ? "source-change priority" : "the initiating error"}`, async t => {
+      const h = await harness(t);
+      const failure = new Error("VISUAL_PROJECT_CHECK_FAILED");
+      const writeFailure = new Error("synthetic failure-record write error");
+      let snapshots = 0;
+      let recordAttempts = 0;
+      await assert.rejects(h.module.verifyAppTransitionVisuals({ mode: "candidates" }, {
+        ...h.adapters,
+        snapshotSource: async () => ({ revision: sourceChanged && snapshots++ > 0 ? "changed" : "original" }),
+        executeCase: async () => { throw failure; },
+        filesystem: { ...filesystem, open: async (path, ...arguments_) => {
+          if (!String(path).endsWith("/failure.json")) return filesystem.open(path, ...arguments_);
+          recordAttempts++;
+          if (stage === "open") throw writeFailure;
+          const handle = await filesystem.open(path, ...arguments_);
+          return { writeFile: async () => { throw writeFailure; }, close: () => handle.close() };
+        } },
+      }), error => {
+        if (sourceChanged) {
+          assert.equal(error.message, "VISUAL_SOURCE_CHANGED");
+          assert.equal(error.cause, failure);
+        } else assert.equal(error, failure);
+        assert.equal(error.failureRecordUnavailable, true);
+        return true;
+      });
+      assert.equal(failure.failureRecordUnavailable, true);
+      assert.equal(recordAttempts, 1);
+      const directory = join(h.root, "generated-visual-artifacts/app-transitions");
+      const [run] = await readdir(directory);
+      await assert.rejects(access(join(directory, run, "candidate-manifest.json")), { code: "ENOENT" });
+    });
+  }
+}
+
+test("CLI failure serialization exposes incomplete artifact retention", async () => {
+  for (const [index, unavailable] of [undefined, false, true].entries()) {
+    const failure = Object.assign(new Error("VISUAL_PROJECT_CHECK_FAILED"), {
+      failureRecordUnavailable: unavailable, writtenPaths: ["retained-evidence.json"],
+    });
+    const original = { argv: process.argv, stderrWrite: process.stderr.write, exitCode: process.exitCode };
+    let stderr = "";
+    try {
+      process.argv = [process.execPath, fileURLToPath(producer)];
+      // Exercise the actual CLI catch without starting verification prerequisites.
+      process.argv.slice = () => { throw failure; };
+      process.stderr.write = value => { stderr += String(value); return true; };
+      await import(new URL(`?failure-retention-serialization=${index}`, producer).href);
+      assert.equal(process.exitCode, 1);
+    } finally {
+      process.argv = original.argv;
+      process.stderr.write = original.stderrWrite;
+      process.exitCode = original.exitCode;
+    }
+    assert.deepEqual(JSON.parse(stderr), {
+      ok: false, code: "VISUAL_PROJECT_CHECK_FAILED", writtenPaths: ["retained-evidence.json"],
+      ...(unavailable ? { failureRecordUnavailable: true } : {}),
+    });
+  }
 });

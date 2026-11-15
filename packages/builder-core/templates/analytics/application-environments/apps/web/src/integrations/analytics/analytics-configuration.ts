@@ -1,3 +1,4 @@
+import { resolveSiteOrigin } from "../../configuration/site-origin.ts";
 import {
   readCompiledApplicationEnvironment,
   type ApplicationEnvironment,
@@ -85,20 +86,9 @@ export function resolveAnalyticsConfiguration(
       if (activeRelease) return { ok: false, issue: { field, reason: "missing" } };
       missingFields.push(field);
     } else {
-      try {
-        if (typeof value !== "string" || value.trim() !== value || value.includes("?") || value.includes("#")) {
-          return { ok: false, issue: { field, reason: "invalid" } };
-        }
-        const url = new URL(value);
-        const loopback = url.hostname === "localhost" || url.hostname === "127.0.0.1" || url.hostname === "[::1]";
-        if (url.username !== "" || url.password !== "" || url.pathname !== "/" ||
-          (url.protocol !== "https:" && !(target === "development" && loopback && url.protocol === "http:"))) {
-          return { ok: false, issue: { field, reason: "invalid" } };
-        }
-        siteOrigin = url.origin;
-      } catch {
-        return { ok: false, issue: { field, reason: "invalid" } };
-      }
+      const origin = resolveSiteOrigin({ target, value });
+      if (!origin.ok) return origin;
+      siteOrigin = origin.value;
     }
   }
   return { ok: true, configuration: {
