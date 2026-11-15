@@ -1,0 +1,34 @@
+import type { ApplicationEnvironment } from "../../configuration/application-environment.ts";
+
+export type CalendlyBookingSettings = Readonly<{
+  destination: string | undefined;
+  mode: "link" | "inline" | "popup";
+}>;
+export type BookingDestinationResult =
+  | Readonly<{ ok: true; destination: string | undefined }>
+  | Readonly<{ ok: false; issue: Readonly<{
+      field: "NEXT_PUBLIC_CALENDLY_URL";
+      reason: "missing" | "invalid";
+    }> }>;
+
+export function resolveBookingDestination(value: unknown, target: ApplicationEnvironment): BookingDestinationResult {
+  const missing = value === undefined || value === "";
+  if (missing && target === "development") return { ok: true, destination: undefined };
+  if (missing) return { ok: false, issue: { field: "NEXT_PUBLIC_CALENDLY_URL", reason: "missing" } };
+  const invalid = { ok: false, issue: { field: "NEXT_PUBLIC_CALENDLY_URL", reason: "invalid" } } as const;
+  if (typeof value !== "string" || value.length > 2048 || !/^https:\/\/(?:www\.)?calendly\.com(?::443)?\/[^\s/?#][^\s?#]*$/u.test(value)) return invalid;
+  try {
+    const destination = new URL(value);
+    if (destination.protocol !== "https:" || !["calendly.com", "www.calendly.com"].includes(destination.hostname) ||
+      destination.port !== "" || destination.pathname === "/" || destination.username !== "" || destination.password !== "" ||
+      destination.search !== "" || destination.hash !== "") return invalid;
+  } catch {
+    return invalid;
+  }
+  return { ok: true, destination: value };
+}
+
+export const bookingCalendlySettings: CalendlyBookingSettings = {
+  destination: process.env.NEXT_PUBLIC_CALENDLY_URL || undefined,
+  mode: {{calendlyModeJson}},
+};

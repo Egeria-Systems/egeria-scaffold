@@ -51,3 +51,5 @@ The examples contain configuration names only for selected capabilities. Better 
 Use appropriate shared nonproduction provider resources within one project; keep production resources separate. Local persistent state stays simulated. Provider rules or actual security and test-interference boundaries can require finer separation. Analytics collection stays off by default and requires explicit activation plus visitor consent. Common target declarations alone do not prove resource isolation, Access protection, workflow approval or provider behavior.
 
 Correct invalid local configuration and rebuild when build inputs changed. Revert source separately from runtime configuration, provider changes or persistent data. Do not reset a database, drain queues or delete reusable resources to repair a source or target mismatch.
+
+If booking is selected, see the generated `docs/booking-calendly.md` guide for isolated calendars, its fixed public build input, modes and safe recovery.
