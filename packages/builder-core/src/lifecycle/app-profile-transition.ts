@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { stringify } from "yaml";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { GeneratedFile, RenderedSkeleton } from "../generation/render-skeleton.js";
@@ -58,7 +59,7 @@ export const appTransitionVisualAnalyticsSettings = Object.freeze({
   providers: { cloudflareWebAnalytics: { siteToken: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" } },
   operationalIntegrations: {},
 });
-// These fixed inputs and expected image identities require review together.
+// Historical visual provenance only; these retired inputs confer no current admission.
 // The producer must regenerate and obtain approval before promoting images.
 // Template/configuration/dependency changes require renewed visual evidence;
 // recomputing a canonical render cannot silently approve new inputs.
@@ -101,48 +102,82 @@ export const vitestFiveAppTransitionVisualInputRecord = Object.freeze({
     "analytics+booking-calendly+multilingual": "sha256:3baacdc7a131838d5a5a3431e71beb7788550500c852002864e2e60f89da90a2",
   }),
 });
+// Fixed literal-root candidate only. Exact-manifest visual review is still
+// required; this candidate is deliberately excluded from admitted records.
+export const literalLintAppTransitionVisualInputCandidate = Object.freeze({
+  targetLockfileFingerprint: "sha256:34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6",
+  baselines: appTransitionVisualInputRecord.baselines,
+  subsets: Object.freeze({
+    "none": "sha256:3a2979a5a0c1ebce2def160497fb16e56689240c05a87c6e8845c3205c6764cb",
+    "analytics": "sha256:c388c978c756309e2a6c2313505b50736b384f92112dcb5bcf7d93ecec5f446c",
+    "booking-calendly": "sha256:70f07ab1f3f482462c174423cbcf52547b887c7c9e30d20bf1520a11f190dc86",
+    "analytics+booking-calendly": "sha256:abb2ad7f31d7726b2d424792cd99ded5301188f13302e57d5f4d964ae1cd6075",
+    "multilingual": "sha256:32d777c649e67ddf3fb1e639be6ec224f5829ba18b7ff1103da058edbd4dec77",
+    "analytics+multilingual": "sha256:b09fa78d1f49b5c9269193c18c48b9858e3bcb8a41b1e7d65857a8aa2bd44fd3",
+    "booking-calendly+multilingual": "sha256:1d849f7e9a843d4ebf01eee9814e2cf280660abf30aec04278730774d4b6d234",
+    "analytics+booking-calendly+multilingual": "sha256:743f8334dd26261a81ed31c6fb2d9f07af359f9f7258d0f926aa7c4ba6a89f24",
+  }),
+});
+// Fixed Vite security candidate only; separate exact-manifest human review
+// is required before these inputs may enter the admitted record array.
+export const viteSecurityAppTransitionVisualInputCandidate = Object.freeze({
+  targetLockfileFingerprint: "sha256:6b119f067ef4647b1e9147899ef10e7df91b2eb2d25aeba78de85d5522f6b0c6",
+  baselines: appTransitionVisualInputRecord.baselines,
+  subsets: Object.freeze({
+    none: "sha256:a7252bf88c3630bc041ef8f24c3a991bca762ca415d48ddd6df61a631a04faac",
+    "booking-calendly": "sha256:96a32a8fd7fa0fc44745b5891ce57ef5efc34a1fd8485b72d326f03449e60294",
+    multilingual: "sha256:03cf3dc4bd784de07c3f21a81977944744baf6756d3a7283aa3563fb37d1d85a",
+    "booking-calendly+multilingual": "sha256:8f2ba5eef94570d02054e5983b442ede23ae6bee4465bb5dacb8d021ef62deeb",
+    analytics: "sha256:be86927b9d6ee2df47b7504dd848648912562ff4a28cbdd5898dd45310ed57e7",
+    "analytics+booking-calendly": "sha256:729a87959cb4ddbf44ca2b450f31a52bef16dfe5af96c6060b4c7553c347d9a9",
+    "analytics+multilingual": "sha256:66ab3ce5dcfc84bfbbbe1cc79b1926f6a2390c026efb81bdb8566ead727d669d",
+    "analytics+booking-calendly+multilingual": "sha256:5156b57ac0088c5c703a3163160281894a8442508aadda4b1ffcc5bb5e6fcbd7",
+  }),
+});
 export function verifyAppTransitionVisualInputRecord(input: Readonly<{
   optionalCapabilities: readonly string[];
   influencingFingerprints: readonly AppTransitionPathFingerprint[];
   targetLockfileFingerprint: `sha256:${string}`;
   baselines?: readonly GeneratedFile[];
 }>): AppTransitionResult<Readonly<{ fingerprint: `sha256:${string}` }>> {
-  const record = input.targetLockfileFingerprint === appTransitionVisualInputRecord.targetLockfileFingerprint
-    ? appTransitionVisualInputRecord
-    : input.targetLockfileFingerprint === vitestFiveAppTransitionVisualInputRecord.targetLockfileFingerprint
-      ? vitestFiveAppTransitionVisualInputRecord
-      : undefined;
-  if (record === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-  const optionalCapabilities = [...input.optionalCapabilities].sort(compareText);
-  const key = optionalCapabilities.join("+") || "none";
-  const fingerprint = fingerprintJsonValue(input.influencingFingerprints);
-  if (new Set(optionalCapabilities).size !== optionalCapabilities.length ||
-      !Object.hasOwn(record.subsets, key) ||
-      Reflect.get(record.subsets, key) !== fingerprint ||
-      input.targetLockfileFingerprint !== record.targetLockfileFingerprint) {
-    return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-  }
-  const expectedBaselines = record.baselines[optionalCapabilities.includes("multilingual") ? "multilingual" : "monolingual"];
-  if (input.baselines !== undefined) {
-    const baselines = input.baselines;
-    if (baselines.length !== appTransitionBaselinePaths.length ||
-        appTransitionBaselinePaths.some((path, index) => {
-          const matching = baselines.filter(file => file.path === path);
-          const baseline = matching[0];
-          return matching.length !== 1 || baseline === undefined || fingerprintFileContent(baseline.content) !== expectedBaselines[index];
-        })) {
-      return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-    }
-  }
-  return {ok:true,value:{fingerprint:fingerprintJsonValue({optionalCapabilities,influencingFingerprint:fingerprint,targetLockfileFingerprint:input.targetLockfileFingerprint,expectedBaselines})}};
+  const influencingFingerprint = fingerprintJsonValue(input.influencingFingerprints);
+  const identity = visualAdmission.verifyAppTransitionVisualInputIdentity({
+    optionalCapabilities: input.optionalCapabilities,
+    influencingFingerprint,
+    targetLockfileFingerprint: input.targetLockfileFingerprint,
+    ...(input.baselines === undefined ? {} : { baselineFingerprints: input.baselines.map(file => ({
+      path: file.path, fingerprint: fingerprintFileContent(file.content),
+    })) }),
+  });
+  if (identity === undefined) return appTransitionFailure("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+  return { ok: true, value: { fingerprint: fingerprintJsonValue({
+    optionalCapabilities: identity.optionalCapabilities,
+    influencingFingerprint,
+    targetLockfileFingerprint: input.targetLockfileFingerprint,
+    expectedBaselines: identity.expectedBaselines,
+  }) } };
 }
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const maximumContentBytes = 1024 * 1024;
-export const appTransitionBaselinePaths = [
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-  "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-] as const;
+type VisualAdmission = Readonly<{
+  baselinePaths: readonly [string, string];
+  verifyAppTransitionVisualInputIdentity: (input: Readonly<{
+    optionalCapabilities: readonly string[];
+    influencingFingerprint: `sha256:${string}`;
+    targetLockfileFingerprint: `sha256:${string}`;
+    baselineFingerprints?: readonly AppTransitionPathFingerprint[];
+  }>) => Readonly<{ optionalCapabilities: readonly string[]; expectedBaselines: readonly string[] }> | undefined;
+}>;
+const visualAdmissionModule: unknown = createRequire(new URL("../../package.json", import.meta.url))("./src/lifecycle/app-transition-visual-admission.cjs");
+if (visualAdmissionModule === null || typeof visualAdmissionModule !== "object" ||
+    !("baselinePaths" in visualAdmissionModule) || !Array.isArray(visualAdmissionModule.baselinePaths) ||
+    visualAdmissionModule.baselinePaths.length !== 2 || visualAdmissionModule.baselinePaths.some(path => typeof path !== "string") ||
+    !("verifyAppTransitionVisualInputIdentity" in visualAdmissionModule) || typeof visualAdmissionModule.verifyAppTransitionVisualInputIdentity !== "function") {
+  throw new Error("PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+}
+const visualAdmission = visualAdmissionModule as VisualAdmission;
+export const appTransitionBaselinePaths = visualAdmission.baselinePaths;
 export function appTransitionFailure(code: AppTransitionFailureCode): AppTransitionResult<never> {
   return { ok: false, issues: [{
         code, path: [], context: { reason: "precondition-refused" }

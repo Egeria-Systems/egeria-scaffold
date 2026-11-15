@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import * as core from "../dist/index.js";
-import { retainedRenderingContext } from "./retained-generation.mjs";
+const retainedRenderingContext = { catalogSnapshot: { standards: "0.4.0", siteRouting: "0.4.0", appFoundation: "0.1.0" }, profiles: [] };
 
 const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
 const packageVersions = { standards: "0.1.0", observability: "0.3.0" };
@@ -54,5 +54,5 @@ test("absent contact selection preserves the existing portfolio source", async (
   assert.equal(result.ok, true);
   assert.equal(result.value.files.some(f => f.path.includes("web3forms")), false);
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
-    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio/${path}`, import.meta.url)));
+    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.11.7/${path}`, import.meta.url)));
 });

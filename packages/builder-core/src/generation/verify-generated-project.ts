@@ -93,7 +93,7 @@ const execFileAsync = promisify(execFile);
 const maximumOutputBytes = 1024 * 1024;
 const versionTimeoutMilliseconds = 30 * 1000;
 const commandTimeoutMilliseconds = 15 * 60 * 1000;
-const requiredPnpmVersion = "11.20.0";
+const requiredPnpmVersion = "11.28.1";
 const publicRegistry = "https://registry.npmjs.org/";
 const exclusiveFileOperations: ExclusiveFileOperations = {
   open,
@@ -138,6 +138,7 @@ function createChildEnvironment(
     ...toolEnvironment,
     CI: "true",
     NEXT_TELEMETRY_DISABLED: "1",
+    WRANGLER_SEND_METRICS: "false",
     HOME: support.home,
     USERPROFILE: support.home,
     TMPDIR: support.temporary,

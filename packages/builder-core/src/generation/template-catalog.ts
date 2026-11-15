@@ -1,3 +1,4 @@
+import { applicationEnvironmentRecipeVersions, publicRecipeVersions } from "../contracts/profile.js";
 import { backgroundJobFiles, backgroundJobOperationFiles } from "../catalog/capability-catalog.js";
 import type { ContractIssue, ValidationResult } from "../contracts/result.js";
 import type { ProfileIdentifier } from "../contracts/profile.js";
@@ -104,25 +105,6 @@ const portfolioTemplateSources: readonly TemplateSource[] = [
   {
     source:
       "portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
-    contentKind: "binary",
-  },
-];
-
-const legacySiteTemplateSources: readonly TemplateSource[] = [
-  ...textTemplateSources([
-    "site/apps/web/content/en-CA/site.yaml.template",
-    "site/apps/web/content/en-CA/about.yaml.template",
-    "site/apps/web/content/en-CA/long-form/introduction.md.template",
-    "site/apps/web/app/about/page.tsx",
-  ] as const),
-  {
-    source:
-      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
-    contentKind: "binary",
-  },
-  {
-    source:
-      "site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
     contentKind: "binary",
   },
 ];
@@ -349,7 +331,7 @@ function remapSourceIssue(
 export function createTemplateCatalog(
   profile: ProfileIdentifier,
   includeBookingCalendly = false,
-  recipeVersion = profile === "app" ? "0.2.0" : profile === "site" ? "0.12.0" : "0.11.0",
+  recipeVersion: string = publicRecipeVersions[profile],
   includeMultilingual = false,
   includeAnalytics = false,
   includeApplicationPersistence = false,
@@ -358,17 +340,30 @@ export function createTemplateCatalog(
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
   backgroundJobVersion: "0.1.0" | "0.2.0" = "0.2.0",
+  applicationEnvironments = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
-  const app = profile === "app" && (recipeVersion === "0.1.0" || recipeVersion === "0.2.0");
-  const productionSite = app || (profile === "site" && (recipeVersion === "0.11.0" || recipeVersion === "0.12.0"));
-  const vitestFive = (profile === "portfolio" && recipeVersion === "0.11.0") ||
-    (profile === "site" && recipeVersion === "0.12.0") ||
-    (profile === "app" && recipeVersion === "0.2.0");
+  if (recipeVersion !== (applicationEnvironments ? applicationEnvironmentRecipeVersions : publicRecipeVersions)[profile]) {
+    return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
+  }
+  const app = profile === "app";
+  const productionSite = app || profile === "site";
   const sources = [
-    ...commonTemplateSources.map(entry => vitestFive && [
+    ...([{
+      source: "common/literal-lint-roots/patches/next-eslint-plugin-next.patch",
+      destinationSource: "common/patches/next-eslint-plugin-next.patch",
+      contentKind: "text" as const,
+    }]),
+    ...(applicationEnvironments ? textTemplateSources([
+      "common/apps/web/src/configuration/application-environment.ts",
+      "common/apps/web/scripts/check-application-environment.mjs",
+      "common/apps/web/tests/unit/application-environment.test.ts",
+      "common/docs/environments.md",
+    ]) : []),
+    ...commonTemplateSources.map(entry => entry.source === "common/pnpm-workspace.yaml"
+      ? { ...entry, source: "common/dependency-security/pnpm-workspace.yaml", destinationSource: entry.source }
+      : [
       "common/apps/web/package.json.template",
       "common/apps/web/tests/setup/component.ts",
-      "common/pnpm-workspace.yaml",
     ].includes(entry.source)
       ? { ...entry, source: entry.source.replace("common/", "common/vitest-five/"), destinationSource: entry.source }
       : entry).filter(
@@ -391,16 +386,14 @@ export function createTemplateCatalog(
     ),
     ...(profile === "portfolio"
       ? portfolioTemplateSources
-      : productionSite
-        ? productionSiteTemplateSources.filter(
+      : productionSiteTemplateSources.filter(
             ({ source }) =>
               (!includeBookingCalendly || source !== "site/apps/web/app/page.tsx") &&
               (!includeMultilingual ||
                 (source !== "site/apps/web/app/sitemap.ts" &&
                   source !==
                     "site/apps/web/tests/e2e/site-routing.spec.ts.template")),
-          )
-        : legacySiteTemplateSources),
+          )),
     ...(includeBookingCalendly
       ? bookingCalendlyTemplateSources.filter(
           ({ source }) =>
@@ -452,10 +445,32 @@ export function createTemplateCatalog(
       { source: `deployment-cloudflare/background-job-delivery/.github/workflows/deploy${includeApplicationPersistence ? ".persistence" : ""}.yml.template`, destinationSource: "common/.github/workflows/deploy.yml.template", contentKind: "text" as const },
     ] : []),
   ];
+  if (applicationEnvironments && (app || includeFoundation)) {
+    sources.push({
+      source: "app-foundation/application-environments/apps/web/src/infrastructure/cloudflare/application-environment.ts",
+      destinationSource: "app-foundation/apps/web/src/infrastructure/cloudflare/application-environment.ts",
+      contentKind: "text",
+    });
+  }
+  const selectedSources = sources.map((entry) => {
+    if (!applicationEnvironments) return entry;
+    const common = ["common/apps/web/next.config.ts", "common/apps/web/wrangler.jsonc.template"].includes(entry.source);
+    const foundation = [
+      "app-foundation/apps/web/src/composition/server-health.ts",
+      "app-foundation/apps/web/src/delivery/health-route.ts",
+      "app-foundation/apps/web/app/api/health/route.ts",
+      "app-foundation/apps/web/tests/unit/health-route.test.ts",
+      "app-foundation/apps/web/tests/integration/health-worker.test.ts",
+      "app-foundation/apps/web/docs/application-boundaries.md",
+    ].includes(entry.source);
+    return common || foundation
+      ? { ...entry, source: entry.source.replace(common ? "common/" : "app-foundation/", common ? "common/application-environments/" : "app-foundation/application-environments/"), destinationSource: entry.source }
+      : entry;
+  });
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];
 
-  for (const [index, { source, destinationSource, contentKind }] of sources.entries()) {
+  for (const [index, { source, destinationSource, contentKind }] of selectedSources.entries()) {
     const destinationResult = deriveTemplateDestination(
       destinationSource ?? source,
     );

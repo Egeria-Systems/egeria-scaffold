@@ -1,0 +1,163 @@
+{
+  "sourceCommit": "2a699bc2b0a91b29e7e85050c1f6e14a4eaaf745",
+  "source": "packages/builder-core/src/lifecycle/app-profile-transition.ts",
+  "record": "securityPatchedAppTransitionVisualInputRecord",
+  "disposition": "Historical source-input record and original image bytes only. Not executable admission, new visual acceptance, runtime verification or certification for any successor.",
+  "value": {
+    "targetLockfileFingerprint": "sha256:fa8ce392f2da0c645f4e26a2eb788a431defab7d3e22fc5e01b8824f0cb2fc4b",
+    "baselines": {
+      "monolingual": [
+        "sha256:6f6dd1ddd3049d998ac51b4da17b7eb66ca481b89f9e4947fb68b0bce1af50d5",
+        "sha256:00e95d03593487ac4a6bb3e08afe9a1df475ecb76b8b1f1da676259ccf551d27"
+      ],
+      "multilingual": [
+        "sha256:d737921e3ceba92f58c1aa0fd728d7e8ecfd20dafb3e8241487e105d8f8aab8c",
+        "sha256:b2eecb8f5a8d18f8b4f7516073b57f7faca8df1e947df37883e301d61403fd17"
+      ]
+    },
+    "subsets": {
+      "none": "sha256:7eff583b73d1d1e1228f178880df2b18fddc3c41b1c6c23e978217e6c4a2f85c",
+      "analytics": "sha256:3c43c3717d2c73b671ac7eccbaf8e2e3c260915ab0bbcd80ed77beeda0e3b7fb",
+      "booking-calendly": "sha256:5a72911349b2dd066617e0d95e7c6a17e3ba59746f7eb74034d9d9b2473013c7",
+      "analytics+booking-calendly": "sha256:c0245422d9a38a6025f42b67b031da0712f8ec91a8be1e2ff22467a0795234a3",
+      "multilingual": "sha256:bc97938a606983554689f8987f09ca7aa337e059db2f3a30807a7292ef288afe",
+      "analytics+multilingual": "sha256:52f9456ce9dcd50fb37d3dbc1cdb71cdca23c7f1b2a1ff47950ccb641e1e7806",
+      "booking-calendly+multilingual": "sha256:9f5fcb246893c0da55990fbe8ed69c104161b879816083653ce5dec08ba42c80",
+      "analytics+booking-calendly+multilingual": "sha256:c80de7e01a484d56cfdb9a819cf6605bec29eba5af395b425accf2d868f208e0"
+    }
+  },
+  "images": [
+    {
+      "source": "fixtures/generated/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "8fdc529d5557dd52ffc80c229f2b7526e2c5207a",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.1/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "5f738b6395fc7add593508f3d87e14f0722f840f",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    }
+  ]
+}

@@ -1,0 +1,775 @@
+{
+  "status": "active",
+  "advisory": "GHSA-vfj7-8cjw-p6xm",
+  "package": "braces",
+  "version": "3.0.3",
+  "expiresAt": "2026-10-10T23:00:00Z",
+  "classification": "accepted with user-approved security exception",
+  "pnpmVersion": "11.20.0",
+  "approvedAt": "2026-10-09T23:14:28.635445+00:00",
+  "graphs": [
+    {
+      "id": "portfolio",
+      "lockSha256": "59d219cbcc418b523b57d73a9afb46e507e184fe7e932fbe5aa12fc1ab60bf08",
+      "workspacePolicySha256": "e4c14914b5fdf5b2af3a0fc1468da5b1d5711c8d2629f98e568a3c90daaa28da",
+      "eslintConfigPath": "apps/web/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "apps__web>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 355,
+        "devDependencies": 457,
+        "optionalDependencies": 177,
+        "totalDependencies": 914
+      },
+      "callerFiles": [
+        {
+          "sha256": "c33346215b2c2b393a52ba300a475e264cc41bdfb4eff43150810d407f807555",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.0",
+          "member": "package.json"
+        },
+        {
+          "sha256": "4f5a6cd5a84bf3c0fbb442c50d6d45eee62924ddab54a370e13d8b8547160773",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.0",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    },
+    {
+      "id": "site",
+      "lockSha256": "027e2dfb6710d8f9316dddaf37627f72ec7465b27f787de39b1d918654712b8b",
+      "workspacePolicySha256": "e4c14914b5fdf5b2af3a0fc1468da5b1d5711c8d2629f98e568a3c90daaa28da",
+      "eslintConfigPath": "apps/web/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "apps__web>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 355,
+        "devDependencies": 457,
+        "optionalDependencies": 177,
+        "totalDependencies": 914
+      },
+      "callerFiles": [
+        {
+          "sha256": "c289bcc566ee7d672b49643bd4d3e932aa0bd67b4eeb6d07e926c3582685acf9",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "fdf5f6301d81221357d15e85a466f17cc658895a8deefb4dcaccd09a08ac3c96",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    },
+    {
+      "id": "app-policy",
+      "lockSha256": "71c4d59802625006860409d6298e3bd13963089fc55260350ad4c262dd216067",
+      "workspacePolicySha256": "77ec2285337d983c1d84cbfa0bd8119216d95da10046cc7474ca85faca954ca9",
+      "eslintConfigPath": "apps/web/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "apps__web>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 359,
+        "devDependencies": 456,
+        "optionalDependencies": 186,
+        "totalDependencies": 925
+      },
+      "callerFiles": [
+        {
+          "sha256": "c289bcc566ee7d672b49643bd4d3e932aa0bd67b4eeb6d07e926c3582685acf9",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "fdf5f6301d81221357d15e85a466f17cc658895a8deefb4dcaccd09a08ac3c96",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    },
+    {
+      "id": "foundation-policy",
+      "lockSha256": "f41dcc8dd8b8057bc8bddbcdad3e507efb58b03f2269cbe6bca15c65e67b65d0",
+      "workspacePolicySha256": "77ec2285337d983c1d84cbfa0bd8119216d95da10046cc7474ca85faca954ca9",
+      "eslintConfigPath": "apps/web/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "apps__web>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 359,
+        "devDependencies": 456,
+        "optionalDependencies": 185,
+        "totalDependencies": 925
+      },
+      "callerFiles": [
+        {
+          "sha256": "c33346215b2c2b393a52ba300a475e264cc41bdfb4eff43150810d407f807555",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.0",
+          "member": "package.json"
+        },
+        {
+          "sha256": "4f5a6cd5a84bf3c0fbb442c50d6d45eee62924ddab54a370e13d8b8547160773",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.0",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    },
+    {
+      "id": "persistence-policy",
+      "lockSha256": "60ec16a624d73976e52f6dd45041c514c578042d581514a62aeba01903f24683",
+      "workspacePolicySha256": "ecc4be331c65cfadc1fd27b6968d2b40e070c7c568ff026470720d5ab82c12ef",
+      "eslintConfigPath": "apps/web/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "apps__web>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 361,
+        "devDependencies": 461,
+        "optionalDependencies": 186,
+        "totalDependencies": 932
+      },
+      "callerFiles": [
+        {
+          "sha256": "c289bcc566ee7d672b49643bd4d3e932aa0bd67b4eeb6d07e926c3582685acf9",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "fdf5f6301d81221357d15e85a466f17cc658895a8deefb4dcaccd09a08ac3c96",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    },
+    {
+      "id": "root",
+      "lockSha256": "a4f8fe878fa95cb22847084797ad0ce447f273050a6d431c9843933f0096d6dc",
+      "workspacePolicySha256": "ee3efaa1cd51a4f4a4f509fe096b66a32a064a92a5a490e80a5f22a0ed282a37",
+      "eslintConfigPath": "proofs/nextjs-cloudflare/eslint.config.mjs",
+      "eslintConfigSha256": "d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df",
+      "advisoryFindings": [
+        {
+          "version": "3.0.3",
+          "paths": [
+            "proofs__nextjs-cloudflare>eslint-config-next>@next/eslint-plugin-next>fast-glob>micromatch>braces"
+          ],
+          "dev": true,
+          "optional": false,
+          "bundled": false
+        }
+      ],
+      "dependencyCounts": {
+        "dependencies": 447,
+        "devDependencies": 277,
+        "optionalDependencies": 153,
+        "totalDependencies": 825
+      },
+      "callerFiles": [
+        {
+          "sha256": "64a4543b6f34494861b93405ec4bb43166d0b910d7a171951550ebb85d978f28",
+          "bytes": 1734,
+          "package": "eslint-config-next",
+          "version": "16.3.5",
+          "member": "package.json"
+        },
+        {
+          "sha256": "ac78f5826ab4b37a6098976b6085462ef9f9258eea31afad9a1dd876b15d6a5f",
+          "bytes": 748,
+          "package": "@next/eslint-plugin-next",
+          "version": "16.3.5",
+          "member": "package.json"
+        },
+        {
+          "sha256": "8ad595ebee47ca89a32323be8dd2a21e6074e91db95e8add8b628af4ff025981",
+          "bytes": 2798,
+          "package": "fast-glob",
+          "version": "3.3.1",
+          "member": "package.json"
+        },
+        {
+          "sha256": "94dbc881c0329813f2481f35fcfa725a2285d45926d33e9b9b8b80b28487752b",
+          "bytes": 2648,
+          "package": "micromatch",
+          "version": "4.0.8",
+          "member": "package.json"
+        },
+        {
+          "sha256": "56f08b888a4f30dc7cf8a7dbb36ffe92b737912ba36abe9d069d32167c957ac7",
+          "bytes": 1647,
+          "package": "braces",
+          "version": "3.0.3",
+          "member": "package.json"
+        },
+        {
+          "sha256": "886677432990a735e5ebdfb345ff1cbd40e264f9947a8432eeeb254b3a926bde",
+          "bytes": 916,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/utils/get-root-dirs.js"
+        },
+        {
+          "sha256": "3b184e28aa8997eb8e7f7b43c8da327fd3e2a2acf826e6e328632e7006687baa",
+          "bytes": 9550,
+          "package": "@next/eslint-plugin-next",
+          "member": "dist/rules/no-html-link-for-pages.js"
+        },
+        {
+          "sha256": "007e6052c85f7ed2ca2eaed4ae0ca5fb14226cd7585a5f096abcf78e28146f96",
+          "bytes": 4091,
+          "package": "fast-glob",
+          "member": "out/index.js"
+        },
+        {
+          "sha256": "6a56366fcf3ae8e678e574900a0acb2ea6f118ea030d09bcc1b1053ccab916bb",
+          "bytes": 13898,
+          "package": "micromatch",
+          "member": "index.js"
+        },
+        {
+          "sha256": "332ea07c7b006361aad12aa994ca75dc1db8e8382b884909e2f38f10b85c88a4",
+          "bytes": 4380,
+          "package": "braces",
+          "member": "index.js"
+        },
+        {
+          "sha256": "e572166565f15fa6ad9865ae49d678218e32aabfd1b3720f6d0d43d39800d310",
+          "bytes": 6899,
+          "package": "braces",
+          "member": "lib/parse.js"
+        },
+        {
+          "sha256": "dc98f22eee3d511785d92a00758d5f0d48efed5f5813bdecc2de430c529b5c9f",
+          "bytes": 1501,
+          "package": "braces",
+          "member": "lib/compile.js"
+        }
+      ]
+    }
+  ],
+  "fixObservation": {
+    "observedAt": "2026-10-09T04:03:26.601Z",
+    "packages": [
+      {
+        "name": "eslint-config-next",
+        "url": "https://registry.npmjs.org/eslint-config-next",
+        "latest": "16.4.0",
+        "knownVersions": [
+          {
+            "version": "16.3.6",
+            "dependencies": {
+              "globals": "16.4.0",
+              "typescript-eslint": "^8.46.0",
+              "eslint-plugin-react": "^7.37.0",
+              "eslint-plugin-import": "^2.32.0",
+              "eslint-plugin-jsx-a11y": "^6.10.0",
+              "@next/eslint-plugin-next": "16.3.6",
+              "eslint-plugin-react-hooks": "^7.0.0",
+              "eslint-import-resolver-node": "^0.3.6",
+              "eslint-import-resolver-typescript": "^3.5.2"
+            },
+            "publishedAt": "2026-09-22T16:11:44.900Z"
+          },
+          {
+            "version": "16.3.8",
+            "dependencies": {
+              "globals": "16.4.0",
+              "typescript-eslint": "^8.46.0",
+              "eslint-plugin-react": "^7.37.0",
+              "eslint-plugin-import": "^2.32.0",
+              "eslint-plugin-jsx-a11y": "^6.10.0",
+              "@next/eslint-plugin-next": "16.3.8",
+              "eslint-plugin-react-hooks": "^7.0.0",
+              "eslint-import-resolver-node": "^0.3.6",
+              "eslint-import-resolver-typescript": "^3.5.2"
+            },
+            "publishedAt": "2026-09-30T15:59:39.390Z"
+          },
+          {
+            "version": "16.4.0",
+            "dependencies": {
+              "globals": "16.4.0",
+              "typescript-eslint": "^8.56.0",
+              "eslint-plugin-react": "^7.37.0",
+              "eslint-plugin-import": "^2.32.0",
+              "eslint-plugin-jsx-a11y": "^6.10.0",
+              "@next/eslint-plugin-next": "16.4.0",
+              "eslint-plugin-react-hooks": "^7.1.0",
+              "eslint-import-resolver-node": "^0.3.6",
+              "eslint-import-resolver-typescript": "^3.5.2"
+            },
+            "publishedAt": "2026-10-06T18:26:44.970Z"
+          }
+        ]
+      },
+      {
+        "name": "@next/eslint-plugin-next",
+        "url": "https://registry.npmjs.org/%40next%2Feslint-plugin-next",
+        "latest": "16.4.0",
+        "knownVersions": [
+          {
+            "version": "16.3.6",
+            "dependencies": {
+              "fast-glob": "3.3.1",
+              "@eslint-community/eslint-utils": "4.9.1"
+            },
+            "publishedAt": "2026-09-22T16:08:27.257Z"
+          },
+          {
+            "version": "16.3.8",
+            "dependencies": {
+              "fast-glob": "3.3.1",
+              "@eslint-community/eslint-utils": "4.9.1"
+            },
+            "publishedAt": "2026-09-30T15:56:48.503Z"
+          },
+          {
+            "version": "16.4.0",
+            "dependencies": {
+              "fast-glob": "3.3.1",
+              "@eslint-community/eslint-utils": "4.9.1"
+            },
+            "publishedAt": "2026-10-06T18:23:40.171Z"
+          }
+        ]
+      },
+      {
+        "name": "fast-glob",
+        "url": "https://registry.npmjs.org/fast-glob",
+        "latest": "3.3.3",
+        "knownVersions": [
+          {
+            "version": "3.3.3",
+            "dependencies": {
+              "@nodelib/fs.stat": "^2.0.2",
+              "@nodelib/fs.walk": "^1.2.3",
+              "glob-parent": "^5.1.2",
+              "merge2": "^1.3.0",
+              "micromatch": "^4.0.8"
+            },
+            "publishedAt": "2025-01-05T10:38:42.236Z"
+          }
+        ]
+      },
+      {
+        "name": "micromatch",
+        "url": "https://registry.npmjs.org/micromatch",
+        "latest": "4.0.8",
+        "knownVersions": [
+          {
+            "version": "4.0.8",
+            "dependencies": {
+              "braces": "^3.0.3",
+              "picomatch": "^2.3.1"
+            },
+            "publishedAt": "2024-08-23T16:31:18.748Z"
+          }
+        ]
+      },
+      {
+        "name": "braces",
+        "url": "https://registry.npmjs.org/braces",
+        "latest": "3.0.3",
+        "knownVersions": [
+          {
+            "version": "3.0.3",
+            "dependencies": {
+              "fill-range": "^7.1.1"
+            },
+            "publishedAt": "2024-05-21T08:59:11.390Z"
+          }
+        ]
+      }
+    ]
+  },
+  "hostedActivePolicy": {
+    "repository": "Egeria-Systems/egeria-scaffold",
+    "ref": "application-environment-configuration",
+    "path": "scripts/dependency-audit-exception.json"
+  },
+  "limits": [
+    "This is a single temporary exception, not an advisory ignore list.",
+    "A current raw audit, exact inputs, live no-fix check and active authorization are required for every exception disposition.",
+    "Any uncertainty, expiry, revocation or relevant drift refuses the exception."
+  ]
+}

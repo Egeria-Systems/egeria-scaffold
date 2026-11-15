@@ -12,6 +12,20 @@ On 2026-08-13, Repository quality [run `31742910235`](https://github.com/Egeria-
 
 The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](../../proofs/nextjs-cloudflare/). Its package manifest and the root manifest own the current exact executable versions; the current workflows own their action pins and deployment contract. Preparation evidence and the approved implementation plan remain separately reviewable as private local workflow artifacts ignored by Git.
 
+## Current local dependency renewal
+
+The 2026-10-22 successor selects Next `16.4.1`, OpenNext Cloudflare `1.20.12`, AWS adapter `4.1.11`, Wrangler `4.148.0` and Vitest `5.0.3`. The root/proof and eight generated lock graphs share the scoped glob correction; only the persistence graph selects Workers types `5.20261006.1` and its explicitly approved tsx/esbuild edge. [ADR-0015](../adr/0015-vitest-five-generation.md#adapter-and-scoped-glob-renewal) owns this exact dependency boundary.
+
+The initial nine-graph renewal passed native frozen installation, peer checks, full-info audits and registry-signature checks with unchanged resolved lock hashes and zero vulnerabilities. Its signature evidence covers 800 root packages, 937 persistence packages, 904 packages in each foundation/app graph and 892 packages in each remaining portfolio/site graph. Those receipts remain bound to their original graphs.
+
+The subsequent proof-only [ESLint alignment](../adr/0015-vitest-five-generation.md#proof-eslint-alignment) selects `eslint-config-next@16.4.1` and its exact patched plugin, with the narrowly accepted React Hooks Zod edge/peer changes. The root lock SHA-256 is `44e506c480b4f1ec8c3ab621510c1a75c41dbaae75f538032eaf6b3519b8c0b4`. Its fresh native frozen installation, release-age eligibility, peer check, full-info audit with zero vulnerabilities and all 799 registry signatures passed. The installed literal-root helper matches the unchanged canonical patch, with no direct or installed-snapshot fast-glob edge. The eight generated graphs remain unchanged.
+
+The aligned proof passed one complete local aggregate: lint, typecheck, four unit tests, Next and OpenNext builds, unchanged generated Cloudflare types, 21 workerd integration tests, four development-browser tests and four preview-browser tests. These browser checks include their selected automated accessibility assertions; they do not establish WCAG conformance. The remaining kernel/runtime/browser/visual matrix and independent final reviews remain pending; no hosted, deployed, visual-admission or certification result is implied. Earlier failures and accepted historical evidence below remain bound to their original subjects.
+
+## Earlier local dependency renewal
+
+The unused-public-generation retirement candidate changed only the proof's Vitest declaration from `5.0.1` to `5.0.3` and its necessary root lock closure under [ADR-0015](../adr/0015-vitest-five-generation.md#patched-public-generation). The exact root lock SHA-256 is `06247cf74d1084578ab07cfa7e1cb58ab6c5ae5f51399a19f2146b2bef49287d`. Local frozen installation, peer checks, moderate-threshold audit (zero advisories), all 807 registry signatures, four unit tests, Next/OpenNext builds and 21 workerd integration tests passed against that candidate. OpenNext reuses the completed Next build. These local outcomes do not renew the historical browser, hosted or deployed evidence below, and supply no release or certification acceptance.
+
 ## Accepted evidence snapshot
 
 | Surface | Exact version or value |
@@ -117,3 +131,9 @@ Revalidate the current executable subject and current official documentation whe
 These triggers require exact-revision executable evidence; they do not rewrite or extend the accepted snapshot automatically. Replacing the snapshot requires a separately approved record that binds one evidence date, exact commit, hosted run, and lockfile identity to the replacement matrix.
 
 Retain this private proof as the compatibility regression canary for those changes. Retire it only when an equivalent maintained surface replaces its Node development, built-Worker, workerd preview, deployed Worker, browser, and bounded accessibility evidence. Update this record plus the architecture owners in the same approved change whenever the accepted snapshot or its ownership changes.
+
+## Matcher and traversal security repair
+
+The [scoped dependency repair](../adr/0015-vitest-five-generation.md#matcher-and-traversal-security-repair) pins glob `14.0.3` on its two inspected parents and modern minimatch `11.0.4`, while preserving legacy minimatch `3.1.5`. The November 4 repair supplied native lock resolution for root/proof and eight recipe families, peer checks, and checks of actual matcher, lint, minification and traversal cancellation behavior. Its compatibility proof passed four unit tests, 21 Worker integration tests, and four browser cases each against development and workerd preview. The earlier-stage candidate uses the same proof subtree, root dependency declarations, package-manager policy and reviewed lock output.
+
+On November 6 the earlier-stage renderer reproduced the eleven public fixtures’ rendered files and selected locks. Its three internal base profiles retained their own package scripts and resolved the reviewed dependency graphs. Fresh ordinary audits passed on the installed root and all eight generated lock contexts with the existing audit policy. The original failed audits remain historical evidence. The [transition visual boundary](../architecture/capability-model.md#app-transition-visual-evidence) owns separate measurement and finite lifecycle admission.

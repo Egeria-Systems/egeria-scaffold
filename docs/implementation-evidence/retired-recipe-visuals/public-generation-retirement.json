@@ -1,0 +1,416 @@
+{
+  "status": "historical-only-not-current-visual-admission",
+  "decision": "ADR-0020 unused public generation retirement",
+  "images": [
+    {
+      "source": "fixtures/generated/app-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-all-optional-integrations/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-all-optional-integrations/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email-0.2.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app-persistence/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app-persistence/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app-persistence/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/app/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/app/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/app/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-contact-form/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-contact-form/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.2/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics-0.12.4/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual-analytics/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual-analytics/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site-multilingual/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site-multilingual/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    },
+    {
+      "source": "fixtures/generated/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "sha256": "0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+    },
+    {
+      "source": "fixtures/generated/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/site/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "sha256": "c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+    }
+  ]
+}

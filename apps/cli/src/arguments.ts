@@ -1,4 +1,8 @@
 import {
+  applicationEnvironmentAnalyticsSettingsSchema,
+  applicationEnvironmentBookingSettingsSchema,
+  type ApplicationEnvironmentAnalyticsSettings,
+  type ApplicationEnvironmentBookingSettings,
   analyticsSettingsSchema,
   calendlyBookingSettingsSchema,
   web3FormsContactSettingsSchema,
@@ -59,12 +63,6 @@ export type CliCommand =
       jobRemovalPath?: string;
     }>
   | Readonly<{
-      kind: "plan-upgrade";
-      directory: string;
-      capability: "site-routing" | "standards";
-      toVersion: "0.4.0";
-    }>
-  | Readonly<{
       kind: "plan-profile-transition";
       directory: string;
       toProfile: "site" | "app";
@@ -101,18 +99,30 @@ export type CliCommand =
       approvedPlanFingerprint: string;
     }>
   | Readonly<{
-      kind: "apply-upgrade";
-      directory: string;
-      capability: "site-routing" | "standards";
-      toVersion: "0.4.0";
-      approvedPlanFingerprint: string;
-    }>
-  | Readonly<{
       kind: "apply-profile-transition";
       directory: string;
       toProfile: "site" | "app";
       approvedPlanFingerprint: string;
     }>;
+
+export type ApplicationEnvironmentCliCommand =
+  | Readonly<Omit<Extract<CliCommand, { kind: "create" }>, "analytics" | "bookingCalendly" | "contactFormWeb3Forms"> & {
+      analytics?: ApplicationEnvironmentAnalyticsSettings;
+      bookingCalendly?: ApplicationEnvironmentBookingSettings;
+      contactFormWeb3Forms?: true;
+    }>
+  | Readonly<{ kind: "infer" | "doctor"; directory: string }>;
+
+const applicationEnvironmentOptionDefinitions = {
+  "contact-form-web3forms": { type: "boolean" },
+  "booking-calendly": { type: "boolean" },
+  "cloudflare-web-analytics": { type: "boolean" },
+  "google-analytics-4": { type: "boolean" },
+  "microsoft-clarity": { type: "boolean" },
+  "google-search-console": { type: "boolean" },
+  "microsoft-clarity-audience": { type: "string" },
+  "looker-studio": { type: "boolean" },
+} as const;
 
 const projectFields = projectConfigurationSchema
   .unwrap()
@@ -242,7 +252,9 @@ function validAbsoluteDirectory(value: string | undefined): value is string {
 
 function parseCreate(
   arguments_: readonly string[],
-): ValidationResult<CliCommand> {
+  schemaVersion: "1.0.0" | "2.0.0",
+): ValidationResult<CliCommand | ApplicationEnvironmentCliCommand> {
+  const environmentMode = schemaVersion === "2.0.0";
   try {
     const { values, tokens } = parseArgs({
       args: [...arguments_],
@@ -259,6 +271,7 @@ function parseCreate(
         "transactional-email-resend": { type: "boolean" },
         "background-job-delivery": { type: "boolean" },
         ...analyticsOptionDefinitions,
+        ...applicationEnvironmentOptionDefinitions,
       },
       strict: true,
       allowPositionals: false,
@@ -268,6 +281,48 @@ function parseCreate(
     const projectName = values.name;
     const displayName = values["display-name"];
     const directory = values.directory;
+    if (environmentMode) {
+      const profileResult = profileIdentifierSchema.safeParse(profile);
+      const nameResult = projectFields.name.safeParse(projectName);
+      const displayResult = projectFields.displayName.safeParse(displayName);
+      const hasBooking = values["booking-calendly"] === true;
+      const mode = values["calendly-mode"];
+      const booking = hasBooking ? applicationEnvironmentBookingSettingsSchema.safeParse({ mode }) : undefined;
+      const hasAnalytics = ["cloudflare-web-analytics", "google-analytics-4", "microsoft-clarity", "google-search-console", "microsoft-clarity-audience", "looker-studio"]
+        .some((name) => values[name as keyof typeof values] !== undefined);
+      const analytics = hasAnalytics ? applicationEnvironmentAnalyticsSettingsSchema.safeParse({
+        consent: { policy: "explicit-opt-in" },
+        providers: {
+          ...(values["cloudflare-web-analytics"] === true ? { cloudflareWebAnalytics: true } : {}),
+          ...(values["google-analytics-4"] === true ? { googleAnalytics4: true } : {}),
+          ...(values["microsoft-clarity"] === true ? { microsoftClarity: { audience: values["microsoft-clarity-audience"] } } : {}),
+        },
+        operationalIntegrations: {
+          ...(values["google-search-console"] === true ? { googleSearchConsole: true } : {}),
+          ...(values["looker-studio"] === true ? { lookerStudio: { connector: "google-analytics-4" } } : {}),
+        },
+      }) : undefined;
+      const expectedOptions = ["profile", "name", "display-name", "directory",
+        ...(hasBooking ? ["calendly-mode"] : []),
+        ...Object.keys(applicationEnvironmentOptionDefinitions).filter((name) => values[name as keyof typeof values] !== undefined),
+        ...["multilingual", "application-persistence", "transactional-email-resend", "background-job-delivery"].filter((name) => values[name as keyof typeof values] === true),
+      ];
+      if (!hasExactOptions(tokens, expectedOptions) || !profileResult.success || !nameResult.success || !displayResult.success || !validDirectory(directory) ||
+        hasBooking !== (mode !== undefined) || (booking !== undefined && !booking.success) || (analytics !== undefined && !analytics.success) ||
+        (values["microsoft-clarity"] === true) !== (values["microsoft-clarity-audience"] !== undefined)) {
+        return invalidArguments();
+      }
+      return { ok: true, value: {
+        kind: "create", profile: profileResult.data, projectName: nameResult.data, displayName: displayResult.data, directory,
+        ...(booking?.success === true ? { bookingCalendly: booking.data } : {}),
+        ...(analytics?.success === true ? { analytics: analytics.data } : {}),
+        ...(values["contact-form-web3forms"] === true ? { contactFormWeb3Forms: true } : {}),
+        ...(values.multilingual === true ? { multilingual: true } : {}),
+        ...(values["application-persistence"] === true ? { applicationPersistence: true } : {}),
+        ...(values["transactional-email-resend"] === true ? { transactionalEmailResend: true } : {}),
+        ...(values["background-job-delivery"] === true ? { backgroundJobDelivery: true } : {}),
+      } };
+    }
     const calendlyUrl = values["calendly-url"];
     const calendlyMode = values["calendly-mode"];
     const multilingual = values.multilingual;
@@ -567,69 +622,6 @@ function parseRemove(
   }
 }
 
-function parseUpgrade(
-  kind: "plan-upgrade" | "apply-upgrade",
-  arguments_: readonly string[],
-): ValidationResult<CliCommand> {
-  try {
-    const applying = kind === "apply-upgrade";
-    const { values, tokens } = parseArgs({
-      args: [...arguments_],
-      options: {
-        directory: { type: "string" },
-        capability: { type: "string" },
-        "to-version": { type: "string" },
-        ...(applying ? approvedPlanOptionDefinitions : {}),
-      },
-      strict: true,
-      allowPositionals: false,
-      tokens: true,
-    });
-    const directory = values.directory;
-    const capability = values.capability;
-    const toVersion = values["to-version"];
-    const approvedPlanFingerprint = values["approved-plan"];
-
-    if (
-      !hasExactOptions(tokens, [
-        "directory",
-        "capability",
-        "to-version",
-        ...(applying ? ["approved-plan"] : []),
-      ]) ||
-      !validAbsoluteDirectory(directory) ||
-      (capability !== "standards" && capability !== "site-routing") ||
-      toVersion !== "0.4.0"
-    ) {
-      return invalidArguments();
-    }
-
-    if (kind === "apply-upgrade") {
-      if (!validApprovedPlanFingerprint(approvedPlanFingerprint)) {
-        return invalidArguments();
-      }
-
-      return {
-        ok: true,
-        value: {
-          kind,
-          directory,
-          capability,
-          toVersion,
-          approvedPlanFingerprint,
-        },
-      };
-    }
-
-    return {
-      ok: true,
-      value: { kind, directory, capability, toVersion },
-    };
-  } catch {
-    return invalidArguments();
-  }
-}
-
 function parseProfileTransition(
   kind: "plan-profile-transition" | "apply-profile-transition",
   arguments_: readonly string[],
@@ -683,14 +675,20 @@ function parseProfileTransition(
   }
 }
 
+export function parseCliArguments(arguments_: readonly string[], schemaVersion: "2.0.0"): ValidationResult<ApplicationEnvironmentCliCommand>;
+export function parseCliArguments(arguments_: readonly string[]): ValidationResult<CliCommand>;
 export function parseCliArguments(
   arguments_: readonly string[],
-): ValidationResult<CliCommand> {
+  schemaVersion: "1.0.0" | "2.0.0" = "1.0.0",
+): ValidationResult<CliCommand | ApplicationEnvironmentCliCommand> {
   const [command, ...commandArguments] = arguments_;
+  if (schemaVersion === "2.0.0" && command !== "create" && command !== "infer" && command !== "doctor") {
+    return invalidArguments();
+  }
 
   switch (command) {
     case "create":
-      return parseCreate(commandArguments);
+      return parseCreate(commandArguments, schemaVersion);
     case "infer":
     case "doctor":
     case "diff":
@@ -701,9 +699,6 @@ export function parseCliArguments(
     case "plan-remove":
     case "apply-remove":
       return parseRemove(command, commandArguments);
-    case "plan-upgrade":
-    case "apply-upgrade":
-      return parseUpgrade(command, commandArguments);
     case "plan-profile-transition":
     case "apply-profile-transition":
       return parseProfileTransition(command, commandArguments);

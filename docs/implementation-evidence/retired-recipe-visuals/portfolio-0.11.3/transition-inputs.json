@@ -1,0 +1,89 @@
+{
+  "sourceCommit": "c1a8e6c09832e7155df4b33676645a93c3317dac",
+  "source": "packages/builder-core/src/lifecycle/app-profile-transition.ts",
+  "record": "literalLintAppTransitionVisualInputCandidate",
+  "disposition": "Historical candidate inputs and exact original PNG bytes only. Portfolio recipe support is retired; these records do not admit a transition, certify a successor or confer security acceptance.",
+  "value": {
+    "targetLockfileFingerprint": "sha256:34be78bdb6d3f8a2b1c02cd2f58fadff1d3a90b14395da5ff5a2c9c72bddfbe6",
+    "baselines": {
+      "monolingual": [
+        "sha256:6f6dd1ddd3049d998ac51b4da17b7eb66ca481b89f9e4947fb68b0bce1af50d5",
+        "sha256:00e95d03593487ac4a6bb3e08afe9a1df475ecb76b8b1f1da676259ccf551d27"
+      ],
+      "multilingual": [
+        "sha256:d737921e3ceba92f58c1aa0fd728d7e8ecfd20dafb3e8241487e105d8f8aab8c",
+        "sha256:b2eecb8f5a8d18f8b4f7516073b57f7faca8df1e947df37883e301d61403fd17"
+      ]
+    },
+    "subsets": {
+      "none": "sha256:3a2979a5a0c1ebce2def160497fb16e56689240c05a87c6e8845c3205c6764cb",
+      "analytics": "sha256:c388c978c756309e2a6c2313505b50736b384f92112dcb5bcf7d93ecec5f446c",
+      "booking-calendly": "sha256:70f07ab1f3f482462c174423cbcf52547b887c7c9e30d20bf1520a11f190dc86",
+      "analytics+booking-calendly": "sha256:abb2ad7f31d7726b2d424792cd99ded5301188f13302e57d5f4d964ae1cd6075",
+      "multilingual": "sha256:32d777c649e67ddf3fb1e639be6ec224f5829ba18b7ff1103da058edbd4dec77",
+      "analytics+multilingual": "sha256:b09fa78d1f49b5c9269193c18c48b9858e3bcb8a41b1e7d65857a8aa2bd44fd3",
+      "booking-calendly+multilingual": "sha256:1d849f7e9a843d4ebf01eee9814e2cf280660abf30aec04278730774d4b6d234",
+      "analytics+booking-calendly+multilingual": "sha256:743f8334dd26261a81ed31c6fb2d9f07af359f9f7258d0f926aa7c4ba6a89f24"
+    }
+  },
+  "images": [
+    {
+      "source": "fixtures/generated/portfolio-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-calendly-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-calendly-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+      "gitBlob": "67ca698d8315654f50671faf6da39b7d6a940c88",
+      "sha256": "75d3f59fe7171ac4709bbebbd69d86eba1b153995ca6e15865277a990d2e7e55"
+    },
+    {
+      "source": "fixtures/generated/portfolio-email-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "destination": "docs/implementation-evidence/retired-recipe-visuals/portfolio-email-0.11.3/apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+      "gitBlob": "f65ab235ede5b73662324035f657dd4dff16444e",
+      "sha256": "455d1c659e0e8cad261dc590b5eaf4c68e1e091240be038a4f5f5a20a551e395"
+    }
+  ],
+  "sharedImages": [
+    {
+      "path": "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png",
+      "sha256": "6f6dd1ddd3049d998ac51b4da17b7eb66ca481b89f9e4947fb68b0bce1af50d5",
+      "bytes": 58634
+    },
+    {
+      "path": "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-mobile-chromium-linux.png",
+      "sha256": "00e95d03593487ac4a6bb3e08afe9a1df475ecb76b8b1f1da676259ccf551d27",
+      "bytes": 38500
+    },
+    {
+      "path": "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-desktop-chromium-linux.png",
+      "sha256": "d737921e3ceba92f58c1aa0fd728d7e8ecfd20dafb3e8241487e105d8f8aab8c",
+      "bytes": 59984
+    },
+    {
+      "path": "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-multilingual-home-mobile-chromium-linux.png",
+      "sha256": "b2eecb8f5a8d18f8b4f7516073b57f7faca8df1e947df37883e301d61403fd17",
+      "bytes": 36850
+    }
+  ]
+}

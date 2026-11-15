@@ -111,7 +111,7 @@ export type CapabilityRemovalPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: RemovableCapability;
-    version: "0.1.0" | "0.2.0";
+    version: "0.1.0" | "0.1.1" | "0.2.0";
   }>;
   jobRemovalReport?: JobRemovalMachineReport;
   jobRemovalSubject?: Omit<JobRemovalSubject, "resources">;
@@ -966,7 +966,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor === undefined || (capabilityValue === "background-job-delivery" ? !["0.1.0", "0.2.0"].includes(descriptor.version) : descriptor.version !== "0.1.0")) {
+  if (descriptor === undefined || (capabilityValue === "background-job-delivery" ? !["0.1.0", "0.2.0"].includes(descriptor.version) : descriptor.version !== (capabilityValue === "application-persistence" ? "0.1.1" : "0.1.0"))) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -1022,6 +1022,20 @@ export async function planCapabilityRemoval(input: Readonly<{
     ...(project.capabilitySettings["contact-form-web3forms"] === undefined ? {} : { contactFormWeb3Forms: project.capabilitySettings["contact-form-web3forms"] }),
     packageVersions: verifiedCapabilityPackageVersions,
   } as const;
+  let desiredContext = snapshot.value.renderingContext;
+  if (desiredContext !== undefined &&
+      (capabilityValue === "background-job-delivery" || capabilityValue === "application-persistence")) {
+    const catalogSnapshot = { ...desiredContext.catalogSnapshot };
+    if (capabilityValue === "background-job-delivery") {
+      delete catalogSnapshot.backgroundJobDelivery;
+      catalogSnapshot.deploymentCloudflare = project.selectedCapabilities.includes("application-persistence") ? "0.4.1" : "0.3.1";
+    } else {
+      delete catalogSnapshot.applicationPersistence;
+      catalogSnapshot.standards = "0.5.1";
+      catalogSnapshot.deploymentCloudflare = catalogSnapshot.backgroundJobDelivery === undefined ? "0.3.1" : "0.5.1";
+    }
+    desiredContext = { ...desiredContext, catalogSnapshot };
+  }
   const [currentRender, desiredRender] = await Promise.all([
     renderSkeleton(renderRequest, snapshot.value.renderingContext),
     renderSkeleton({
@@ -1043,9 +1057,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue !== "transactional-email-resend" && renderRequest.transactionalEmailResend === true ? { transactionalEmailResend: true as const } : {}),
       ...(capabilityValue !== "contact-form-web3forms" && renderRequest.contactFormWeb3Forms !== undefined ? { contactFormWeb3Forms: renderRequest.contactFormWeb3Forms } : {}),
       packageVersions: verifiedCapabilityPackageVersions,
-    }, capabilityValue === "background-job-delivery"
-      ? createGenerationRenderingContext(project.selectedCapabilities.includes("application-persistence"), true, false)
-      : capabilityValue === "application-persistence" ? createGenerationRenderingContext(false, snapshot.value.renderingContext?.catalogSnapshot.appFoundation === "0.2.0") : snapshot.value.renderingContext),
+    }, desiredContext),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {
@@ -1182,7 +1194,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     profile: project.originProfile,
     capability: {
       identifier: capabilityValue,
-      version: descriptor.version as "0.1.0" | "0.2.0",
+      version: descriptor.version as "0.1.0" | "0.1.1" | "0.2.0",
     },
     ...(jobReview?.ok === true ? {jobRemovalReport: jobReview.value.report, jobRemovalSubject: jobReview.value.subject} : {}),
     ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),

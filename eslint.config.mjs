@@ -7,7 +7,7 @@ const builderTypeScriptFiles = [
   "packages/builder-core/src/**/*.ts",
   "packages/observability/src/**/*.ts",
 ];
-const builderJavaScriptFiles = ["packages/standards/eslint/**/*.mjs"];
+const builderJavaScriptFiles = ["packages/standards/eslint/**/*.mjs", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"];
 export default [
   {
     name: "@egeria-systems/scaffold/ignores",

@@ -128,7 +128,7 @@ function createSnapshotReader(entries, overrides = new Map()) {
 }
 
 async function fixtureEntries(name) {
-  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}`));
+  return loadTextEntries(resolve(repositoryRoot, `fixtures/generated/${name}-${name.startsWith("portfolio") ? "0.11.7" : name.startsWith("site") ? "0.12.7" : "0.2.7"}`));
 }
 
 function assertFailure(result, code) {
@@ -423,11 +423,11 @@ test("capability addition plan refuses invalid controls and historical recipes",
   assert.equal(parsedState.ok, true);
   historical.set(
     ".egeria/project.yaml",
-    core.serializeProjectYaml({ ...parsedProject.value, recipeVersion: "0.9.0" }),
+    JSON.stringify({ ...parsedProject.value, recipeVersion: "0.9.0" }),
   );
   historical.set(
     ".egeria/state.json",
-    core.serializeStateJson({
+    JSON.stringify({
       ...parsedState.value,
       origin: { ...parsedState.value.origin, recipeVersion: "0.9.0" },
     }),

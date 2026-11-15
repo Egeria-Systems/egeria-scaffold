@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+import { generatedFixtureContracts, inspectGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -142,12 +142,23 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /@testing-library\/user-event@14\.6\.3/u);
   assert.match(lockfile, /@vitejs\/plugin-react@6\.0\.5/u);
   assert.match(lockfile, /jsdom@30\.0\.1/u);
-  assert.match(lockfile, /vitest@5\.0\.0/u);
+  assert.match(lockfile, /vitest@5\.0\.3/u);
   assert.match(lockfile, /raw-loader@4\.0\.2/u);
   assert.match(lockfile, /@tailwindcss\/postcss@4\.3\.3/u);
   assert.match(lockfile, /postcss@8\.5\.26/u);
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
+
+test("current security fixtures declare corrected Next with matching installed fingerprints", async () => {
+  for (const fixture of generatedFixtureContracts) {
+    const root = resolve(repositoryRoot, fixture.relativeRoot);
+    const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
+    const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
+    assert.equal(manifest.dependencies.next, "16.4.1", fixture.identifier);
+    assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(manifest.dependencies.next), fixture.identifier);
+    await inspectGeneratedFixture(root, fixture.identifier);
+  }
+});
 
 test("representative app fixtures retain exact descriptor ownership, production-site output and workflow ordering", async () => {
   for (const fixture of generatedFixtureContracts.filter(({ profile }) => profile === "app")) {
@@ -171,7 +182,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
       fixture.expectedFiles,
     );
     const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.0" });
+    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.2.7" });
     assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
     for (const surface of rendered.value.surfaces) {
       const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
@@ -184,7 +195,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
     assert.equal(foundation.managedSurfaces.length, 17 + 2, "seventeen files and two package members");
     assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
       .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-application-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.2.0/pnpm-lock.yaml")));
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml")));
     const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
     assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
     assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");
@@ -207,7 +218,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
 test("compiled project generation matches every committed fixture identifier", async (context) => {
   for (const identifier of ["app", "app-all-optional-integrations", "app-persistence"]) {
     assert.equal(
-      await pathExists(resolve(repositoryRoot, "fixtures/generated", identifier)),
+      await pathExists(resolve(repositoryRoot, generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot)),
       true,
       `representative app fixture is absent: ${identifier}`,
     );

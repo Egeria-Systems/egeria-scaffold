@@ -1,0 +1,5109 @@
+{
+  "sourceCommit": "2a699bc2b0a91b29e7e85050c1f6e14a4eaaf745",
+  "sourceFixture": "fixtures/generated/app-persistence-email-0.2.1",
+  "provenance": "Corrected project/state copied exactly from committed controls; original declaration projected using the pre-retirement canonical renderer and independently selected before retirement. Neither variant is new runtime verification.",
+  "sourceHashes": {
+    "projectYaml": "07ff3494a2a0635bfc2f6fe2003756c11f5d4a266d679dbb0ae770edeadfec08",
+    "stateJson": "e38b1c202e2f7df1e8fc8c3d41cfe5df119da66db4ee837b1bd1e538f3c79cb6"
+  },
+  "projectYaml": "builderCompatibility: 0.0.0\ncapabilitySettings: {}\nejectedAreas: []\noriginProfile: app\nplatformAdapter: cloudflare-workers\nproject:\n  defaultLocale: en-CA\n  displayName: Acme App Persistence Email\n  name: acme-app-persistence-email\nrecipeVersion: 0.2.1\nschemaVersion: 1.0.0\nselectedCapabilities:\n  - standards\n  - deployment-cloudflare\n  - content-files\n  - section-composition\n  - observability\n  - app-foundation\n  - site-routing\n  - application-persistence\n  - transactional-email-resend\n",
+  "project": {
+    "schemaVersion": "1.0.0",
+    "builderCompatibility": "0.0.0",
+    "project": {
+      "name": "acme-app-persistence-email",
+      "displayName": "Acme App Persistence Email",
+      "defaultLocale": "en-CA"
+    },
+    "originProfile": "app",
+    "recipeVersion": "0.2.1",
+    "platformAdapter": "cloudflare-workers",
+    "selectedCapabilities": [
+      "standards",
+      "deployment-cloudflare",
+      "content-files",
+      "section-composition",
+      "observability",
+      "app-foundation",
+      "site-routing",
+      "application-persistence",
+      "transactional-email-resend"
+    ],
+    "capabilitySettings": {},
+    "ejectedAreas": []
+  },
+  "variants": {
+    "corrected": {
+      "next": "16.3.6",
+      "state": {
+        "schemaVersion": "1.0.0",
+        "builderVersion": "0.0.0",
+        "projectSchemaVersion": "1.0.0",
+        "origin": {
+          "profile": "app",
+          "recipeVersion": "0.2.1"
+        },
+        "installedCapabilities": [
+          {
+            "identifier": "standards",
+            "version": "0.6.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "deployment-cloudflare",
+            "version": "0.4.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "content-files",
+            "version": "0.4.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "section-composition",
+            "version": "0.3.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "observability",
+            "version": "0.3.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "app-foundation",
+            "version": "0.2.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "site-routing",
+            "version": "0.4.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "application-persistence",
+            "version": "0.1.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful",
+              "persistent-data"
+            ],
+            "removalPolicy": "export-and-remove"
+          },
+          {
+            "identifier": "transactional-email-resend",
+            "version": "0.1.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          }
+        ],
+        "appliedMigrations": [],
+        "managedSurfaces": [
+          {
+            "identifier": "app-foundation-application-boundaries-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/docs/application-boundaries.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e31e7d17db24b47d52a62403fa0c16bbcaf0e80e8af08dc42dd01ccbeb0f7ab7"
+          },
+          {
+            "identifier": "app-foundation-build-information-domain",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/domain/build-information.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6a82ea50779abe2161000e5258fc9edfa63660a2c5eb4c9b912372d69530c1fa"
+          },
+          {
+            "identifier": "app-foundation-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9a77897a7789e6cc888aed3808ffe03e28808eee568de165d50b514fdde4fb60"
+          },
+          {
+            "identifier": "app-foundation-build-information-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/build-information.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3a15d8e86a56b5d4c6bff011472ee2173b31326320202ca01eab69e385b92c99"
+          },
+          {
+            "identifier": "app-foundation-cloudflare-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9f1dba2e65ee261e53f96d678342d43ee1e7748c8f1cd1b87c2e6aef64c8bcca"
+          },
+          {
+            "identifier": "app-foundation-cloudflare-reader-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:402e107e76e07f8c4873e74677441bc2e2cd09a76c0c578d22e6dc2db2981aff"
+          },
+          {
+            "identifier": "app-foundation-effect-dependency",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/effect"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:02cdf96db52258fa612bb53c57f37f7417c5d8bcb350cb1b6463b21c04097d0e"
+          },
+          {
+            "identifier": "app-foundation-health-application",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/health.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c9c0bb42e519e438c5252c32bc9525e9b7f0b9272ab5b9f51285a97598cf0caa"
+          },
+          {
+            "identifier": "app-foundation-health-route-delivery",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/delivery/health-route.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a9b63fc9eeae0cdcfb3cb338d370b368cec1eafdceb5371ed811ed33b11086d9"
+          },
+          {
+            "identifier": "app-foundation-health-route-entry",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/app/api/health/route.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:95a33043b7a147107b6931f3ef015b9993e228e49dda0adafa6815a3b7f3d640"
+          },
+          {
+            "identifier": "app-foundation-health-route-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/health-route.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:af08b1cc8a157d2f377937f63d7a227a12a36c2bfe3e9bd0267015211eb54523"
+          },
+          {
+            "identifier": "app-foundation-health-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/health.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d55f4944d73a1c212e60cab4a5c6ce546b896df9b22e908c8520583b57d4ca1e"
+          },
+          {
+            "identifier": "app-foundation-memory-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/infrastructure/memory/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:b3dde1af2b75d2fe0b9742aefee8de4fd54220d504fe59a739d833b32383fa36"
+          },
+          {
+            "identifier": "app-foundation-request-context",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/request-context.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:747954e6f154921a09d7b35b962fc6e1be7ed55fb1ce72cb21be0fe0bf448b25"
+          },
+          {
+            "identifier": "app-foundation-request-context-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/request-context.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cb4fe89f6508758b798558dd8e5b2e3320dd68b8ec15da3173d1eb0185454569"
+          },
+          {
+            "identifier": "app-foundation-server-health-composition",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/composition/server-health.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:28eaf1b18ca956dc5baa4e21969a39725eff5373c949d4ce84263e51f6ff612c"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/vitest.cloudflare.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3a5ad5ba76e26fada236f49385ec137b6cc91d658f3e16bc90f6e133c547146f"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:integration:cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:cf2de1e180d4f7a309e89c79db66b33143755f01f508a84f47f26ad5b0a73f13"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/integration/health-worker.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:73b377214bcae68f4a2febf7407bdf23d6c909dd4877e853df76057233037510"
+          },
+          {
+            "identifier": "builder-dependency-lockfile",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "pnpm-lock.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:886c4d66a47d0dea6d1856ab422b9c2c7865a62b58bd1a8d48adb6e490142e04"
+          },
+          {
+            "identifier": "builder-gitignore",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".gitignore",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ea9ae5806fbefcbfbc1f39b2dc4bacb4226408ca8355caaa6401d591d46675bb"
+          },
+          {
+            "identifier": "builder-home-route",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/app/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:5a8e69d58a8f32818f68e91e6d1815b04d44ce909e391245e980422ee7d2cfa9"
+          },
+          {
+            "identifier": "builder-migration-log",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".egeria/migrations.jsonl",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "identifier": "builder-node-version",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".nvmrc",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a"
+          },
+          {
+            "identifier": "builder-project-configuration",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".egeria/project.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:07ff3494a2a0635bfc2f6fe2003756c11f5d4a266d679dbb0ae770edeadfec08"
+          },
+          {
+            "identifier": "builder-readme",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "README.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f669eb3399fbf5e4386632c2dafd4af9bd44da551510863e199877db7324d83b"
+          },
+          {
+            "identifier": "builder-root-instructions",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "AGENTS.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4823518c1074ae33a5fd6868418631918a8bc50955c364eb39c8f85c7234e666"
+          },
+          {
+            "identifier": "builder-root-layout",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/app/layout.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:dc909d1a1943e8374c5cb3f3144ecb7922f4a58c02b971e3ff9d7a2a465e2f93"
+          },
+          {
+            "identifier": "builder-root-package-manifest",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "package.json",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d6e3e5455c4dd7bffce69a1fb35c5121ee96ad9e60ce00fd41ac967548d1d600"
+          },
+          {
+            "identifier": "builder-web-build-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/build"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:71969d21b7129941ed33eb40fa5747153633fa2e9a2b4447b0a25e4b6f15c77b"
+          },
+          {
+            "identifier": "builder-web-cloudflare-build-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/build:cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8c523427bfc39ac7aad8675c0e2b7c0b86dba7ffe20bf8a485523a3038c28827"
+          },
+          {
+            "identifier": "builder-web-cloudflare-type-generation-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/cf-typegen"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6b8d38da193b295a86e581b03d211134f89d851b0ebfc871057f136f90a804fe"
+          },
+          {
+            "identifier": "builder-web-development-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/dev"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:349da1dedba850fc330991e0a85f3fe4db6022703870443b9b86f96ef529b2fe"
+          },
+          {
+            "identifier": "builder-web-instructions",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/AGENTS.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1b3c378d3fdde8d58e34576aa4875925f8f58e49a0c4ce86b4408450f3463175"
+          },
+          {
+            "identifier": "builder-web-lint-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/lint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6eefc9a9608c332e6b3f0c8d0e6366241a189f0c8b732982da29abec3be8cb20"
+          },
+          {
+            "identifier": "builder-web-package-eslint",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/eslint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d53b05b125b368cca2922e1cdb25b29e06326ac70c968b879c5a9a13102ddc31"
+          },
+          {
+            "identifier": "builder-web-package-eslint-next",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/eslint-config-next"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2"
+          },
+          {
+            "identifier": "builder-web-package-name",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/name"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:95e6ed28bcb9931a27d1cae7ad7301554c51e0af6b54437086a678e85593378d"
+          },
+          {
+            "identifier": "builder-web-package-next",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/next"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a01471d20ade5771d03251f5cc3bd7ed632154a7777792b7c35f9e12a42b4959"
+          },
+          {
+            "identifier": "builder-web-package-private",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/private"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          {
+            "identifier": "builder-web-package-react",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c83897e566a718cd5cb9d625c381bfe441b41ae069ea471dab9745a22948d63c"
+          },
+          {
+            "identifier": "builder-web-package-react-dom",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/react-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c83897e566a718cd5cb9d625c381bfe441b41ae069ea471dab9745a22948d63c"
+          },
+          {
+            "identifier": "builder-web-package-type",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/type"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:51b03279c071bc2e55a377745fdd442c9eedc700152b19366572fa8f76d76017"
+          },
+          {
+            "identifier": "builder-web-package-types-node",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1node"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0d23b4fc35b446ea877122556f0735726e8acae05df3b96ba85c95dc077f6e07"
+          },
+          {
+            "identifier": "builder-web-package-types-react",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4223e25989d406d49471ab23add79b6fdeb9238ab2c03bb2882ff588787892d6"
+          },
+          {
+            "identifier": "builder-web-package-types-react-dom",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1react-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0cfa9aa35b96ccbe8d85ed2bb8108166e3a24157bb3bd95441f787b8ecd79027"
+          },
+          {
+            "identifier": "builder-web-package-typescript",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/typescript"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:3e3fa41437ab238c8a99b85f9564f6e5443fb2f47ca54f841fd20e26bf699fb4"
+          },
+          {
+            "identifier": "builder-web-package-typescript-eslint",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/typescript-eslint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:f258a3564d82ac23d6317c132f310472ff88ee888dc0733ed4940fbbad9ff5bf"
+          },
+          {
+            "identifier": "builder-web-package-version",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/version"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:03091d605ba0cafdfa2d21835ec1ab8bf17e7b4b8060cfa08a2d3b7488b71371"
+          },
+          {
+            "identifier": "builder-web-preview-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/preview"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d82dcb84764c339391ed650d0a718dd1c262d78802b3141d386f1f7824bae102"
+          },
+          {
+            "identifier": "builder-web-typecheck-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/typecheck"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c1850885b2eaf24bf28769efab035e68cd60206d1cde61228959b3049fe20cac"
+          },
+          {
+            "identifier": "builder-workspace-configuration",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "pnpm-workspace.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:503a9b68f51a1b60936d49a6915ea94b35821c721ac53302b99da59829525c3e"
+          },
+          {
+            "identifier": "content-files-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/content.config.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4f827edda6b1bde315c4e0add09dae1df69aeb6c2e4593fa6ba23eae430ebc55"
+          },
+          {
+            "identifier": "content-files-long-form-introduction",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/en-CA/long-form/introduction.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9449c0d5eb74c49863f6351f071a8b867a0332d74d6d0e1295b032265fa3a7d9"
+          },
+          {
+            "identifier": "content-files-raw-loader-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/raw-loader"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:24822994d0f46fb84da71490a87020e2a9409e578e084d5e5ac2992b9d9ffb64"
+          },
+          {
+            "identifier": "content-files-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/read-content.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:448b65e8814d30c3e00338248216618954aec031bcb1ab0caca3cda2f7a037b0"
+          },
+          {
+            "identifier": "content-files-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/content-schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085"
+          },
+          {
+            "identifier": "content-files-site-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/en-CA/site.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:900fa69c98344e3a4db8824eaf38a37a366103d88596b845753e6918b73061c4"
+          },
+          {
+            "identifier": "content-files-source-declarations",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/content-source.d.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a7e45b479a8b43ff63ddd7ce893cdfb91488faef53e762648908d98092b12dbb"
+          },
+          {
+            "identifier": "content-files-yaml-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/yaml"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:ffff7c6d8151c7c43be2fb894756deb6abcc84d003a569fce989dd5aa111bd7a"
+          },
+          {
+            "identifier": "deployment-binding-test-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/vitest.bindings.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ce180380b3a00b5f9017706a632f1aad19c5cf800816db9989f223e8838fba8f"
+          },
+          {
+            "identifier": "deployment-cloudflare-next-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/next.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9a7e515381b029b4f2bafdd1feec366a17f2664bdfd2929ed9571090009e4d80"
+          },
+          {
+            "identifier": "deployment-cloudflare-open-next-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/open-next.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8e02c850592160eb80d1aed908789f317babcb76985792a86bb79e7c0dd4b1d9"
+          },
+          {
+            "identifier": "deployment-cloudflare-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/@opennextjs~1cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e4791bd213160897516915ad85706c1bdcf6c0f08977e66f98df56c212f3a925"
+          },
+          {
+            "identifier": "deployment-cloudflare-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": ".github/workflows/deploy.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:7eac1e693153eb3ca88a2e51952a9564fc3bcd5e0609a81c5224c6893a5f1619"
+          },
+          {
+            "identifier": "deployment-cloudflare-wrangler-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/wrangler.jsonc",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4c1ac7b3a076ec86b76631724e9cc9a47c96362e54b12513e2084c49ab863aa2"
+          },
+          {
+            "identifier": "deployment-cloudflare-wrangler-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/wrangler"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:16b87f40883cb37f7fe55be07fff2a2c0b644b6aa11aa041c6b0e9eab1596db6"
+          },
+          {
+            "identifier": "deployment-database-preflight",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/scripts/check-application-database.mjs",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4f97079e48364ec613faacb396cdf49108bf37a344e3e0b54be567532bf7292c"
+          },
+          {
+            "identifier": "deployment-db-check-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:check"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0769ac4449d44273cb386caed45508b6f30c9073af56f0b10b48474ddcae43d9"
+          },
+          {
+            "identifier": "deployment-db-migrations-hash-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:migrations:hash"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:194084497b3919ffea06e8fa73e893d2c67b4b5b432f12aa47cb0f98fbc99964"
+          },
+          {
+            "identifier": "deployment-test-integration-bindings-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:integration:bindings"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:cbca8b6b5b8afbe7054d499174bbb588f04443440cffa66ee419b93afd583816"
+          },
+          {
+            "identifier": "observability-browser-ingest-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/api/observability/route.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a9373820327bdfa94cddf625e90e9d6372d921044c3aabfedd4f8ed59ec69d07"
+          },
+          {
+            "identifier": "observability-browser-instrumentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/instrumentation-client.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9722b012487e7cd514f42f8fee02e37ee2706a45db02bc7e33156963bdf40d0c"
+          },
+          {
+            "identifier": "observability-browser-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/browser-reporter.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0c6ea3a819be830d7551c5ab64e1ecad4d00248529d58ed7aaddcb85709ebbca"
+          },
+          {
+            "identifier": "observability-cloudflare-context",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d986d4cf7d8c859cad7f5a4ff1ed28093e0c1279846f3bb935fc59c90b2570f6"
+          },
+          {
+            "identifier": "observability-error-copy",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/error-copy.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ef461e56e5bb86bc05b89515cc2789e4201e9eb48f8ac06b7035735219a52c2e"
+          },
+          {
+            "identifier": "observability-error-copy-source",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/content/en-CA/observability.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a05df3a90a920a747842dbd766a68c0f52df8a90978a2419836df83313519550"
+          },
+          {
+            "identifier": "observability-error-fallback",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/presentation/error-fallback.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f60bdac6ed3c66252ccb5a75d6961584f13a6ed6d35eed3363f8685579276492"
+          },
+          {
+            "identifier": "observability-global-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/global-error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e4cb19f30f11d647a41ef45c9c5911706769ebc9842797802ab1e100c7b2bd9d"
+          },
+          {
+            "identifier": "observability-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/@egeria-systems~1observability"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a09e2d94133d00d7d72ce4dcb988afb0adf5e34fc0dd8068f9fd582899d63034"
+          },
+          {
+            "identifier": "observability-page-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:829b25e9a75d6a89bb4a875b14dcec62c8df0ba48641e4c9cba5b2e77ab8daa0"
+          },
+          {
+            "identifier": "observability-registration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/installed-capability.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1ad97f88cab83d93e01953f32104d0583f26793cfe9b35d7a75ed400a05f7956"
+          },
+          {
+            "identifier": "observability-server-instrumentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/instrumentation.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9478268eeae340750033378816f0fdf86d931722740fb99b61ad30762fed0da0"
+          },
+          {
+            "identifier": "observability-server-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/server-reporter.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f7c925ea38d6d12bd93c70ef940cdf4d7a1d00d1a113f6d70da948e16b64faf7"
+          },
+          {
+            "identifier": "observability-web-vitals-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:992ca875960306c6d4df22af9fc2e2d9336745ca5ba3724b11d967c8a0d83f33"
+          },
+          {
+            "identifier": "persistence-binding-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/application-persistence.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cd3805e8c96557bedbb61fb89141f24434913fd00d3d8c2fdd4c83411215cab6"
+          },
+          {
+            "identifier": "persistence-db-generate-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:generate"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6a32398548b163b69a5a07596e645957b6ebb25164532c60ea23fd5a59ea7005"
+          },
+          {
+            "identifier": "persistence-db-migrate-local-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:migrate:local"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:868c9bae2103b1e5472305314206bd2c7eeea262b8af82d2c360a951c294b40c"
+          },
+          {
+            "identifier": "persistence-drizzle-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/drizzle.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f2d3d9838220d2d6d7de5da6b988b6c995b18b450acffd42ffd984c1692393a7"
+          },
+          {
+            "identifier": "persistence-migration-tool-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/drizzle-kit"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e93c1bcd422092b06d01ca87b9d6a42fde2e89fec6f08ee7646fe619935846d8"
+          },
+          {
+            "identifier": "persistence-migration-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": ".github/workflows/migrate-application-database.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:91e6bb69a2eda950414e7a622aaea0aa47f5a5a04a0d8063ba2b23a50e773968"
+          },
+          {
+            "identifier": "persistence-operator-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "docs/application-persistence.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:5d464a4f2dcfe608ec508734fb7e2b268fa3d6902161fb06c0e355d299b8444a"
+          },
+          {
+            "identifier": "persistence-orm-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/drizzle-orm"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:b3f00a391d7d4db64a6a2ecec327f804310468f29fb21554065281b6449c7da9"
+          },
+          {
+            "identifier": "persistence-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/src/infrastructure/persistence/schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c0c373918383bed14624850b1fd3fac8041192ade58c8dc9f3983744128edc8b"
+          },
+          {
+            "identifier": "persistence-test-index-migration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fb993c0ef28575a506e4ac30c04e16a4f935ccf9d41a2de4ffe0f41238495944"
+          },
+          {
+            "identifier": "persistence-test-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6b0e656194a8091070db648b122e4b1f16fd3d8343f1bb8ec96f26dda509d473"
+          },
+          {
+            "identifier": "persistence-test-table-migration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fa6c1c9bd8d69633d67b292fdb652b29a63f0c8f7f99513ffb9724f8f0d568fd"
+          },
+          {
+            "identifier": "persistence-test-worker",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/worker.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8a8b7239f8b002734a4c256ed1d61fb835361644a5bb96098a4ba02f8eb8b0aa"
+          },
+          {
+            "identifier": "persistence-worker-types-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@cloudflare~1workers-types"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c5da2865e604198c384a56c2025b883fe9814a65812663c3db3f7654bf5bc49f"
+          },
+          {
+            "identifier": "section-composition-global-styles",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/app/globals.css",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f01825fbb5aa782f14f9c24ee6934fc8dcc9b6c1aab96864d651cc001ba28be2"
+          },
+          {
+            "identifier": "section-composition-postcss-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/postcss.config.mjs",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:b24e265a48887c14722800bc0968fa807151a8a08228b2498c43ee860c1b25e9"
+          },
+          {
+            "identifier": "section-composition-postcss-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/postcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7782efb6ca4adf9e8b12fcb4899db473368ec7af9e06e5b15842fbae13fe4a79"
+          },
+          {
+            "identifier": "section-composition-presentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/src/presentation/content-page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fc3187b34aff7b20c39cf588a199a26eb2c83072694805bd6fb4c5b026882212"
+          },
+          {
+            "identifier": "section-composition-registry",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/src/sections/section-registry.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f69d5ae9ce4eb7da4b6b76a209c699f8586d886ccdac196dc1299ea6f29720d6"
+          },
+          {
+            "identifier": "section-composition-tailwind-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/tailwindcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c"
+          },
+          {
+            "identifier": "section-composition-tailwind-postcss-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@tailwindcss~1postcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c"
+          },
+          {
+            "identifier": "site-routing-about-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/about.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:33309063be899f2fc636ece1110b3f6fdd9325e5c96cbdf3eb5b635898bfdf26"
+          },
+          {
+            "identifier": "site-routing-about-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/about/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:639171f5b67d74acb8b1c8ee5886285f0441c75a2d98eb4b7d94378300a22d54"
+          },
+          {
+            "identifier": "site-routing-browser-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/e2e/site-routing.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:7a77e78e9953fab3ebe1ca2e23e5022c799769aea4e870027c9d262ef9665ff8"
+          },
+          {
+            "identifier": "site-routing-component-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/component/site-page.test.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e241fffe579bb264830a927f258fb4ec287b42e86cd1452e4dab950d90e2c90c"
+          },
+          {
+            "identifier": "site-routing-configuration-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/routing.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:43a2836aef1d37c9d2e43b8ba39cce466fad65873c303c810d00bf3fa6010393"
+          },
+          {
+            "identifier": "site-routing-content-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/read-routing-content.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1a0ba418c242837cfc63b7d3226f8fcdfe9c6994d945fe88db34a232b6c954c9"
+          },
+          {
+            "identifier": "site-routing-content-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/routing-content-schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ce8f178e035a9571b434ebd526295217dfd20baa4bdece4affe26737ed49f3e3"
+          },
+          {
+            "identifier": "site-routing-featured-work-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/work-featured.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c9d7438159d6646f39a7dc96c0adb07e6d3e316b48c8d83f10856476c4f7e406"
+          },
+          {
+            "identifier": "site-routing-featured-work-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/featured/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0f5ecaaff1b3794d0fdce1865bdb8a1d80e721e3b1afe27344bdf8c0a4b952b0"
+          },
+          {
+            "identifier": "site-routing-not-found-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/not-found.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6b128e47d783c9cbff20fea5b0cf1b992edd2008934250ddede992313dfac4ca"
+          },
+          {
+            "identifier": "site-routing-not-found-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/not-found.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cf31de6de404c8b2c140d3429a219c9a681f4307c3f19485676f0aa4c6c24337"
+          },
+          {
+            "identifier": "site-routing-presentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/site-page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:79a0722274b461256e450c4406fd068d6dab60e28dc6b7cfaa4fc7a00fc2cb72"
+          },
+          {
+            "identifier": "site-routing-robots-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/robots.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:eaefccadfa25577374cece3d88d34a14adc281046f65eb6296388512e8e73a45"
+          },
+          {
+            "identifier": "site-routing-sitemap-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/sitemap.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:59e48bad4ef7e42344057382cfa0352864cfaa80dc12a9eb59dbf0fd64d308a5"
+          },
+          {
+            "identifier": "site-routing-unit-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/unit/routing-content.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:96a753f48540d23a52452bf1114c957af8b7c037c56373e05ae4ec8d77e1aaa5"
+          },
+          {
+            "identifier": "site-routing-work-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:74dac5954dec142c19ab5e837655875f2bb5582cd793679c4596d665e4b9321c"
+          },
+          {
+            "identifier": "site-routing-work-index-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:19f511d2a798724ff35d935743b4720c79c63d4883f0b239c22dcbddfc1916f5"
+          },
+          {
+            "identifier": "standards-axe-playwright-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@axe-core~1playwright"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a34b8455789ad192f62d9d3e732553d26494caf9d900efc45a6976345799b6b3"
+          },
+          {
+            "identifier": "standards-browser-install-ci-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/browser:install:ci"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7ee503f27fb5497b1aeacf815a4e415d2c69d2c9be8d3f42033ff7fc5a36d76b"
+          },
+          {
+            "identifier": "standards-browser-install-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/browser:install"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:54c8e5675ec91fd6ebceff6fd0ef4f6db641ddb2d132071b1bfe1e8bce59ed7d"
+          },
+          {
+            "identifier": "standards-browser-quality-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/e2e/site-quality.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c617c71800f8a300bcca47d0b720a34989ae445d5fc2511a74af1c1b54b23790"
+          },
+          {
+            "identifier": "standards-component-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:component"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:985c9d4bb6507b74af1d223826891e92ca7c246c920db9792c202a65afb34f8f"
+          },
+          {
+            "identifier": "standards-component-test-setup",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/setup/component.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:486fd3f10a1d0e0b37727ce3a79368e408f90c3dac604ca18fdfd0bec7dd0dc2"
+          },
+          {
+            "identifier": "standards-component-test-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/component/content-page.test.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:61b7e37fd0089ca940c8906999643db839ca0cc251b6792343cccb7b3539ad88"
+          },
+          {
+            "identifier": "standards-component-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:component:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d56afc4fe48f520efc1039aaccb101e356f1238cb4b282ee61d9c2f82756cb49"
+          },
+          {
+            "identifier": "standards-deployed-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:deployed"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7c9757ae5f5a432943330ecf8d33be53b42ddf3ae4fb0e0c65ea074373699f4c"
+          },
+          {
+            "identifier": "standards-development-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:dev"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7171b2b1152579c5b0452f278ac13708e819768423363ec8ff73116430e9b273"
+          },
+          {
+            "identifier": "standards-dom-testing-library-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a31ad83ed6c54f39cac0e675158ff49669bb2c84bbdbcb618bc530d0404cb311"
+          },
+          {
+            "identifier": "standards-eslint-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/eslint.config.mjs",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df"
+          },
+          {
+            "identifier": "standards-jest-dom-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1jest-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:40fd1d5c919218b162d4a288ed960001b1c4031f04e96a2fc9f665d368ecd6bf"
+          },
+          {
+            "identifier": "standards-jsdom-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/jsdom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4fc133df2106052bebf94d0e09f8aaa02d9d2cda3782ae97ad5c3c4da89fdf21"
+          },
+          {
+            "identifier": "standards-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@egeria-systems~1standards"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8e633b4f41f99d4c388915bc852f2143cf4e9f5eaad70c76a81d4f4aa629eec1"
+          },
+          {
+            "identifier": "standards-playwright-deployed-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.deployed.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d4da22b547bbcc589aaf1c1c9b0ece4e8254ab658612237f167034fa52b2f2b5"
+          },
+          {
+            "identifier": "standards-playwright-development-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.dev.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a2a11cb72cb9009fff32b2e00240fa804943995f2ddee7fe8963a039d712f379"
+          },
+          {
+            "identifier": "standards-playwright-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@playwright~1test"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:634c3863a42508fe6e1e77fadb84f74555d5a0677bb941035f2613b4dc39162a"
+          },
+          {
+            "identifier": "standards-playwright-preview-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.preview.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:50b63c0cc129988305244717db0bf7f7a44c3aa2f960930af6934487381636df"
+          },
+          {
+            "identifier": "standards-playwright-shared-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.config.shared.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:89c07b78bb0442f65664afb83e56ec37d1b0d7d3ca1698901a2abad9433ffd1a"
+          },
+          {
+            "identifier": "standards-playwright-visual-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.visual.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:eacad1190c4dec110b823210773f670b017822237afbd1c21889f0fc489de879"
+          },
+          {
+            "identifier": "standards-preview-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:preview"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:be381fd0767cc44566010e2f4c8936e50eeb0470eaa5a69082d52100dce4b3e8"
+          },
+          {
+            "identifier": "standards-quality-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": ".github/workflows/quality.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d11d54661dac2c61931f00a0695c981a33949133c4e2614fcf8c8907c2440b06"
+          },
+          {
+            "identifier": "standards-react-testing-library-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:f4e846bb6efaf55da19cc06b9eebd94eec96ef4213e637e1524c48d9d8f46adb"
+          },
+          {
+            "identifier": "standards-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8f1036543a0bc25aeefae4f8576b947b19a79dd5135d30e692a51bb3d20f6345"
+          },
+          {
+            "identifier": "standards-test-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e7d8dc898b9979eff59dbfa3edbbd47b20378a0e33299da24fe1c93f84e88bbf"
+          },
+          {
+            "identifier": "standards-typescript-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tsconfig.json",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:69f986f57d11c0d37e288d05805689d37f6caea3664a78d927fcf9e299a751be"
+          },
+          {
+            "identifier": "standards-unit-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:unit"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:bbca9b7e63231badcd542320d45c2380b404b9c6a34e2dd3de0b95ca2bb34b9d"
+          },
+          {
+            "identifier": "standards-unit-test-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/unit/content-schema.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f171b3f82123b2e01fab64edc7f065dd482fb9e6e8fbe642477c68501e8a06c8"
+          },
+          {
+            "identifier": "standards-unit-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:unit:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7939c38a3400a7e5bde6ccb5b094276f671c7764759ca8438d538e2e6e59b785"
+          },
+          {
+            "identifier": "standards-user-event-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1user-event"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c659ff0e3067837f4cb832327a80e418dd5b24485dc80cf121013b1c167e3788"
+          },
+          {
+            "identifier": "standards-visual-regression-desktop-baseline",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+          },
+          {
+            "identifier": "standards-visual-regression-mobile-baseline",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+          },
+          {
+            "identifier": "standards-visual-regression-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:566990fcd546fa8f1ec43ca64456e3b6eddd5ff90948d21085074dda98a56eac"
+          },
+          {
+            "identifier": "standards-visual-regression-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:visual"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:ed74e7af1aa0e964e79c6884ee8d8c72b2ba76d99c6f903e285f4dba6cbd5d17"
+          },
+          {
+            "identifier": "standards-vite-react-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@vitejs~1plugin-react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:407c0a101a59d2b970f8a4ee46a82f521d5059c0da5415fffd68fc8576c967e1"
+          },
+          {
+            "identifier": "standards-vitest-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/vitest.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a577adba8d5c6a881826d1934602c50da72f2bca82c3c35715a0b66e997a1f0e"
+          },
+          {
+            "identifier": "standards-vitest-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/vitest"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:95ccc76176af7a0746cd34976a22903bbd99a9cd5018191165fba387c60ac538"
+          },
+          {
+            "identifier": "transactional-email-composition-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/server-transactional-email.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0a39eb05e944ec845dc1b61365718256852d42d17433e51c174f7cca08c8d980"
+          },
+          {
+            "identifier": "transactional-email-event-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/transactional-email-events.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d9560968101ad607265690af07557cf130f3288521bfa71a161f9579c52f8292"
+          },
+          {
+            "identifier": "transactional-email-operator-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "docs/transactional-email.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3cc8521d4671eb5ab79b038f7c904a49454db8fb9b4670ef7b359e0e47b76eb7"
+          },
+          {
+            "identifier": "transactional-email-provider-contract-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/resend-transactional-email-sender.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a6058c882fbd3bba8e53c3c45fd5297784040f8c757ac3f612a44456c8eb2329"
+          },
+          {
+            "identifier": "transactional-email-resend-adapter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/resend/transactional-email-sender.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:69cc127fb11eef64bd325fcfe05cffa591b74bf2116018301cfce6e2cc4a648e"
+          },
+          {
+            "identifier": "transactional-email-runtime-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/transactional-email-configuration.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:61c0f64f487fc3728f2dd386d076973bd147c2ef91d397353500b0a403c290d6"
+          },
+          {
+            "identifier": "transactional-email-safe-events",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/observability/transactional-email-events.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:2fd062e4fc57443ff091eab0cc7ae92a6220381abce71e5214e163a3665592ce"
+          },
+          {
+            "identifier": "transactional-email-sender-port",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/application/transactional-email-sender.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ba8cc264da5c946c5b81dc8d5ff1a2228670c1741f80ad92b47dd6874222581f"
+          },
+          {
+            "identifier": "transactional-email-server-composition",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/composition/server-transactional-email.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3f8e6c3a0d95ffad0aea96e134352128692d2a8cc14b3de577ee018888ac54e2"
+          }
+        ],
+        "ejections": [],
+        "compatibility": {
+          "node": "22.23.2",
+          "pnpm": "11.20.0",
+          "platformAdapter": "cloudflare-workers"
+        },
+        "lastSuccessfulVerification": {
+          "kind": "generation",
+          "checks": [
+            "contracts",
+            "pre-state-inference",
+            "lockfile",
+            "frozen-install",
+            "lint",
+            "cloudflare-types",
+            "typecheck",
+            "unit-tests",
+            "component-tests",
+            "next-build",
+            "opennext-build",
+            "worker-integration",
+            "binding-integration",
+            "post-state-inference"
+          ]
+        }
+      }
+    },
+    "original": {
+      "next": "16.3.3",
+      "state": {
+        "schemaVersion": "1.0.0",
+        "builderVersion": "0.0.0",
+        "projectSchemaVersion": "1.0.0",
+        "origin": {
+          "profile": "app",
+          "recipeVersion": "0.2.1"
+        },
+        "installedCapabilities": [
+          {
+            "identifier": "standards",
+            "version": "0.6.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "deployment-cloudflare",
+            "version": "0.4.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "content-files",
+            "version": "0.4.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "section-composition",
+            "version": "0.3.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "observability",
+            "version": "0.3.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "app-foundation",
+            "version": "0.2.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "site-routing",
+            "version": "0.4.0",
+            "deliveryMode": "source-generated",
+            "stateClassifications": [
+              "repository-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          },
+          {
+            "identifier": "application-persistence",
+            "version": "0.1.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful",
+              "persistent-data"
+            ],
+            "removalPolicy": "export-and-remove"
+          },
+          {
+            "identifier": "transactional-email-resend",
+            "version": "0.1.0",
+            "deliveryMode": "hybrid",
+            "stateClassifications": [
+              "repository-stateful",
+              "external-stateful"
+            ],
+            "removalPolicy": "reviewed"
+          }
+        ],
+        "appliedMigrations": [],
+        "managedSurfaces": [
+          {
+            "identifier": "app-foundation-application-boundaries-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/docs/application-boundaries.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e31e7d17db24b47d52a62403fa0c16bbcaf0e80e8af08dc42dd01ccbeb0f7ab7"
+          },
+          {
+            "identifier": "app-foundation-build-information-domain",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/domain/build-information.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6a82ea50779abe2161000e5258fc9edfa63660a2c5eb4c9b912372d69530c1fa"
+          },
+          {
+            "identifier": "app-foundation-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9a77897a7789e6cc888aed3808ffe03e28808eee568de165d50b514fdde4fb60"
+          },
+          {
+            "identifier": "app-foundation-build-information-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/build-information.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3a15d8e86a56b5d4c6bff011472ee2173b31326320202ca01eab69e385b92c99"
+          },
+          {
+            "identifier": "app-foundation-cloudflare-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9f1dba2e65ee261e53f96d678342d43ee1e7748c8f1cd1b87c2e6aef64c8bcca"
+          },
+          {
+            "identifier": "app-foundation-cloudflare-reader-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/cloudflare-build-information-reader.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:402e107e76e07f8c4873e74677441bc2e2cd09a76c0c578d22e6dc2db2981aff"
+          },
+          {
+            "identifier": "app-foundation-effect-dependency",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/effect"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:02cdf96db52258fa612bb53c57f37f7417c5d8bcb350cb1b6463b21c04097d0e"
+          },
+          {
+            "identifier": "app-foundation-health-application",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/health.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c9c0bb42e519e438c5252c32bc9525e9b7f0b9272ab5b9f51285a97598cf0caa"
+          },
+          {
+            "identifier": "app-foundation-health-route-delivery",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/delivery/health-route.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a9b63fc9eeae0cdcfb3cb338d370b368cec1eafdceb5371ed811ed33b11086d9"
+          },
+          {
+            "identifier": "app-foundation-health-route-entry",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/app/api/health/route.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:95a33043b7a147107b6931f3ef015b9993e228e49dda0adafa6815a3b7f3d640"
+          },
+          {
+            "identifier": "app-foundation-health-route-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/health-route.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:af08b1cc8a157d2f377937f63d7a227a12a36c2bfe3e9bd0267015211eb54523"
+          },
+          {
+            "identifier": "app-foundation-health-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/health.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d55f4944d73a1c212e60cab4a5c6ce546b896df9b22e908c8520583b57d4ca1e"
+          },
+          {
+            "identifier": "app-foundation-memory-build-information-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/infrastructure/memory/build-information-reader.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:b3dde1af2b75d2fe0b9742aefee8de4fd54220d504fe59a739d833b32383fa36"
+          },
+          {
+            "identifier": "app-foundation-request-context",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/application/request-context.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:747954e6f154921a09d7b35b962fc6e1be7ed55fb1ce72cb21be0fe0bf448b25"
+          },
+          {
+            "identifier": "app-foundation-request-context-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/unit/request-context.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cb4fe89f6508758b798558dd8e5b2e3320dd68b8ec15da3173d1eb0185454569"
+          },
+          {
+            "identifier": "app-foundation-server-health-composition",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/src/composition/server-health.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:28eaf1b18ca956dc5baa4e21969a39725eff5373c949d4ce84263e51f6ff612c"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/vitest.cloudflare.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3a5ad5ba76e26fada236f49385ec137b6cc91d658f3e16bc90f6e133c547146f"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:integration:cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:cf2de1e180d4f7a309e89c79db66b33143755f01f508a84f47f26ad5b0a73f13"
+          },
+          {
+            "identifier": "app-foundation-whole-worker-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "app-foundation"
+            },
+            "path": "apps/web/tests/integration/health-worker.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:73b377214bcae68f4a2febf7407bdf23d6c909dd4877e853df76057233037510"
+          },
+          {
+            "identifier": "builder-dependency-lockfile",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "pnpm-lock.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:886c4d66a47d0dea6d1856ab422b9c2c7865a62b58bd1a8d48adb6e490142e04"
+          },
+          {
+            "identifier": "builder-gitignore",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".gitignore",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ea9ae5806fbefcbfbc1f39b2dc4bacb4226408ca8355caaa6401d591d46675bb"
+          },
+          {
+            "identifier": "builder-home-route",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/app/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:5a8e69d58a8f32818f68e91e6d1815b04d44ce909e391245e980422ee7d2cfa9"
+          },
+          {
+            "identifier": "builder-migration-log",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".egeria/migrations.jsonl",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+          },
+          {
+            "identifier": "builder-node-version",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".nvmrc",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:08062faf0d7a2d22f5d7933c50e975dd1527034275597be7c1b3b9fd2b9d079a"
+          },
+          {
+            "identifier": "builder-project-configuration",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": ".egeria/project.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:07ff3494a2a0635bfc2f6fe2003756c11f5d4a266d679dbb0ae770edeadfec08"
+          },
+          {
+            "identifier": "builder-readme",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "README.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f669eb3399fbf5e4386632c2dafd4af9bd44da551510863e199877db7324d83b"
+          },
+          {
+            "identifier": "builder-root-instructions",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "AGENTS.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4823518c1074ae33a5fd6868418631918a8bc50955c364eb39c8f85c7234e666"
+          },
+          {
+            "identifier": "builder-root-layout",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/app/layout.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:dc909d1a1943e8374c5cb3f3144ecb7922f4a58c02b971e3ff9d7a2a465e2f93"
+          },
+          {
+            "identifier": "builder-root-package-manifest",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "package.json",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d6e3e5455c4dd7bffce69a1fb35c5121ee96ad9e60ce00fd41ac967548d1d600"
+          },
+          {
+            "identifier": "builder-web-build-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/build"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:71969d21b7129941ed33eb40fa5747153633fa2e9a2b4447b0a25e4b6f15c77b"
+          },
+          {
+            "identifier": "builder-web-cloudflare-build-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/build:cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8c523427bfc39ac7aad8675c0e2b7c0b86dba7ffe20bf8a485523a3038c28827"
+          },
+          {
+            "identifier": "builder-web-cloudflare-type-generation-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/cf-typegen"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6b8d38da193b295a86e581b03d211134f89d851b0ebfc871057f136f90a804fe"
+          },
+          {
+            "identifier": "builder-web-development-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/dev"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:349da1dedba850fc330991e0a85f3fe4db6022703870443b9b86f96ef529b2fe"
+          },
+          {
+            "identifier": "builder-web-instructions",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/AGENTS.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1b3c378d3fdde8d58e34576aa4875925f8f58e49a0c4ce86b4408450f3463175"
+          },
+          {
+            "identifier": "builder-web-lint-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/lint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6eefc9a9608c332e6b3f0c8d0e6366241a189f0c8b732982da29abec3be8cb20"
+          },
+          {
+            "identifier": "builder-web-package-eslint",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/eslint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d53b05b125b368cca2922e1cdb25b29e06326ac70c968b879c5a9a13102ddc31"
+          },
+          {
+            "identifier": "builder-web-package-eslint-next",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/eslint-config-next"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2"
+          },
+          {
+            "identifier": "builder-web-package-name",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/name"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:95e6ed28bcb9931a27d1cae7ad7301554c51e0af6b54437086a678e85593378d"
+          },
+          {
+            "identifier": "builder-web-package-next",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/next"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4e824eb6621057d8bbcf84dd8ab707616492dd66e5ed634a82d5360a36be3fa2"
+          },
+          {
+            "identifier": "builder-web-package-private",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/private"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:b5bea41b6c623f7c09f1bf24dcae58ebab3c0cdd90ad966bc43a45b44867e12b"
+          },
+          {
+            "identifier": "builder-web-package-react",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c83897e566a718cd5cb9d625c381bfe441b41ae069ea471dab9745a22948d63c"
+          },
+          {
+            "identifier": "builder-web-package-react-dom",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/react-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c83897e566a718cd5cb9d625c381bfe441b41ae069ea471dab9745a22948d63c"
+          },
+          {
+            "identifier": "builder-web-package-type",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/type"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:51b03279c071bc2e55a377745fdd442c9eedc700152b19366572fa8f76d76017"
+          },
+          {
+            "identifier": "builder-web-package-types-node",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1node"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0d23b4fc35b446ea877122556f0735726e8acae05df3b96ba85c95dc077f6e07"
+          },
+          {
+            "identifier": "builder-web-package-types-react",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4223e25989d406d49471ab23add79b6fdeb9238ab2c03bb2882ff588787892d6"
+          },
+          {
+            "identifier": "builder-web-package-types-react-dom",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@types~1react-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0cfa9aa35b96ccbe8d85ed2bb8108166e3a24157bb3bd95441f787b8ecd79027"
+          },
+          {
+            "identifier": "builder-web-package-typescript",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/typescript"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:3e3fa41437ab238c8a99b85f9564f6e5443fb2f47ca54f841fd20e26bf699fb4"
+          },
+          {
+            "identifier": "builder-web-package-typescript-eslint",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/typescript-eslint"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:f258a3564d82ac23d6317c132f310472ff88ee888dc0733ed4940fbbad9ff5bf"
+          },
+          {
+            "identifier": "builder-web-package-version",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/version"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:03091d605ba0cafdfa2d21835ec1ab8bf17e7b4b8060cfa08a2d3b7488b71371"
+          },
+          {
+            "identifier": "builder-web-preview-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/preview"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d82dcb84764c339391ed650d0a718dd1c262d78802b3141d386f1f7824bae102"
+          },
+          {
+            "identifier": "builder-web-typecheck-script",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/typecheck"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c1850885b2eaf24bf28769efab035e68cd60206d1cde61228959b3049fe20cac"
+          },
+          {
+            "identifier": "builder-workspace-configuration",
+            "owner": {
+              "kind": "builder-kernel"
+            },
+            "path": "pnpm-workspace.yaml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:503a9b68f51a1b60936d49a6915ea94b35821c721ac53302b99da59829525c3e"
+          },
+          {
+            "identifier": "content-files-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/content.config.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4f827edda6b1bde315c4e0add09dae1df69aeb6c2e4593fa6ba23eae430ebc55"
+          },
+          {
+            "identifier": "content-files-long-form-introduction",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/en-CA/long-form/introduction.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9449c0d5eb74c49863f6351f071a8b867a0332d74d6d0e1295b032265fa3a7d9"
+          },
+          {
+            "identifier": "content-files-raw-loader-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/raw-loader"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:24822994d0f46fb84da71490a87020e2a9409e578e084d5e5ac2992b9d9ffb64"
+          },
+          {
+            "identifier": "content-files-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/read-content.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:448b65e8814d30c3e00338248216618954aec031bcb1ab0caca3cda2f7a037b0"
+          },
+          {
+            "identifier": "content-files-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/content-schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085"
+          },
+          {
+            "identifier": "content-files-site-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/content/en-CA/site.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:900fa69c98344e3a4db8824eaf38a37a366103d88596b845753e6918b73061c4"
+          },
+          {
+            "identifier": "content-files-source-declarations",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/src/content/content-source.d.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a7e45b479a8b43ff63ddd7ce893cdfb91488faef53e762648908d98092b12dbb"
+          },
+          {
+            "identifier": "content-files-yaml-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "content-files"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/yaml"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:ffff7c6d8151c7c43be2fb894756deb6abcc84d003a569fce989dd5aa111bd7a"
+          },
+          {
+            "identifier": "deployment-binding-test-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/vitest.bindings.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ce180380b3a00b5f9017706a632f1aad19c5cf800816db9989f223e8838fba8f"
+          },
+          {
+            "identifier": "deployment-cloudflare-next-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/next.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9a7e515381b029b4f2bafdd1feec366a17f2664bdfd2929ed9571090009e4d80"
+          },
+          {
+            "identifier": "deployment-cloudflare-open-next-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/open-next.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8e02c850592160eb80d1aed908789f317babcb76985792a86bb79e7c0dd4b1d9"
+          },
+          {
+            "identifier": "deployment-cloudflare-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/@opennextjs~1cloudflare"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e4791bd213160897516915ad85706c1bdcf6c0f08977e66f98df56c212f3a925"
+          },
+          {
+            "identifier": "deployment-cloudflare-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": ".github/workflows/deploy.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:7eac1e693153eb3ca88a2e51952a9564fc3bcd5e0609a81c5224c6893a5f1619"
+          },
+          {
+            "identifier": "deployment-cloudflare-wrangler-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/wrangler.jsonc",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4c1ac7b3a076ec86b76631724e9cc9a47c96362e54b12513e2084c49ab863aa2"
+          },
+          {
+            "identifier": "deployment-cloudflare-wrangler-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/wrangler"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:16b87f40883cb37f7fe55be07fff2a2c0b644b6aa11aa041c6b0e9eab1596db6"
+          },
+          {
+            "identifier": "deployment-database-preflight",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/scripts/check-application-database.mjs",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:4f97079e48364ec613faacb396cdf49108bf37a344e3e0b54be567532bf7292c"
+          },
+          {
+            "identifier": "deployment-db-check-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:check"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:0769ac4449d44273cb386caed45508b6f30c9073af56f0b10b48474ddcae43d9"
+          },
+          {
+            "identifier": "deployment-db-migrations-hash-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:migrations:hash"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:194084497b3919ffea06e8fa73e893d2c67b4b5b432f12aa47cb0f98fbc99964"
+          },
+          {
+            "identifier": "deployment-test-integration-bindings-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "deployment-cloudflare"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:integration:bindings"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:cbca8b6b5b8afbe7054d499174bbb588f04443440cffa66ee419b93afd583816"
+          },
+          {
+            "identifier": "observability-browser-ingest-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/api/observability/route.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a9373820327bdfa94cddf625e90e9d6372d921044c3aabfedd4f8ed59ec69d07"
+          },
+          {
+            "identifier": "observability-browser-instrumentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/instrumentation-client.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9722b012487e7cd514f42f8fee02e37ee2706a45db02bc7e33156963bdf40d0c"
+          },
+          {
+            "identifier": "observability-browser-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/browser-reporter.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0c6ea3a819be830d7551c5ab64e1ecad4d00248529d58ed7aaddcb85709ebbca"
+          },
+          {
+            "identifier": "observability-cloudflare-context",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/observability-context.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d986d4cf7d8c859cad7f5a4ff1ed28093e0c1279846f3bb935fc59c90b2570f6"
+          },
+          {
+            "identifier": "observability-error-copy",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/error-copy.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ef461e56e5bb86bc05b89515cc2789e4201e9eb48f8ac06b7035735219a52c2e"
+          },
+          {
+            "identifier": "observability-error-copy-source",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/content/en-CA/observability.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a05df3a90a920a747842dbd766a68c0f52df8a90978a2419836df83313519550"
+          },
+          {
+            "identifier": "observability-error-fallback",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/presentation/error-fallback.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f60bdac6ed3c66252ccb5a75d6961584f13a6ed6d35eed3363f8685579276492"
+          },
+          {
+            "identifier": "observability-global-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/global-error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e4cb19f30f11d647a41ef45c9c5911706769ebc9842797802ab1e100c7b2bd9d"
+          },
+          {
+            "identifier": "observability-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/@egeria-systems~1observability"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a09e2d94133d00d7d72ce4dcb988afb0adf5e34fc0dd8068f9fd582899d63034"
+          },
+          {
+            "identifier": "observability-page-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/app/error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:829b25e9a75d6a89bb4a875b14dcec62c8df0ba48641e4c9cba5b2e77ab8daa0"
+          },
+          {
+            "identifier": "observability-registration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/installed-capability.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1ad97f88cab83d93e01953f32104d0583f26793cfe9b35d7a75ed400a05f7956"
+          },
+          {
+            "identifier": "observability-server-instrumentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/instrumentation.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:9478268eeae340750033378816f0fdf86d931722740fb99b61ad30762fed0da0"
+          },
+          {
+            "identifier": "observability-server-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/server-reporter.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f7c925ea38d6d12bd93c70ef940cdf4d7a1d00d1a113f6d70da948e16b64faf7"
+          },
+          {
+            "identifier": "observability-web-vitals-reporter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "observability"
+            },
+            "path": "apps/web/src/infrastructure/observability/web-vitals-reporter.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:992ca875960306c6d4df22af9fc2e2d9336745ca5ba3724b11d967c8a0d83f33"
+          },
+          {
+            "identifier": "persistence-binding-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/application-persistence.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cd3805e8c96557bedbb61fb89141f24434913fd00d3d8c2fdd4c83411215cab6"
+          },
+          {
+            "identifier": "persistence-db-generate-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:generate"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:6a32398548b163b69a5a07596e645957b6ebb25164532c60ea23fd5a59ea7005"
+          },
+          {
+            "identifier": "persistence-db-migrate-local-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/db:migrate:local"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:868c9bae2103b1e5472305314206bd2c7eeea262b8af82d2c360a951c294b40c"
+          },
+          {
+            "identifier": "persistence-drizzle-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/drizzle.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f2d3d9838220d2d6d7de5da6b988b6c995b18b450acffd42ffd984c1692393a7"
+          },
+          {
+            "identifier": "persistence-migration-tool-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/drizzle-kit"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e93c1bcd422092b06d01ca87b9d6a42fde2e89fec6f08ee7646fe619935846d8"
+          },
+          {
+            "identifier": "persistence-migration-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": ".github/workflows/migrate-application-database.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:91e6bb69a2eda950414e7a622aaea0aa47f5a5a04a0d8063ba2b23a50e773968"
+          },
+          {
+            "identifier": "persistence-operator-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "docs/application-persistence.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:5d464a4f2dcfe608ec508734fb7e2b268fa3d6902161fb06c0e355d299b8444a"
+          },
+          {
+            "identifier": "persistence-orm-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/dependencies/drizzle-orm"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:b3f00a391d7d4db64a6a2ecec327f804310468f29fb21554065281b6449c7da9"
+          },
+          {
+            "identifier": "persistence-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/src/infrastructure/persistence/schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c0c373918383bed14624850b1fd3fac8041192ade58c8dc9f3983744128edc8b"
+          },
+          {
+            "identifier": "persistence-test-index-migration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/migrations/0001_persistence_fixture_index.sql",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fb993c0ef28575a506e4ac30c04e16a4f935ccf9d41a2de4ffe0f41238495944"
+          },
+          {
+            "identifier": "persistence-test-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6b0e656194a8091070db648b122e4b1f16fd3d8343f1bb8ec96f26dda509d473"
+          },
+          {
+            "identifier": "persistence-test-table-migration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/migrations/0000_persistence_fixture.sql",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fa6c1c9bd8d69633d67b292fdb652b29a63f0c8f7f99513ffb9724f8f0d568fd"
+          },
+          {
+            "identifier": "persistence-test-worker",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/tests/bindings/fixtures/worker.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:8a8b7239f8b002734a4c256ed1d61fb835361644a5bb96098a4ba02f8eb8b0aa"
+          },
+          {
+            "identifier": "persistence-worker-types-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "application-persistence"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@cloudflare~1workers-types"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c5da2865e604198c384a56c2025b883fe9814a65812663c3db3f7654bf5bc49f"
+          },
+          {
+            "identifier": "section-composition-global-styles",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/app/globals.css",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f01825fbb5aa782f14f9c24ee6934fc8dcc9b6c1aab96864d651cc001ba28be2"
+          },
+          {
+            "identifier": "section-composition-postcss-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/postcss.config.mjs",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:b24e265a48887c14722800bc0968fa807151a8a08228b2498c43ee860c1b25e9"
+          },
+          {
+            "identifier": "section-composition-postcss-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/postcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7782efb6ca4adf9e8b12fcb4899db473368ec7af9e06e5b15842fbae13fe4a79"
+          },
+          {
+            "identifier": "section-composition-presentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/src/presentation/content-page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:fc3187b34aff7b20c39cf588a199a26eb2c83072694805bd6fb4c5b026882212"
+          },
+          {
+            "identifier": "section-composition-registry",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/src/sections/section-registry.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f69d5ae9ce4eb7da4b6b76a209c699f8586d886ccdac196dc1299ea6f29720d6"
+          },
+          {
+            "identifier": "section-composition-tailwind-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/tailwindcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c"
+          },
+          {
+            "identifier": "section-composition-tailwind-postcss-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "section-composition"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@tailwindcss~1postcss"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:085b109f2a3bd45ae5bfe8d68c321f54f29b47a7099b994de36f100c58d8825c"
+          },
+          {
+            "identifier": "site-routing-about-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/about.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:33309063be899f2fc636ece1110b3f6fdd9325e5c96cbdf3eb5b635898bfdf26"
+          },
+          {
+            "identifier": "site-routing-about-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/about/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:639171f5b67d74acb8b1c8ee5886285f0441c75a2d98eb4b7d94378300a22d54"
+          },
+          {
+            "identifier": "site-routing-browser-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/e2e/site-routing.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:7a77e78e9953fab3ebe1ca2e23e5022c799769aea4e870027c9d262ef9665ff8"
+          },
+          {
+            "identifier": "site-routing-component-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/component/site-page.test.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:e241fffe579bb264830a927f258fb4ec287b42e86cd1452e4dab950d90e2c90c"
+          },
+          {
+            "identifier": "site-routing-configuration-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/routing.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:43a2836aef1d37c9d2e43b8ba39cce466fad65873c303c810d00bf3fa6010393"
+          },
+          {
+            "identifier": "site-routing-content-reader",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/read-routing-content.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:1a0ba418c242837cfc63b7d3226f8fcdfe9c6994d945fe88db34a232b6c954c9"
+          },
+          {
+            "identifier": "site-routing-content-schema",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/routing-content-schema.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ce8f178e035a9571b434ebd526295217dfd20baa4bdece4affe26737ed49f3e3"
+          },
+          {
+            "identifier": "site-routing-featured-work-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/work-featured.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c9d7438159d6646f39a7dc96c0adb07e6d3e316b48c8d83f10856476c4f7e406"
+          },
+          {
+            "identifier": "site-routing-featured-work-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/featured/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0f5ecaaff1b3794d0fdce1865bdb8a1d80e721e3b1afe27344bdf8c0a4b952b0"
+          },
+          {
+            "identifier": "site-routing-not-found-content",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/content/en-CA/not-found.yaml",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:6b128e47d783c9cbff20fea5b0cf1b992edd2008934250ddede992313dfac4ca"
+          },
+          {
+            "identifier": "site-routing-not-found-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/not-found.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:cf31de6de404c8b2c140d3429a219c9a681f4307c3f19485676f0aa4c6c24337"
+          },
+          {
+            "identifier": "site-routing-presentation",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/src/routing/site-page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:79a0722274b461256e450c4406fd068d6dab60e28dc6b7cfaa4fc7a00fc2cb72"
+          },
+          {
+            "identifier": "site-routing-robots-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/robots.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:eaefccadfa25577374cece3d88d34a14adc281046f65eb6296388512e8e73a45"
+          },
+          {
+            "identifier": "site-routing-sitemap-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/sitemap.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:59e48bad4ef7e42344057382cfa0352864cfaa80dc12a9eb59dbf0fd64d308a5"
+          },
+          {
+            "identifier": "site-routing-unit-test",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/tests/unit/routing-content.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:96a753f48540d23a52452bf1114c957af8b7c037c56373e05ae4ec8d77e1aaa5"
+          },
+          {
+            "identifier": "site-routing-work-error-boundary",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/error.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:74dac5954dec142c19ab5e837655875f2bb5582cd793679c4596d665e4b9321c"
+          },
+          {
+            "identifier": "site-routing-work-index-route",
+            "owner": {
+              "kind": "capability",
+              "identifier": "site-routing"
+            },
+            "path": "apps/web/app/work/page.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:19f511d2a798724ff35d935743b4720c79c63d4883f0b239c22dcbddfc1916f5"
+          },
+          {
+            "identifier": "standards-axe-playwright-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@axe-core~1playwright"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a34b8455789ad192f62d9d3e732553d26494caf9d900efc45a6976345799b6b3"
+          },
+          {
+            "identifier": "standards-browser-install-ci-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/browser:install:ci"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7ee503f27fb5497b1aeacf815a4e415d2c69d2c9be8d3f42033ff7fc5a36d76b"
+          },
+          {
+            "identifier": "standards-browser-install-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/browser:install"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:54c8e5675ec91fd6ebceff6fd0ef4f6db641ddb2d132071b1bfe1e8bce59ed7d"
+          },
+          {
+            "identifier": "standards-browser-quality-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/e2e/site-quality.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c617c71800f8a300bcca47d0b720a34989ae445d5fc2511a74af1c1b54b23790"
+          },
+          {
+            "identifier": "standards-component-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:component"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:985c9d4bb6507b74af1d223826891e92ca7c246c920db9792c202a65afb34f8f"
+          },
+          {
+            "identifier": "standards-component-test-setup",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/setup/component.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:486fd3f10a1d0e0b37727ce3a79368e408f90c3dac604ca18fdfd0bec7dd0dc2"
+          },
+          {
+            "identifier": "standards-component-test-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/component/content-page.test.tsx",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:61b7e37fd0089ca940c8906999643db839ca0cc251b6792343cccb7b3539ad88"
+          },
+          {
+            "identifier": "standards-component-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:component:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:d56afc4fe48f520efc1039aaccb101e356f1238cb4b282ee61d9c2f82756cb49"
+          },
+          {
+            "identifier": "standards-deployed-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:deployed"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7c9757ae5f5a432943330ecf8d33be53b42ddf3ae4fb0e0c65ea074373699f4c"
+          },
+          {
+            "identifier": "standards-development-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:dev"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7171b2b1152579c5b0452f278ac13708e819768423363ec8ff73116430e9b273"
+          },
+          {
+            "identifier": "standards-dom-testing-library-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:a31ad83ed6c54f39cac0e675158ff49669bb2c84bbdbcb618bc530d0404cb311"
+          },
+          {
+            "identifier": "standards-eslint-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/eslint.config.mjs",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d8458336de55b7e4de72711619490a857d1a1f16d2004f2d7e1d2f98ecab84df"
+          },
+          {
+            "identifier": "standards-jest-dom-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1jest-dom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:40fd1d5c919218b162d4a288ed960001b1c4031f04e96a2fc9f665d368ecd6bf"
+          },
+          {
+            "identifier": "standards-jsdom-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/jsdom"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:4fc133df2106052bebf94d0e09f8aaa02d9d2cda3782ae97ad5c3c4da89fdf21"
+          },
+          {
+            "identifier": "standards-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@egeria-systems~1standards"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8e633b4f41f99d4c388915bc852f2143cf4e9f5eaad70c76a81d4f4aa629eec1"
+          },
+          {
+            "identifier": "standards-playwright-deployed-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.deployed.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d4da22b547bbcc589aaf1c1c9b0ece4e8254ab658612237f167034fa52b2f2b5"
+          },
+          {
+            "identifier": "standards-playwright-development-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.dev.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a2a11cb72cb9009fff32b2e00240fa804943995f2ddee7fe8963a039d712f379"
+          },
+          {
+            "identifier": "standards-playwright-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@playwright~1test"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:634c3863a42508fe6e1e77fadb84f74555d5a0677bb941035f2613b4dc39162a"
+          },
+          {
+            "identifier": "standards-playwright-preview-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.preview.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:50b63c0cc129988305244717db0bf7f7a44c3aa2f960930af6934487381636df"
+          },
+          {
+            "identifier": "standards-playwright-shared-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.config.shared.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:89c07b78bb0442f65664afb83e56ec37d1b0d7d3ca1698901a2abad9433ffd1a"
+          },
+          {
+            "identifier": "standards-playwright-visual-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/playwright.visual.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:eacad1190c4dec110b823210773f670b017822237afbd1c21889f0fc489de879"
+          },
+          {
+            "identifier": "standards-preview-browser-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:e2e:preview"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:be381fd0767cc44566010e2f4c8936e50eeb0470eaa5a69082d52100dce4b3e8"
+          },
+          {
+            "identifier": "standards-quality-workflow",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": ".github/workflows/quality.yml",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d11d54661dac2c61931f00a0695c981a33949133c4e2614fcf8c8907c2440b06"
+          },
+          {
+            "identifier": "standards-react-testing-library-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:f4e846bb6efaf55da19cc06b9eebd94eec96ef4213e637e1524c48d9d8f46adb"
+          },
+          {
+            "identifier": "standards-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:8f1036543a0bc25aeefae4f8576b947b19a79dd5135d30e692a51bb3d20f6345"
+          },
+          {
+            "identifier": "standards-test-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:e7d8dc898b9979eff59dbfa3edbbd47b20378a0e33299da24fe1c93f84e88bbf"
+          },
+          {
+            "identifier": "standards-typescript-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tsconfig.json",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:69f986f57d11c0d37e288d05805689d37f6caea3664a78d927fcf9e299a751be"
+          },
+          {
+            "identifier": "standards-unit-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:unit"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:bbca9b7e63231badcd542320d45c2380b404b9c6a34e2dd3de0b95ca2bb34b9d"
+          },
+          {
+            "identifier": "standards-unit-test-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/unit/content-schema.test.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:f171b3f82123b2e01fab64edc7f065dd482fb9e6e8fbe642477c68501e8a06c8"
+          },
+          {
+            "identifier": "standards-unit-watch-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:unit:watch"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:7939c38a3400a7e5bde6ccb5b094276f671c7764759ca8438d538e2e6e59b785"
+          },
+          {
+            "identifier": "standards-user-event-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@testing-library~1user-event"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:c659ff0e3067837f4cb832327a80e418dd5b24485dc80cf121013b1c167e3788"
+          },
+          {
+            "identifier": "standards-visual-regression-desktop-baseline",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-desktop-chromium-linux.png",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0af7b83955d5e5cd92c9a41e2025688149f5145ae572959ec8700ca644d7bce7"
+          },
+          {
+            "identifier": "standards-visual-regression-mobile-baseline",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts-snapshots/home-mobile-chromium-linux.png",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:c2845499229e8ab193ea0ff867a5edb0b98284e41e9da5e1272f0c8f10c2e6e6"
+          },
+          {
+            "identifier": "standards-visual-regression-specification",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/tests/visual/home-visual.spec.ts",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:566990fcd546fa8f1ec43ca64456e3b6eddd5ff90948d21085074dda98a56eac"
+          },
+          {
+            "identifier": "standards-visual-regression-test-script",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/scripts/test:visual"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:ed74e7af1aa0e964e79c6884ee8d8c72b2ba76d99c6f903e285f4dba6cbd5d17"
+          },
+          {
+            "identifier": "standards-vite-react-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/@vitejs~1plugin-react"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:407c0a101a59d2b970f8a4ee46a82f521d5059c0da5415fffd68fc8576c967e1"
+          },
+          {
+            "identifier": "standards-vitest-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/vitest.config.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a577adba8d5c6a881826d1934602c50da72f2bca82c3c35715a0b66e997a1f0e"
+          },
+          {
+            "identifier": "standards-vitest-package",
+            "owner": {
+              "kind": "capability",
+              "identifier": "standards"
+            },
+            "path": "apps/web/package.json",
+            "ownership": "merge-managed",
+            "fingerprintTarget": {
+              "kind": "json-value",
+              "pointer": "/devDependencies/vitest"
+            },
+            "mergeStrategy": "json-property",
+            "fingerprint": "sha256:95ccc76176af7a0746cd34976a22903bbd99a9cd5018191165fba387c60ac538"
+          },
+          {
+            "identifier": "transactional-email-composition-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/server-transactional-email.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:0a39eb05e944ec845dc1b61365718256852d42d17433e51c174f7cca08c8d980"
+          },
+          {
+            "identifier": "transactional-email-event-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/transactional-email-events.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:d9560968101ad607265690af07557cf130f3288521bfa71a161f9579c52f8292"
+          },
+          {
+            "identifier": "transactional-email-operator-guide",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "docs/transactional-email.md",
+            "ownership": "application-owned",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3cc8521d4671eb5ab79b038f7c904a49454db8fb9b4670ef7b359e0e47b76eb7"
+          },
+          {
+            "identifier": "transactional-email-provider-contract-tests",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/tests/unit/resend-transactional-email-sender.test.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:a6058c882fbd3bba8e53c3c45fd5297784040f8c757ac3f612a44456c8eb2329"
+          },
+          {
+            "identifier": "transactional-email-resend-adapter",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/resend/transactional-email-sender.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:69cc127fb11eef64bd325fcfe05cffa591b74bf2116018301cfce6e2cc4a648e"
+          },
+          {
+            "identifier": "transactional-email-runtime-configuration",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/cloudflare/transactional-email-configuration.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:61c0f64f487fc3728f2dd386d076973bd147c2ef91d397353500b0a403c290d6"
+          },
+          {
+            "identifier": "transactional-email-safe-events",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/infrastructure/observability/transactional-email-events.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:2fd062e4fc57443ff091eab0cc7ae92a6220381abce71e5214e163a3665592ce"
+          },
+          {
+            "identifier": "transactional-email-sender-port",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/application/transactional-email-sender.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:ba8cc264da5c946c5b81dc8d5ff1a2228670c1741f80ad92b47dd6874222581f"
+          },
+          {
+            "identifier": "transactional-email-server-composition",
+            "owner": {
+              "kind": "capability",
+              "identifier": "transactional-email-resend"
+            },
+            "path": "apps/web/src/composition/server-transactional-email.ts",
+            "ownership": "managed",
+            "fingerprintTarget": {
+              "kind": "file"
+            },
+            "mergeStrategy": "replace-file",
+            "fingerprint": "sha256:3f8e6c3a0d95ffad0aea96e134352128692d2a8cc14b3de577ee018888ac54e2"
+          }
+        ],
+        "ejections": [],
+        "compatibility": {
+          "node": "22.23.2",
+          "pnpm": "11.20.0",
+          "platformAdapter": "cloudflare-workers"
+        },
+        "lastSuccessfulVerification": {
+          "kind": "generation",
+          "checks": [
+            "contracts",
+            "pre-state-inference",
+            "lockfile",
+            "frozen-install",
+            "lint",
+            "cloudflare-types",
+            "typecheck",
+            "unit-tests",
+            "component-tests",
+            "next-build",
+            "opennext-build",
+            "worker-integration",
+            "binding-integration",
+            "post-state-inference"
+          ]
+        }
+      }
+    }
+  }
+}
