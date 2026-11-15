@@ -2335,7 +2335,7 @@ const deploymentSnapshotCases = [
   {
     name: "explicit internal environments",
     version: "0.7.1",
-    snapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0" },
+    snapshot: { standards: "0.7.1", siteRouting: "0.4.0", appFoundation: "0.3.0", transactionalEmailResend: "0.2.0" },
   },
 ];
 

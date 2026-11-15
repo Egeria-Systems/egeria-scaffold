@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-catalog.js";
-import { createGenerationRenderingContext, createVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
+import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, createVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
 
@@ -81,3 +81,70 @@ test("email composes with explicit app persistence without altering persistence 
   assert.ok(rendered.value.project.selectedCapabilities.includes("transactional-email-resend"));
   assert.ok(rendered.value.project.selectedCapabilities.includes("application-persistence"));
 });
+
+for (const [profile, lockfile] of [
+  ["portfolio", "portfolio-0.11.7-foundation"],
+  ["site", "app-0.2.7"],
+  ["app", "app-0.3.0"],
+]) {
+  test(`environment email selection preserves ${profile} identity without persistence`, async () => {
+    const rendered = await renderSkeleton(
+      request(profile, { transactionalEmailResend: true }),
+      createApplicationEnvironmentRenderingContext(),
+    );
+    assert.equal(rendered.ok, true, JSON.stringify(rendered));
+    const { project, resolved, files } = rendered.value;
+    const versions = Object.fromEntries(resolved.capabilities.map(({ identifier, version }) => [identifier, version]));
+    assert.equal(project.schemaVersion, "2.0.0");
+    assert.equal(project.originProfile, profile);
+    assert.equal(project.recipeVersion, { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile]);
+    assert.equal(versions["transactional-email-resend"], "0.2.0");
+    assert.equal(versions["app-foundation"], "0.3.0");
+    assert.equal(versions.standards, "0.7.1");
+    assert.equal(versions["deployment-cloudflare"], "0.7.1");
+    assert.equal(versions["application-persistence"], undefined);
+    assert.equal(versions["site-routing"], profile === "portfolio" ? undefined : "0.4.0");
+    const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
+    assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
+    assert.equal(manifest.dependencies.resend, undefined);
+    assert.equal(resolveRecipeLockfileVersion(project, manifest), lockfile);
+    assert.ok(files.some(({ path }) => path === "apps/web/src/composition/server-transactional-email.ts"));
+    const file = path => new TextDecoder().decode(files.find(entry => entry.path === path).content);
+    for (const name of ["RESEND_API_KEY", "TRANSACTIONAL_EMAIL_FROM", "TRANSACTIONAL_EMAIL_DOMAIN", "TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS"]) {
+      assert.ok(file("apps/web/.dev.vars.example").includes(`${name}=\n`));
+      assert.equal(file("apps/web/.env.example").includes(name), false);
+    }
+    const descriptor = resolved.capabilities.find(capability => capability.identifier === "transactional-email-resend");
+    assert.deepEqual(descriptor.dependencies, ["app-foundation"]);
+    assert.deepEqual(descriptor.migrationPlanners, ["add-transactional-email-resend-0-2-0", "remove-transactional-email-resend-0-2-0"]);
+  });
+}
+
+test("environment email composes with independently selected current persistence", async () => {
+  const rendered = await renderSkeleton(
+    request("app", { transactionalEmailResend: true, applicationPersistence: true }),
+    createApplicationEnvironmentRenderingContext(true),
+  );
+  assert.equal(rendered.ok, true, JSON.stringify(rendered));
+  const { project, resolved, files } = rendered.value;
+  const versions = Object.fromEntries(resolved.capabilities.map(({ identifier, version }) => [identifier, version]));
+  assert.equal(versions["transactional-email-resend"], "0.2.0");
+  assert.equal(versions["app-foundation"], "0.3.0");
+  assert.equal(versions["application-persistence"], "0.2.0");
+  assert.equal(versions.standards, "0.8.0");
+  assert.equal(versions["deployment-cloudflare"], "0.8.0");
+  const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
+  assert.equal(resolveRecipeLockfileVersion(project, manifest), "app-0.2.7-persistence");
+});
+
+for (const profile of ["portfolio", "site"]) {
+  test(`environment email context retains ${profile} foundation without selecting email`, async () => {
+    const rendered = await renderSkeleton(request(profile), createApplicationEnvironmentRenderingContext(false, true));
+    assert.equal(rendered.ok, true, JSON.stringify(rendered));
+    const versions = Object.fromEntries(rendered.value.resolved.capabilities.map(({ identifier, version }) => [identifier, version]));
+    assert.equal(versions["app-foundation"], "0.3.0");
+    assert.equal(versions["transactional-email-resend"], undefined);
+    assert.equal(versions["application-persistence"], undefined);
+    assert.equal(rendered.value.project.originProfile, profile);
+  });
+}
