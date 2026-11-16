@@ -1,3 +1,4 @@
+import { readCompiledApplicationEnvironment } from "@/src/configuration/application-environment";
 import { Cause, Effect, Exit } from "effect";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -27,6 +28,7 @@ function setup(environment: unknown = configuration) {
   const reportEvent = vi.fn<(event: unknown) => void | Promise<void>>();
   const readConfiguration = vi.fn(() => environment);
   const layer = createResendTransactionalEmailSenderLayer({
+    compiledTarget: readCompiledApplicationEnvironment,
     configuration: Effect.sync(readConfiguration), request, reportEvent,
   });
   const program = (input: TransactionalEmailMessage = message) => Effect.gen(function* () {
@@ -364,6 +366,7 @@ it.each([true, false])("binds recipient authorization and payload to the message
   const pendingConfiguration = new Promise<unknown>(resolve => { supplyConfiguration = resolve; });
   const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: messageReference }));
   const layer = createResendTransactionalEmailSenderLayer({
+    compiledTarget: readCompiledApplicationEnvironment,
     configuration: Effect.promise(() => { configurationStarted(); return pendingConfiguration; }),
     request, reportEvent: () => {},
   });
@@ -384,4 +387,17 @@ it.each([true, false])("binds recipient authorization and payload to the message
     expect(failure(exit)).toMatchObject({ code: "transactional-email-authorization" });
     expect(request).not.toHaveBeenCalled();
   }
+});
+
+it("uses an explicit event target with no public process target or HTTP context", async () => {
+  vi.stubEnv("NEXT_PUBLIC_APPLICATION_ENVIRONMENT", undefined);
+  const request = vi.fn<typeof fetch>().mockResolvedValue(Response.json({ id: messageReference }));
+  const dependencies = {
+    compiledTarget: () => ({ ok: true as const, value: "production" as const }),
+    configuration: Effect.succeed(configuration), request, reportEvent: vi.fn(),
+  };
+  const send = Effect.gen(function* () { return yield* (yield* TransactionalEmailSender).send(message); })
+    .pipe(Effect.provide(createResendTransactionalEmailSenderLayer(dependencies)));
+  expect(await Effect.runPromise(send)).toEqual({ status: "accepted", messageReference });
+  expect(request).toHaveBeenCalledOnce();
 });

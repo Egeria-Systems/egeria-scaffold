@@ -14,9 +14,9 @@ const optionalServers = ["application-persistence", "background-job-delivery", "
 // fixture must first be created by the ordinary compiled public CLI verifier.
 for (const [identifier, relativeRoot, selected] of [
   ["app", "fixtures/generated/app-0.3.0", []],
-  ["portfolio-email", "fixtures/generated/portfolio-email-0.12.0", ["transactional-email-resend"]],
-  ["app-jobs", "fixtures/generated/app-jobs-0.3.0", ["background-job-delivery"]],
-  ["app-persistence-jobs-email", "fixtures/generated/app-persistence-jobs-email-0.3.0", optionalServers],
+  ["portfolio-email", "fixtures/generated/portfolio-email-explicit-target-0.12.0", ["transactional-email-resend"]],
+  ["app-jobs", "fixtures/generated/app-jobs-recovery-composition-0.3.0", ["background-job-delivery"]],
+  ["app-persistence-jobs-email", "fixtures/generated/app-persistence-jobs-email-recovery-composition-0.3.0", optionalServers],
 ]) {
   test(`${identifier} preserves independent server effects across all application targets`, { timeout: 90 * 60 * 1000 }, async context => {
     const root = join(repositoryRoot, relativeRoot);

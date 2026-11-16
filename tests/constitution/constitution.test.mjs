@@ -4037,9 +4037,11 @@ test("executable capability certification ownership is current", async () => {
     "standards",
     "transactional-email-resend",
   ]);
-  for (const record of Object.values(registry.records)) {
+  for (const [identifier, record] of Object.entries(registry.records)) {
     assert.equal(record.status, "pending");
-    assert.equal(record.taskPlan, "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
+    assert.equal(record.taskPlan, identifier === "background-job-delivery"
+      ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
+      : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
     assert.deepEqual(record.evidence, []);
   }
   assert.match(

@@ -495,15 +495,15 @@ test("fixture inspection accepts only the exact portable generated trees", async
       },
       {
         identifier: "portfolio-email", profile: "portfolio",
-        relativeRoot: "fixtures/generated/portfolio-email-0.12.0",
+        relativeRoot: "fixtures/generated/portfolio-email-explicit-target-0.12.0",
       },
       {
         identifier: "app-persistence-email", profile: "app",
-        relativeRoot: "fixtures/generated/app-persistence-email-0.3.0",
+        relativeRoot: "fixtures/generated/app-persistence-email-explicit-target-0.3.0",
       },
       { identifier: "site-contact-form", profile: "site", relativeRoot: "fixtures/generated/site-contact-form-0.13.0" },
-      { identifier: "app-jobs", profile: "app", relativeRoot: "fixtures/generated/app-jobs-0.3.0" },
-      { identifier: "app-persistence-jobs-email", profile: "app", relativeRoot: "fixtures/generated/app-persistence-jobs-email-0.3.0" },
+      { identifier: "app-jobs", profile: "app", relativeRoot: "fixtures/generated/app-jobs-recovery-composition-0.3.0" },
+      { identifier: "app-persistence-jobs-email", profile: "app", relativeRoot: "fixtures/generated/app-persistence-jobs-email-recovery-composition-0.3.0" },
     ],
   );
 
@@ -540,7 +540,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       portfolio: 134, "portfolio-calendly": 143, site: 150, "site-multilingual": 166,
       "site-public-integrations": 208, app: 170, "app-all-optional-integrations": 212,
       "app-persistence": 191, "portfolio-email": 163, "app-persistence-email": 200,
-      "site-contact-form": 166, "app-jobs": 181, "app-persistence-jobs-email": 211,
+      "site-contact-form": 166, "app-jobs": 183, "app-persistence-jobs-email": 213,
     };
     assert.equal(contract.expectedSurfaces, surfaces[contract.identifier]);
     assert.equal(contract.visualRegression, ["portfolio", "portfolio-calendly", "site", "app"].includes(contract.identifier));

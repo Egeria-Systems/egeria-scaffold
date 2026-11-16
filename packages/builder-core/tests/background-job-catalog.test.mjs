@@ -228,3 +228,21 @@ test("jobs catalog rejects mixed and unknown current tuples", () => {
     ]) assert.equal(createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, { ...snapshot, ...changed }).ok, false, JSON.stringify(changed));
   }
 });
+
+test("current jobs owns event composition independently of optional service selection", async () => {
+  for (const email of [false, true]) {
+    const result = await renderSkeleton(request("site", { backgroundJobDelivery: true, ...(email ? { transactionalEmailResend: true } : {}) }));
+    assert.equal(result.ok, true, JSON.stringify(result));
+    const generated = new Map(result.value.files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
+    const descriptor = result.value.resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery");
+    for (const [path, ownership] of [["apps/web/src/composition/job-handler-composition.ts", "application-owned"], ["apps/web/tests/unit/job-handler-composition.test.ts", "managed"]]) {
+      assert.equal(descriptor.managedSurfaces.find(surface => surface.path === path)?.ownership, ownership);
+      assert.ok(generated.has(path));
+    }
+    const hook = generated.get("apps/web/src/composition/job-handler-composition.ts");
+    assert.match(hook, /typeof jobHandlers/u);
+    assert.doesNotMatch(hook, /transactional-email|resend|application-persistence|getCloudflareContext/u);
+    assert.match(generated.get("apps/web/src/composition/server-jobs.ts"), /await import\("@\/src\/composition\/job-handler-composition"\)/u);
+    assert.equal(generated.has("apps/web/src/infrastructure/resend/transactional-email-sender.ts"), email);
+  }
+});
