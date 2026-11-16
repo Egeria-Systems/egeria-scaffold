@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { JobDispatcher, executeJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
+import { JobDispatcher, executeJob, validateJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
 
 const state = vi.hoisted(() => ({
   definitions: [] as JobDefinition[],
@@ -107,6 +107,7 @@ it("isolates concurrent invocation environments and compiled targets without eag
 it("refuses assembly that rewrites registry policy and sanitizes hook failures", async () => {
   const current = invocation();
   state.definitions[0] = { ...definition };
+  const originalValidator = state.definitions[0].validate;
   state.create.mockImplementation(input => {
     for (const item of input.definitions) Reflect.set(item, "validate", () => true);
     return input.definitions.map(item => ({ ...item, handle: () => Effect.void }));
@@ -114,6 +115,9 @@ it("refuses assembly that rewrites registry policy and sanitizes hook failures",
   const { consumeServerJobs } = await import("@/src/composition/server-jobs");
   await expect(consumeServerJobs(current.batch, current.environment, "development")).rejects.toMatchObject({ code: "job-configuration" });
   expect(current.message.ack).not.toHaveBeenCalled();
+  expect(state.create.mock.calls[0]?.[0].definitions[0]).not.toBe(state.definitions[0]);
+  expect(state.definitions[0].validate).toBe(originalValidator);
+  expect(() => validateJob({ ...job, payload: { unexpected: true } }, "local", state.definitions)).toThrowError();
   state.create.mockImplementation(() => { throw new Error("private-hook-configuration"); });
   await expect(consumeServerJobs(current.batch, current.environment, "development")).rejects.toMatchObject({ code: "job-configuration" });
 });

@@ -27,7 +27,7 @@ export async function consumeServerJobs(batch: JobMessageBatch, environment: unk
   try {
     const declarations = jobHandlers.map(({ type, version, repeatSafety, validate }) => ({ type, version, repeatSafety, validate }));
     const { createJobHandlers } = await import("@/src/composition/job-handler-composition");
-    handlers = createJobHandlers({ definitions: jobHandlers, environment, compiledTarget });
+    handlers = createJobHandlers({ definitions: jobHandlers.map(definition => ({ ...definition })), environment, compiledTarget });
     validateAssembly(declarations, handlers);
   } catch { throw new JobDeliveryFailure("job-configuration"); }
   await consumeCloudflareJobs(batch, environment, compiledTarget, handlers);

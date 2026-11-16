@@ -657,6 +657,8 @@ export async function verifyEmailOnlyFixture(fixture) {
     await run("frozen-install", ["install", "--frozen-lockfile", "--store-dir", store]);
     await run("lint", ["run", "lint"]);
     await run("typecheck", ["run", "typecheck"]);
+    await run("unit", ["run", "test:unit"]);
+    await run("component", ["run", "test:component"]);
     await run("next-build", ["run", "build"]);
     await run("opennext-build", ["--dir", "apps/web", "exec", "opennextjs-cloudflare", "build", "--skipNextBuild"]);
     const artifact = mode => ["--dir", "apps/web", "run", "check:prepared-artifact", mode, "development", revision, "--local"];
