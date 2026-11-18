@@ -693,7 +693,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          reviewed=d6a402003519889c92e5c1b84e7282ff4b48e269
+          reviewed=89952c3e6571ee8f70c14f65d50320bbbe01b73e
           if ! git diff --quiet "$reviewed" HEAD -- \
               ':(glob)**/pnpm-lock.yaml' ':(glob)**/pnpm-workspace.yaml' \
               ':(glob)**/package.json' ':(glob)**/.npmrc' ':(glob)**/*.patch'; then
