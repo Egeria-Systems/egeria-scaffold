@@ -337,3 +337,76 @@ test("input inspection binds lock-policy pairs, caller bytes and reviewed config
   await writeFile(join(cwd, "pnpm-workspace.yaml"), "different policy");
   assert.equal((await h.module.inspectDependencyAuditInputs(cwd, policy)).graph, null);
 });
+
+test("the temporary picomatch exception accepts only the reviewed development finding", async t => {
+  const h = await fixture(t);
+  const reviewedAt = Date.parse("2026-11-18T15:00:00Z");
+  const findings = [{ bundled: false, dev: true, optional: false, paths: [
+    "apps__web>typescript-eslint>tinyglobby>picomatch",
+    "apps__web>vitest>picomatch",
+  ], version: "4.0.7" }];
+  const graph = {
+    id: "app",
+    lockSha256: digest("app lock"),
+    workspacePolicySha256: digest("app workspace"),
+    dependencyCounts: h.graph.dependencyCounts,
+  };
+  const exception = {
+    status: "active",
+    advisory: "GHSA-fc5q-39xc-vjpf",
+    package: "picomatch",
+    version: "4.0.7",
+    approvedAt: new Date(reviewedAt).toISOString(),
+    expiresAt: "2026-11-21T15:00:00Z",
+    findingsSha256: digest(JSON.stringify(findings)),
+    graphs: [graph],
+  };
+  const report = {
+    advisories: { "1": { id: 1, github_advisory_id: exception.advisory, module_name: "picomatch",
+      severity: "high", vulnerable_versions: "<=4.0.7", findings: [{ ...findings[0], paths: [...findings[0].paths].reverse() }] } },
+    metadata: { ...graph.dependencyCounts, vulnerabilities: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 } },
+  };
+  const policyBytes = Buffer.from(JSON.stringify({ ...h.policy, picomatch: exception }));
+  const result = raw(1, report);
+  const adapters = {
+    ...h.adapters,
+    now: () => reviewedAt,
+    readPolicy: async () => policyBytes,
+    inspectInputs: async () => ({ graph, fingerprint: "reviewed" }),
+    fetchBytes: async url => {
+      assert.equal(url, "https://registry.npmjs.org/picomatch");
+      return Buffer.from(JSON.stringify({ name: "picomatch", "dist-tags": { latest: "4.0.7" }, versions: { "4.0.7": {} } }));
+    },
+    runProcess: async () => result,
+  };
+  const disposition = await h.module.runDependencyAudit(h.input, adapters);
+  assert.equal(disposition.status, "accepted-with-security-exception");
+  assert.equal(disposition.advisory, exception.advisory);
+  assert.equal(disposition.rawExitCode, 1);
+  assert.equal(disposition.expiresAt, exception.expiresAt);
+  assert.deepEqual(await readFile(join(h.input.artifactRoot, disposition.artifactDirectory, "stdout")), result.stdout);
+
+  const refusalCases = [
+    { now: () => Date.parse(exception.expiresAt) },
+    { inspectInputs: async () => ({ graph: { ...graph, lockSha256: digest("other lock") }, fingerprint: "other" }) },
+    { fetchBytes: async () => Buffer.from(JSON.stringify({ name: "picomatch", "dist-tags": { latest: "4.0.7" }, versions: { "4.0.7": {}, "4.0.8": {} } })) },
+    { fetchBytes: async () => { throw new Error("registry unavailable"); } },
+  ];
+  for (const change of [
+    advisory => { advisory.findings[0].dev = false; },
+    advisory => { advisory.findings[0].paths.push("apps__web>changed-parent>picomatch"); },
+    advisory => { advisory.github_advisory_id = "GHSA-aaaa-bbbb-cccc"; },
+    advisory => { advisory.patched_versions = ">=4.0.8"; },
+  ]) {
+    const changed = structuredClone(report);
+    change(changed.advisories["1"]);
+    refusalCases.push({ runProcess: async () => raw(1, changed) });
+  }
+  const additional = structuredClone(report);
+  additional.advisories["2"] = { ...additional.advisories["1"], id: 2, github_advisory_id: "GHSA-aaaa-bbbb-cccc", severity: "moderate" };
+  additional.metadata.vulnerabilities.moderate = 1;
+  refusalCases.push({ runProcess: async () => raw(1, additional) });
+  for (const change of refusalCases) {
+    await assert.rejects(h.module.runDependencyAudit(h.input, { ...adapters, ...change }), /DEPENDENCY_AUDIT_FAILED/);
+  }
+});

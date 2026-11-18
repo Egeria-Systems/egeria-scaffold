@@ -38,6 +38,10 @@ Fresh schema-2 generation and the compatibility proof select Next.js `16.4.5` fo
 
 A supported installed schema-2 project whose managed Next.js fingerprint records `16.4.1` retains that exact rendering and lock view. Capability changes and profile transitions preserve the installed dependency view, with the existing actual-manifest and lock checks at their applicable boundaries. The new lock paths preserve the earlier graphs and fixtures as exact evidence. Client upgrades and existing-project security remediation require their own supported operation and approval. [Current generation and fixtures](../architecture/capability-model.md#current-environment-generation)
 
+### Temporary picomatch CI exception
+
+The user authorized a temporary CI exception during PR #177 development for the high-severity [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). The current [exception record](../../scripts/dependency-audit-exception.json) owns the expiry and the five exact generated dependency graphs. Visual verification keeps the failing raw audit and the separate exception disposition. GitHub dependency review applies the allowance to PR #177 in this repository while its reviewed dependency inputs match. The exception closes at expiry or when npm publishes a newer stable picomatch version.
+
 ### Proof ESLint alignment
 
 The compatibility proof selects `eslint-config-next@16.4.1` to retain its existing Next/config minor-version alignment contract. Its independent ESLint `9.39.5` and typescript-eslint `8.70.0` boundary remains unchanged. Only the root workspace's exact `@next/eslint-plugin-next` patch and fast-glob-removal parent keys advance from `16.3.5` to `16.4.1`; the canonical literal-root patch bytes remain unchanged.

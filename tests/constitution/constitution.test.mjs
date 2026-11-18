@@ -1010,17 +1010,29 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   }
 
   const dependencySteps = workflow.jobs["dependency-review"].steps;
-  assert.equal(dependencySteps.length, 1);
+  assert.equal(dependencySteps.length, 3);
+  const [dependencyCheckout, exceptionStep, dependencyReview] = dependencySteps;
+  const exceptionScope = "github.repository == 'Egeria-Systems/egeria-scaffold' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.number == 177";
+  assert.equal(dependencyCheckout.if, exceptionScope);
+  assert.equal(isPinnedGitHubActionReference(dependencyCheckout.uses, "actions/checkout"), true);
+  assert.deepEqual(dependencyCheckout.with, { "fetch-depth": 0, "persist-credentials": false });
+  assert.equal(exceptionStep.id, "picomatch_exception");
+  assert.equal(exceptionStep.if, exceptionScope);
+  assert.match(exceptionStep.run, /git diff --quiet "\$reviewed" HEAD --/u);
+  assert.match(exceptionStep.run, /await picomatchDependencyReviewAllowance\(\)/u);
   assert.equal(
     isPinnedGitHubActionReference(
-      dependencySteps[0]?.uses,
+      dependencyReview.uses,
       "actions/dependency-review-action",
     ),
     true,
   );
-  assert.deepEqual(dependencySteps[0]?.with, {
+  assert.equal(dependencyReview.if, undefined);
+  assert.equal(dependencyReview["continue-on-error"], undefined);
+  assert.deepEqual(dependencyReview.with, {
     "fail-on-severity": "moderate",
     "fail-on-scopes": "runtime, development",
+    "allow-ghsas": "${{ steps.picomatch_exception.outputs.advisory }}",
   });
 }
 

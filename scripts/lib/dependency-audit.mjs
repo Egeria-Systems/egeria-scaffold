@@ -23,7 +23,7 @@ const same = (left, right) => JSON.stringify(canonical(left)) === JSON.stringify
 const parse = bytes => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 function refuse(code = "DEPENDENCY_AUDIT_FAILED") { throw new Error(code); }
 
-function inspectReport(result, graph) {
+function inspectReport(result, graph, policy) {
   if (result.operationalError || result.signal || result.killed || ![0, 1].includes(result.exitCode) || result.stderr.length) refuse();
   const report = parse(result.stdout);
   if (!object(report) || !same(Object.keys(report).sort(), ["advisories", "metadata"]) || !object(report.advisories) || !object(report.metadata)) refuse();
@@ -54,6 +54,16 @@ function inspectReport(result, graph) {
   if (!thresholdFailure) return { status: "passed", thresholdExitCode: 0 };
   if (!graph || advisories.length !== 1) refuse();
   const advisory = advisories[0][1];
+  if (advisory.github_advisory_id === "GHSA-fc5q-39xc-vjpf") {
+    const reviewed = policy.picomatch;
+    const findings = advisory.findings.map(finding => ({ ...finding, paths: [...finding.paths].sort() }));
+    if (advisory.module_name !== "picomatch" || advisory.severity !== "high" ||
+        advisory.vulnerable_versions !== "<=4.0.7" || advisory.patched_versions != null ||
+        !reviewed?.graphs.some(entry => same(entry, graph)) ||
+        findings.some(finding => finding.version !== "4.0.7" || !finding.dev || finding.optional || finding.bundled) ||
+        hash(JSON.stringify(canonical(findings))) !== reviewed.findingsSha256) refuse();
+    return { status: "exception-required", thresholdExitCode: 1, picomatch: true };
+  }
   if (advisory.github_advisory_id !== "GHSA-vfj7-8cjw-p6xm" || advisory.module_name !== "braces" || advisory.severity !== "high" ||
       advisory.vulnerable_versions !== "<=3.0.3" || !same(advisory.findings, graph.advisoryFindings) ||
       advisory.findings.some(finding => finding.version !== "3.0.3")) refuse();
@@ -84,9 +94,11 @@ export async function inspectDependencyAuditInputs(cwd, policy) {
   const root = await realpath(cwd);
   const lock = hash(await readBounded(root, join(root, "pnpm-lock.yaml")));
   const workspace = hash(await readBounded(root, join(root, "pnpm-workspace.yaml")));
-  const graph = policy.graphs.find(entry => entry.lockSha256 === lock && entry.workspacePolicySha256 === workspace) ?? null;
+  const matches = entry => entry.lockSha256 === lock && entry.workspacePolicySha256 === workspace;
+  const legacyGraph = policy.graphs.find(matches);
+  const graph = legacyGraph ?? policy.picomatch?.graphs.find(matches) ?? null;
   const files = { lock, workspace };
-  if (graph) {
+  if (legacyGraph) {
     files.configuration = hash(await readBounded(root, join(root, graph.eslintConfigPath)));
     if (files.configuration !== graph.eslintConfigSha256) refuse("DEPENDENCY_AUDIT_INPUT_CHANGED");
     const consumer = dirname(join(root, graph.eslintConfigPath));
@@ -142,11 +154,65 @@ function requireActivePolicy(policy, now) {
       policy.pnpmVersion !== "11.20.0" || !Number.isFinite(now) || !Number.isFinite(Date.parse(policy.expiresAt)) || now >= Date.parse(policy.expiresAt)) refuse();
 }
 
+function requireActivePicomatchException(exception, now) {
+  const approved = Date.parse(exception?.approvedAt);
+  const expires = Date.parse(exception?.expiresAt);
+  if (exception?.status !== "active" || exception.advisory !== "GHSA-fc5q-39xc-vjpf" ||
+      exception.package !== "picomatch" || exception.version !== "4.0.7" ||
+      !Number.isFinite(now) || !Number.isFinite(approved) || !Number.isFinite(expires) ||
+      now < approved || now >= expires || expires - approved > 72 * 60 * 60 * 1000) refuse();
+}
+
+async function checkPicomatchFixAvailability(fetchRegistry, observations) {
+  const url = "https://registry.npmjs.org/picomatch";
+  const bytes = await fetchRegistry(url);
+  const metadata = parse(bytes);
+  observations.push({ url, sha256: hash(bytes), bytes: bytes.length, latest: metadata["dist-tags"]?.latest });
+  if (metadata.name !== "picomatch" || metadata["dist-tags"]?.latest !== "4.0.7" ||
+      !object(metadata.versions) || !Object.hasOwn(metadata.versions, "4.0.7")) refuse();
+  for (const version of Object.keys(metadata.versions)) {
+    if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
+    const [major, minor, patch] = version.split(".").map(Number);
+    if (major > 4 || (major === 4 && (minor > 0 || patch > 7))) refuse();
+  }
+}
+
+// The GitHub dependency review input accepts only advisory IDs. CI binds this
+// value to the reviewed pull request and unchanged dependency inputs.
+export async function picomatchDependencyReviewAllowance() {
+  try {
+    const bytes = await readFile(policyUrl);
+    const exception = parse(bytes).picomatch;
+    const host = { isHosted: () => process.env.GITHUB_ACTIONS === "true", fetchBytes };
+    requireActivePicomatchException(exception, Date.now());
+    const observations = [];
+    await checkCurrentPicomatchPolicy(bytes, host, observations);
+    await checkPicomatchFixAvailability(fetchBytes, observations);
+    requireActivePicomatchException(exception, Date.now());
+    if (!(await readFile(policyUrl)).equals(bytes)) return "";
+    return exception.advisory;
+  } catch {
+    return "";
+  }
+}
+
 async function checkCurrentPolicy(policy, bytes, adapters, observations) {
   if (!adapters.isHosted()) return;
   const active = policy.hostedActivePolicy;
   if (active.repository !== "Egeria-Systems/egeria-scaffold" || active.ref !== "application-environment-configuration" || active.path !== "scripts/dependency-audit-exception.json") refuse();
   const url = `https://raw.githubusercontent.com/${active.repository}/${active.ref}/${active.path}`;
+  const current = await adapters.fetchBytes(url);
+  observations.push({ url, sha256: hash(current), bytes: current.length });
+  if (!Buffer.from(current).equals(bytes)) refuse();
+}
+
+async function checkCurrentPicomatchPolicy(bytes, adapters, observations) {
+  if (!adapters.isHosted()) return;
+  if (process.env.GITHUB_REPOSITORY !== "Egeria-Systems/egeria-scaffold") refuse();
+  const ref = process.env.GITHUB_REF === "refs/pull/177/merge"
+    ? "repair/capability-reliability-latest-main"
+    : "main";
+  const url = `https://raw.githubusercontent.com/Egeria-Systems/egeria-scaffold/${ref}/scripts/dependency-audit-exception.json`;
   const current = await adapters.fetchBytes(url);
   observations.push({ url, sha256: hash(current), bytes: current.length });
   if (!Buffer.from(current).equals(bytes)) refuse();
@@ -219,22 +285,30 @@ export async function runDependencyAudit(input, injected = {}) {
     await save("process.json", JSON.stringify({ executable: input.executable, arguments: auditArguments, graph: graph?.id ?? null, startedAt,
       completedAt: adapters.now(), exitCode: result.exitCode, signal: result.signal ?? null, killed: result.killed === true, operationalError: result.operationalError === true,
       stdoutSha256: hash(result.stdout), stderrSha256: hash(result.stderr) }, null, 2));
-    const assessment = inspectReport(result, graph);
+    const assessment = inspectReport(result, graph, policy);
+    const exception = assessment.picomatch ? policy.picomatch : policy;
+    const requireActive = assessment.picomatch ? requireActivePicomatchException : requireActivePolicy;
     let status = assessment.status;
     if (status === "exception-required") {
-      requireActivePolicy(policy, startedAt);
-      await checkCurrentPolicy(policy, policyBytes, adapters, observations);
-      await checkFixAvailability(policy, adapters, observations);
+      requireActive(exception, startedAt);
+      if (assessment.picomatch) {
+        await checkCurrentPicomatchPolicy(policyBytes, adapters, observations);
+        await checkPicomatchFixAvailability(adapters.fetchBytes, observations);
+      } else {
+        await checkCurrentPolicy(policy, policyBytes, adapters, observations);
+        await checkFixAvailability(policy, adapters, observations);
+      }
       if (!Buffer.from(await adapters.readPolicy()).equals(policyBytes)) refuse();
-      await checkCurrentPolicy(policy, policyBytes, adapters, observations);
-      requireActivePolicy(policy, adapters.now());
+      if (assessment.picomatch) await checkCurrentPicomatchPolicy(policyBytes, adapters, observations);
+      else await checkCurrentPolicy(policy, policyBytes, adapters, observations);
+      requireActive(exception, adapters.now());
       status = "accepted-with-security-exception";
     }
     const after = await adapters.inspectInputs(input.cwd, policy);
     if (after.fingerprint !== before.fingerprint) refuse();
-    if (status === "accepted-with-security-exception") requireActivePolicy(policy, adapters.now());
+    if (status === "accepted-with-security-exception") requireActive(exception, adapters.now());
     const disposition = { status, rawExitCode: result.exitCode, thresholdExitCode: assessment.thresholdExitCode, graph: graph?.id ?? null, policySha256,
-      ...(status === "accepted-with-security-exception" ? { advisory: policy.advisory, expiresAt: policy.expiresAt } : {}) };
+      ...(status === "accepted-with-security-exception" ? { advisory: exception.advisory, expiresAt: exception.expiresAt } : {}) };
     await save("metadata-observations.json", JSON.stringify(observations, null, 2));
     await save("disposition.json", JSON.stringify(disposition, null, 2));
     return { ...disposition, artifactDirectory: artifactIdentifier };
