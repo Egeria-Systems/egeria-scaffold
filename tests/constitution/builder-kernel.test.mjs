@@ -576,17 +576,18 @@ test("the public kernel rejects invalid fixed-visual arguments before spawning c
   }
 });
 
-test("the kernel retains fixed visual and export failure codes without claiming passes", { timeout: 60000 }, async context => {
+test("the kernel retains fixed visual and export failure codes without claiming passes", { timeout: 60000, concurrency: 2 }, async context => {
   const ownerParent = await mkdtemp(join(tmpdir(), "kernel-visual-diagnostics-"));
   context.after(() => rm(ownerParent, { recursive: true, force: true }));
   const privateValue = "fixtureSecretValueNeverRetain";
   const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === "portfolio");
   const fixture = fileURLToPath(new URL("../../" + relativeRoot, import.meta.url));
+  const subtests = [];
   for (const [failingScript, failureCode] of [
     ["test:visual", "VISUAL_REGRESSION_FAILED"],
     ["test:e2e:preview", "BROWSER_PREVIEW_FAILED"],
   ]) {
-    await context.test(failureCode, async failureContext => {
+    subtests.push(context.test(failureCode, async failureContext => {
       let visualFailure;
       await assert.rejects(verifyGeneratedProjectForTesting(fixture, "portfolio", {
         createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
@@ -615,8 +616,9 @@ test("the kernel retains fixed visual and export failure codes without claiming 
       assert.ok(log.split("\n").includes("stderr " + expectedDiagnostic));
       assert.doesNotMatch([log, JSON.stringify(rows), result.stdout, result.stderr].join("\n"),
         /fixtureSecretValueNeverRetain|VISUAL_UNKNOWN_FAILURE|visualComparisons/u);
-    });
+    }));
   }
+  await Promise.all(subtests);
 });
 
 test("a missing fixed-visual child script leaves its kernel group failed", { timeout: 60000 }, async context => {
