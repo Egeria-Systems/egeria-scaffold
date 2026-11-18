@@ -1257,7 +1257,7 @@
       "path": "apps/web/src/composition/job-handler-composition.ts"
     },
     {
-      "fingerprint": "sha256:00563692a09a67bd39e7be87879eab8a41f457eb12b108594581bce029dbea7d",
+      "fingerprint": "sha256:48b3447f8ed3fcdc51d02c5c52010375d9aa4f2f2903e4ecfed9dc9cacd490f1",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1327,7 +1327,7 @@
       "path": "apps/web/src/infrastructure/cloudflare/job-delivery.ts"
     },
     {
-      "fingerprint": "sha256:55536d39574a20611a85dd437db683918fed594a16c9a65f6dfd344ea2a8e4a8",
+      "fingerprint": "sha256:c407c5d96a89a60aad1b5646e3d9ee861de9366b1e531dd3da27f50da20fecd9",
       "fingerprintTarget": {
         "kind": "file"
       },
