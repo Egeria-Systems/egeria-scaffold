@@ -708,7 +708,12 @@ export async function applyCapabilityRemoval(input: Readonly<{
     ...(input.capability !== "analytics" && environmentAnalyticsSettings !== undefined ? { analytics: environmentAnalyticsSettings } : {}),
     ...(input.capability !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
     ...(input.capability !== "contact-form-web3forms" && controls.project.value.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
-  }, createApplicationEnvironmentRenderingContext(retainsPersistence, controls.project.value.selectedCapabilities.includes("app-foundation")));
+  }, createApplicationEnvironmentRenderingContext(
+    retainsPersistence,
+    controls.project.value.selectedCapabilities.includes("app-foundation"),
+    false,
+    environmentContext.retainedNextVersion,
+  ));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }

@@ -251,7 +251,7 @@ async function requirePreparedMeasurementIdentity(prepared, adapters) {
       !Array.isArray(prepared.files) || prepared.files.length === 0 || prepared.files.some(file => !safeRelative(file.path) || !(file.content instanceof Uint8Array)) ||
       new Set(prepared.files.map(file => file.path)).size !== prepared.files.length) fail("VISUAL_INPUT_IDENTITY_MISSING");
   const locks = prepared.files.filter(file => file.path === "pnpm-lock.yaml");
-  const expectedLock = await boundedRead(adapters.filesystem, adapters.repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml");
+  const expectedLock = await boundedRead(adapters.filesystem, adapters.repositoryRoot, "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml");
   if (locks.length !== 1 || !Buffer.from(locks[0].content).equals(expectedLock) ||
       !same(prepared.influencingFingerprints, policy.appTransitionInfluencingFingerprints(prepared.files.filter(file => file.path !== "pnpm-lock.yaml")))) fail("VISUAL_INPUT_IDENTITY_MISSING");
 }
@@ -383,7 +383,7 @@ export async function prepareProject(root, subset, recipeVersion = "0.3.0") {
   if (!prepared.ok) fail("VISUAL_PREPARATION_FAILED");
   const manifest = JSON.parse(Buffer.from(prepared.value.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8"));
   const version = lockfiles.resolveRecipeLockfileVersion(target.value.project, manifest);
-  if (version !== `app-${recipeVersion}`) fail("VISUAL_LOCKFILE_INVALID");
+  if (version !== `app-${recipeVersion}-next-${lockfiles.currentNextVersion}`) fail("VISUAL_LOCKFILE_INVALID");
   const lockfile = await filesystem.readFile(lockfiles.createRecipeLockfileUrl(version));
   return { request, sourceProject: source.value.project, targetProject: target.value.project,
     files: [...prepared.value.files, { path: "pnpm-lock.yaml", content: lockfile }], influencingFingerprints: prepared.value.influencingFingerprints };

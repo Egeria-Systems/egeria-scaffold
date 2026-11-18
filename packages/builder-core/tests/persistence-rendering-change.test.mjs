@@ -12,7 +12,7 @@ const currentContext = (persistence = false) => ({ ...createGenerationRenderingC
 const ordinary = (await renderSkeleton(request, currentContext())).value;
 const persistent = (await renderSkeleton({ ...request, applicationPersistence: true }, currentContext(true))).value;
 const manifest = (rendered) => JSON.parse(decoder.decode(rendered.files.find(({ path }) => path === "apps/web/package.json").content));
-const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+const lock = async (persistent) => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : "web-recipe-app-0.3.0-next-16.4.5"}/pnpm-lock.yaml`, import.meta.url), "utf8");
 async function reader(rendered, modify = (value) => value, lockSource) {
   return createInMemoryRepositoryReader({
     "package.json": decoder.decode(rendered.files.find(({ path }) => path === "package.json").content),
@@ -63,15 +63,16 @@ test("persistence refuses a changed root dependency graph before replacing its l
 
 test("current persistence dependency replacement refuses swapped source locks", async () => {
   const cases = [
-    { profiles: createApplicationEnvironmentProfileRecipes(), ordinary: "web-recipe-app-0.3.0", persistent: "web-recipe-app-0.2.7-persistence" },
+    { next: "16.4.5", ordinary: "web-recipe-app-0.3.0-next-16.4.5", persistent: "web-recipe-app-0.2.7-persistence-next-16.4.5" },
+    { next: "16.4.1", ordinary: "web-recipe-app-0.3.0", persistent: "web-recipe-app-0.2.7-persistence" },
   ];
   for (const cohort of cases) {
-    const context = persistence => ({ ...createGenerationRenderingContext(persistence), profiles: cohort.profiles });
+    const context = persistence => createGenerationRenderingContext(persistence, false, false, cohort.next === "16.4.1" ? cohort.next : undefined);
     const currentOrdinary = await renderSkeleton(request, context(false));
     const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
     assert.equal(currentOrdinary.ok, true);
     assert.equal(currentPersistent.ok, true);
-    const expectedNext = "16.4.1";
+    const expectedNext = cohort.next;
     assert.equal(currentOrdinary.value.project.recipeVersion, "0.3.0");
     assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
     assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
@@ -87,7 +88,7 @@ test("current persistence dependency replacement refuses swapped source locks", 
       assert.equal(decoder.decode(actual.value.desired.files.find(file => file.path === "pnpm-lock.yaml").content), expectedTarget);
       assert.equal(actual.value.desired.project.recipeVersion, current.project.recipeVersion);
       assert.equal(manifest(actual.value.desired).dependencies.next, expectedNext);
-      const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.3.6" ? "16.3.3" : "16.3.6" } }), expectedSource) });
+      const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.4.5" ? "16.4.1" : "16.4.5" } }), expectedSource) });
       assert.equal(mismatched.ok, false);
       for (const source of [expectedTarget, expectedSource + "\n"]) {
         const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
@@ -98,7 +99,7 @@ test("current persistence dependency replacement refuses swapped source locks", 
 });
 
 test("environment persistence dependency changes preserve custom members and reuse both exact locks", async () => {
-  const environmentLock = async persistent => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url), "utf8");
+  const environmentLock = async persistent => readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : "web-recipe-app-0.3.0-next-16.4.5"}/pnpm-lock.yaml`, import.meta.url), "utf8");
   const ordinaryCandidate = (await renderSkeleton(request, createApplicationEnvironmentRenderingContext())).value;
   const persistentCandidate = (await renderSkeleton({ ...request, applicationPersistence: true }, createApplicationEnvironmentRenderingContext(true))).value;
   for (const [current, desired, removing] of [[ordinaryCandidate, persistentCandidate, false], [persistentCandidate, ordinaryCandidate, true]]) {

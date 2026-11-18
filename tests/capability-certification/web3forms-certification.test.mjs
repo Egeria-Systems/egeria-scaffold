@@ -79,7 +79,7 @@ test("preparation checks compiled site generation without exposing its public fo
   assert.match(projectSource, /recipeVersion: 0\.13\.0/u);
   assert.doesNotMatch(projectSource, /accessKey|00000000-0000-4000-8000-000000000001/u);
   const manifest = JSON.parse(await readFile(join(projectRoot, "apps/web/package.json"), "utf8"));
-  assert.equal(manifest.dependencies.next, "16.4.1");
+  assert.equal(manifest.dependencies.next, "16.4.5");
   assert.equal(manifest.dependencies.effect, undefined);
   await assert.rejects(access(join(projectRoot, "apps/web/app/api/contact")), { code: "ENOENT" });
   assert.equal((await lstat(input.outputRoot)).mode & 0o777, 0o700);

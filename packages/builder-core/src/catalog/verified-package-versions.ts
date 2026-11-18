@@ -4,6 +4,8 @@ import { projectConfigurationSchema, type ProjectConfiguration } from "../contra
 import type { ValidationResult } from "../contracts/result.js";
 import { installedStateSchema, type InstalledState } from "../contracts/state.js";
 import type { ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
+import { retainedNextVersion } from "../generation/recipe-lockfiles.js";
+import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { createApplicationEnvironmentProfileRecipes } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
@@ -33,8 +35,9 @@ export function createGenerationRenderingContext(
   applicationPersistence = false,
   retainAppFoundation = false,
   backgroundJobs = false,
+  retainedNext?: typeof retainedNextVersion,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -67,10 +70,16 @@ export function createVerifiedProjectSnapshot(
   const projectValue = projectResult.data;
   const stateValue = stateResult.data;
   if (projectValue.originProfile !== stateValue.origin.profile || projectValue.recipeVersion !== stateValue.origin.recipeVersion) return invalidProjectSnapshot();
+  const retainedNextFingerprint = fingerprintJsonValue(retainedNextVersion);
+  const retainsNext = stateValue.managedSurfaces.some(surface =>
+    surface.identifier === "builder-web-package-next" && surface.path === "apps/web/package.json" &&
+    surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next" &&
+    surface.fingerprint === retainedNextFingerprint);
   const renderingContext = createGenerationRenderingContext(
     projectValue.selectedCapabilities.includes("application-persistence"),
     projectValue.selectedCapabilities.includes("app-foundation"),
     projectValue.selectedCapabilities.includes("background-job-delivery"),
+    retainsNext ? retainedNextVersion : undefined,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -100,9 +109,15 @@ export async function readVerifiedProjectSnapshot(
   return snapshot.ok ? { ok: true, value: { ...snapshot.value, reader } } : snapshot;
 }
 
-export function createApplicationEnvironmentRenderingContext(applicationPersistence = false, retainAppFoundation = false, backgroundJobs = false): ApplicationEnvironmentRenderingContext {
+export function createApplicationEnvironmentRenderingContext(
+  applicationPersistence = false,
+  retainAppFoundation = false,
+  backgroundJobs = false,
+  retainedNext?: typeof retainedNextVersion,
+): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
+    ...(retainedNext === undefined ? {} : { retainedNextVersion: retainedNext }),
     ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     catalogSnapshot: backgroundJobs
       ? (applicationPersistence ? applicationEnvironmentPersistenceJobsCatalogSnapshot : applicationEnvironmentJobsCatalogSnapshot)
@@ -113,9 +128,12 @@ export function createApplicationEnvironmentRenderingContext(applicationPersiste
 
 export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
   try {
+    const retainedNext = typeof value === "object" && value !== null && "retainedNextVersion" in value &&
+      value.retainedNextVersion === retainedNextVersion ? retainedNextVersion : undefined;
+    const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
-        [false, true].some((jobs) => stringifyCanonicalJson(value) === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs)))),
+        [false, true].some((jobs) => serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext)))),
     );
   } catch {
     return false;

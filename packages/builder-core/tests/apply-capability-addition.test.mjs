@@ -1111,10 +1111,35 @@ test("application persistence addition preserves custom scripts and installs the
   assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.10.0");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.equal(JSON.parse(repository.files.get("apps/web/package.json")).scripts.custom, "node custom.mjs");
-  assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"), "utf8"));
+  assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml"), "utf8"));
   assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
   assert.equal(result.value.migration, "add-application-persistence-0-2-0");
   assert.deepEqual(repository.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
+});
+
+test("persistence addition refuses a mixed Next.js patch before writing or verifying", async () => {
+  for (const drift of ["manifest", "lockfile"]) {
+    const repository = createRepository(await fixtureEntries("app"));
+    const plan = await approvedPlan(repository.reader, "application-persistence");
+    if (drift === "manifest") {
+      const manifest = JSON.parse(repository.files.get("apps/web/package.json"));
+      manifest.dependencies.next = "16.4.1";
+      repository.files.set("apps/web/package.json", `${JSON.stringify(manifest)}\n`);
+    } else {
+      repository.files.set("pnpm-lock.yaml", await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml"), "utf8"));
+    }
+    const before = [...repository.files];
+    const result = await core.applyCapabilityAddition({
+      root, capability: "application-persistence", approvedPlanFingerprint: plan.planFingerprint,
+      reader: repository.reader, writer: repository.writer,
+      inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { verifyInIsolatedCopy: async () => { throw new Error("mixed inputs must not verify"); } },
+    });
+    assert.equal(result.ok, false, drift);
+    assert.equal(result.phase, "precondition", drift);
+    assert.deepEqual(repository.writes, [], drift);
+    assert.deepEqual([...repository.files], before, drift);
+  }
 });
 
 test("application persistence addition refuses incomplete binding receipts before persisting state", async () => {
@@ -1187,7 +1212,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
       verifier: {
         async prepareLockfile(root) {
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}-next-16.4.5/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },

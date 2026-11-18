@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { parseDocument } from "yaml";
 
@@ -43,15 +43,17 @@ test("current recipes own the lint patch and select exact optional dependency fa
       assert.equal(policy.overrides["@next/eslint-plugin-next@" + plugin + ">fast-glob"], "-");
       assert.equal(policy.patchedDependencies["@next/eslint-plugin-next@" + plugin], patchPath);
       assert.equal(manifest.devDependencies.vitest, "5.0.3");
-      assert.equal(manifest.dependencies.next, "16.4.1");
+      assert.equal(manifest.dependencies.next, "16.4.5");
+      assert.equal(policy.overrides["next@>=16.2.0 <16.4.5"], "16.4.5");
       const foundation = manifest.dependencies.effect !== undefined;
-      const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence"
+      const retainedLock = options.applicationPersistence ? "app-0.2.7-persistence"
         : profile === "app" ? "app-0.3.0"
         : profile === "site" && foundation ? "app-0.2.7"
         : profile === "portfolio" && foundation ? "portfolio-0.11.7-foundation"
         : profile + "-" + recipes[profile];
+      const expectedLock = retainedLock + "-next-16.4.5";
       assert.equal(resolveRecipeLockfileVersion(current.project, manifest), expectedLock);
-      for (const next of ["16.3.8", "16.4.0", "^16.4.1"]) {
+      for (const next of ["16.3.8", "16.4.0", "^16.4.5", "16.4.6"]) {
         assert.equal(resolveRecipeLockfileVersion(current.project, { ...manifest, dependencies: { ...manifest.dependencies, next } }), undefined);
       }
       for (const vitest of ["4.1.10", "4.1.11", "5.0.0", "^5.0.3"]) {
@@ -64,6 +66,29 @@ test("current recipes own the lint patch and select exact optional dependency fa
     const candidate = assertSuccess(await core.renderSkeleton({ profile, projectName: "internal-example", displayName: "Internal Example", packageVersions: core.verifiedCapabilityPackageVersions }, core.createApplicationEnvironmentRenderingContext()));
     assert.equal(candidate.project.schemaVersion, "2.0.0");
     assert.deepEqual(Buffer.from(candidate.files.find(({ path }) => path === patchPath).content), patch);
+  }
+});
+
+test("installed Next.js patch preserves its exact generated dependency view", async () => {
+  const core = await import("../dist/index.js");
+  const { readVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
+  for (const [root, profile, projectName, displayName, persistent, lock] of [
+    ["portfolio-0.12.0", "portfolio", "acme-portfolio", "Acme Portfolio", false, "portfolio-0.12.0"],
+    ["app-persistence-0.3.0", "app", "acme-app-persistence", "Acme App Persistence", true, "app-0.2.7-persistence"],
+  ]) {
+    const fixture = new URL("../../../fixtures/generated/" + root + "/", import.meta.url);
+    const reader = core.createFileSystemRepositoryReader(fileURLToPath(fixture));
+    const snapshot = assertSuccess(await readVerifiedProjectSnapshot(reader));
+    const rendered = assertSuccess(await core.renderSkeleton({
+      profile, projectName, displayName,
+      packageVersions: core.verifiedCapabilityPackageVersions,
+      ...(persistent ? { applicationPersistence: true } : {}),
+    }, snapshot.renderingContext));
+    for (const path of ["apps/web/package.json", "pnpm-workspace.yaml"]) {
+      assert.deepEqual(Buffer.from(rendered.files.find(file => file.path === path).content), await readFile(new URL(path, fixture)));
+    }
+    assert.equal(resolveRecipeLockfileVersion(rendered.project, parseGeneratedJson(rendered.files, "apps/web/package.json")), lock);
   }
 });
 
@@ -2077,7 +2102,7 @@ test("rendered manifests and desired project match the approved resolved recipe"
     dependencies: {
       "@egeria-systems/observability": "0.3.0",
       "@opennextjs/cloudflare": "1.20.12",
-      next: "16.4.1",
+      next: "16.4.5",
       react: "19.2.8",
       "react-dom": "19.2.8",
       yaml: "2.9.0",
@@ -2185,7 +2210,7 @@ test("generated workspaces constrain vulnerable transitive dependency ranges", a
   assert.equal(workspace.minimumReleaseAge, 1440);
   assert.equal(workspace.resolutionMode, "time-based");
   assert.equal(workspace.overrides["vitest@4.1.10"], undefined);
-  assert.equal(workspace.overrides["next@>=16.2.0 <16.4.1"], "16.4.1");
+  assert.equal(workspace.overrides["next@>=16.2.0 <16.4.5"], "16.4.5");
   assert.equal(workspace.overrides["vite@>=8.2.0 <8.2.4"], "8.2.4");
   assert.equal(workspace.overrides["sharp@>=0.35.0 <0.35.5"], "0.35.5");
   assert.ok(workspace.minimumReleaseAgeExclude.includes("vite@8.2.4"));
@@ -6053,10 +6078,10 @@ test("fresh security declarations match their locked Next across supported depen
     for (const options of [{}, { transactionalEmailResend: true }, { backgroundJobDelivery: true }, ...(profile === "app" ? [{ applicationPersistence: true }, { applicationPersistence: true, transactionalEmailResend: true }, { applicationPersistence: true, backgroundJobDelivery: true }] : [])]) {
       const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "declared-next", displayName: "Declared Next", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
       const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
-      assert.equal(manifest.dependencies.next, "16.4.1");
+      assert.equal(manifest.dependencies.next, "16.4.5");
       const lock = resolveRecipeLockfileVersion(rendered.project, manifest);
       assert.ok(lock);
-      for (const version of ["16.3.1", "16.3.4", "^16.4.1", "99.0.0"]) {
+      for (const version of ["16.3.1", "16.3.4", "^16.4.5", "99.0.0"]) {
         assert.equal(resolveRecipeLockfileVersion(rendered.project, { ...manifest, dependencies: { ...manifest.dependencies, next: version } }), undefined);
       }
     }
@@ -6100,7 +6125,7 @@ test("security dependency policy shares exact reviewed patches with environment 
       assert.equal(rootManifest.engines.pnpm, "11.28.1");
     });
     assert.equal(policy.overrides["next@16.3.0"], undefined);
-    assert.equal(policy.overrides["next@>=16.2.0 <16.4.1"], "16.4.1");
+    assert.equal(policy.overrides["next@>=16.2.0 <16.4.5"], "16.4.5");
     assert.equal(policy.overrides["brace-expansion@>=1.0.0 <1.1.21"], "1.1.21");
     assert.equal(policy.overrides["brace-expansion@>=2.0.0 <2.1.7"], "2.1.7");
     assert.equal(policy.overrides["brace-expansion@>=5.0.0 <5.0.12"], "5.0.12");
@@ -6596,10 +6621,10 @@ test("current generation owns literal lint patches across foundation and persist
       assert.deepEqual(ownedPatch.owner, { kind: "builder-kernel" });
       const manifest = parseGeneratedJson(rendered.files, "apps/web/package.json");
       const foundation = manifest.dependencies.effect !== undefined;
-      const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence"
-        : profile === "app" ? "app-0.3.0"
-        : foundation ? profile === "portfolio" ? "portfolio-0.11.7-foundation" : "app-0.2.7"
-        : profile === "portfolio" ? "portfolio-0.12.0" : "site-0.13.0";
+      const expectedLock = options.applicationPersistence ? "app-0.2.7-persistence-next-16.4.5"
+        : profile === "app" ? "app-0.3.0-next-16.4.5"
+        : foundation ? profile === "portfolio" ? "portfolio-0.11.7-foundation-next-16.4.5" : "app-0.2.7-next-16.4.5"
+        : profile === "portfolio" ? "portfolio-0.12.0-next-16.4.5" : "site-0.13.0-next-16.4.5";
       assert.equal(resolveRecipeLockfileVersion(rendered.project, manifest), expectedLock);
       const lock = parseDocument(await readFile(new URL(`../lockfiles/web-recipe-${expectedLock}/pnpm-lock.yaml`, import.meta.url), "utf8")).toJS();
       assert.equal(lock.patchedDependencies[plugin], createHash("sha256").update(patch).digest("hex"));

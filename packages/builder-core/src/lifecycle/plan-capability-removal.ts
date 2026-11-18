@@ -986,7 +986,12 @@ export async function planCapabilityRemoval(input: Readonly<{
       ...(capabilityValue !== "analytics" && environmentAnalyticsSettings !== undefined ? { analytics: environmentAnalyticsSettings } : {}),
       ...(capabilityValue !== "booking-calendly" && environmentBookingSettings !== undefined ? { bookingCalendly: environmentBookingSettings } : {}),
       ...(capabilityValue !== "contact-form-web3forms" && project.selectedCapabilities.includes("contact-form-web3forms") ? { contactFormWeb3Forms: true as const } : {}),
-    }, createApplicationEnvironmentRenderingContext(capabilityValue !== "application-persistence" && project.selectedCapabilities.includes("application-persistence"), project.selectedCapabilities.includes("app-foundation"))),
+    }, createApplicationEnvironmentRenderingContext(
+      capabilityValue !== "application-persistence" && project.selectedCapabilities.includes("application-persistence"),
+      project.selectedCapabilities.includes("app-foundation"),
+      false,
+      environmentContext.retainedNextVersion,
+    )),
   ]);
 
   if (!currentRender.ok || !desiredRender.ok) {

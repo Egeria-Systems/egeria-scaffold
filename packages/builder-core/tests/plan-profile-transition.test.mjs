@@ -59,7 +59,7 @@ async function loadEntries(root) {
 }
 
 async function portfolioEntries() {
-  return loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0"));
+  return loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5"));
 }
 
 function cloneEntries(entries) {
@@ -173,7 +173,7 @@ test("only the current incoming app edges are supported", () => {
 });
 
 test("site planning binds the current target without mutation or control-file actions", async () => {
-  const entries = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
+  const entries = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0-next-16.4.5"));
   const result = await planFromEntries(entries);
   assert.equal(result.ok, true, JSON.stringify(result));
   assert.deepEqual(result.value.target.profile, "app");
@@ -183,7 +183,7 @@ test("site planning binds the current target without mutation or control-file ac
 });
 
 test("current planning refuses collisions, managed drift, ejections and invalid controls without mutation", async () => {
-  const base = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
+  const base = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0-next-16.4.5"));
   for (const mutate of [
     entries => entries.set("apps/web/app/api/health/route.ts", encoder.encode("collision")),
     entries => entries.set("pnpm-lock.yaml", encoder.encode("changed lock")),
@@ -201,7 +201,7 @@ test("current planning refuses collisions, managed drift, ejections and invalid 
 });
 
 test("current planning contains reader errors and refuses a reader without bytes", async () => {
-  const entries = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
+  const entries = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0-next-16.4.5"));
   for (const path of controlPaths) {
     const result = await planFromEntries(entries, { overrides: new Map([[path, "throw"]]) });
     assertFailure(result, "PROJECT_INSPECTION_INVALID");
@@ -229,7 +229,7 @@ test("app transition planning reaches content and visual eligibility after exact
 
 test("successor portfolio transition refuses missing exact visual admission without mutation", async () => {
   for (const recipeVersion of ["0.12.0"]) {
-    const entries = await loadEntries(resolve(repositoryRoot, `fixtures/generated/portfolio-${recipeVersion}`));
+    const entries = await loadEntries(resolve(repositoryRoot, `fixtures/generated/portfolio-${recipeVersion}-next-16.4.5`));
     const project = core.parseProjectYaml(text(entries, ".egeria/project.yaml"));
     assert.equal(project.ok, true);
     assert.equal(project.value.recipeVersion, recipeVersion);

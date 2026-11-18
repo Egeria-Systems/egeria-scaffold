@@ -14,6 +14,8 @@ The executable proof is the private workspace at [`proofs/nextjs-cloudflare`](..
 
 ## Current local dependency renewal
 
+The current proof manifest selects Next.js `16.4.5` and its reviewed closure under [ADR-0015](../adr/0015-vitest-five-generation.md#nextjs-1645-security-successor). Root and proof development checks use that exact lockfile with the existing OpenNext adapter and ESLint configuration. The dated proof evidence below retains its original revision and inputs.
+
 The 2026-10-22 successor selects Next `16.4.1`, OpenNext Cloudflare `1.20.12`, AWS adapter `4.1.11`, Wrangler `4.148.0` and Vitest `5.0.3`. The root/proof and eight generated lock graphs share the scoped glob correction; only the persistence graph selects Workers types `5.20261006.1` and its explicitly approved tsx/esbuild edge. [ADR-0015](../adr/0015-vitest-five-generation.md#adapter-and-scoped-glob-renewal) owns this exact dependency boundary.
 
 The initial nine-graph renewal passed native frozen installation, peer checks, full-info audits and registry-signature checks with unchanged resolved lock hashes and zero vulnerabilities. Its signature evidence covers 800 root packages, 937 persistence packages, 904 packages in each foundation/app graph and 892 packages in each remaining portfolio/site graph. Those receipts remain bound to their original graphs.

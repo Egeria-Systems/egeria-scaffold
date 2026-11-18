@@ -501,7 +501,7 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
 });
 
 test("standards recognizes only the exact patched Vitest declaration without accepting other versions or managed drift", async () => {
-  const root = resolve(packageRoot, "../../fixtures/generated/app-0.3.0");
+  const root = resolve(packageRoot, "../../fixtures/generated/app-0.3.0-next-16.4.5");
   const reader = { async readText(path) {
     try { return { kind: "file", content: await readFile(resolve(root, path), "utf8") }; }
     catch (error) { return error.code === "ENOENT" ? { kind: "missing" } : { kind: "error", code: "FILE_ENCODING_INVALID" }; }

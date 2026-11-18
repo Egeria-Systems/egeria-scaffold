@@ -17,7 +17,7 @@ const root = "/generated/email-lifecycle";
 const git = { ok: true, identity: { root, revision: "abcdef0123456789abcdef0123456789abcdef01", attachedRef: "refs/heads/email-lifecycle", gitDirectory: "/generated/.git/worktrees/email-lifecycle", commonDirectory: "/generated/.git" } };
 
 const cohorts = [
-  { profiles: createApplicationEnvironmentProfileRecipes(), versions: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.7-foundation", site: "web-recipe-app-0.2.7", app: "web-recipe-app-0.3.0" }, persistenceLock: "web-recipe-app-0.2.7-persistence" },
+  { profiles: createApplicationEnvironmentProfileRecipes(), versions: { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }, foundationLocks: { portfolio: "web-recipe-portfolio-0.11.7-foundation-next-16.4.5", site: "web-recipe-app-0.2.7-next-16.4.5", app: "web-recipe-app-0.3.0-next-16.4.5" }, persistenceLock: "web-recipe-app-0.2.7-persistence-next-16.4.5" },
 ];
 async function assertCohort(repo, cohort, profile, persistent = false) {
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")));
@@ -96,7 +96,7 @@ test("email lifecycle preserves current declarations and custom metadata", async
       manifest.description = "Custom email project";
       repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
       const checks = persistent ? core.persistenceGenerationVerificationChecks : core.appGenerationVerificationChecks;
-      const expectedNext = "16.4.1";
+      const expectedNext = "16.4.5";
       for (const operation of ["add", "remove"]) {
         const { result } = await contactOperation(repo, operation, capability, undefined, checks);
         assert.equal(result.ok, true, JSON.stringify(result));

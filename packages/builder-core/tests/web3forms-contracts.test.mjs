@@ -51,7 +51,7 @@ test("absent contact selection preserves the existing portfolio source", async (
   assert.equal(result.ok, true);
   assert.equal(result.value.files.some(f => f.path.includes("web3forms")), false);
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
-    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.12.0/${path}`, import.meta.url)));
+    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/${path}`, import.meta.url)));
 });
 
 test("environment contact selection renders every profile and locale without literal settings", async () => {
