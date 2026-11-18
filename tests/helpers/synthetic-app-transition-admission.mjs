@@ -17,6 +17,7 @@ const compiledPaths = [
   "packages/builder-core/dist/serialization/canonical-json.js",
 ];
 const currentLockPaths = new Map([
+  ["packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml"],
   ["packages/builder-core/lockfiles/web-recipe-app-0.2.6-persistence/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"],
   ["packages/builder-core/lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml"],
   ["packages/builder-core/lockfiles/web-recipe-portfolio-0.11.6-foundation/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.7-foundation/pnpm-lock.yaml"],
@@ -65,7 +66,7 @@ export async function createSyntheticAppTransitionAdmission(context) {
     assert.deepEqual(await readFile(join(root, path)), await readFile(join(sourceRoot, path)), path);
   }
   const originalSourceFiles = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha256(await readFile(join(root, path))) })));
-  const targetLockfileFingerprint = `sha256:${sha256(await readFile(join(root, "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml")))}`;
+  const targetLockfileFingerprint = `sha256:${sha256(await readFile(join(root, "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml")))}`;
   for (const prepared of preparedProjects.values()) {
     const locks = prepared.files.filter(({ path }) => path === "pnpm-lock.yaml");
     assert.equal(locks.length, 1);

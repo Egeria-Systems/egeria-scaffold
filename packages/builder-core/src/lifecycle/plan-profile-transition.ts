@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
+import { createRecipeLockfileUrl, currentNextVersion, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
 import { loadAppTransitionContentValidators } from "./app-transition-content-validation.js";
 import { appTransitionBaselinePaths, appTransitionVisualProject, appTransitionVisualBookingSettings, appTransitionVisualAnalyticsSettings, verifyAppTransitionVisualInputRecord, prepareAppProfileTransition, selectAppTransitionVisuals, type AppTransitionDisposition, type AppTransitionVisualEvidence, type AppTransitionPreparation, type AppTransitionFailureCode } from "./app-profile-transition.js";
 
@@ -530,7 +530,10 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   }
   const fromLock = resolveRecipeLockfileVersion({ originProfile: project.originProfile, recipeVersion: project.recipeVersion }, JSON.parse(new TextDecoder().decode(sourceManifest.content)));
   const toLock = resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: targetRecipeVersion }, JSON.parse(new TextDecoder().decode(targetManifest.content)));
-  if (fromLock === undefined || toLock !== `app-${targetRecipeVersion}`) {
+  const expectedTargetLock = renderingContext.retainedNextVersion === undefined
+    ? `app-${targetRecipeVersion}-next-${currentNextVersion}`
+    : `app-${targetRecipeVersion}`;
+  if (fromLock === undefined || toLock !== expectedTargetLock) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
   const sourceLock = new Uint8Array(await readFile(createRecipeLockfileUrl(fromLock)));

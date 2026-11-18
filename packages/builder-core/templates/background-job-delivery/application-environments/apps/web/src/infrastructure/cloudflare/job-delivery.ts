@@ -1,8 +1,8 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Effect, Layer } from "effect";
 import { parseApplicationEnvironment, validateRuntimeApplicationEnvironment, type ApplicationEnvironment, type ApplicationEnvironmentResult } from "@/src/configuration/application-environment";
-import { executeJob, isJobEnvironment, JobDeliveryFailure, JobDispatcher, terminalJob, validateJob,
-  type JobDefinition, type JobEnvironment, type JobEnvelope, type JobFailureCode } from "@/src/application/job-delivery";
+import { executeJob, isJobEnvironment, JobDeliveryFailure, JobDispatcher, parseJobEnvelope, terminalJob, validateJob,
+  type JobDeclaration, type JobDefinition, type JobEnvironment, type JobEnvelope, type JobFailureCode } from "@/src/application/job-delivery";
 
 export const cloudflareJobConfiguration = Effect.tryPromise({
   try: async () => (await getCloudflareContext({ async: true })).env,
@@ -58,7 +58,7 @@ async function send(queue: QueueBinding, body: unknown, signal: AbortSignal): Pr
 
 export function createCloudflareJobDispatcherLayer(dependencies: Readonly<{
   compiledTarget: () => ApplicationEnvironmentResult;
-  configuration: Effect.Effect<unknown, JobDeliveryFailure>; handlers: readonly JobDefinition[];
+  configuration: Effect.Effect<unknown, JobDeliveryFailure>; handlers: readonly JobDeclaration[];
 }>): Layer.Layer<JobDispatcher> {
   return Layer.succeed(JobDispatcher, {
     dispatch: (input: JobEnvelope) => Effect.gen(function* () {
@@ -78,7 +78,7 @@ export function createCloudflareJobDispatcherLayer(dependencies: Readonly<{
   });
 }
 
-export async function consumeCloudflareJobs(batch: JobMessageBatch, environment: unknown, compiledTarget: ApplicationEnvironment, handlers: readonly JobDefinition[], signal?: AbortSignal): Promise<void> {
+export function validateCloudflareJobBatch(batch: JobMessageBatch, environment: unknown, compiledTarget: ApplicationEnvironment): Configuration {
   const settings = configuration(environment, compiledTarget);
   if (batch.queue !== settings.queueName || batch.messages.length > 10) throw new JobDeliveryFailure("job-configuration");
   // Refuse cross-target batches before any message handler, queue write or ack.
@@ -89,26 +89,33 @@ export async function consumeCloudflareJobs(batch: JobMessageBatch, environment:
       throw new JobDeliveryFailure("job-configuration");
     }
   }
+  return settings;
+}
+
+export async function consumeCloudflareJobs(batch: JobMessageBatch, environment: unknown, compiledTarget: ApplicationEnvironment, handlers: readonly JobDefinition[], signal?: AbortSignal): Promise<void> {
+  const settings = validateCloudflareJobBatch(batch, environment, compiledTarget);
   for (const message of batch.messages) {
     if (!Number.isSafeInteger(message.attempts) || message.attempts < 1) throw new JobDeliveryFailure("job-configuration");
     const delaySeconds = Math.min(300, 5 * 2 ** Math.min(6, message.attempts - 1));
     try {
       let job: JobEnvelope;
-      try { job = validateJob(message.body, settings.environment, handlers); }
+      try { job = parseJobEnvelope(message.body, settings.environment); }
       catch (error) {
         const code = error instanceof JobDeliveryFailure ? error.code : "job-validation";
-        if (code === "job-configuration" || code === "job-unsupported") {
-          // A consumer deployment can temporarily remove a supported version or
-          // break registration. Native exhaustion must retain accepted work.
-          message.retry({ delaySeconds }); report("retry", code); continue;
-        }
-        await send(settings.deadLetters, terminalJob(message.body, settings.environment, handlers, code), signal ?? new AbortController().signal);
+        await send(settings.deadLetters, terminalJob(message.body, settings.environment, code), signal ?? new AbortController().signal);
         message.ack(); report("terminal", code); continue;
+      }
+      try { job = validateJob(job, settings.environment, handlers); }
+      catch (error) {
+        const code = error instanceof JobDeliveryFailure ? error.code : "job-configuration";
+        // Current business rejection cannot distinguish a changed consumer from
+        // invalid injected work. Native exhaustion retains the original body.
+        message.retry({ delaySeconds }); report("retry", code); continue;
       }
       const decision = await executeJob(job, handlers, message.attempts, signal);
       if (decision.outcome === "completed") { message.ack(); report("completed"); }
       else if (decision.outcome === "terminal") {
-        await send(settings.deadLetters, terminalJob(job, settings.environment, handlers, decision.code), signal ?? new AbortController().signal);
+        await send(settings.deadLetters, terminalJob(job, settings.environment, decision.code), signal ?? new AbortController().signal);
         message.ack(); report("terminal", decision.code);
       } else {
         // Native max_retries owns exhaustion and transfers the original envelope

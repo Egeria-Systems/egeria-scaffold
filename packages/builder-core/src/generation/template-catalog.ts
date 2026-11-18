@@ -503,6 +503,11 @@ export function createTemplateCatalog(
         return { ...entry, source: jobSource.replace("background-job-delivery/", "background-job-delivery/application-environments/") };
       }
       if ([
+        "background-job-delivery/apps/web/src/application/job-delivery.ts",
+        "background-job-delivery/apps/web/src/application/job-handlers.ts",
+        "background-job-delivery/apps/web/src/composition/job-handler-composition.ts",
+        "background-job-delivery/apps/web/tests/unit/job-handler-composition.test.ts",
+        "background-job-delivery/apps/web/src/infrastructure/memory/job-delivery.ts",
         "background-job-delivery/apps/web/src/infrastructure/cloudflare/job-delivery.ts",
         "background-job-delivery/apps/web/src/composition/server-jobs.ts",
         "background-job-delivery/apps/web/tests/unit/job-delivery.test.ts",
@@ -514,6 +519,7 @@ export function createTemplateCatalog(
       }
     }
     if (includeTransactionalEmail && [
+      "transactional-email-resend/apps/web/src/composition/server-transactional-email.ts",
       "transactional-email-resend/apps/web/src/infrastructure/resend/transactional-email-sender.ts",
       "transactional-email-resend/apps/web/tests/unit/resend-transactional-email-sender.test.ts",
       "transactional-email-resend/apps/web/tests/unit/server-transactional-email.test.ts",

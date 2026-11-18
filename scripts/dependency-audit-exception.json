@@ -771,5 +771,72 @@
     "This is a single temporary exception, not an advisory ignore list.",
     "A current raw audit, exact inputs, live no-fix check and active authorization are required for every exception disposition.",
     "Any uncertainty, expiry, revocation or relevant drift refuses the exception."
-  ]
+  ],
+  "picomatch": {
+    "status": "active",
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "package": "picomatch",
+    "version": "4.0.7",
+    "approvedAt": "2026-11-18T15:00:00Z",
+    "expiresAt": "2026-11-21T15:00:00Z",
+    "reason": "Temporary development exception for PR #177 while upstream reviews the fix. The five recorded generated-project graphs carry a known high-severity regular-expression denial-of-service finding on development dependency paths.",
+    "findingsSha256": "36b0bcaa59d42d143c856bbb4265c81f8676d9ad59fdbe6cfa210c6ca7146e36",
+    "graphs": [
+      {
+        "id": "portfolio",
+        "lockSha256": "e46a83d2b2fcd45b1368965cc02694cd60d1d9000283341e884287a9df4f3597",
+        "workspacePolicySha256": "a91e1b66e04605fff44dc168eddd60cab2027adf6218ef89e29fbde892b022da",
+        "dependencyCounts": {
+          "dependencies": 321,
+          "devDependencies": 453,
+          "optionalDependencies": 180,
+          "totalDependencies": 876
+        }
+      },
+      {
+        "id": "site",
+        "lockSha256": "041c4684a58db5b9e12753ce9f132fd02623cd0d8c87fc6d9a27b9d18a35a6ae",
+        "workspacePolicySha256": "25f93c3fceeaa13d129748db36f171706ee5ceef5c55a1e529ffcff762057c6b",
+        "dependencyCounts": {
+          "dependencies": 321,
+          "devDependencies": 453,
+          "optionalDependencies": 180,
+          "totalDependencies": 876
+        }
+      },
+      {
+        "id": "app",
+        "lockSha256": "17988722d44ecb809a7d73d7eb553b33f422596f7089ab9ee04900242260c10f",
+        "workspacePolicySha256": "559a5acf71f6950c2ca20e759c54b04f93afb80c3f5a03a6448ad0f73c3dff1d",
+        "dependencyCounts": {
+          "dependencies": 325,
+          "devDependencies": 453,
+          "optionalDependencies": 188,
+          "totalDependencies": 888
+        }
+      },
+      {
+        "id": "portfolio-email",
+        "lockSha256": "526c473aa0bac20c39435216ceac88b6daca911367ac16a9a13dd1ad53fc3070",
+        "workspacePolicySha256": "5e0c092b271e3322a583c6a9ce037e8f6943c9719e0658ce8bb8e7bae10d4984",
+        "dependencyCounts": {
+          "dependencies": 325,
+          "devDependencies": 453,
+          "optionalDependencies": 188,
+          "totalDependencies": 888
+        }
+      },
+      {
+        "id": "app-persistence",
+        "lockSha256": "e70b7ad107c93d245c32f9f2c7f8424fd1c4a35a2c146679c55f30cc0c977830",
+        "workspacePolicySha256": "bce2f25a339e28fdc6ec7d248318ff2b1273a338e23134d760bc67852f23180d",
+        "dependencyCounts": {
+          "dependencies": 326,
+          "devDependencies": 485,
+          "optionalDependencies": 213,
+          "totalDependencies": 921
+        }
+      }
+    ]
+  }
 }

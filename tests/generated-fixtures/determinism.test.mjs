@@ -154,7 +154,7 @@ test("current security fixtures declare corrected Next with matching installed f
     const root = resolve(repositoryRoot, fixture.relativeRoot);
     const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
     const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.equal(manifest.dependencies.next, "16.4.1", fixture.identifier);
+    assert.equal(manifest.dependencies.next, "16.4.5", fixture.identifier);
     assert.equal(state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue(manifest.dependencies.next), fixture.identifier);
     await inspectGeneratedFixture(root, fixture.identifier);
   }
@@ -196,7 +196,7 @@ test("representative app fixtures retain exact descriptor ownership, production-
     assert.equal(foundation.managedSurfaces.length, 18 + 2, "eighteen files and two package members");
     assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
       .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml")));
+    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml")));
     const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
     assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
     assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");

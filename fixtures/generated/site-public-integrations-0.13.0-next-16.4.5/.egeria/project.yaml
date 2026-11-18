@@ -1,0 +1,36 @@
+builderCompatibility: 0.0.0
+capabilitySettings:
+  analytics:
+    consent:
+      policy: explicit-opt-in
+    operationalIntegrations:
+      googleSearchConsole: true
+      lookerStudio:
+        connector: google-analytics-4
+    providers:
+      cloudflareWebAnalytics: true
+      googleAnalytics4: true
+      microsoftClarity:
+        audience: not-directed-to-minors
+  booking-calendly:
+    mode: popup
+ejectedAreas: []
+originProfile: site
+platformAdapter: cloudflare-workers
+project:
+  defaultLocale: en-CA
+  displayName: Acme Site Public Integrations
+  name: acme-site-public-integrations
+recipeVersion: 0.13.0
+schemaVersion: 2.0.0
+selectedCapabilities:
+  - standards
+  - content-files
+  - section-composition
+  - deployment-cloudflare
+  - observability
+  - site-routing
+  - contact-form-web3forms
+  - analytics
+  - booking-calendly
+  - multilingual

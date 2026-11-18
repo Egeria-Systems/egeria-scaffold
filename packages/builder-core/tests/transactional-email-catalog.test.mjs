@@ -28,7 +28,7 @@ test("email selection adds the server foundation to each current profile without
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
     assert.equal(manifest.dependencies.effect, "4.0.0-rc.112");
     assert.equal(manifest.dependencies.resend, undefined);
-    assert.equal(manifest.dependencies.next, "16.4.1");
+    assert.equal(manifest.dependencies.next, "16.4.5");
     assert.ok(manifest.scripts["test:integration:cloudflare"]);
     assert.ok(resolveRecipeLockfileVersion(project, manifest));
   }
@@ -47,7 +47,7 @@ test("email leaves default and unrelated descriptor contracts unchanged", async 
     assert.equal(rendered.ok, true);
     assert.equal(rendered.value.project.selectedCapabilities.includes("transactional-email-resend"), false);
     const manifest = JSON.parse(new TextDecoder().decode(rendered.value.files.find(({ path }) => path === "apps/web/package.json").content));
-    assert.equal(manifest.dependencies.next, "16.4.1");
+    assert.equal(manifest.dependencies.next, "16.4.5");
     assert.equal(rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation")?.version, profile === "app" ? "0.3.0" : undefined);
   }
 });
@@ -89,9 +89,9 @@ test("email composes with explicit app persistence without altering persistence 
 });
 
 for (const [profile, lockfile] of [
-  ["portfolio", "portfolio-0.11.7-foundation"],
-  ["site", "app-0.2.7"],
-  ["app", "app-0.3.0"],
+  ["portfolio", "portfolio-0.11.7-foundation-next-16.4.5"],
+  ["site", "app-0.2.7-next-16.4.5"],
+  ["app", "app-0.3.0-next-16.4.5"],
 ]) {
   test(`environment email selection preserves ${profile} identity without persistence`, async () => {
     const rendered = await renderSkeleton(
@@ -140,7 +140,7 @@ test("environment email composes with independently selected current persistence
   assert.equal(versions.standards, "0.10.0");
   assert.equal(versions["deployment-cloudflare"], "0.10.0");
   const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
-  assert.equal(resolveRecipeLockfileVersion(project, manifest), "app-0.2.7-persistence");
+  assert.equal(resolveRecipeLockfileVersion(project, manifest), "app-0.2.7-persistence-next-16.4.5");
 });
 
 for (const profile of ["portfolio", "site"]) {

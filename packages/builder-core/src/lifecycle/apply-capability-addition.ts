@@ -510,6 +510,8 @@ export async function applyCapabilityAddition(input: Readonly<{
   const environmentTargetContext = createGenerationRenderingContext(
     input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
     controls.project.value.selectedCapabilities.includes("app-foundation"),
+    false,
+    environmentContext.retainedNextVersion,
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

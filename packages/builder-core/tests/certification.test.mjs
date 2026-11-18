@@ -12,7 +12,7 @@ const descriptorDigests = Object.freeze({
   "analytics": "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b",
   "app-foundation": "sha256:2557256a72b6a62257298dcbafd587430b899285ef999141f45c1b9da91a749f",
   "application-persistence": "sha256:07740afcd637972b0de5cf5c538e697ae09a901eb52409eac30533a04d8374c7",
-  "background-job-delivery": "sha256:a47e895e683f6880c0175ce79c4d113c5aa8078b916e0730c51b4d3074fbad76",
+  "background-job-delivery": "sha256:7f42f615f573bc8594bbec10ea6b1cfca1d4317a616c6bbb7e2d4b68b9c8aa79",
   "booking-calendly": "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08",
   "contact-form-web3forms": "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
   "content-files": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
@@ -81,7 +81,9 @@ function createRecord(identifier) {
     },
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
-    taskPlan: "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
+    taskPlan: identifier === "background-job-delivery"
+      ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
+      : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
     evidence: [],
   };
 }
@@ -272,6 +274,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   booking.evidence = evidenceFor(booking, ["fresh-scaffold"]);
   const artifacts = {
     [registry.records.standards.taskPlan]: "# current generation certification renewal",
+    [registry.records["background-job-delivery"].taskPlan]: "# current jobs recovery and composition certification renewal",
     [evidencePath]: createEvidenceDocument(),
   };
 

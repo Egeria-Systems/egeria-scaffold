@@ -83,6 +83,8 @@ export const backgroundJobFiles = Object.freeze([
   { identifier: "job-handler-registration", path: "apps/web/src/application/job-handlers.ts", ownership: "application-owned" },
   { identifier: "job-queue-adapter", path: "apps/web/src/infrastructure/cloudflare/job-delivery.ts", ownership: "managed" },
   { identifier: "job-memory-adapter", path: "apps/web/src/infrastructure/memory/job-delivery.ts", ownership: "managed" },
+  { identifier: "job-handler-composition", path: "apps/web/src/composition/job-handler-composition.ts", ownership: "application-owned" },
+  { identifier: "job-handler-composition-tests", path: "apps/web/tests/unit/job-handler-composition.test.ts", ownership: "managed" },
   { identifier: "job-server-composition", path: "apps/web/src/composition/server-jobs.ts", ownership: "managed" },
   { identifier: "job-delivery-contract-tests", path: "apps/web/tests/unit/job-delivery.test.ts", ownership: "managed" },
   { identifier: "job-worker-tests", path: "apps/web/tests/integration/job-worker.test.ts", ownership: "managed" },

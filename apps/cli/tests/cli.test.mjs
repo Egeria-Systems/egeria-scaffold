@@ -21,7 +21,13 @@ import { generatedFixtureContracts } from "../../../scripts/verify-generated-ske
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 const lifecycleCohorts = [
-  { label: "current", generation: "current", profiles: createGenerationRenderingContext().profiles, portfolio: "0.12.0", site: "0.13.0", app: "0.3.0", portfolioFoundation: "portfolio-0.11.7-foundation" },
+  {
+    label: "current", generation: "current", profiles: createGenerationRenderingContext().profiles,
+    portfolio: "0.12.0", site: "0.13.0", app: "0.3.0",
+    appLock: "app-0.3.0-next-16.4.5",
+    portfolioFoundationLock: "portfolio-0.11.7-foundation-next-16.4.5",
+    siteFoundationLock: "app-0.2.7-next-16.4.5",
+  },
 ];
 
 
@@ -5408,7 +5414,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       assert.deepEqual(state.origin, { profile: "app", recipeVersion: cohort.app });
       assert.deepEqual(state.lastSuccessfulVerification.checks, core.appProfileTransitionPersistedVerificationChecks);
       assert.equal(JSON.parse(await readFile(join(linked, "apps/web/package.json"), "utf8")).devDependencies.vitest, "5.0.3");
-      assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-app-${cohort.app}/pnpm-lock.yaml`)));
+      assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${cohort.appLock}/pnpm-lock.yaml`)));
       await assertExactInstalledAgreement(linked);
     }, cohort.generation);
   });
@@ -5565,8 +5571,9 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
             assert.deepEqual(actual, Buffer.from(file.content), file.path);
           }
         }
+        const foundationLock = profile === "portfolio" ? cohort.portfolioFoundationLock : cohort.siteFoundationLock;
         assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), await readFile(resolve(
-          repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${profile === "portfolio" ? cohort.portfolioFoundation : `app-${cohort.app}`}/pnpm-lock.yaml`,
+          repositoryRoot, `packages/builder-core/lockfiles/web-recipe-${foundationLock}/pnpm-lock.yaml`,
         )));
         await commitAll(linked, `${operation} transactional email`);
         const diagnosis = await executeBuilt(["doctor", "--directory", linked]);

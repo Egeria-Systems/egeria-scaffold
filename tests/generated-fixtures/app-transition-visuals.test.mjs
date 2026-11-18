@@ -421,7 +421,7 @@ test(`${preparation} visual ${mode} preserve captures and receipts without retai
     assert.equal(result.project.sourceProject.recipeVersion, "0.12.0");
     assert.equal(result.project.targetProject.schemaVersion, "2.0.0");
     assert.equal(result.project.targetProject.recipeVersion, "0.3.0");
-    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf");
+    assert.equal(result.project.files.find(({ path }) => path === "pnpm-lock.yaml").sha256, "17988722d44ecb809a7d73d7eb553b33f422596f7089ab9ee04900242260c10f");
     assert.ok(result.influencingFingerprints.some(({ path }) => path === "patches/next-eslint-plugin-next.patch"));
   }
   const passes = mode === "candidates" ? ["candidate", "reproduction"] : ["comparison"];
@@ -611,7 +611,7 @@ test("comparison rejects missing or unsafe source, lock, PNG and policy before e
   h.effects.length = 0;
   const paths = [admissionLeaf, "scripts/verify-app-transition-visuals.mjs", "packages/builder-core/src/lifecycle/app-profile-transition.ts",
     "packages/builder-core/templates/common/apps/web/app/globals.css", "packages/builder-core/templates/common/apps/web/tests/visual/home-visual.spec.ts",
-    "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml",
+    "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml",
     "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-desktop-chromium-linux.png"];
   for (const path of paths) for (const kind of ["missing", "symlink"]) {
     const effects = [];
@@ -785,7 +785,7 @@ test("fresh comparison measures stable unaccepted inputs without granting lifecy
   influenced.fingerprint = `sha256:${sha256(file.content)}`;
   const policy = await import(h.verifierUrl);
   const input = { optionalCapabilities: [], influencingFingerprints: prepared.influencingFingerprints,
-    targetLockfileFingerprint: "sha256:c63769d697a8db5b7ffad280e2d25f483f2adf2e37638bfc68158e544e7aabcf" };
+    targetLockfileFingerprint: "sha256:17988722d44ecb809a7d73d7eb553b33f422596f7089ab9ee04900242260c10f" };
   assert.equal(policy.verifyAppTransitionVisualInputRecord(input).ok, false);
   const adapters = { ...h.adapters };
   const result = await h.module.verifyAppTransitionVisuals({ mode: "compare" }, adapters);
@@ -830,7 +830,7 @@ test("visual command failure retains its exit when its report is missing or malf
 
 test("comparison binds operation inputs before build and refuses their drift before artifact writes", async t => {
   for (const path of [admissionLeaf, "packages/builder-core/src/lifecycle/app-profile-transition.ts",
-    "packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml",
+    "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml",
     "packages/builder-core/templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-home-mobile-chromium-linux.png",
     "packages/builder-core/src/fresh-measurement-input.ts"]) {
     const h = await comparisonHarness(t);

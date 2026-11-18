@@ -25,7 +25,7 @@ const digest = (bytes) => `sha256:${createHash("sha256").update(bytes).digest("h
 const fingerprint = (value) => digest(stringifyCanonicalJson(value));
 
 const cohorts = [
-  { profiles: createApplicationEnvironmentProfileRecipes(), recipe: "0.3.0", appLock: "web-recipe-app-0.3.0" },
+  { profiles: createApplicationEnvironmentProfileRecipes(), recipe: "0.3.0", appLock: "web-recipe-app-0.3.0-next-16.4.5" },
 ];
 
 async function repository(options = {}) {
@@ -241,7 +241,7 @@ test("persistence lifecycle preserves current declarations and custom metadata",
     const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
     manifest.description = "Custom persistence project";
     repo.files.set("apps/web/package.json", encoder.encode(JSON.stringify(manifest)));
-    const expectedNext = "16.4.1";
+    const expectedNext = "16.4.5";
     const evidence = removalEvidence(repo);
     const planned = await plan(repo, evidence);
     assert.equal(planned.ok, true, JSON.stringify(planned));
@@ -258,7 +258,7 @@ test("persistence lifecycle preserves current declarations and custom metadata",
       assert.equal(project.recipeVersion, "0.3.0");
       assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), persistent);
       assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend"), transactionalEmailResend);
-      assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence" : "web-recipe-app-0.3.0"}/pnpm-lock.yaml`, import.meta.url))));
+      assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : "web-recipe-app-0.3.0-next-16.4.5"}/pnpm-lock.yaml`, import.meta.url))));
       assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
     };
     await assertInstalled(false);

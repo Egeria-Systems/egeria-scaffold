@@ -11,6 +11,7 @@ import {
   type CapabilityPackageVersions,
 } from "../catalog/capability-catalog.js";
 import { createGenerationRenderingContext, isApplicationEnvironmentRenderingContext } from "../catalog/verified-package-versions.js";
+import { currentNextVersion, retainedNextVersion } from "./recipe-lockfiles.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   type ProjectConfiguration,
@@ -77,6 +78,7 @@ export type SkeletonRenderingContext = Readonly<{
   profiles: readonly ProfileRecipe[];
   projectSchemaVersion: "2.0.0";
   retainAppFoundation?: true;
+  retainedNextVersion?: typeof retainedNextVersion;
 }>;
 
 export type ApplicationEnvironmentRenderingContext = SkeletonRenderingContext;
@@ -216,6 +218,7 @@ function enrichApplicationManifest(
   profile: ProfileIdentifier,
   persistence: boolean,
   foundation: boolean,
+  nextVersion: typeof currentNextVersion | typeof retainedNextVersion,
 ): ValidationResult<readonly GeneratedFile[]> {
   const manifestIndex = files.findIndex(
     ({ path }) => path === "apps/web/package.json",
@@ -268,7 +271,7 @@ function enrichApplicationManifest(
     dependencies: {
       ...manifest.dependencies,
       "@egeria-systems/observability": packageVersions.observability,
-      next: "16.4.1",
+      next: nextVersion,
       ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
       ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
     },
@@ -299,7 +302,10 @@ function enrichApplicationManifest(
       return { path: file.path, content: encoder.encode(`${decoder.decode(file.content)}\nSee [Application environments](docs/environments.md) for build inputs, runtime targets and local recovery.\n`) };
     }
     if (file.path === "pnpm-workspace.yaml") {
-      let workspaceSource = decoder.decode(file.content);
+      let workspaceSource = decoder.decode(file.content).replace(
+        `"next@>=16.2.0 <${retainedNextVersion}": ${retainedNextVersion}`,
+        `"next@>=16.2.0 <${nextVersion}": ${nextVersion}`,
+      );
       if (foundation) {
         const workspace = parseDocument(workspaceSource);
         workspace.setIn(["allowBuilds", "msgpackr-extract"], false);
@@ -652,6 +658,7 @@ export async function renderSkeleton(
     projectResult.value.originProfile,
     request.applicationPersistence === true,
     resolutionResult.value.capabilities.some(({ identifier }) => identifier === "app-foundation"),
+    context.retainedNextVersion ?? currentNextVersion,
   );
   if (!manifestResult.ok) {
     return manifestResult;

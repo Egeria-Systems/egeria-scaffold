@@ -1010,17 +1010,29 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   }
 
   const dependencySteps = workflow.jobs["dependency-review"].steps;
-  assert.equal(dependencySteps.length, 1);
+  assert.equal(dependencySteps.length, 3);
+  const [dependencyCheckout, exceptionStep, dependencyReview] = dependencySteps;
+  const exceptionScope = "github.repository == 'Egeria-Systems/egeria-scaffold' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.number == 177";
+  assert.equal(dependencyCheckout.if, exceptionScope);
+  assert.equal(isPinnedGitHubActionReference(dependencyCheckout.uses, "actions/checkout"), true);
+  assert.deepEqual(dependencyCheckout.with, { "fetch-depth": 0, "persist-credentials": false });
+  assert.equal(exceptionStep.id, "picomatch_exception");
+  assert.equal(exceptionStep.if, exceptionScope);
+  assert.match(exceptionStep.run, /git diff --quiet "\$reviewed" HEAD --/u);
+  assert.match(exceptionStep.run, /await picomatchDependencyReviewAllowance\(\)/u);
   assert.equal(
     isPinnedGitHubActionReference(
-      dependencySteps[0]?.uses,
+      dependencyReview.uses,
       "actions/dependency-review-action",
     ),
     true,
   );
-  assert.deepEqual(dependencySteps[0]?.with, {
+  assert.equal(dependencyReview.if, undefined);
+  assert.equal(dependencyReview["continue-on-error"], undefined);
+  assert.deepEqual(dependencyReview.with, {
     "fail-on-severity": "moderate",
     "fail-on-scopes": "runtime, development",
+    "allow-ghsas": "${{ steps.picomatch_exception.outputs.advisory }}",
   });
 }
 
@@ -1631,7 +1643,7 @@ test("the workspace declares the approved proof root and install policy", async 
 
   assert.equal(
     workspace,
-    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@node-minify/core@9.0.2>glob\": \"14.0.3\"\n  \"@opennextjs/cloudflare@1.20.12>glob\": \"14.0.3\"\n  \"minimatch@>=7.0.0 <11.0.4\": \"11.0.4\"\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.4.1>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.4.1\": 16.4.1\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.30.1\n  \"qs@\": 6.16.1\n  \"body-parser@\": 2.4.0\n  \"undici@\": 6.29.1\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.4.1\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
+    "packages:\n  - \"apps/*\"\n  - \"packages/*\"\n  - \"proofs/*\"\n\npmOnFail: error\n\nminimumReleaseAge: 1440\n\noverrides:\n  \"@node-minify/core@9.0.2>glob\": \"14.0.3\"\n  \"@opennextjs/cloudflare@1.20.12>glob\": \"14.0.3\"\n  \"minimatch@>=7.0.0 <11.0.4\": \"11.0.4\"\n  \"vite@>=8.2.0 <8.2.4\": 8.2.4\n  \"launch-editor@2.14.1\": 2.14.2\n  \"vite@8.2.4>rolldown\": 1.2.5\n  \"vite@8.2.4>postcss\": 8.5.26\n  \"@next/eslint-plugin-next@16.4.1>fast-glob\": \"-\"\n  \"next@>=16.2.0 <16.4.5\": 16.4.5\n  \"brace-expansion@>=1.0.0 <1.1.21\": 1.1.21\n  \"brace-expansion@>=2.0.0 <2.1.7\": 2.1.7\n  \"brace-expansion@>=5.0.0 <5.0.12\": 5.0.12\n  \"js-yaml@>=4.0.0 <4.3.2\": 4.3.2\n  \"miniflare>undici\": 7.30.1\n  \"qs@\": 6.16.1\n  \"body-parser@\": 2.4.0\n  \"undici@\": 6.29.1\n  \"sharp@>=0.35.0 <0.35.5\": 0.35.5\n  \"source-map-js@>=1.0.0 <1.2.2\": 1.2.2\n  \"proxy-addr@>=2.0.0 <2.0.8\": 2.0.8\n\n  \"shell-quote@>=1.8.4 <1.11.0\": 1.11.0\n\nallowBuilds:\n  \"@parcel/watcher\": true\n  \"@swc/core\": true\n  esbuild: true\n  unrs-resolver: true\n  workerd: true\n\npatchedDependencies:\n  \"@next/eslint-plugin-next@16.4.1\": \"packages/builder-core/templates/common/literal-lint-roots/patches/next-eslint-plugin-next.patch\"\n",
   );
 });
 
@@ -4037,9 +4049,11 @@ test("executable capability certification ownership is current", async () => {
     "standards",
     "transactional-email-resend",
   ]);
-  for (const record of Object.values(registry.records)) {
+  for (const [identifier, record] of Object.entries(registry.records)) {
     assert.equal(record.status, "pending");
-    assert.equal(record.taskPlan, "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
+    assert.equal(record.taskPlan, identifier === "background-job-delivery"
+      ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
+      : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
     assert.deepEqual(record.evidence, []);
   }
   assert.match(

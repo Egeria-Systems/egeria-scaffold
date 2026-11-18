@@ -102,7 +102,7 @@ async function installedEntries(profile, options = {}) {
     "pnpm-lock.yaml",
     new Uint8Array(
       await readFile(
-        resolve(packageRoot, `lockfiles/web-recipe-${profile}-${cohort.versions[profile]}/pnpm-lock.yaml`),
+        resolve(packageRoot, `lockfiles/web-recipe-${profile}-${cohort.versions[profile]}-next-16.4.5/pnpm-lock.yaml`),
       ),
     ),
   );
@@ -2396,7 +2396,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
       verifier: {
         async prepareLockfile(root) {
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}-next-16.4.5/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },

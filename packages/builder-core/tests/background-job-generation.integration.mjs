@@ -4,14 +4,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { createApplicationEnvironmentRenderingContext, createFileSystemRepositoryReader, createPnpmGeneratedProjectVerifier, generateProject, inferRepository, readVerifiedProjectSnapshot } from "../dist/index.js";
+import { assertCompositionSourcePreserved, createJobCompositionFixture, createEmailOnlyFixture, verifyEmailOnlyFixture } from "./helpers/job-composition-fixture.mjs";
 
 for (const [profile, selection] of [
   ["portfolio", {}],
   ["site", { transactionalEmailResend: true }],
   ["app", { applicationPersistence: true }],
 ]) {
-  test(`${profile} jobs generation verifies its actual runtime before persisting confirmed state`, async () => {
+  test(`${profile} jobs generation verifies its actual runtime before persisting confirmed state`, async context => {
     const owner = await mkdtemp(join(tmpdir(), "egeria-jobs-generation-"));
+    let verified = false;
     try {
       const result = await generateProject({
         request: { profile, projectName: `jobs-${profile}`, displayName: `Jobs ${profile}`, backgroundJobDelivery: true, ...selection },
@@ -28,7 +30,11 @@ for (const [profile, selection] of [
       assert.ok(inference.capabilities.every(({ category }) => category === "confirmed"), JSON.stringify(inference.capabilities));
       assert.ok(inference.surfaces.every(({ status }) => ["confirmed", "application-owned"].includes(status)), JSON.stringify(inference.surfaces.filter(({status})=>!["confirmed","application-owned"].includes(status))));
       assert.equal(result.value.state.installedCapabilities.some(({identifier})=>identifier==="application-persistence"), profile === "app");
-    } finally { await rm(owner, { recursive: true, force: true }); }
+      verified = true;
+    } finally {
+      if (verified) await rm(owner, { recursive: true, force: true });
+      else context.diagnostic(`Retained failed jobs generation owner: ${owner}`);
+    }
   });
 }
 
@@ -54,15 +60,36 @@ for (const [profile, selection] of [
     assert.equal(versions["app-foundation"], "0.3.0");
     assert.equal(versions["application-persistence"], selection.applicationPersistence ? "0.2.0" : undefined);
     assert.equal(versions["transactional-email-resend"], selection.transactionalEmailResend ? "0.2.0" : undefined);
+    // The generation receipt belongs to the unchanged generated source. The
+    // application-owned extension is authored before its own prepared builds.
+    const fixture = await createJobCompositionFixture({ generatedRoot: result.value.destination, parent: owner, selection });
     const { verifyApplicationEnvironmentProject } = await import("../../../scripts/verify-generated-skeletons.mjs");
     let verification;
     try {
-      verification = await verifyApplicationEnvironmentProject(result.value.destination);
+      verification = await verifyApplicationEnvironmentProject(fixture.root);
     } catch (error) {
       if (error.verificationFailure !== undefined) context.diagnostic(JSON.stringify(error.verificationFailure));
       throw error;
     }
     assert.deepEqual(verification.targets.map(({ target }) => target), ["development", "staging", "production"]);
+    await assertCompositionSourcePreserved(fixture);
     await writeFile(join(owner, "prepared-target-evidence.json"), JSON.stringify(verification, null, 2));
   });
 }
+
+test("independent email-only site verifies its actual HTTP sender without jobs or persistence", { timeout: 30 * 60 * 1000 }, async context => {
+  const owner = await mkdtemp(join(tmpdir(), "egeria-email-only-generation-"));
+  context.diagnostic(`Retained independent email owner: ${owner}`);
+  const result = await generateProject({
+    request: { profile: "site", projectName: "independent-email", displayName: "Independent Email", transactionalEmailResend: true },
+    destination: join(owner, "project"),
+    verifier: createPnpmGeneratedProjectVerifier({ pnpmExecutable: "pnpm" }),
+  });
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.ok(result.value.state.lastSuccessfulVerification.checks.includes("worker-integration"));
+  const fixture = await createEmailOnlyFixture({ generatedRoot: result.value.destination, parent: owner });
+  const verification = await verifyEmailOnlyFixture(fixture);
+  assert.deepEqual(verification.targets, ["development"]);
+  await assertCompositionSourcePreserved(fixture);
+  await writeFile(join(owner, "email-only-evidence.json"), JSON.stringify(verification, null, 2));
+});

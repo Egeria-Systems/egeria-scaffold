@@ -32,6 +32,16 @@ On 2026-10-22, the public dependency successor advances Next from `16.3.8` to `1
 
 The prior public `portfolio@0.11.5`, `site@0.12.5` and `app@0.2.5` identities retire under the precise [unused-generation exception](0020-application-environments.md#early-retirement-of-unused-public-generations). Independently frozen predecessor controls retain their original project/state bytes and refusal coverage. The internal candidate identities remain unchanged and explicitly selected. Next and its lock/workspace fingerprints are builder-owned, so this dependency renewal does not advance the unchanged standards descriptors or package versions. The [compatibility record](../compatibility/nextjs-cloudflare.md#current-local-dependency-renewal) distinguishes current verification from the immutable historical snapshot.
 
+### Next.js 16.4.5 security successor
+
+Fresh schema-2 generation and the compatibility proof select Next.js `16.4.5` for [GHSA-mfr8-8qww-v76h](https://github.com/advisories/GHSA-mfr8-8qww-v76h). The current generator selects six matching successor lockfiles, and the root lock renews the proof graph. Each graph changes only the Next.js release, its environment and compiler packages, and the affected peer and snapshot records. The proof's separate `eslint-config-next@16.4.1` patch and the existing OpenNext and toolchain selections stay exact.
+
+A supported installed schema-2 project whose managed Next.js fingerprint records `16.4.1` retains that exact rendering and lock view. Capability changes and profile transitions preserve the installed dependency view, with the existing actual-manifest and lock checks at their applicable boundaries. The new lock paths preserve the earlier graphs and fixtures as exact evidence. Client upgrades and existing-project security remediation require their own supported operation and approval. [Current generation and fixtures](../architecture/capability-model.md#current-environment-generation)
+
+### Temporary picomatch CI exception
+
+The user authorized a temporary CI exception during PR #177 development for the high-severity [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). The current [exception record](../../scripts/dependency-audit-exception.json) owns the expiry and the five exact generated dependency graphs. Visual verification keeps the failing raw audit and the separate exception disposition. GitHub dependency review applies the allowance to PR #177 in this repository while its reviewed dependency inputs match. The exception closes at expiry or when npm publishes a newer stable picomatch version.
+
 ### Proof ESLint alignment
 
 The compatibility proof selects `eslint-config-next@16.4.1` to retain its existing Next/config minor-version alignment contract. Its independent ESLint `9.39.5` and typescript-eslint `8.70.0` boundary remains unchanged. Only the root workspace's exact `@next/eslint-plugin-next` patch and fast-glob-removal parent keys advance from `16.3.5` to `16.4.1`; the canonical literal-root patch bytes remain unchanged.

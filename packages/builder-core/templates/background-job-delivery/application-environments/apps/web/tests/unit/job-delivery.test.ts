@@ -269,3 +269,219 @@ it("maps development to local while staging and production preserve their queue 
     expect(delivery.ack).toHaveBeenCalledOnce();
   }
 });
+
+it("accepted envelope remains recoverable after validator rejection", async () => {
+  const { environment, accepted, terminals } = nativeEnvironment();
+  let effects = 0;
+  const original = [definition(() => Effect.sync(() => { effects++; }))];
+  const layer = createCloudflareJobDispatcherLayer({ compiledTarget: () => ({ ok: true, value: "development" }), configuration: Effect.succeed(environment), handlers: original });
+  await Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(layer)));
+  const replacement = [{ ...original[0]!, validate: () => false }];
+  const delivery = message(accepted[0]);
+  const logs = vi.spyOn(console, "info").mockImplementation(() => {});
+  try {
+    await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, environment, "development", replacement);
+    expect(effects).toBe(0);
+    expect(delivery.ack).not.toHaveBeenCalled();
+    expect(delivery.retry).toHaveBeenCalledWith({ delaySeconds: 5 });
+    expect(terminals).toEqual([]);
+    expect(delivery.body).toEqual(envelope());
+    expect(() => prepareJobRecovery(delivery.body, "local", replacement)).toThrow();
+    expect(JSON.stringify(logs.mock.calls)).not.toContain("sequence");
+  } finally { logs.mockRestore(); }
+});
+
+it("producer rejects invalid payload before send", async () => {
+  const { environment, accepted } = nativeEnvironment();
+  const handlers = [definition(() => Effect.void)];
+  const layer = createCloudflareJobDispatcherLayer({ compiledTarget: () => ({ ok: true, value: "development" }), configuration: Effect.succeed(environment), handlers });
+  await expect(Effect.runPromise(dispatch(envelope({ payload: { sequence: "invalid" } })).pipe(Effect.provide(layer))))
+    .rejects.toMatchObject({ code: "job-validation" });
+  expect(accepted).toEqual([]);
+});
+
+it("malformed body remains sanitized even when the declaration is absent", async () => {
+  const { environment, terminals } = nativeEnvironment();
+  const delivery = message({ ...envelope(), payload: { secret: "synthetic-private-malformed" }, unexpected: true });
+  await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, environment, "development", []);
+  expect(delivery.ack).toHaveBeenCalledOnce();
+  expect(delivery.retry).not.toHaveBeenCalled();
+  expect(terminals).toEqual([{ terminalVersion: 1, environment: "local", code: "job-validation", operationId }]);
+});
+
+it("terminal disposition preserves the original validated snapshot", async () => {
+  for (const disposition of ["terminal", "cancelled"] as const) {
+    const { environment, terminals } = nativeEnvironment();
+    let accepts = true;
+    let validations = 0;
+    const handlers = [{ ...definition(job => Effect.sync(() => {
+      accepts = false;
+      Reflect.set(job.payload, "sequence", 999);
+    }).pipe(Effect.andThen(Effect.fail(new JobHandlerFailure(disposition))))),
+      validate: () => { validations++; return accepts; } }];
+    const delivery = message(envelope());
+    await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, environment, "development", handlers);
+    expect(terminals).toEqual([{ terminalVersion: 1, environment: "local", code: `job-handler-${disposition}`, operationId, job: envelope() }]);
+    expect(validations).toBe(1);
+    expect(delivery.ack).toHaveBeenCalledOnce();
+    expect(delivery.retry).not.toHaveBeenCalled();
+  }
+});
+
+it("restored declaration recovers unchanged identity and payload", async () => {
+  let effects = 0;
+  const restored = [definition(() => Effect.sync(() => { effects++; }))];
+  const handlers = [...restored];
+  const memory = createMemoryJobDelivery("local", handlers);
+  await Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(memory.layer)));
+  handlers[0] = { ...restored[0]!, validate: () => false };
+  for (let attempt = 1; attempt <= 4; attempt++) {
+    expect(await memory.consumeNext()).toEqual(attempt < 4 ? { outcome: "retry", code: "job-validation" } : { outcome: "terminal", code: "job-retries-exhausted" });
+  }
+  expect(effects).toBe(0);
+  expect(await memory.consumeNext()).toBeUndefined();
+  const retained = memory.terminals()[0];
+  expect(retained).toEqual({ terminalVersion: 1, environment: "local", code: "job-retries-exhausted", operationId, job: envelope() });
+  expect(() => prepareJobRecovery(retained, "local", handlers)).toThrow();
+  expect(prepareJobRecovery(retained, "local", restored)).toEqual(envelope());
+  handlers[0] = restored[0]!;
+  await Effect.runPromise(dispatch(prepareJobRecovery(retained, "local", restored)).pipe(Effect.provide(memory.layer)));
+  expect(await memory.consumeNext()).toEqual({ outcome: "completed" });
+  expect(effects).toBe(1);
+});
+
+it("validator and caller mutation cannot change the admitted nested snapshot", async () => {
+  const { environment, accepted } = nativeEnvironment();
+  const job = envelope({ payload: { nested: { sequence: 1 }, entries: [1, 2] } });
+  const handlers = [{ ...definition(() => Effect.void), validate: (payload: JobEnvelope["payload"]) => {
+    Reflect.set(payload.nested as object, "sequence", 999);
+    Reflect.set(payload.entries as object, "0", 999);
+    return true;
+  } }];
+  const layer = createCloudflareJobDispatcherLayer({ compiledTarget: () => ({ ok: true, value: "development" }), configuration: Effect.succeed(environment), handlers });
+  await Effect.runPromise(dispatch(job).pipe(Effect.provide(layer)));
+  Reflect.set(job.payload.nested as object, "sequence", 777);
+  expect(accepted).toEqual([envelope({ payload: { nested: { sequence: 1 }, entries: [1, 2] } })]);
+});
+
+it("local retries isolate handler mutation and revalidate each attempt", async () => {
+  const seen: unknown[] = [];
+  const handlers = [{ ...definition(job => Effect.sync(() => {
+    seen.push(structuredClone(job.payload));
+    Reflect.set(job.payload.nested as object, "sequence", 999);
+  }).pipe(Effect.andThen(Effect.fail(new JobHandlerFailure("retry"))))), validate: () => true }];
+  const memory = createMemoryJobDelivery("local", handlers);
+  await Effect.runPromise(dispatch(envelope({ payload: { nested: { sequence: 1 } } })).pipe(Effect.provide(memory.layer)));
+  for (let attempt = 0; attempt < 4; attempt++) await memory.consumeNext();
+  expect(seen).toEqual(Array.from({ length: 4 }, () => ({ nested: { sequence: 1 } })));
+  expect(memory.terminals()[0]?.job).toEqual(envelope({ payload: { nested: { sequence: 1 } } }));
+});
+
+it("memory retries missing, duplicate and throwing declarations without execution", async () => {
+  for (const fault of ["missing", "duplicate", "throwing"] as const) {
+    let effects = 0;
+    const handler = definition(() => Effect.sync(() => { effects++; }));
+    const handlers = [handler];
+    const memory = createMemoryJobDelivery("local", handlers);
+    await Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(memory.layer)));
+    if (fault === "missing") handlers.length = 0;
+    if (fault === "duplicate") handlers.push(handler);
+    if (fault === "throwing") handlers[0] = { ...handler, validate: () => { throw new Error("synthetic-private-validator"); } };
+    expect(await memory.consumeNext()).toEqual({ outcome: "retry", code: fault === "missing" ? "job-unsupported" : "job-configuration" });
+    expect(effects).toBe(0);
+    handlers.splice(0, handlers.length, handler);
+    expect(await memory.consumeNext()).toEqual({ outcome: "completed" });
+    expect(effects).toBe(1);
+  }
+});
+
+it("acknowledgement failure retries the original without undoing its effect", async () => {
+  const { environment, terminals } = nativeEnvironment();
+  let effects = 0;
+  const delivery = message(envelope());
+  delivery.ack.mockImplementation(() => { throw new Error("synthetic-ack-uncertainty"); });
+  await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, environment, "development", [definition(() => Effect.sync(() => { effects++; }))]);
+  expect(effects).toBe(1);
+  expect(delivery.retry).toHaveBeenCalledOnce();
+  expect(delivery.body).toEqual(envelope());
+  expect(terminals).toEqual([]);
+});
+
+it("terminal admission uncertainty preserves the source and permits duplicate terminal copies", async () => {
+  const { environment, terminals } = nativeEnvironment();
+  const delivery = message(envelope());
+  const handlers = [definition(() => Effect.fail(new JobHandlerFailure("terminal")))];
+  await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, { ...environment,
+    JOB_DEAD_LETTER_QUEUE: { send: async (body: unknown) => { terminals.push(body); throw new Error("synthetic-uncertain-send"); } },
+  }, "development", handlers);
+  expect(delivery.ack).not.toHaveBeenCalled();
+  expect(delivery.retry).toHaveBeenCalledOnce();
+  await consumeCloudflareJobs({ queue: "jobs-local", messages: [message(delivery.body, 2)] }, environment, "development", handlers);
+  expect(terminals).toEqual(Array.from({ length: 2 }, () => ({ terminalVersion: 1, environment: "local", code: "job-handler-terminal", operationId, job: envelope() })));
+});
+
+it("a cross-target batch refuses every message before any effect", async () => {
+  const { environment, accepted, terminals } = nativeEnvironment();
+  let effects = 0;
+  const deliveries = [message(envelope()), message(envelope({ environment: "production" }))];
+  await expect(consumeCloudflareJobs({ queue: "jobs-local", messages: deliveries }, environment, "development",
+    [definition(() => Effect.sync(() => { effects++; }))])).rejects.toMatchObject({ code: "job-configuration" });
+  expect(effects).toBe(0);
+  expect(accepted).toEqual([]);
+  expect(terminals).toEqual([]);
+  for (const delivery of deliveries) { expect(delivery.ack).not.toHaveBeenCalled(); expect(delivery.retry).not.toHaveBeenCalled(); }
+});
+
+it("structurally valid injected business-invalid work retries without a provenance claim", async () => {
+  const { environment, accepted, terminals } = nativeEnvironment();
+  let effects = 0;
+  const handlers = [definition(() => Effect.sync(() => { effects++; }))];
+  const source = envelope({ payload: { sequence: "synthetic-business-invalid" } });
+  for (let attempts = 1; attempts <= 4; attempts++) {
+    const delivery = message(source, attempts);
+    await consumeCloudflareJobs({ queue: "jobs-local", messages: [delivery] }, environment, "development", handlers);
+    expect(delivery.retry).toHaveBeenCalledWith({ delaySeconds: 5 * 2 ** (attempts - 1) });
+    expect(delivery.ack).not.toHaveBeenCalled();
+    expect(delivery.body).toEqual(source);
+  }
+  expect(effects).toBe(0);
+  expect(accepted).toEqual([]);
+  expect(terminals).toEqual([]);
+  expect(inspectTerminalJob(source, "local", handlers)).toEqual({ recoverable: false });
+});
+
+it("preserves the bounded payload shape and declaration limits", () => {
+  const permissive = { ...definition(() => Effect.void), validate: () => true };
+  const nested = (depth: number): JobEnvelope["payload"] => depth === 0 ? { leaf: true } : { child: nested(depth - 1) };
+  const valid = [{ value: "a".repeat(2_048) }, { values: Array.from({ length: 64 }, () => 1) },
+    Object.fromEntries(Array.from({ length: 64 }, (_, index) => [`field${index}`, 1])), nested(4)];
+  const invalid = [{ value: "a".repeat(2_049) }, { values: Array.from({ length: 65 }, () => 1) },
+    Object.fromEntries(Array.from({ length: 65 }, (_, index) => [`field${index}`, 1])), nested(5), { invalidKey$: true }];
+  for (const payload of valid) expect(validateJob(envelope({ payload }), "local", [permissive]).payload).toEqual(payload);
+  for (const payload of invalid) expect(() => validateJob(envelope({ payload }), "local", [permissive])).toThrow();
+  const registry = Array.from({ length: 32 }, (_, index) => ({ ...permissive, type: index === 0 ? "synthetic" : `job-${index}` }));
+  expect(validateJob(envelope(), "local", registry)).toEqual(envelope());
+  expect(() => validateJob(envelope(), "local", [...registry, { ...permissive, type: "overflow" }]))
+    .toThrow(expect.objectContaining({ code: "job-configuration" }));
+});
+
+it("local terminal retention counts toward capacity without losing recoverable work", async () => {
+  const memory = createMemoryJobDelivery("local", [definition(() => Effect.fail(new JobHandlerFailure("terminal")))]);
+  for (let index = 0; index < 100; index++) {
+    await Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(memory.layer)));
+    expect((await memory.consumeNext())?.outcome).toBe("terminal");
+  }
+  await expect(Effect.runPromise(dispatch(envelope()).pipe(Effect.provide(memory.layer)))).rejects.toMatchObject({ code: "job-capacity" });
+  expect(memory.terminals()).toHaveLength(100);
+  const copy = memory.terminals();
+  Reflect.set(copy[0]!.job!.payload, "sequence", 999);
+  expect(memory.terminals()[0]?.job).toEqual(envelope());
+});
+
+it("admits and prepares recovery from a provider-independent declaration without an executable handle", () => {
+  const declaration = { type: "synthetic", version: 1, repeatSafety: "idempotent" as const, validate: (payload: Readonly<Record<string, unknown>>) => payload.sequence === 1 };
+  // Runtime admission inspects declaration policy, not the executable handle.
+  const registry = [Object.assign(declaration, { handle: undefined })];
+  expect(validateJob(envelope(), "local", registry)).toEqual(envelope());
+  expect(prepareJobRecovery(envelope(), "local", registry)).toEqual(envelope());
+});

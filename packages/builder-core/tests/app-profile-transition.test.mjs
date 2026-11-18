@@ -36,7 +36,7 @@ async function fixture(profile, subset = 0, project = { projectName: "transition
   const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
   assert.equal(target.ok, true);
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, new Uint8Array(content)]));
-  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}/pnpm-lock.yaml`, import.meta.url))));
+  files.set("pnpm-lock.yaml", new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}-next-16.4.5/pnpm-lock.yaml`, import.meta.url))));
   files.set(".egeria/project.yaml", encoder.encode(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", encoder.encode(""));
   const surfaces = core.materializeInstalledSurfaces({ files, surfaces: [...rendered.value.surfaces, ...createBuilderStateSurfaces()] });
@@ -142,7 +142,7 @@ test("portfolio preparation preserves scalar content, navigation, Markdown and u
   assert.equal(merged.scripts.custom, "echo safe");
   assert.equal(merged.description, "custom");
   assert.equal(merged.dependencies.effect, "4.0.0-rc.112");
-  assert.equal(merged.dependencies.next, "16.4.1");
+  assert.equal(merged.dependencies.next, "16.4.5");
 });
 test("app planning preserves both supported Git revision formats and rejects invalid identities", async () => {
   for (const profile of ["portfolio", "site"]) {
@@ -430,7 +430,7 @@ test("synthetic wrapper admission refuses changed runtime and lock identities wh
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const validators = await loadAppTransitionContentValidators();
   const cohorts = [
-    { context: currentTransitionContexts.current, lock: "app-0.3.0" },
+    { context: currentTransitionContexts.current, lock: "app-0.3.0-next-16.4.5" },
   ];
   const lockFingerprints = await Promise.all(cohorts.map(async ({ lock }) => core.fingerprintFileContent(new Uint8Array(await readFile(new URL(`../lockfiles/web-recipe-${lock}/pnpm-lock.yaml`, import.meta.url))))));
   for (const [cohortIndex, cohort] of cohorts.entries()) {
@@ -500,7 +500,7 @@ test("historical visual candidates remain inert alongside exact current admissio
   const historical = JSON.parse(await readFile(new URL("../../../docs/implementation-evidence/retired-recipe-visuals/portfolio-0.11.3/transition-inputs.json", import.meta.url), "utf8"));
   assert.deepEqual(candidate, historical.value);
   for (const generation of [
-    { context: createGenerationRenderingContext(), portfolio: "0.12.0", app: "0.3.0", next: "16.4.1", lock: "app-0.3.0" },
+    { context: createGenerationRenderingContext(), portfolio: "0.12.0", app: "0.3.0", next: "16.4.5", lock: "app-0.3.0-next-16.4.5" },
   ]) for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -646,7 +646,7 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
   const subsets = {};
-  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml", import.meta.url))));
+  const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml", import.meta.url))));
   for (let subset = 0; subset < 8; subset++) {
     const request = {
       ...policy.appTransitionVisualProject, packageVersions: core.verifiedCapabilityPackageVersions,
@@ -675,14 +675,14 @@ test("current preparation fingerprints and canonical admission protect exact bas
     assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
   }
   assert.deepEqual(subsets, {
-  "none": "sha256:88373bf1c527f1a06bf2973606eb96f40ff50101108878b39c78aab94884047f",
-  "analytics": "sha256:409e1c1ccb8b0c69faa66b1b21198df81098ef9015831c6297a6a2708b55d48b",
-  "booking-calendly": "sha256:f44b0fdc17aa9434f9039399501ee396d3366e2f812f3c7e08e99536470524c6",
-  "analytics+booking-calendly": "sha256:8c974b8466d0631e63aa613731660d3d3f9f1e08df3a8d17e0c13748fcceef20",
-  "multilingual": "sha256:9293d22179f9a9ff23b9c6ccd5e3581f13930b4ab179f72db5f1b6cc7aff89e0",
-  "analytics+multilingual": "sha256:9d9a6712b8077073e6dfc000517e8eed2df6079ce29d6188f497f0362525956f",
-  "booking-calendly+multilingual": "sha256:4e7472480678c3dae28ad48f6d12d6b7e7a7cd28535f40f42f63e62e8bab97e1",
-  "analytics+booking-calendly+multilingual": "sha256:a11472500e55ff3e235af7576de24dca491e0baa81c11473c6d9b3bed20d94e9"
+  "none": "sha256:b95793876632bc0532d66fbcd110368ae2c47e03b44b16adb849679064473366",
+  "analytics": "sha256:3f3a591cd48419cc2debf38296a359053e0809b82aff77c1fecfd30553caee7d",
+  "booking-calendly": "sha256:975e4ec16bf9136b13a35c8a480f20173d17886b028bf5a4709f7ef2b8c16697",
+  "analytics+booking-calendly": "sha256:5272e692f85caaf73123e9577b4739b32904b6314be9707140e4b21c093437f9",
+  "multilingual": "sha256:a47c2bc2901680da1e9e2ef9b8fa4acbbfcc45f022cc9cd224376a437967158e",
+  "analytics+multilingual": "sha256:717c8b370793d1c306fff5e323cf99400c4a909d007a9e406568ea43ef5d37d4",
+  "booking-calendly+multilingual": "sha256:1aa8a18ea19437f26b812401808034aebe75ea14a9b776262c40ba6ddfcbe5fd",
+  "analytics+booking-calendly+multilingual": "sha256:478eae6d54d3dc7ecf5bd718e20248f166998f3d25906422b394f1c9d3108457"
 });
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
   assert.notDeepEqual(candidate.subsets, subsets);

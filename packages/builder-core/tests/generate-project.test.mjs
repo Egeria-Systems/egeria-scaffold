@@ -24,7 +24,7 @@ import { parse as parseYaml } from "yaml";
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const portfolioRecipeLockfile = resolve(
   packageRoot,
-  "lockfiles/web-recipe-portfolio-0.12.0/pnpm-lock.yaml",
+  "lockfiles/web-recipe-portfolio-0.12.0-next-16.4.5/pnpm-lock.yaml",
 );
 const portfolioRecipeIdentity = Object.freeze({
   originProfile: "portfolio",
@@ -76,8 +76,8 @@ test("application environment dependency locks reject retired recipe identities"
     }, context));
     const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
-    assert.equal(manifest.dependencies.next, "16.4.1");
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), `${profile}-${candidateVersion}`);
+    assert.equal(manifest.dependencies.next, "16.4.5");
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), `${profile}-${candidateVersion}-next-16.4.5`);
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...rendered.project, recipeVersion: retainedVersion }, manifest), undefined);
     for (const [section, key, version] of [
       ["dependencies", "next", "16.3.1"],
@@ -90,12 +90,12 @@ test("application environment dependency locks reject retired recipe identities"
       }), undefined);
     }
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...rendered.project, recipeVersion: "unknown" }, manifest), undefined);
-    const lockPath = resolve(packageRoot, `lockfiles/web-recipe-${profile}-${candidateVersion}/pnpm-lock.yaml`);
+    const lockPath = resolve(packageRoot, `lockfiles/web-recipe-${profile}-${candidateVersion}-next-16.4.5/pnpm-lock.yaml`);
     const lockBytes = await readFile(lockPath);
     const lock = parseYaml(lockBytes.toString("utf8"));
     const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
     assert.deepEqual(lock.overrides, workspace.overrides);
-    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
+    for (const patched of ["next@16.4.5", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
     for (const vulnerable of ["next@16.3.3", "fast-uri@3.1.6", "fast-uri@3.1.7", "brace-expansion@1.1.18", "brace-expansion@2.1.4", "brace-expansion@5.0.9", "undici@7.29.0", "undici@8.10.0", "fast-uri@3.1.8", "body-parser@2.3.0", "undici@6.29.0", "undici@7.29.1", "undici@8.10.2", "zod@4.4.3", "zod@4.6.5", "zod@4.6.6", "qs@6.16.0", "content-type@2.0.0", "content-type@2.0.2"]) assert.equal(lock.packages[vulnerable], undefined);
     await withTestRoot(async root => {
       await mkdir(join(root, "apps/web"), { recursive: true });
@@ -117,8 +117,8 @@ test("default generation preserves state-last verification and supports exact re
       assert.equal(result.state.schemaVersion, "2.0.0");
       assert.equal(result.state.projectSchemaVersion, "2.0.0");
       assert.deepEqual(result.state.origin, { profile, recipeVersion: profile === "portfolio" ? "0.12.0" : "0.13.0" });
-      assert.equal(JSON.parse(await readFile(join(result.destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.1");
-      assert.equal(result.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
+      assert.equal(JSON.parse(await readFile(join(result.destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.5");
+      assert.equal(result.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.5"));
       assert.deepEqual(result.state.lastSuccessfulVerification.checks, completeChecks);
       assert.deepEqual(verifier.calls, ["prepare-lockfile", "verify-isolated-copy"]);
       const reader = core.createFileSystemRepositoryReader(result.destination);
@@ -259,8 +259,8 @@ test("application environment generation rejects malformed and mismatched select
 });
 
 for (const [profile, expectedLock] of [
-  ["portfolio", "portfolio-0.11.7-foundation"],
-  ["site", "app-0.2.7"],
+  ["portfolio", "portfolio-0.11.7-foundation-next-16.4.5"],
+  ["site", "app-0.2.7-next-16.4.5"],
 ]) {
   test(`environment ${profile} email foundation prepares the matching security lock`, async () => {
     for (const transactionalEmailResend of [true, false]) {
@@ -485,8 +485,8 @@ test("app generation requires its complete verification vector before state or d
       } else {
         const generated = assertSuccess(result);
         assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.3.0" });
-        assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.1");
-        assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
+        assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.5");
+        assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.5"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks,
           ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
         assert.equal((await infer(destination)).state.kind, "valid");
@@ -561,7 +561,7 @@ test("environment persistence uses current dependency locks and refuses retired 
   }, core.createApplicationEnvironmentRenderingContext(true)));
   const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
   const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
-  const bytes = await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"));
+  const bytes = await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml"));
   const lock = parseYaml(bytes.toString("utf8"));
   for (const [importer, path] of [[".", "package.json"], ["apps/web", "apps/web/package.json"]]) {
     const actual = JSON.parse(new TextDecoder().decode(rendered.files.find(file => file.path === path).content));
@@ -578,8 +578,8 @@ test("environment persistence uses current dependency locks and refuses retired 
   }));
   assert.deepEqual(lock.patchedDependencies, patchHashes);
   assert.equal(rendered.project.recipeVersion, "0.3.0");
-  assert.equal(manifest.dependencies.next, "16.4.1");
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), "app-0.2.7-persistence");
+  assert.equal(manifest.dependencies.next, "16.4.5");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), "app-0.2.7-persistence-next-16.4.5");
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.2" }, manifest), undefined);
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.3" }, manifest), undefined);
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: "0.2.7" }, manifest), undefined);
@@ -665,8 +665,8 @@ test("persistence generation requires binding checks before state or destination
       } else {
         const generated = assertSuccess(result);
         assert.deepEqual(generated.state.origin, { profile: "app", recipeVersion: "0.3.0" });
-        assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.1");
-        assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
+        assert.equal(JSON.parse(await readFile(join(destination, "apps/web/package.json"), "utf8")).dependencies.next, "16.4.5");
+        assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.5"));
         assert.deepEqual(generated.state.lastSuccessfulVerification.checks, ["contracts", "pre-state-inference", ...checks, "post-state-inference"]);
         assert.equal(generated.state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
       }
@@ -1724,8 +1724,8 @@ test("portfolio and site generation writes exact state-last repositories", async
       const webManifest = JSON.parse(
         await readFile(join(destination, "apps/web/package.json"), "utf8"),
       );
-      assert.equal(webManifest.dependencies.next, "16.4.1");
-      assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.1"));
+      assert.equal(webManifest.dependencies.next, "16.4.5");
+      assert.equal(generated.state.managedSurfaces.find(surface => surface.identifier === "builder-web-package-next").fingerprint, core.fingerprintJsonValue("16.4.5"));
       assert.equal(
         webManifest.devDependencies["@egeria-systems/standards"],
         "0.1.0",
@@ -2382,6 +2382,9 @@ test("current dependency locks reject Vitest declaration drift", () => {
     const identity = { originProfile, recipeVersion };
     const manifest = { dependencies: { next: "16.4.1", ...(originProfile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.3" } };
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
+    const patched = { ...manifest, dependencies: { ...manifest.dependencies, next: "16.4.5" } };
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, patched), lock + "-next-16.4.5");
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...patched, dependencies: { ...patched.dependencies, next: "^16.4.5" } }), undefined);
     for (const vitest of [undefined, "4.1.10", "4.1.11", "5.0.0", "5.0.1", "5.0.2", "^5.0.3"]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, devDependencies: { ...manifest.devDependencies, vitest } }), undefined);
     for (const section of ["dependencies", "devDependencies"]) {
       const key = section === "dependencies" ? "next" : "eslint-config-next";
@@ -2420,19 +2423,19 @@ test("public generation accepts only a contact selection and refuses credentials
 
 test("security lock selection requires complete exact recipe manifests", async () => {
   for (const [profile, options, expected] of [
-    ["portfolio", {}, "portfolio-0.12.0"],
-    ["site", {}, "site-0.13.0"],
-    ["app", {}, "app-0.3.0"],
-    ["app", { applicationPersistence: true }, "app-0.2.7-persistence"],
-    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.7-foundation"],
-    ["site", { transactionalEmailResend: true }, "app-0.2.7"],
+    ["portfolio", {}, "portfolio-0.12.0-next-16.4.5"],
+    ["site", {}, "site-0.13.0-next-16.4.5"],
+    ["app", {}, "app-0.3.0-next-16.4.5"],
+    ["app", { applicationPersistence: true }, "app-0.2.7-persistence-next-16.4.5"],
+    ["portfolio", { transactionalEmailResend: true }, "portfolio-0.11.7-foundation-next-16.4.5"],
+    ["site", { transactionalEmailResend: true }, "app-0.2.7-next-16.4.5"],
   ]) {
     const rendered = assertSuccess(await core.renderSkeleton({ profile, projectName: "security-graph", displayName: "Security Graph", packageVersions: core.verifiedCapabilityPackageVersions, ...options }));
     const manifestBytes = rendered.files.find(({ path }) => path === "apps/web/package.json").content;
     const manifest = JSON.parse(new TextDecoder().decode(manifestBytes));
     assert.equal(rendered.project.schemaVersion, "2.0.0");
     assert.equal(rendered.project.recipeVersion, { portfolio: "0.12.0", site: "0.13.0", app: "0.3.0" }[profile]);
-    assert.equal(manifest.dependencies.next, "16.4.1");
+    assert.equal(manifest.dependencies.next, "16.4.5");
     assert.equal(manifest.devDependencies["eslint-config-next"], profile === "portfolio" ? "16.3.0" : "16.3.3");
     assert.equal(manifest.devDependencies.vitest, "5.0.3");
     assert.equal(manifest.dependencies.effect, profile === "app" || options.transactionalEmailResend ? "4.0.0-rc.112" : undefined);
@@ -2441,7 +2444,7 @@ test("security lock selection requires complete exact recipe manifests", async (
     const lock = parseYaml(bytes.toString("utf8"));
     const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
     assert.deepEqual(lock.overrides, workspace.overrides);
-    for (const patched of ["next@16.4.1", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
+    for (const patched of ["next@16.4.5", "fast-uri@3.1.9", "brace-expansion@1.1.21", "glob@14.0.3", "minimatch@11.0.4", "brace-expansion@5.0.12", "body-parser@2.4.0", "undici@6.29.1", "undici@7.30.1", "undici@8.12.2", "zod@4.6.7", "qs@6.16.1", "content-type@2.1.0"]) assert.ok(lock.packages[patched]);
     for (const old of ["next@16.3.3", "fast-uri@3.1.6", "fast-uri@3.1.7", "brace-expansion@1.1.18", "brace-expansion@2.1.4", "brace-expansion@5.0.9", "undici@7.29.0", "undici@8.10.0", "fast-uri@3.1.8", "body-parser@2.3.0", "undici@6.29.0", "undici@7.29.1", "undici@8.10.2", "zod@4.4.3", "zod@4.6.5", "zod@4.6.6", "qs@6.16.0", "content-type@2.0.0", "content-type@2.0.2"]) assert.equal(lock.packages[old], undefined);
     for (const [section, key] of [["dependencies", "next"], ["devDependencies", "eslint-config-next"], ["devDependencies", "vitest"], ["dependencies", "effect"], ...(options.applicationPersistence ? [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]] : [])]) {
       assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, { ...manifest, [section]: { ...manifest[section], [key]: "9.9.9" } }), undefined);

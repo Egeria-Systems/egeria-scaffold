@@ -501,7 +501,7 @@ test("probe evidence is deterministic, exact, RFC 6901 aware, and content-safe",
 });
 
 test("standards recognizes only the exact patched Vitest declaration without accepting other versions or managed drift", async () => {
-  const root = resolve(packageRoot, "../../fixtures/generated/app-0.3.0");
+  const root = resolve(packageRoot, "../../fixtures/generated/app-0.3.0-next-16.4.5");
   const reader = { async readText(path) {
     try { return { kind: "file", content: await readFile(resolve(root, path), "utf8") }; }
     catch (error) { return error.code === "ENOENT" ? { kind: "missing" } : { kind: "error", code: "FILE_ENCODING_INVALID" }; }
@@ -886,7 +886,12 @@ test("application-owned and ejected surfaces are reported without reading their 
 test("installed deployment verification files must match the selected recipe even when their recorded fingerprints agree", async (t) => {
   const workflow = ".github/workflows/deploy.yml";
   const helper = "apps/web/scripts/prepare-ci-git.sh";
-  for (const fixture of ["site-public-integrations-0.13.0", "app-persistence-0.3.0", "app-jobs-0.3.0", "app-persistence-jobs-email-0.3.0"]) {
+  for (const fixture of [
+    "site-public-integrations-0.13.0",
+    "app-persistence-0.3.0",
+    "app-jobs-recovery-composition-0.3.0-next-16.4.5",
+    "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5",
+  ]) {
     await t.test(fixture, async () => {
       const source = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated", fixture));
       const state = JSON.parse((await source.readText(".egeria/state.json")).content);

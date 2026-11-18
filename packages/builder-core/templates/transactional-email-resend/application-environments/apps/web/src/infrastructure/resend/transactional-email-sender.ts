@@ -1,4 +1,4 @@
-import { readCompiledApplicationEnvironment, validateRuntimeApplicationEnvironment } from "@/src/configuration/application-environment";
+import { validateRuntimeApplicationEnvironment, type ApplicationEnvironmentResult } from "@/src/configuration/application-environment";
 import { Cause, Effect, Exit, Layer } from "effect";
 import {
   TransactionalEmailFailure,
@@ -10,6 +10,7 @@ import {
 } from "@/src/application/transactional-email-sender";
 
 type SenderDependencies = Readonly<{
+  compiledTarget: () => ApplicationEnvironmentResult;
   configuration: Effect.Effect<unknown, TransactionalEmailFailure>;
   request: typeof fetch;
   reportEvent: (event: TransactionalEmailEvent) => void | Promise<void>;
@@ -50,10 +51,10 @@ function parseMessage(value: TransactionalEmailMessage): TransactionalEmailMessa
   }
 }
 
-function parseConfiguration(value: unknown): ResendConfiguration {
+function parseConfiguration(value: unknown, compiledTarget: () => ApplicationEnvironmentResult): ResendConfiguration {
   try {
     if (typeof value !== "object" || value === null) throw new Error();
-    const compiled = readCompiledApplicationEnvironment();
+    const compiled = compiledTarget();
     if (!compiled.ok || !validateRuntimeApplicationEnvironment(Reflect.get(value, "APPLICATION_ENVIRONMENT"), compiled.value).ok) throw new Error();
     const allowlist: unknown = compiled.value === "production" ? undefined : Reflect.get(value, "TRANSACTIONAL_EMAIL_ALLOWED_RECIPIENTS");
     const allowedRecipients = typeof allowlist === "string" ? allowlist.split(",") : undefined;
@@ -221,7 +222,7 @@ export function createResendTransactionalEmailSenderLayer(
     send: (input) => Effect.gen(function* () {
       const message = yield* Effect.try({ try: () => parseMessage(input), catch: () => new TransactionalEmailFailure("transactional-email-validation") });
       const environment = yield* dependencies.configuration;
-      const configuration = yield* Effect.try({ try: () => parseConfiguration(environment), catch: () => new TransactionalEmailFailure("transactional-email-configuration") });
+      const configuration = yield* Effect.try({ try: () => parseConfiguration(environment, dependencies.compiledTarget), catch: () => new TransactionalEmailFailure("transactional-email-configuration") });
       if (configuration.allowedRecipients !== undefined && !configuration.allowedRecipients.includes(message.to)) {
         return yield* Effect.fail(new TransactionalEmailFailure("transactional-email-authorization"));
       }

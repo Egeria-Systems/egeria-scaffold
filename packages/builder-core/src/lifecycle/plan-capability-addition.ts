@@ -576,6 +576,8 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
   const environmentTargetContext = createGenerationRenderingContext(
     capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
     project.selectedCapabilities.includes("app-foundation"),
+    false,
+    environmentContext.retainedNextVersion,
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");

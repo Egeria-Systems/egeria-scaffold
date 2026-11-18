@@ -51,3 +51,30 @@ it.each(["development", "staging", "production"])("labels the independent safe-o
   expect(write).toHaveBeenCalledOnce();
   expect(write.mock.calls[0]?.[0]).toMatchObject({ environment: target });
 });
+
+it("reports from explicit event readers with unavailable HTTP context and no process target", async () => {
+  vi.stubEnv("NEXT_PUBLIC_APPLICATION_ENVIRONMENT", undefined);
+  getCloudflareContext.mockRejectedValue(new Error("NO_HTTP_CONTEXT"));
+  const write = vi.spyOn(console, "info").mockImplementation(() => {});
+  const { createTransactionalEmailEventReporter } = await import("@/src/infrastructure/observability/transactional-email-events");
+  const report = createTransactionalEmailEventReporter({
+    compiledTarget: () => ({ ok: true, value: "staging" }), runtimeTarget: () => "staging",
+  });
+  await report({ outcome: "unknown", code: "transactional-email-acceptance-unknown", ...{ body: "private-body", key: "private-key" } });
+  expect(write).toHaveBeenCalledOnce();
+  expect(write.mock.calls[0]?.[0]).toMatchObject({ environment: "staging", attributes: { outcome: "unknown", error_code: "transactional-email-acceptance-unknown" } });
+  expect(JSON.stringify(write.mock.calls)).not.toContain("private-");
+  expect(getCloudflareContext).not.toHaveBeenCalled();
+});
+
+it("isolates simultaneous explicit reporters and contains reader failure", async () => {
+  const write = vi.spyOn(console, "info").mockImplementation(() => {});
+  const { createTransactionalEmailEventReporter } = await import("@/src/infrastructure/observability/transactional-email-events");
+  await Promise.all(["development", "staging", "production"].map(async target => {
+    const { parseApplicationEnvironment } = await import("@/src/configuration/application-environment");
+    await createTransactionalEmailEventReporter({ compiledTarget: () => parseApplicationEnvironment(target), runtimeTarget: async () => target })({ outcome: "accepted" });
+  }));
+  expect(write.mock.calls.map(([record]) => record.environment).sort()).toEqual(["development", "production", "staging"]);
+  await createTransactionalEmailEventReporter({ compiledTarget: () => ({ ok: true, value: "staging" }), runtimeTarget: () => { throw new Error("private-reader"); } })({ outcome: "accepted" });
+  expect(write).toHaveBeenCalledTimes(3);
+});
