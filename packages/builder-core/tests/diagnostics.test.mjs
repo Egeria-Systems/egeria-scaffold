@@ -47,7 +47,7 @@ function createDescriptor(
 ) {
   return {
     identifier,
-    version: ["analytics", "booking-calendly"].includes(identifier) ? "0.2.0" : "0.1.0",
+    version: ["analytics", "booking-calendly"].includes(identifier) ? "0.2.0" : identifier === "multilingual" ? "0.1.1" : "0.1.0",
     deliveryMode: "source-generated",
     stateClassifications: ["repository-stateful"],
     removalPolicy: "reviewed",

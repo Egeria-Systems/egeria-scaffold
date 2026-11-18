@@ -2106,9 +2106,9 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
   );
   const revision = "a".repeat(40);
   const subject = {
-    descriptorVersion: "0.1.0",
+    descriptorVersion: "0.1.1",
     behaviorContractDigest:
-      "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
+      "sha256:76f26b43ab7b952f23e472abde9958efe844b2f5730c4a7edb3d0a9acde27615",
   };
   let revisionReads = 0;
   let statusReads = 0;
@@ -2133,7 +2133,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
       "booking-calendly",
       "multilingual",
     ]),
-    inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+    inferredCapability: { identifier: "multilingual", version: "0.1.1" },
     profile: "portfolio",
     readCurrentRevision: authority.readCurrentRevision,
     postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
@@ -2145,7 +2145,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
       "site-routing",
       "multilingual",
     ]),
-    inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+    inferredCapability: { identifier: "multilingual", version: "0.1.1" },
     profile: "site",
     readCurrentRevision: authority.readCurrentRevision,
     postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),
@@ -2189,7 +2189,7 @@ test("multilingual certification binds both profiles and the exact lifecycle to 
   assert.deepEqual(result, {
     ok: true,
     capability: "multilingual",
-    version: "0.1.0",
+    version: "0.1.1",
     profiles: ["portfolio", "site"],
     subject,
     evidenceRevision: revision,
@@ -2463,7 +2463,7 @@ test("multilingual certification fails closed on authority and selected-evidence
         "booking-calendly",
         "multilingual",
       ]),
-      inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+      inferredCapability: { identifier: "multilingual", version: "0.1.1" },
       profile: "portfolio",
       readCurrentRevision: async () => revision,
       postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.12.0"),
@@ -2475,7 +2475,7 @@ test("multilingual certification fails closed on authority and selected-evidence
         "site-routing",
         "multilingual",
       ]),
-      inferredCapability: { identifier: "multilingual", version: "0.1.0" },
+      inferredCapability: { identifier: "multilingual", version: "0.1.1" },
       profile: "site",
       readCurrentRevision: async () => revision,
       postCreate: (projectRoot) => writeRecipeVersion(projectRoot, "0.13.0"),

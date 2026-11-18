@@ -1631,6 +1631,8 @@ test("current multilingual removal preserves selected neighbors and refuses surv
   const accepted = await plan(entries);
   assert.equal(accepted.ok, true, JSON.stringify(accepted));
   assert.ok(!accepted.value.desiredCapabilities.includes("multilingual"));
+  assert.deepEqual(accepted.value.capability, { identifier: "multilingual", version: "0.1.1" });
+  assert.ok(accepted.value.actions.some(({ kind, path }) => kind === "delete-file" && path === "docs/multilingual.md"));
   for (const identifier of ["booking-calendly", "contact-form-web3forms", "site-routing"]) assert.ok(accepted.value.desiredCapabilities.includes(identifier));
   const referenced = new Map(entries);
   referenced.set("apps/web/src/locale-consumer.ts", 'import { defaultLocale } from "./i18n/locale";\n');

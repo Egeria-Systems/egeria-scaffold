@@ -97,7 +97,7 @@ const expectedInstalledCapabilities = [
   { identifier: "observability", version: "0.4.0" },
   { identifier: "site-routing", version: "0.5.0" },
   { identifier: "analytics", version: "0.2.0" },
-  { identifier: "multilingual", version: "0.1.0" },
+  { identifier: "multilingual", version: "0.1.1" },
 ];
 // The immutable packet retains its historical origin/expectation provenance.
 // Current origins come from build configuration; only its still-owned content is applied.

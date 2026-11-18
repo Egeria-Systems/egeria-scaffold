@@ -97,7 +97,7 @@ function removalMigrationIdentifier(capability: Exclude<RemovableCapability, "ba
   const identifiers = {
     analytics: "remove-analytics-0-2-0",
     "booking-calendly": "remove-booking-calendly-0-2-0",
-    multilingual: "remove-multilingual-0-1-0",
+    multilingual: "remove-multilingual-0-1-1",
     "application-persistence": "remove-application-persistence-0-2-0",
     "transactional-email-resend": "remove-transactional-email-resend-0-2-0",
     "contact-form-web3forms": "remove-contact-form-web3forms-0-2-0",

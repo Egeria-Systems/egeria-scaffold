@@ -460,6 +460,7 @@ const bookingCalendlyPaths = [
 ];
 
 const multilingualPaths = [
+  "docs/multilingual.md",
   "apps/web/app/[locale]/[[...segments]]/page.tsx",
   "apps/web/app/[locale]/layout.tsx",
   "apps/web/app/[locale]/not-found.tsx",
@@ -1685,6 +1686,9 @@ test("multilingual selection renders deterministic locale-prefixed portfolio and
     );
     assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
     assert.equal(first.project.selectedCapabilities.includes("multilingual"), true);
+    assert.equal(first.surfaces.find(({ path }) => path === "docs/multilingual.md")?.ownership, "application-owned");
+    const baseline = assertSuccess(await renderSkeleton({ ...request, multilingual: undefined }));
+    assert.equal(baseline.files.some(({ path }) => path === "docs/multilingual.md"), false);
     assert.deepEqual(first.project.capabilitySettings, {});
     assert.match(files.get("apps/web/middleware.ts"), /accept-language/iu);
     assert.match(files.get("apps/web/middleware.ts"), /x-egeria-locale/u);

@@ -259,7 +259,7 @@ test("Calendly addition accepts the planned multilingual booking-composition rep
   assert.equal(state.ok, true, JSON.stringify(state.issues));
   assert.equal(migrations.ok, true, JSON.stringify(migrations.issues));
   assert.deepEqual(state.value.appliedMigrations, [
-    "add-multilingual-0-1-0",
+    "add-multilingual-0-1-1",
     "add-booking-calendly-0-2-0",
   ]);
   assert.deepEqual(
@@ -290,9 +290,9 @@ test("multilingual addition applies the locale overlay and persists fresh discov
     assert.equal(result.ok, true, JSON.stringify(result));
     assert.deepEqual(result.value.capability, {
       identifier: "multilingual",
-      version: "0.1.0",
+      version: "0.1.1",
     });
-    assert.equal(result.value.migration, "add-multilingual-0-1-0");
+    assert.equal(result.value.migration, "add-multilingual-0-1-1");
     assert.deepEqual(verifierCalls, [root]);
     assert.equal(repository.writes.length, 3);
     assert.deepEqual(repository.writes[0], plan.actions.map(({ path }) => path));
@@ -322,7 +322,7 @@ test("multilingual addition applies the locale overlay and persists fresh discov
     );
     assert.equal(
       state.value.appliedMigrations.at(-1),
-      "add-multilingual-0-1-0",
+      "add-multilingual-0-1-1",
     );
     assert.deepEqual(
       result.value.changedPaths,

@@ -1,5 +1,6 @@
 import {
   capabilityDescriptorSchema,
+  multilingualCapabilityVersion,
   type CapabilityDescriptor,
   type InferenceProbe,
   type ManagedSurfaceDescriptor,
@@ -891,6 +892,12 @@ function createDescriptors(
 
   const multilingualEvidencePoints = [
     createFileEvidencePoint(
+      "multilingual-authoring-guide",
+      "multilingual",
+      "docs/multilingual.md",
+      "application-owned",
+    ),
+    createFileEvidencePoint(
       "multilingual-locale-middleware",
       "multilingual",
       "apps/web/middleware.ts",
@@ -1590,7 +1597,7 @@ function createDescriptors(
     },
     {
       identifier: "multilingual",
-      version: "0.1.0",
+      version: multilingualCapabilityVersion,
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
@@ -1603,8 +1610,8 @@ function createDescriptors(
       adapterSemanticRequirements: [],
       ...projectEvidencePoints(multilingualEvidencePoints),
       migrationPlanners: [
-        "add-multilingual-0-1-0",
-        "remove-multilingual-0-1-0",
+        "add-multilingual-0-1-1",
+        "remove-multilingual-0-1-1",
       ],
       verificationPlan: [
         "locale-contracts",

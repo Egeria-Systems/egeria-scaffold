@@ -237,6 +237,7 @@ test("multilingual addition plans the exact locale overlay with or without Calen
     "apps/web/tests/e2e/multilingual-routing.spec.ts",
     "apps/web/tests/unit/locale.test.ts",
     "apps/web/tests/unit/localized-content.test.ts",
+    "docs/multilingual.md",
   ];
 
   for (const fixture of ["portfolio", "portfolio-calendly"]) {
@@ -246,7 +247,7 @@ test("multilingual addition plans the exact locale overlay with or without Calen
     assert.equal(result.ok, true, JSON.stringify(result.issues));
     assert.deepEqual(result.value.capability, {
       identifier: "multilingual",
-      version: "0.1.0",
+      version: "0.1.1",
     });
     assert.equal(result.value.settings, null);
     assert.equal(result.value.desiredCapabilities.includes("multilingual"), true);
@@ -768,11 +769,33 @@ test("current multilingual addition preserves selection-only neighbors without a
   const before = snapshot.snapshot();
   const plan = await core.planCapabilityAddition({ reader: snapshot.reader, git, capability: "multilingual" });
   assert.equal(plan.ok, true, JSON.stringify(plan));
-  assert.deepEqual(plan.value.capability, { identifier: "multilingual", version: "0.1.0" });
+  assert.deepEqual(plan.value.capability, { identifier: "multilingual", version: "0.1.1" });
   for (const identifier of ["contact-form-web3forms", "booking-calendly", "site-routing"]) {
     assert.ok(plan.value.desiredCapabilities.includes(identifier));
   }
   assert.ok(plan.value.actions.some(({ kind, path }) => kind === "create-file" && path.includes("/i18n/")));
+  assert.ok(plan.value.actions.some(({ kind, path, ownership }) =>
+    kind === "create-file" && path === "docs/multilingual.md" && ownership === "application-owned"));
+  assert.equal(snapshot.snapshot(), before);
+});
+
+test("retired multilingual installs refuse planning before inspecting write targets", async () => {
+  const entries = await environmentContactEntries("site", { multilingual: true });
+  const state = JSON.parse(entries.get(".egeria/state.json"));
+  state.installedCapabilities.find(({ identifier }) => identifier === "multilingual").version = "0.1.0";
+  entries.set(".egeria/state.json", JSON.stringify(state));
+  const snapshot = createSnapshotReader(entries);
+  const before = snapshot.snapshot();
+  const result = await core.planCapabilityAddition({
+    reader: snapshot.reader,
+    git,
+    capability: "multilingual",
+    inspectCreateTargets() {
+      assert.fail("retired installed controls must refuse before inspecting create targets");
+    },
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.issues[0].code, "PROJECT_INSPECTION_INVALID");
   assert.equal(snapshot.snapshot(), before);
 });
 

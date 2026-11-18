@@ -5,6 +5,7 @@ import {
   capabilityRemovalPolicySchema,
   capabilityStateClassificationsSchema,
   fingerprintTargetSchema,
+  multilingualCapabilityVersion,
   surfaceOwnerSchema,
   surfaceOwnershipModeSchema,
 } from "./capability.js";
@@ -327,7 +328,7 @@ export const installedStateSchema = z
     ...(email ? { "transactional-email-resend": "0.2.0" } : {}),
     ...(jobs ? { "background-job-delivery": "0.3.0" } : {}),
     ...(persistence && state.origin.profile === "app" ? { "application-persistence": "0.2.0" } : {}),
-    ...(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual") ? { multilingual: "0.1.0" } : {}),
+    ...(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual") ? { multilingual: multilingualCapabilityVersion } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "booking-calendly") ? { "booking-calendly": "0.2.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "analytics") ? { analytics: "0.2.0" } : {}),
     ...(state.installedCapabilities.some(({ identifier }) => identifier === "contact-form-web3forms") ? { "contact-form-web3forms": "0.2.0" } : {}),

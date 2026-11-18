@@ -3965,7 +3965,7 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
   assert.equal(planExecution.exitCode, 0, planExecution.stderr);
   assert.equal(planExecution.stderr, "");
   const plan = JSON.parse(planExecution.stdout).result;
-  assert.deepEqual(plan.capability, { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" });
+  assert.deepEqual(plan.capability, { identifier, version: identifier === "multilingual" ? "0.1.1" : "0.2.0" });
   assert.match(plan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
   assert.deepEqual(await gitRepositorySnapshot(root), cleanBefore);
 
@@ -3981,8 +3981,8 @@ async function applyCompiledCapabilityAddition(root, identifier, environment = {
     result: {
       status: "verified-final-diff-approval-required",
       baseRevision: Buffer.from(cleanBefore.head).toString("utf8").trim(),
-      capability: { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" },
-      migration: `add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`,
+      capability: { identifier, version: identifier === "multilingual" ? "0.1.1" : "0.2.0" },
+      migration: `add-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`,
       changedPaths: [
         ...plan.actions.map(({ path }) => path),
         ".egeria/migrations.jsonl",
@@ -4396,7 +4396,7 @@ test("the compiled CLI preserves multilingual through both capability install or
             environment,
           );
           lifecycleOutput.push(addition.execution.stdout);
-          expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
+          expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`);
           installedOptionalCapabilities.push(identifier);
           await assertCapabilityLifecycleState(
             linked,
@@ -4429,7 +4429,7 @@ test("the compiled CLI preserves multilingual through both capability install or
         const removalPlan = JSON.parse(removalPlanExecution.stdout).plan;
         assert.deepEqual(removalPlan.capability, {
           identifier: "multilingual",
-          version: "0.1.0",
+          version: "0.1.1",
         });
         assert.match(removalPlan.planFingerprint, /^sha256:[a-f0-9]{64}$/u);
         assert.deepEqual(await gitRepositorySnapshot(linked), cleanComposed);
@@ -4447,8 +4447,8 @@ test("the compiled CLI preserves multilingual through both capability install or
           result: {
             status: "verified-final-diff-approval-required",
             baseRevision: Buffer.from(cleanComposed.head).toString("utf8").trim(),
-            capability: { identifier: "multilingual", version: "0.1.0" },
-            migration: "remove-multilingual-0-1-0",
+            capability: { identifier: "multilingual", version: "0.1.1" },
+            migration: "remove-multilingual-0-1-1",
             changedPaths: [
               ...removalPlan.actions.flatMap((action) =>
                 action.kind === "preserve-file-and-eject"
@@ -4463,7 +4463,7 @@ test("the compiled CLI preserves multilingual through both capability install or
           },
         });
         lifecycleOutput.push(removal.stdout);
-        expectedMigrations.push("remove-multilingual-0-1-0");
+        expectedMigrations.push("remove-multilingual-0-1-1");
         await assertCapabilityLifecycleState(
           linked,
           expectedMigrations,
@@ -4487,7 +4487,7 @@ test("the compiled CLI preserves multilingual through both capability install or
           usesRealFinalVerification ? {} : environment,
         );
         lifecycleOutput.push(readdition.execution.stdout);
-        expectedMigrations.push("add-multilingual-0-1-0");
+        expectedMigrations.push("add-multilingual-0-1-1");
         await assertCapabilityLifecycleState(
           linked,
           expectedMigrations,
@@ -4560,7 +4560,7 @@ test("the compiled CLI preserves analytics and multilingual across both install 
               environment,
             );
             lifecycleOutput.push(addition.execution.stdout);
-            expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
+            expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`);
             installedOptionalCapabilities.push(identifier);
             await assertCapabilityLifecycleState(
               linked,
@@ -5451,7 +5451,7 @@ for (const generation of [
         const addition = await applyCompiledCapabilityAddition(linked, identifier);
         output.push(addition.execution.stdout);
         selected.push(identifier);
-        expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
+        expectedMigrations.push(`add-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`);
         await assertAppState(core.appCapabilityAdditionPersistedVerificationChecks);
         await commitAll(linked, `add ${identifier} capability`);
         context.diagnostic(`${identifier} addition with Worker integration: ${Math.round(performance.now() - started)} ms`);
@@ -5485,8 +5485,8 @@ for (const generation of [
           result: {
             status: "verified-final-diff-approval-required",
             baseRevision: Buffer.from(before.head).toString("utf8").trim(),
-            capability: { identifier, version: identifier === "multilingual" ? "0.1.0" : "0.2.0" },
-            migration: `remove-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`,
+            capability: { identifier, version: identifier === "multilingual" ? "0.1.1" : "0.2.0" },
+            migration: `remove-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`,
             changedPaths: [...plan.actions.filter(({ kind }) => kind !== "preserve-file-and-eject").map(({ path }) => path), ".egeria/migrations.jsonl", ".egeria/state.json"].sort(),
             preservedPaths: [],
             verificationChecks: core.appCapabilityRemovalVerificationChecks,
@@ -5494,7 +5494,7 @@ for (const generation of [
         });
         output.push(removal.stdout);
         selected.splice(selected.indexOf(identifier), 1);
-        expectedMigrations.push(`remove-${identifier}-${identifier === "multilingual" ? "0-1-0" : "0-2-0"}`);
+        expectedMigrations.push(`remove-${identifier}-${identifier === "multilingual" ? "0-1-1" : "0-2-0"}`);
         await assertAppState(core.appCapabilityRemovalPersistedVerificationChecks);
         await commitAll(linked, `remove ${identifier} capability`);
         context.diagnostic(`${identifier} removal with Worker integration: ${Math.round(performance.now() - started)} ms`);

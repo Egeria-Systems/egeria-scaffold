@@ -17,7 +17,7 @@ const descriptorDigests = Object.freeze({
   "contact-form-web3forms": "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
   "content-files": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
   "deployment-cloudflare": "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6",
-  "multilingual": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891",
+  "multilingual": "sha256:76f26b43ab7b952f23e472abde9958efe844b2f5730c4a7edb3d0a9acde27615",
   "observability": "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
   "section-composition": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
   "site-routing": "sha256:989b092f5d02af02fecde9cd06545119588bd2c6e684c4df52e85dc3ffc62ebb",
@@ -33,7 +33,7 @@ const descriptorVersions = Object.freeze({
   "contact-form-web3forms": "0.2.0",
   "content-files": "0.4.0",
   "deployment-cloudflare": "0.12.0",
-  "multilingual": "0.1.0",
+  "multilingual": "0.1.1",
   "observability": "0.4.0",
   "section-composition": "0.3.0",
   "site-routing": "0.5.0",
@@ -83,7 +83,9 @@ function createRecord(identifier) {
     status: "pending",
     taskPlan: identifier === "background-job-delivery"
       ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
-      : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
+      : identifier === "multilingual"
+        ? ["docs/superpowers/plans/capability-repairs/2026-11-18-multilingual-section-links", "gate", "2.md"].join("-")
+        : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
     evidence: [],
   };
 }
@@ -275,6 +277,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
   const artifacts = {
     [registry.records.standards.taskPlan]: "# current generation certification renewal",
     [registry.records["background-job-delivery"].taskPlan]: "# current jobs recovery and composition certification renewal",
+    [registry.records.multilingual.taskPlan]: "# current multilingual section-link certification renewal",
     [evidencePath]: createEvidenceDocument(),
   };
 

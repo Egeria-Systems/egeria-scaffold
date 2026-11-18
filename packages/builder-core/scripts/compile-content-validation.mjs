@@ -20,7 +20,7 @@ const modules = [
   ], ["observabilityCopySource", "readErrorFallbackCopy"]],
   ...["portfolio", "site"].flatMap((profile) => [
     [`multilingual/${profile}/apps/web/src/i18n/localized-profile.ts`, `${profile}/localized-profile.js`, []],
-    ["multilingual/apps/web/src/i18n/localized-content.ts", `${profile}/localized-content.js`, [
+    ["multilingual/application-environments/apps/web/src/i18n/localized-content.ts", `${profile}/localized-content.js`, [
         ['"../content/content-schema"', '"../content-schema.js"'],
         ['"./localized-profile"', '"./localized-profile.js"'],
         ['"./locale"', '"../locale.js"'],

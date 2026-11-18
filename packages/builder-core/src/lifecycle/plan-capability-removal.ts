@@ -1,3 +1,4 @@
+import { multilingualCapabilityVersion } from "../contracts/capability.js";
 import { createHash } from "node:crypto";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
@@ -112,7 +113,7 @@ export type CapabilityRemovalPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: Exclude<RemovableCapability, "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery" | "application-persistence" | "transactional-email-resend">;
-    version: "0.1.0";
+    version: typeof multilingualCapabilityVersion;
   }> | Readonly<{ identifier: "application-persistence"; version: "0.1.1" | "0.2.0" }>
     | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "background-job-delivery" | "transactional-email-resend"; version: "0.1.0" | "0.2.0" }>;
   jobRemovalReport?: JobRemovalMachineReport;
@@ -928,7 +929,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== (capabilityValue === "multilingual" ? "0.1.0" : "0.2.0")) {
+  if (descriptor?.version !== (capabilityValue === "multilingual" ? multilingualCapabilityVersion : "0.2.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -1111,7 +1112,7 @@ export async function planCapabilityRemoval(input: Readonly<{
     profile: project.originProfile,
     capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend"
       ? { identifier: capabilityValue, version: "0.2.0" }
-      : { identifier: capabilityValue, version: "0.1.0" },
+      : { identifier: capabilityValue, version: multilingualCapabilityVersion },
     ...(persistenceReview?.ok === true ? { persistenceRemovalReport: persistenceReview.value.report, persistenceRemovalSubject: persistenceReview.value.subject } : {}),
     currentCapabilities,
     desiredCapabilities,

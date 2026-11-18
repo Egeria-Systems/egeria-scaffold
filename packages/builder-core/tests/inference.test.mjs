@@ -887,7 +887,7 @@ test("installed deployment verification files must match the selected recipe eve
   const workflow = ".github/workflows/deploy.yml";
   const helper = "apps/web/scripts/prepare-ci-git.sh";
   for (const fixture of [
-    "site-public-integrations-0.13.0",
+    "site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
     "app-persistence-0.3.0",
     "app-jobs-recovery-composition-0.3.0-next-16.4.5",
     "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5",

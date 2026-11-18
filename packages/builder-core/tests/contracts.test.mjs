@@ -1427,6 +1427,8 @@ test("default state parsing enforces the exact current tuple and verification ve
   }
   const localized = structuredClone(environmentState);
   localized.installedCapabilities.push({ ...localized.installedCapabilities[0], identifier: "multilingual", version: "0.1.0" });
+  assert.equal(contracts.parseStateJson(JSON.stringify(localized), "2.0.0").ok, false);
+  localized.installedCapabilities.at(-1).version = "0.1.1";
   assert.equal(contracts.parseStateJson(JSON.stringify(localized), "2.0.0").ok, true);
 });
 
