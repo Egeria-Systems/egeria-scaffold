@@ -104,16 +104,22 @@ it("Queue delivery acknowledges success, retries failed work and quarantines poi
   const { environment, terminals } = nativeEnvironment();
   const success = message(envelope());
   const failure = message(envelope({ payload: { sequence: 2 } }));
-  const poison = message({ secret: "synthetic-sensitive-body" });
+  const poison = [
+    message({ secret: "synthetic-sensitive-body" }),
+    message({ environment: "prod", secret: "synthetic-sensitive-body" }),
+    message({ environment: null, secret: "synthetic-sensitive-body" }),
+  ];
   const logs = vi.spyOn(console, "info").mockImplementation(() => {});
   try {
-    await consumeCloudflareJobs({ queue: "jobs-local", messages: [success, failure, poison] }, environment, "development",
+    await consumeCloudflareJobs({ queue: "jobs-local", messages: [...poison, success, failure] }, environment, "development",
       [definition((job) => job.payload.sequence === 1 ? Effect.void : Effect.fail(new JobHandlerFailure("retry")))]);
     expect(success.ack).toHaveBeenCalledOnce();
     expect(failure.retry).toHaveBeenCalledWith({ delaySeconds: 5 });
-    expect(poison.ack).toHaveBeenCalledOnce();
-    expect(terminals).toHaveLength(1);
-    expect(JSON.stringify(terminals)).not.toContain("synthetic-sensitive-body");
+    for (const delivery of poison) {
+      expect(delivery.ack).toHaveBeenCalledOnce();
+      expect(delivery.retry).not.toHaveBeenCalled();
+    }
+    expect(terminals).toEqual(poison.map(() => ({ terminalVersion: 1, environment: "local", code: "job-validation" })));
     expect(JSON.stringify(logs.mock.calls)).not.toContain("synthetic-sensitive-body");
   } finally { logs.mockRestore(); }
 });

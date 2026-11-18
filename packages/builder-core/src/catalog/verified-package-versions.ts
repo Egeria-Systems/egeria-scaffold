@@ -4,7 +4,7 @@ import { projectConfigurationSchema, type ProjectConfiguration } from "../contra
 import type { ValidationResult } from "../contracts/result.js";
 import { installedStateSchema, type InstalledState } from "../contracts/state.js";
 import type { ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
-import { retainedNextVersion } from "../generation/recipe-lockfiles.js";
+import { currentNextVersion, retainedNextVersion } from "../generation/recipe-lockfiles.js";
 import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { createApplicationEnvironmentProfileRecipes } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
@@ -70,11 +70,13 @@ export function createVerifiedProjectSnapshot(
   const projectValue = projectResult.data;
   const stateValue = stateResult.data;
   if (projectValue.originProfile !== stateValue.origin.profile || projectValue.recipeVersion !== stateValue.origin.recipeVersion) return invalidProjectSnapshot();
-  const retainedNextFingerprint = fingerprintJsonValue(retainedNextVersion);
-  const retainsNext = stateValue.managedSurfaces.some(surface =>
-    surface.identifier === "builder-web-package-next" && surface.path === "apps/web/package.json" &&
-    surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next" &&
-    surface.fingerprint === retainedNextFingerprint);
+  const nextSurface = stateValue.managedSurfaces.find(surface =>
+    surface.identifier === "builder-web-package-next" && surface.owner.kind === "builder-kernel" &&
+    surface.path === "apps/web/package.json" && surface.ownership === "merge-managed" &&
+    surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next");
+  if (nextSurface === undefined || stateValue.ejections.includes(nextSurface.path)) return invalidProjectSnapshot();
+  const retainsNext = nextSurface.fingerprint === fingerprintJsonValue(retainedNextVersion);
+  if (!retainsNext && nextSurface.fingerprint !== fingerprintJsonValue(currentNextVersion)) return invalidProjectSnapshot();
   const renderingContext = createGenerationRenderingContext(
     projectValue.selectedCapabilities.includes("application-persistence"),
     projectValue.selectedCapabilities.includes("app-foundation"),

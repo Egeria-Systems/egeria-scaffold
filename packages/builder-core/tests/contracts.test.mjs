@@ -1537,6 +1537,11 @@ test("current deployment families preserve supported installed combinations and 
       assert.equal(rendered.ok, true, JSON.stringify(rendered));
       const project = rendered.value.project;
       const installedCapabilities = contracts.createInstalledManifest(rendered.value.resolved);
+      const surfaces = contracts.materializeInstalledSurfaces({
+        files: new Map(rendered.value.files.map(({ path, content }) => [path, content])),
+        surfaces: rendered.value.surfaces,
+      });
+      assert.equal(surfaces.ok, true);
       const hasFoundation = installedCapabilities.some(({ identifier }) => identifier === "app-foundation");
       const checks = persistence
         ? contracts.persistenceGenerationVerificationChecks
@@ -1547,7 +1552,7 @@ test("current deployment families preserve supported installed combinations and 
         ...validState,
         origin: { profile, recipeVersion: project.recipeVersion },
         installedCapabilities,
-        managedSurfaces: [],
+        managedSurfaces: surfaces.value,
         lastSuccessfulVerification: {
           kind: "generation",
           checks: ["contracts", "pre-state-inference", ...checks, "post-state-inference"],

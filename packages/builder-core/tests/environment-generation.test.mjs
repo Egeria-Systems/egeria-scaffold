@@ -58,7 +58,11 @@ test("default codecs and installed inspection accept only the exact current tupl
     schemaVersion: "2.0.0", projectSchemaVersion: "2.0.0", builderVersion: "0.0.0",
     origin: { profile: "portfolio", recipeVersion: "0.12.0" },
     installedCapabilities: core.createInstalledManifest(rendered.resolved),
-    appliedMigrations: [], managedSurfaces: [], ejections: [],
+    appliedMigrations: [], ejections: [],
+    managedSurfaces: success(core.materializeInstalledSurfaces({
+      files: new Map(rendered.files.map(({ path, content }) => [path, content])),
+      surfaces: rendered.surfaces,
+    })),
     compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
     lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...ordinaryGenerationVerificationChecks, "post-state-inference"] },
   };
