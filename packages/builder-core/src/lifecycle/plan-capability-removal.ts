@@ -992,6 +992,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       project.selectedCapabilities.includes("app-foundation"),
       false,
       environmentContext.retainedNextVersion,
+      capabilityValue === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
     )),
   ]);
 

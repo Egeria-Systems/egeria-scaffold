@@ -183,6 +183,20 @@ const web3FormsTemplateSources = textTemplateSources([
   "contact-form-web3forms/docs/contact-form-web3forms.md",
 ]);
 
+// Managed fingerprints from the installed template view before the consent
+// session. Use the same finite inventory for selection and reconstruction.
+export const retainedAnalyticsConsentTemplates = [
+  ["analytics-runtime", "apps/web/src/integrations/analytics/analytics-runtime.ts", "sha256:3dd7170ac3d7e58bc8d6d1cee9fa91c1e7bd4fbbd89b656958f0f750a940f2d2"],
+  ["analytics-consent-control", "apps/web/src/integrations/analytics/analytics-consent.tsx", "sha256:118bd3ff9e957d61606be15d9d26b11ccc85978aeaf21ee789f5f3dcdf153d44"],
+  ["analytics-runtime-specification", "apps/web/tests/unit/analytics-runtime.test.ts", "sha256:2d8111516009ed376a5b92d76ea27c49af5df81a437d40fac9eb318494145935"],
+  ["analytics-consent-component-specification", "apps/web/tests/component/analytics-consent.test.tsx", "sha256:40eee3323e4fca5ff60675b1a1d6abd661e594e040ff54703fc1b92936d3dbe1"],
+  ["analytics-browser-specification", "apps/web/tests/e2e/analytics-consent.spec.ts", "sha256:ad6c1bfe450fe2c12d06ce1650495381e108eec0c1c61d996ef9594393811035"],
+] as const;
+
+const successorAnalyticsConsentSources = new Set<string>(
+  retainedAnalyticsConsentTemplates.map(([, path]) => `analytics/${path}`),
+);
+
 const analyticsTemplateSources = textTemplateSources([
   "analytics/apps/web/content/en-CA/analytics.yaml",
   "analytics/apps/web/content/fr-CA/analytics.yaml",
@@ -341,6 +355,7 @@ export function createTemplateCatalog(
   includeTransactionalEmail = false,
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
+  retainAnalyticsConsent?: true,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -553,6 +568,9 @@ export function createTemplateCatalog(
       }
       if (entry.source === "common/apps/web/scripts/check-application-environment.mjs") {
         return { ...entry, source: `analytics/application-environments/apps/web/scripts/check-application-environment${composition === undefined ? "" : `.${composition}`}.mjs`, destinationSource: entry.source };
+      }
+      if (!retainAnalyticsConsent && successorAnalyticsConsentSources.has(entry.source)) {
+        return { ...entry, source: entry.source.replace("analytics/", "analytics/application-environments/consent-session/"), destinationSource: entry.source };
       }
       if ((entry.source.startsWith("analytics/") && !entry.source.startsWith("analytics/application-environments/") && !entry.source.endsWith("analytics-content-source.d.ts")) ||
         ["contact-form-web3forms/apps/web/app/layout.analytics.tsx", "contact-form-web3forms/apps/web/app/layout.multilingual-analytics.tsx"].includes(entry.source)) {

@@ -477,7 +477,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "site-public-integrations",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
+        relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1-consent-session",
       },
       {
         identifier: "app",
@@ -487,7 +487,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5-multilingual-0.1.1",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5-multilingual-0.1.1-consent-session",
       },
       {
         identifier: "app-persistence", profile: "app",

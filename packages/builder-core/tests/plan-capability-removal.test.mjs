@@ -1590,11 +1590,12 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = options.persistence ? core.persistenceGenerationVerificationChecks : profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.persistence ? { applicationPersistence: true } : {}), ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(options.persistence === true),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(options.persistence === true, false, false, options.retainedNext, options.retainConsent),
       verifier: {
         async prepareLockfile(root) {
+          const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/${options.persistence ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : `web-recipe-${version}-next-16.4.5`}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/${options.persistence ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : `web-recipe-${version}${nextSuffix}`}/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
@@ -1691,6 +1692,25 @@ test("environment analytics removal preserves neighbors and refuses surviving re
   assertFailure(await plan(referenced), "CAPABILITY_REMOVAL_REFERENCE_CONFLICT");
 });
 
+
+const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
+
+test("intact retained and current consent are removable while actual managed drift still refuses", async () => {
+  for (const retainedNext of [undefined, "16.4.1"]) {
+    for (const retainConsent of [undefined, true]) {
+      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, multilingual: true, retainedNext, retainConsent });
+      const fingerprint = JSON.parse(entries.get(".egeria/state.json")).managedSurfaces.find(({ path }) => path === consentRuntimePath).fingerprint;
+      const archive = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath));
+      assert.equal(fingerprint === core.fingerprintFileContent(archive), retainConsent === true);
+      const plan = await planFromEntries(entries, { capability: "analytics" });
+      assert.equal(plan.ok, true, JSON.stringify(plan));
+      assert.ok(plan.value.actions.some(action => action.path === consentRuntimePath && action.kind === "delete-file"));
+      const modified = new Map(entries);
+      modified.set(consentRuntimePath, entries.get(consentRuntimePath) + "\n// Drift.\n");
+      assertFailure(await planFromEntries(modified, { capability: "analytics" }), "PROJECT_DRIFT_DETECTED");
+    }
+  }
+});
 
 test("environment persistence neighbor removal binds actual source context and preserves the optional tuple", async () => {
   const entries = await environmentContactEntries("app", { persistence: true, analytics: environmentAnalyticsSelection, booking: "link", contact: true, multilingual: true });

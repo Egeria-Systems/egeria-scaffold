@@ -304,7 +304,7 @@ function assertFailure(result, expected) {
   );
 }
 
-async function appTransitionSource(profile, subset = 0, generation = "current") {
+async function appTransitionSource(profile, subset = 0, generation = "current", renderingContext = currentTransitionContexts[generation]) {
   const rendered = await core.renderSkeleton({
     profile,
     ...appTransitionVisualProject,
@@ -312,11 +312,12 @@ async function appTransitionSource(profile, subset = 0, generation = "current") 
     ...(subset & 1 ? { bookingCalendly: appTransitionVisualBookingSettings } : {}),
     ...(subset & 2 ? { multilingual: true } : {}),
     ...(subset & 4 ? { analytics: appTransitionVisualAnalyticsSettings } : {}),
-  }, currentTransitionContexts[generation]);
+  }, renderingContext);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, bytes(content)]));
+  const nextSuffix = renderingContext.retainedNextVersion === undefined ? "-next-16.4.5" : "";
   files.set("pnpm-lock.yaml", bytes(await readFile(resolve(packageRoot,
-    `lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}-next-16.4.5/pnpm-lock.yaml`))));
+    `lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}${nextSuffix}/pnpm-lock.yaml`))));
   files.set(".egeria/project.yaml", bytes(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", bytes(""));
   const surfaces = core.materializeInstalledSurfaces({
@@ -744,6 +745,32 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
   }
 });
 
+
+const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
+
+test("site-to-app preserves its installed consent bytes and Next graph", async () => {
+  for (const retainedNext of [undefined, "16.4.1"]) {
+    for (const retainConsent of [undefined, true]) {
+      const context = createGenerationRenderingContext(false, false, false, retainedNext, retainConsent);
+      const source = await appTransitionSource("site", 4, "current", context);
+      const oldState = JSON.parse(decode(source.get(".egeria/state.json")));
+      const repository = createRepository(source);
+      const plan = await approvedAppPlan(repository.reader);
+      assert.ok(plan.dispositions.some(({ path, kind }) => path === consentRuntimePath && kind === "preserve-file"));
+      const execution = await runAppTransition(repository);
+      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+      assert.deepEqual(repository.files.get(consentRuntimePath), source.get(consentRuntimePath));
+      const next = JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next;
+      assert.equal(next, retainedNext ?? "16.4.5");
+      const lockSuffix = retainedNext ? "" : "-next-16.4.5";
+      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot,
+        `lockfiles/web-recipe-app-0.3.0${lockSuffix}/pnpm-lock.yaml`))));
+      const state = JSON.parse(decode(repository.files.get(".egeria/state.json")));
+      assert.deepEqual(state.managedSurfaces.find(({ path }) => path === consentRuntimePath),
+        oldState.managedSurfaces.find(({ path }) => path === consentRuntimePath));
+    }
+  }
+});
 
 test("successor portfolio execution refuses unadmitted visual inputs before writes or verification", async () => {
   const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5"));
