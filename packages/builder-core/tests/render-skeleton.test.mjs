@@ -6072,6 +6072,51 @@ const environmentAnalyticsSettings = {
   operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 };
 
+test("fresh consent rendering and exact installed consent bytes select independently of the Next graph", async () => {
+  const core = await import("../dist/index.js");
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const paths = [
+    "apps/web/src/integrations/analytics/analytics-runtime.ts",
+    "apps/web/src/integrations/analytics/analytics-consent.tsx",
+    "apps/web/tests/unit/analytics-runtime.test.ts",
+    "apps/web/tests/component/analytics-consent.test.tsx",
+    "apps/web/tests/e2e/analytics-consent.spec.ts",
+  ];
+  const templateRoot = new URL("../templates/analytics/application-environments/", import.meta.url);
+  const baseline = await Promise.all(paths.map(path => readFile(new URL(path, templateRoot))));
+  for (const profile of ["portfolio", "site", "app"]) {
+    for (const multilingual of [false, true]) {
+      for (const retainedNext of [undefined, "16.4.1"]) {
+        const request = { profile, projectName: "consent-rendering", displayName: "Consent rendering",
+          packageVersions: core.verifiedCapabilityPackageVersions, analytics: analyticsSettings, ...(multilingual ? { multilingual: true } : {}) };
+        const currentContext = core.createApplicationEnvironmentRenderingContext(false, false, false, retainedNext);
+        const priorContext = core.createApplicationEnvironmentRenderingContext(false, false, false, retainedNext, true);
+        const current = assertSuccess(await core.renderSkeleton(request, currentContext));
+        const prior = assertSuccess(await core.renderSkeleton(request, priorContext));
+        assert.deepEqual(prior.files.map(({ path }) => path), current.files.map(({ path }) => path));
+        assert.deepEqual(prior.surfaces, current.surfaces);
+        const next = parseGeneratedJson(current.files, "apps/web/package.json").dependencies.next;
+        assert.equal(next, retainedNext ?? "16.4.5");
+        const currentFiles = new Map(current.files.map(({ path, content }) => [path, Buffer.from(content)]));
+        const priorFiles = new Map(prior.files.map(({ path, content }) => [path, Buffer.from(content)]));
+        assert.deepEqual([...currentFiles.keys()].filter(path => !currentFiles.get(path).equals(priorFiles.get(path))).sort(), [...paths].sort());
+        for (const [index, path] of paths.entries()) assert.deepEqual(priorFiles.get(path), baseline[index]);
+        const priorState = renderingState(core, prior);
+        const currentState = renderingState(core, current);
+        assert.equal(assertSuccess(createVerifiedProjectSnapshot(prior.project, priorState)).renderingContext.retainAnalyticsConsent, true);
+        assert.equal(assertSuccess(createVerifiedProjectSnapshot(current.project, currentState)).renderingContext.retainAnalyticsConsent, undefined);
+        const updated = currentState.managedSurfaces.find(({ path }) => path === paths[0]);
+        const mixed = { ...priorState, managedSurfaces: priorState.managedSurfaces.map(surface => surface.path === paths[0] ? updated : surface) };
+        assert.equal(createVerifiedProjectSnapshot(prior.project, mixed).ok, false);
+        const { analytics, ...omittedRequest } = request;
+        const omitted = assertSuccess(await core.renderSkeleton(omittedRequest, currentContext));
+        assert.deepEqual(assertSuccess(await core.renderSkeleton(omittedRequest, priorContext)).files, omitted.files);
+        assert.ok(paths.every(path => !omitted.files.some(file => file.path === path)));
+      }
+    }
+  }
+});
+
 test("environment analytics rendering composes every profile with selection-only controls and owned configuration", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     for (let selection = 0; selection < 8; selection += 1) {

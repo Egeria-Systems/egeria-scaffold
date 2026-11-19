@@ -78,6 +78,7 @@ export type SkeletonRenderingContext = Readonly<{
   profiles: readonly ProfileRecipe[];
   projectSchemaVersion: "2.0.0";
   retainAppFoundation?: true;
+  retainAnalyticsConsent?: true;
   retainedNextVersion?: typeof retainedNextVersion;
 }>;
 
@@ -467,6 +468,7 @@ function createDesiredSurfaces(
 export async function renderProjectTemplates(
   project: ProjectConfiguration,
   destinations?: ReadonlySet<string>,
+  retainAnalyticsConsent?: true,
 ): Promise<ValidationResult<GeneratedFile[]>> {
   const selected = project.selectedCapabilities;
   const analytics = project.capabilitySettings.analytics;
@@ -485,6 +487,7 @@ export async function renderProjectTemplates(
     selected.includes("transactional-email-resend"),
     contactForm,
     jobsSelected,
+    retainAnalyticsConsent,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -634,7 +637,7 @@ export async function renderSkeleton(
     return projectResult;
   }
 
-  const templates = await renderProjectTemplates(projectResult.value);
+  const templates = await renderProjectTemplates(projectResult.value, undefined, renderingContext.retainAnalyticsConsent);
   if (!templates.ok) return templates;
   const files = templates.value;
   {

@@ -579,6 +579,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     project.selectedCapabilities.includes("app-foundation"),
     false,
     environmentContext.retainedNextVersion,
+    environmentContext.retainAnalyticsConsent,
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");
