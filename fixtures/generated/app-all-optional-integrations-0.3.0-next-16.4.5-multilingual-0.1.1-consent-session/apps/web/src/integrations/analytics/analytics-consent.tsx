@@ -197,11 +197,11 @@ function AnalyticsConsentControl({
     setManaging(false);
   }
 
-  function saveRequested(requested: readonly AnalyticsPurposeDecision[]) {
+  function saveRequested(requested: readonly AnalyticsPurposeDecision[], withdrawHadFocus = false) {
     const result = session.save(requested);
     if (result.persistence === "stale-grant-retained") {
       setDraft(requested);
-      if (!managing) focusRequestReference.current = "management";
+      if (!managing || withdrawHadFocus) focusRequestReference.current = "management";
       setManaging(true);
       return;
     }
@@ -391,7 +391,7 @@ function AnalyticsConsentControl({
           type="button"
           className={secondaryButtonClassName}
           data-analytics-consent-action="withdraw"
-          onClick={() => saveRequested(allDenied)}
+          onClick={(event) => saveRequested(allDenied, event.currentTarget.matches(":focus"))}
         >
           {content.turnOffLabel}
         </button>

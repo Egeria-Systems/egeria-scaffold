@@ -444,15 +444,20 @@ describe("analytics consent", () => {
     expect(screen.getByRole("button", { name: content.manageChoicesLabel })).toHaveFocus();
   });
 
-  it("focuses the management heading when keyboard withdrawal opens a disputed retry", async () => {
+  it.each(["closed", "open"] as const)("focuses the management heading when keyboard withdrawal removes Turn off with management %s", async (management) => {
     vi.stubEnv("NEXT_PUBLIC_ANALYTICS_ENABLED", "false");
+    vi.stubEnv("NEXT_PUBLIC_SITE_URL", `https://${management}.analytics-test.invalid`);
     const user = userEvent.setup();
     seedConsent(partiallyGranted);
     const content = readAnalyticsContent("en-CA");
     render(<AnalyticsConsent settings={analyticsSettings} content={content} />);
     const withdraw = await screen.findByRole("button", { name: content.turnOffLabel });
-    await user.tab();
-    await user.tab();
+    if (management === "open") {
+      await user.tab();
+      await user.keyboard("[Enter]");
+      expect(screen.getByRole("heading", { name: content.manageChoicesLabel })).toHaveFocus();
+    }
+    withdraw.focus();
     expect(withdraw).toHaveFocus();
     const blocked = () => { throw new Error("storage unavailable"); };
     const writes = vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);

@@ -405,6 +405,72 @@ describe("analytics consent runtime", () => {
     expect(storageListeners(browser)).toBe(0);
   });
 
+  it.each([
+    ["GA4", "context switch"],
+    ["Clarity", "context switch"],
+    ["GA4", "local withdrawal"],
+    ["Clarity", "local withdrawal"],
+    ["GA4", "remote withdrawal"],
+    ["Clarity", "remote withdrawal"],
+  ] as const)("finishes a %s reduction after a throwing provider callback during %s", (provider, action) => {
+    const browser = createTestBrowser({ [key]: record(google, clarity) });
+    const outgoing = getBrowserAnalyticsConsentSession(analyticsSettings);
+    const observed = vi.fn();
+    const unsubscribe = outgoing.subscribe(observed);
+    observed.mockClear();
+    expect(present(browser)).toEqual(["analytics-google-analytics-4", "analytics-microsoft-clarity"]);
+
+    const decisionsAtCallback: (readonly AnalyticsPurposeDecision[])[] = [];
+    const failDenial = () => {
+      decisionsAtCallback.push(outgoing.getSnapshot().decisions);
+      throw new Error("synthetic provider callback detail");
+    };
+    const notifyGoogle = vi.fn(() => {
+      if (provider === "GA4") failDenial();
+    });
+    Reflect.set(browser.window, "gtag", notifyGoogle);
+    browser.clarity.mockClear();
+    if (provider === "Clarity") browser.clarity.mockImplementation(failDenial);
+    const diagnostic = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    if (action === "context switch") {
+      const settings: AnalyticsSettings = { ...analyticsSettings, providers: { cloudflareWebAnalytics: true } };
+      browser.storedValues.set(key, JSON.stringify(storedRecord(settings, [cloudflare])));
+      const incoming = getBrowserAnalyticsConsentSession(settings);
+      const nextSubscriber = vi.fn();
+      const unsubscribeIncoming = incoming.subscribe(nextSubscriber);
+      expect(incoming.getSnapshot().decisions).toEqual(purposeDecisions(settings, [cloudflare]));
+      expect(nextSubscriber).toHaveBeenCalledOnce();
+      expect(present(browser)).toEqual(["analytics-cloudflare-web-analytics"]);
+      expect(storageListeners(browser)).toBe(1);
+      expect(browser.reload).not.toHaveBeenCalled();
+      unsubscribeIncoming();
+    } else {
+      if (action === "local withdrawal") {
+        expect(outgoing.save(denied)).toEqual({ persistence: "persisted", reloading: true });
+      } else {
+        browser.storedValues.set(key, record());
+        browser.dispatchStorage(record());
+      }
+      expect(present(browser)).toEqual([]);
+      expect(browser.reload).toHaveBeenCalledOnce();
+    }
+
+    expect(observed).toHaveBeenCalledOnce();
+    expect(outgoing.getSnapshot().decisions).toEqual(denied);
+    expect(decisionsAtCallback).toEqual(provider === "GA4" ? [denied] : [denied, denied]);
+    expect(notifyGoogle).toHaveBeenCalledWith("consent", "update", expect.objectContaining({ analytics_storage: "denied" }));
+    expect(browser.clarity.mock.calls).toEqual([
+      ["consentv2", { analytics_Storage: "denied", ad_Storage: "denied" }],
+      ["consent", false],
+    ]);
+    for (const cookie of ["egeria_nonproduction_ga", "egeria_nonproduction_ga_TEST123456", "_clck", "_clsk"]) {
+      expect(browser.cookieWrites).toContain(`${cookie}=; Max-Age=0; Path=/; SameSite=Lax`);
+    }
+    expect(diagnostic.mock.calls).toEqual(Array.from({ length: decisionsAtCallback.length }, () => ["ANALYTICS_CONSENT_PROVIDER_FAILED"]));
+    unsubscribe();
+  });
+
   it.each(["corrupt", "expired", "wrong context", "absent", "unreadable"] as const)(
     "begins denied when storage is %s",
     state => {

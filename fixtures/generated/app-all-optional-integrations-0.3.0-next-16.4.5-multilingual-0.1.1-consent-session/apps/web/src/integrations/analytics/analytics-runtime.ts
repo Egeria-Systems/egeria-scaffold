@@ -314,6 +314,14 @@ function clearAccessibleCookies(
   }
 }
 
+function attemptProviderReduction(effect: () => void): void {
+  try {
+    effect();
+  } catch {
+    console.error("ANALYTICS_CONSENT_PROVIDER_FAILED");
+  }
+}
+
 function applyReductionEffects(
   settings: AnalyticsSettings,
   removedPurposes: readonly AnalyticsPurposeIdentifier[],
@@ -330,12 +338,14 @@ function applyReductionEffects(
       case "cloudflare-web-analytics":
         break;
       case "google-analytics-4":
-        if (typeof browser.window.gtag === "function") configureGoogleConsent(browser, "update", "denied");
+        if (typeof browser.window.gtag === "function") {
+          attemptProviderReduction(() => configureGoogleConsent(browser, "update", "denied"));
+        }
         break;
       case "microsoft-clarity":
         if (typeof browser.window.clarity === "function") {
-          configureClarityConsent(browser, "denied");
-          browser.window.clarity("consent", false);
+          attemptProviderReduction(() => configureClarityConsent(browser, "denied"));
+          attemptProviderReduction(() => browser.window.clarity?.("consent", false));
         }
         break;
     }
