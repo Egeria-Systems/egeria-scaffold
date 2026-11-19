@@ -152,7 +152,7 @@ jobs:
             if (diff.ok !== true || diff.result?.equal !== true || diff.result?.differences?.length !== 0) fail("DIFF_STATE_INVALID");
             const state = infer.result.state.value;
             const capabilities = state.installedCapabilities.map(({ identifier, version }) => ({ identifier, version }));
-            for (const expected of [{ identifier: "site-routing", version: "0.5.0" }, { identifier: "multilingual", version: "0.1.0" }, { identifier: "analytics", version: "0.2.0" }]) {
+            for (const expected of [{ identifier: "site-routing", version: "0.5.0" }, { identifier: "multilingual", version: "0.1.1" }, { identifier: "analytics", version: "0.2.0" }]) {
               if (!capabilities.some((value) => isDeepStrictEqual(value, expected))) process.exit(1);
             }
             const requireFromBuilderCore = createRequire(resolve("packages/builder-core/package.json"));

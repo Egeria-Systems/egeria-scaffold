@@ -82,10 +82,11 @@ export function validateCloudflareJobBatch(batch: JobMessageBatch, environment: 
   const settings = configuration(environment, compiledTarget);
   if (batch.queue !== settings.queueName || batch.messages.length > 10) throw new JobDeliveryFailure("job-configuration");
   // Refuse cross-target batches before any message handler, queue write or ack.
-  // Malformed envelopes without a target retain the existing poison disposition.
+  // Missing or unrecognized targets are handled by per-message validation.
   for (const message of batch.messages) {
     const body = message.body;
-    if (typeof body === "object" && body !== null && "environment" in body && body.environment !== settings.environment) {
+    if (typeof body === "object" && body !== null && "environment" in body &&
+      isJobEnvironment(body.environment) && body.environment !== settings.environment) {
       throw new JobDeliveryFailure("job-configuration");
     }
   }

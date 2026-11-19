@@ -90,7 +90,7 @@ function additionMigrationIdentifier(capability: Exclude<AddableCapability, "bac
   const identifiers = {
     analytics: "add-analytics-0-2-0",
     "booking-calendly": "add-booking-calendly-0-2-0",
-    multilingual: "add-multilingual-0-1-0",
+    multilingual: "add-multilingual-0-1-1",
     "application-persistence": "add-application-persistence-0-2-0",
     "transactional-email-resend": "add-transactional-email-resend-0-2-0",
     "contact-form-web3forms": "add-contact-form-web3forms-0-2-0",

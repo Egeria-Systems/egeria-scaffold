@@ -227,6 +227,7 @@ const multilingualCommonTemplateSources = textTemplateSources([
   "multilingual/apps/web/tests/unit/locale.test.ts",
   "multilingual/apps/web/tests/unit/localized-content.test.ts",
   "multilingual/apps/web/tests/visual/home-visual.spec.ts",
+  "multilingual/docs/multilingual.md",
 ] as const);
 
 function multilingualProfileSources(
@@ -492,6 +493,9 @@ export function createTemplateCatalog(
       "site/apps/web/tests/unit/routing-content.test.ts", "site/apps/web/app/robots.ts",
       "site/apps/web/tests/e2e/site-routing.spec.ts.template", "multilingual/site/apps/web/tests/e2e/site-routing.spec.ts.template",
       "multilingual/apps/web/tests/e2e/multilingual-routing.spec.ts",
+      "multilingual/apps/web/src/i18n/localized-content.ts",
+      "multilingual/apps/web/tests/unit/localized-content.test.ts",
+      "multilingual/apps/web/tests/component/multilingual-page.test.tsx",
       "site/apps/web/app/about/production-page.tsx", "site/apps/web/app/work/featured/page.tsx",
     ].includes(entry.source)) {
       const separator = entry.source.indexOf("/");

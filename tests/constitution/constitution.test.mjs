@@ -3939,7 +3939,7 @@ test("multilingual implementation and certification remain exact and claim-limit
   assert.ok(multilingualBoundary, "executable multilingual boundary is missing");
   assert.match(
     multilingualBoundary,
-    /multilingual@0\.1\.0[\s\S]+source-generated[\s\S]+portfolio[\s\S]+site/iu,
+    /multilingual@0\.1\.1` is source-generated[^\n]+`portfolio`, `site`, and `app`/iu,
   );
   assert.match(
     multilingualBoundary,
@@ -3986,7 +3986,7 @@ test("multilingual implementation and certification remain exact and claim-limit
   for (const instructions of [cliInstructions, builderCoreInstructions]) {
     assert.match(
       instructions,
-      /booking-calendly@0\.2\.0[\s\S]+multilingual@0\.1\.0/iu,
+      /booking-calendly@0\.2\.0[\s\S]+multilingual@0\.1\.1/iu,
     );
     assert.match(
       instructions,
@@ -4049,11 +4049,14 @@ test("executable capability certification ownership is current", async () => {
     "standards",
     "transactional-email-resend",
   ]);
+  const taskPlanOverrides = new Map([
+    ["background-job-delivery", "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"],
+    ["multilingual", `docs/superpowers/plans/capability-repairs/2026-11-18-multilingual-section-links-${compactLabel("gate", "-", "2")}.md`],
+  ]);
   for (const [identifier, record] of Object.entries(registry.records)) {
     assert.equal(record.status, "pending");
-    assert.equal(record.taskPlan, identifier === "background-job-delivery"
-      ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
-      : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
+    assert.equal(record.taskPlan, taskPlanOverrides.get(identifier)
+      ?? "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md");
     assert.deepEqual(record.evidence, []);
   }
   assert.match(

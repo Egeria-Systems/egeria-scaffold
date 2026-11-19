@@ -2160,7 +2160,7 @@ test("the catalog declares the exact multilingual capability contract", () => {
 
   assert.deepEqual(multilingual, {
     identifier: "multilingual",
-    version: "0.1.0",
+    version: "0.1.1",
     deliveryMode: "source-generated",
     stateClassifications: ["repository-stateful"],
     removalPolicy: "reviewed",
@@ -2182,6 +2182,7 @@ test("the catalog declares the exact multilingual capability contract", () => {
     adapterSemanticRequirements: [],
     managedSurfaces: [
       ...[
+        ["multilingual-authoring-guide", "docs/multilingual.md", "application-owned"],
         ["multilingual-locale-middleware", "apps/web/middleware.ts", "managed"],
         [
           "multilingual-locale-layout",
@@ -2265,6 +2266,7 @@ test("the catalog declares the exact multilingual capability contract", () => {
     ],
     inferenceProbes: [
       ...[
+        "docs/multilingual.md",
         "apps/web/middleware.ts",
         "apps/web/app/[locale]/layout.tsx",
         "apps/web/app/[locale]/[[...segments]]/page.tsx",
@@ -2284,8 +2286,8 @@ test("the catalog declares the exact multilingual capability contract", () => {
       ].map((path) => ({ kind: "file", path })),
     ],
     migrationPlanners: [
-      "add-multilingual-0-1-0",
-      "remove-multilingual-0-1-0",
+      "add-multilingual-0-1-1",
+      "remove-multilingual-0-1-1",
     ],
     verificationPlan: [
       "locale-contracts",
@@ -2699,7 +2701,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     }
     assert.deepEqual(core.createInstalledManifest(selected).at(-1), {
       identifier: "multilingual",
-      version: "0.1.0",
+      version: "0.1.1",
       deliveryMode: "source-generated",
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",

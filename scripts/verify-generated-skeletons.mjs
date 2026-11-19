@@ -234,6 +234,7 @@ const backgroundJobFiles = Object.freeze([
 ].sort(codePointCompare));
 
 const multilingualFiles = Object.freeze([
+  "docs/multilingual.md",
   "apps/web/app/[locale]/[[...segments]]/page.tsx",
   "apps/web/app/[locale]/layout.tsx",
   "apps/web/app/[locale]/not-found.tsx",
@@ -543,7 +544,7 @@ export const generatedFixtureContracts = Object.freeze([
       multilingual: true,
     }),
     expectedCapabilitySettings: noCapabilitySettings,
-    relativeRoot: "fixtures/generated/site-multilingual-0.13.0-next-16.4.5",
+    relativeRoot: "fixtures/generated/site-multilingual-0.13.0-next-16.4.5-multilingual-0.1.1",
     expectedFiles: Object.freeze([
       ...portfolioFiles,
       ...siteRoutingFiles,
@@ -567,8 +568,8 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
-    expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 166,
+    expectedMultilingualVersion: "0.1.1",
+    expectedSurfaces: 167,
     visualRegression: false,
   }),
   Object.freeze({
@@ -586,7 +587,7 @@ export const generatedFixtureContracts = Object.freeze([
       multilingual: true,
     }),
     expectedCapabilitySettings: Object.freeze({ ...siteAnalyticsSettings, ...portfolioCalendlySettings }),
-    relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5",
+    relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter(path => !bookingCalendlyFiles.includes(path)),
       ...bookingCalendlyFiles,
@@ -617,8 +618,8 @@ export const generatedFixtureContracts = Object.freeze([
     expectedBookingCalendlyVersion: "0.2.0",
     expectedContactFormVersion: "0.2.0",
     expectedAnalyticsVersion: "0.2.0",
-    expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 208,
+    expectedMultilingualVersion: "0.1.1",
+    expectedSurfaces: 209,
     visualRegression: false,
   }),
   Object.freeze({
@@ -668,7 +669,7 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilitySettings: Object.freeze({
       ...siteAnalyticsSettings, ...portfolioCalendlySettings,
     }),
-    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5",
+    relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5-multilingual-0.1.1",
     expectedFiles: Object.freeze([
       ...portfolioFiles.filter((path) => !bookingCalendlyFiles.includes(path)),
       ...siteRoutingFiles, ...appFoundationFiles, ...bookingCalendlyFiles,
@@ -689,8 +690,8 @@ export const generatedFixtureContracts = Object.freeze([
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: "0.2.0",
     expectedAnalyticsVersion: "0.2.0",
-    expectedMultilingualVersion: "0.1.0",
-    expectedSurfaces: 212,
+    expectedMultilingualVersion: "0.1.1",
+    expectedSurfaces: 213,
     visualRegression: false,
   }),
   Object.freeze({

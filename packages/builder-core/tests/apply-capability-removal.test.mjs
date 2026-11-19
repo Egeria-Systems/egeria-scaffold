@@ -112,7 +112,7 @@ async function installedEntries(profile, options = {}) {
   );
   const defaultMigrations = [
     ...(includeBooking ? ["add-booking-calendly-0-2-0"] : []),
-    ...(includeMultilingual ? ["add-multilingual-0-1-0"] : []),
+    ...(includeMultilingual ? ["add-multilingual-0-1-1"] : []),
     ...(includeAnalytics ? ["add-analytics-0-2-0"] : []),
   ];
   const appliedMigrations = options.appliedMigrations ?? defaultMigrations;
@@ -487,10 +487,10 @@ test("app optional lifecycle preserves the foundation and composes every optiona
         assert.equal(result.value.status, "verified-final-diff-approval-required");
         assert.deepEqual(result.value.capability, {
           identifier: operation.capability,
-          version: operation.capability === "multilingual" ? "0.1.0" : "0.2.0",
+          version: operation.capability === "multilingual" ? "0.1.1" : "0.2.0",
         });
         assert.equal(result.value.migration,
-          `${operation.kind === "addition" ? "add" : "remove"}-${operation.capability}-${operation.capability === "multilingual" ? "0-1-0" : "0-2-0"}`);
+          `${operation.kind === "addition" ? "add" : "remove"}-${operation.capability}-${operation.capability === "multilingual" ? "0-1-1" : "0-2-0"}`);
         assert.deepEqual(result.value.verificationChecks, [
           "contracts", "plan-approval", "pre-state-inference", ...appVerifierChecks,
           "post-change-inference", "migration-record", "post-state-inference",
@@ -562,7 +562,7 @@ test("app optional lifecycle preserves the foundation and composes every optiona
   }
 });
 
-test("app multilingual removal retains a modified locale catalog as an explicit ejection", async () => {
+test("app multilingual removal retains modified locale content and authoring guidance as explicit ejections", async () => {
   const operation = appOperations.find(({ kind, capability }) =>
     kind === "removal" && capability === "multilingual");
   const repository = createRepository(await installedEntries("app", {
@@ -571,21 +571,29 @@ test("app multilingual removal retains a modified locale catalog as an explicit 
   const path = "apps/web/content/fr-CA/localized-content.yaml";
   const customized = `${repository.files.get(path)}# application translation review\n`;
   repository.files.set(path, customized);
+  const guide = "docs/multilingual.md";
+  const editedGuide = `${repository.files.get(guide)}\n## Application copy review\n`;
+  repository.files.set(guide, editedGuide);
+  const preservedPaths = [path, guide].sort();
   const planned = await planAppOperation(repository, operation);
   assert.equal(planned.ok, true, JSON.stringify(planned));
   assert.equal(planned.value.actions.find((action) => action.path === path)?.kind,
     "preserve-file-and-eject");
+  assert.equal(planned.value.actions.find((action) => action.path === guide)?.kind, "preserve-file-and-eject");
   const result = await applyAppOperation(repository, operation, planned.value);
   assert.equal(result.ok, true, JSON.stringify(result));
-  assert.deepEqual(result.value.preservedPaths, [path]);
+  assert.deepEqual(result.value.preservedPaths, preservedPaths);
   assert.equal(repository.files.get(path), customized);
+  assert.equal(repository.files.get(guide), editedGuide);
   const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
   const project = core.parseProjectYaml(repository.files.get(".egeria/project.yaml"));
   assert.equal(state.ok, true);
   assert.equal(project.ok, true);
-  assert.deepEqual(state.value.ejections, [path]);
-  assert.deepEqual(project.value.ejectedAreas, [path]);
-  assert.equal(state.value.managedSurfaces.find((surface) => surface.path === path)?.ownership, "ejected");
+  assert.deepEqual(state.value.ejections, preservedPaths);
+  assert.deepEqual(project.value.ejectedAreas, preservedPaths);
+  for (const preserved of preservedPaths) {
+    assert.equal(state.value.managedSurfaces.find((surface) => surface.path === preserved)?.ownership, "ejected");
+  }
 });
 
 test("multilingual removal refuses a surviving custom analytics locale reference", async () => {
@@ -937,7 +945,7 @@ async function expectedSuccessfulArtifacts(
   expectedFiles.set(".egeria/project.yaml", projectSource);
   const removalMigration = {
     schemaVersion: "1.0.0",
-    identifier: `remove-${capability}-${capability === "multilingual" ? "0-1-0" : "0-2-0"}`,
+    identifier: `remove-${capability}-${capability === "multilingual" ? "0-1-1" : "0-2-0"}`,
     kind: "migration",
     outcome: "succeeded",
     completedAt,
@@ -997,7 +1005,7 @@ async function expectedSuccessfulArtifacts(
     installedCapabilities: core.createInstalledManifest(desired.value.resolved),
     appliedMigrations: [
       ...currentState.value.appliedMigrations,
-      `remove-${capability}-${capability === "multilingual" ? "0-1-0" : "0-2-0"}`,
+      `remove-${capability}-${capability === "multilingual" ? "0-1-1" : "0-2-0"}`,
     ],
     managedSurfaces: nextSurfaces,
     ejections: nextProject.ejectedAreas,
@@ -1089,8 +1097,8 @@ test("capability removal executes the approved plan once and persists migration 
 
 test("multilingual and Calendly removal preserve the other capability in both install orders", async () => {
   const installOrders = [
-    ["add-booking-calendly-0-2-0", "add-multilingual-0-1-0"],
-    ["add-multilingual-0-1-0", "add-booking-calendly-0-2-0"],
+    ["add-booking-calendly-0-2-0", "add-multilingual-0-1-1"],
+    ["add-multilingual-0-1-1", "add-booking-calendly-0-2-0"],
   ];
 
   for (const appliedMigrations of installOrders) {
@@ -1132,7 +1140,7 @@ test("multilingual and Calendly removal preserve the other capability in both in
         result.value.migration,
         capability === "booking-calendly"
           ? "remove-booking-calendly-0-2-0"
-          : "remove-multilingual-0-1-0",
+          : "remove-multilingual-0-1-1",
       );
       assert.equal(repository.writes.length, 3);
       assert.deepEqual(repository.writes[1], [
@@ -1188,7 +1196,7 @@ test("analytics removal restores the multilingual layout and persists fresh disc
       multilingual: true,
       analytics: true,
       appliedMigrations: [
-        "add-multilingual-0-1-0",
+        "add-multilingual-0-1-1",
         "add-analytics-0-2-0",
       ],
     }),
@@ -1260,7 +1268,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     multilingual: true,
     analytics: true,
     appliedMigrations: [
-      "add-multilingual-0-1-0",
+      "add-multilingual-0-1-1",
       "add-analytics-0-2-0",
     ],
   });
@@ -1275,7 +1283,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
   );
   assert.equal(removedState.ok, true, JSON.stringify(removedState.issues));
   assert.deepEqual(removedState.value.appliedMigrations, [
-    "add-multilingual-0-1-0",
+    "add-multilingual-0-1-1",
     "add-analytics-0-2-0",
     "remove-analytics-0-2-0",
   ]);
@@ -1319,7 +1327,7 @@ test("analytics removal can be re-added with exact repaired surfaces and ordered
     JSON.stringify(readdedMigrations.issues),
   );
   const expectedMigrationHistory = [
-    "add-multilingual-0-1-0",
+    "add-multilingual-0-1-1",
     "add-analytics-0-2-0",
     "remove-analytics-0-2-0",
     "add-analytics-0-2-0",

@@ -7,7 +7,7 @@ import { createCapabilityCatalogSnapshot } from "../dist/catalog/capability-cata
 import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, createVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../dist/catalog/verified-package-versions.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { resolveRecipeLockfileVersion } from "../dist/generation/recipe-lockfiles.js";
-import { appGenerationVerificationChecks } from "../dist/index.js";
+import { appGenerationVerificationChecks, materializeInstalledSurfaces } from "../dist/index.js";
 
 const ordinary = createGenerationRenderingContext().catalogSnapshot;
 const email = createGenerationRenderingContext(false, true).catalogSnapshot;
@@ -57,11 +57,16 @@ test("installed email and retained foundation require exact current controls and
     const rendered = await renderSkeleton(request(profile, emailInstalled ? { transactionalEmailResend: true } : {}), createGenerationRenderingContext(false, true));
     assert.equal(rendered.ok, true);
     const project = rendered.value.project;
+    const surfaces = materializeInstalledSurfaces({
+      files: new Map(rendered.value.files.map(({ path, content }) => [path, content])),
+      surfaces: rendered.value.surfaces,
+    });
+    assert.equal(surfaces.ok, true);
     const state = {
       schemaVersion: "2.0.0", builderVersion: "0.0.0", projectSchemaVersion: "2.0.0",
       origin: { profile, recipeVersion: project.recipeVersion },
       installedCapabilities: createInstalledManifest(rendered.value.resolved),
-      appliedMigrations: [], managedSurfaces: [], ejections: [],
+      appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [],
       compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
       lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...appGenerationVerificationChecks, "post-state-inference"] },
     };

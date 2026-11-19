@@ -1229,7 +1229,7 @@
       "path": "apps/web/src/application/job-delivery.ts"
     },
     {
-      "fingerprint": "sha256:28cb083e262311be08fbc5a42407eb4554757047481f142c2d544d2532c67f12",
+      "fingerprint": "sha256:3f4b52cc7e759c2c637ca058fd3814878d0a79529b3e479170c4933b31d78d3d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1313,7 +1313,7 @@
       "path": "docs/background-job-delivery.md"
     },
     {
-      "fingerprint": "sha256:e4fb8d83984b478c9ccaa197a8ac4e0074c219b02312ca44cb961dd2e10df7e3",
+      "fingerprint": "sha256:4cb4934de5c98118fefb3a6e318c813f1605ae8784f32fa64da631a3eef7055b",
       "fingerprintTarget": {
         "kind": "file"
       },

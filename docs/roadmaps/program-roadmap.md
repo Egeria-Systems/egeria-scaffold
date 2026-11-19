@@ -230,6 +230,10 @@ The user's explicit structurally-valid same-target rejection retention decision 
 
 This exception supplies only the earlier predecessor for the already-authorized local jobs repair. It does not inherit the environment stream's delegated final-diff authority. Stop at the jobs verified-final-diff gate; localization requires accepted jobs, and observability requires accepted localization. Before later integration or use as an accepted successor, reconcile current main, shared subjects and applicable environment/certification gates under their own authority. No push, pull request, merge, publication, deployment, provider effect, replay, remote SQL, provisioning, credential change or external comment is authorized.
 
+## Multilingual section-link successor
+
+The user confirmed the current generation is unused and pre-production and approved retirement of the executable `multilingual@0.1.0` tuple for the [section-link successor](../architecture/capability-model.md#executable-multilingual-boundary). The local jobs exact diff is the accepted predecessor. Historical fixtures and receipts retain their original identities. Observability decision work uses the accepted multilingual comparison as its predecessor.
+
 ## Lean application environments
 
 **Admission recorded 2026-09-24:** The user directly admits one ten-card environment stream from exact baseline `4b713dabbbf0b3c405c0fa07352e90e6de629d3d`. This is new bounded admission, not retrospective acceptance of all merged work. [ADR-0020](../adr/0020-application-environments.md) owns the architecture and precise supersessions; the [governance exception](../governance/review-and-contribution.md#lean-application-environments-delivery-exception) owns delegated approvals, serialized work/publication and reviewed published unmerged predecessors.

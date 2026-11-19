@@ -295,6 +295,40 @@ test("app content migration preserves every localized source value and appends o
   }
 });
 
+test("compiled app transition validation accepts corresponding section links and preserves authored hrefs", async () => {
+  for (const profile of ["portfolio", "site"]) {
+    const f = await fixture(profile, 2);
+    const authored = new Map();
+    for (const locale of ["en-CA", "fr-CA"]) {
+      const path = `apps/web/content/${locale}/localized-content.yaml`;
+      const catalog = parseDocument(decoder.decode(f.files.get(path))).toJS();
+      const cta = catalog.pages.home.sections.find(({ type }) => type === "call-to-action");
+      cta.content.href = `/${locale}?source=cta#home`;
+      if (profile === "site") {
+        const list = catalog.pages.workFeatured.sections.find(({ type }) => type === "project-list");
+        list.content.projects[0].href = `/${locale}/about?source=project#team`;
+      }
+      const bytes = encoder.encode(stringify(catalog));
+      authored.set(path, bytes);
+      f.files.set(path, bytes);
+    }
+    const prepared = await prepare(f);
+    assert.equal(prepared.ok, true, `${profile}: ${JSON.stringify(prepared)}`);
+    for (const [path, bytes] of authored) {
+      const output = prepared.value.files.find((file) => file.path === path).content;
+      const catalog = parseDocument(decoder.decode(output)).toJS();
+      assert.deepEqual(catalog.pages.home, parseDocument(decoder.decode(bytes)).toJS().pages.home);
+      if (profile === "site") assert.deepEqual(output, bytes);
+    }
+
+    const frenchPath = "apps/web/content/fr-CA/localized-content.yaml";
+    const french = parseDocument(decoder.decode(f.files.get(frenchPath))).toJS();
+    french.pages.home.sections.find(({ type }) => type === "call-to-action").content.href = "/fr-CA?source=other#home";
+    f.files.set(frenchPath, encoder.encode(stringify(french)));
+    assert.equal((await prepare(f)).ok, false, profile);
+  }
+});
+
 test("app planning fingerprints preserved bytes, raw controls and optional settings without exposing them", async () => {
   const f = await fixture("portfolio", 5);
   const evidence = await reviewed(f);
@@ -679,10 +713,10 @@ test("current preparation fingerprints and canonical admission protect exact bas
   "analytics": "sha256:3f3a591cd48419cc2debf38296a359053e0809b82aff77c1fecfd30553caee7d",
   "booking-calendly": "sha256:975e4ec16bf9136b13a35c8a480f20173d17886b028bf5a4709f7ef2b8c16697",
   "analytics+booking-calendly": "sha256:5272e692f85caaf73123e9577b4739b32904b6314be9707140e4b21c093437f9",
-  "multilingual": "sha256:a47c2bc2901680da1e9e2ef9b8fa4acbbfcc45f022cc9cd224376a437967158e",
-  "analytics+multilingual": "sha256:717c8b370793d1c306fff5e323cf99400c4a909d007a9e406568ea43ef5d37d4",
-  "booking-calendly+multilingual": "sha256:1aa8a18ea19437f26b812401808034aebe75ea14a9b776262c40ba6ddfcbe5fd",
-  "analytics+booking-calendly+multilingual": "sha256:478eae6d54d3dc7ecf5bd718e20248f166998f3d25906422b394f1c9d3108457"
+  "multilingual": "sha256:82eed03cba5803fe526d4f44254cd120ca281e111d345457d43bfb658e3d699d",
+  "analytics+multilingual": "sha256:56660909495ae01d50c7c63c0d6e26fa6bc05f4e3ea3e00bbe117fa70bd943b3",
+  "booking-calendly+multilingual": "sha256:c1ca023e80b09dfe6eae5915a4c31a7420494f8ce5292f1824f3e3ca4bce2648",
+  "analytics+booking-calendly+multilingual": "sha256:859d19ac3d16a26a710b3b9c6f436d852c9d6b839865ec4b5b254ac8f36b61e6"
 });
   const candidate = policy.viteSecurityAppTransitionVisualInputCandidate;
   assert.notDeepEqual(candidate.subsets, subsets);

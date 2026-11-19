@@ -106,6 +106,33 @@ function renderingState(core, rendered) {
   };
 }
 
+test("installed rendering requires a supported Next fingerprint", async (t) => {
+  const core = await import("../dist/index.js");
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const rendered = assertSuccess(await core.renderSkeleton({
+    profile: "site", projectName: "current-example", displayName: "Current Example",
+    packageVersions: core.verifiedCapabilityPackageVersions,
+  }));
+  const state = renderingState(core, rendered);
+  const nextSurface = state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next");
+  assert.ok(nextSurface);
+  for (const [label, managedSurfaces] of [
+    ["missing Next record", state.managedSurfaces.filter(surface => surface !== nextSurface)],
+    ["mis-targeted Next record", state.managedSurfaces.map(surface =>
+      surface === nextSurface ? { ...surface, fingerprintTarget: { kind: "json-value", pointer: "/dependencies/react" } } : surface)],
+    ["unsupported Next version", state.managedSurfaces.map(surface =>
+      surface === nextSurface ? { ...surface, fingerprint: core.fingerprintJsonValue("16.4.6") } : surface)],
+  ]) {
+    await t.test(label, () => {
+      const snapshot = createVerifiedProjectSnapshot(rendered.project, { ...state, managedSurfaces });
+      assert.equal(snapshot.ok, false);
+      assert.deepEqual(snapshot.issues, [
+        { code: "PROJECT_INSPECTION_INVALID", path: [], context: { reason: "installed-controls-invalid" } },
+      ]);
+    });
+  }
+});
+
 test("frozen retired rendering controls remain inert and refuse executable selection", async () => {
   const core = await import("../dist/index.js");
   const frozen = JSON.parse(await readFile(new URL("./fixtures/retired-recipes/supported-rendering.json", import.meta.url), "utf8"));
@@ -433,6 +460,7 @@ const bookingCalendlyPaths = [
 ];
 
 const multilingualPaths = [
+  "docs/multilingual.md",
   "apps/web/app/[locale]/[[...segments]]/page.tsx",
   "apps/web/app/[locale]/layout.tsx",
   "apps/web/app/[locale]/not-found.tsx",
@@ -1658,6 +1686,9 @@ test("multilingual selection renders deterministic locale-prefixed portfolio and
     );
     assert.deepEqual(snapshotBytes(first.files), snapshotBytes(second.files));
     assert.equal(first.project.selectedCapabilities.includes("multilingual"), true);
+    assert.equal(first.surfaces.find(({ path }) => path === "docs/multilingual.md")?.ownership, "application-owned");
+    const baseline = assertSuccess(await renderSkeleton({ ...request, multilingual: undefined }));
+    assert.equal(baseline.files.some(({ path }) => path === "docs/multilingual.md"), false);
     assert.deepEqual(first.project.capabilitySettings, {});
     assert.match(files.get("apps/web/middleware.ts"), /accept-language/iu);
     assert.match(files.get("apps/web/middleware.ts"), /x-egeria-locale/u);

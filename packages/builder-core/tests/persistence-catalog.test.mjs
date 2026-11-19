@@ -9,7 +9,7 @@ import { resolveCapabilities } from "../dist/resolution/resolve-capabilities.js"
 import { profileRecipes } from "../dist/profiles/profile-recipes.js";
 import { renderSkeleton } from "../dist/generation/render-skeleton.js";
 import { createVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
-import { createInstalledManifest, persistenceGenerationVerificationChecks } from "../dist/index.js";
+import { createInstalledManifest, materializeInstalledSurfaces, persistenceGenerationVerificationChecks } from "../dist/index.js";
 
 const defaultSnapshot = createApplicationEnvironmentRenderingContext().catalogSnapshot;
 const persistenceSnapshot = createApplicationEnvironmentRenderingContext(true).catalogSnapshot;
@@ -48,11 +48,16 @@ test("installed persistence selection requires complete current controls and exa
   const rendered = await renderSkeleton({ profile: "app", projectName: "snapshot-app", displayName: "Snapshot app", applicationPersistence: true, packageVersions: verifiedCapabilityPackageVersions });
   assert.equal(rendered.ok, true);
   const project = rendered.value.project;
+  const surfaces = materializeInstalledSurfaces({
+    files: new Map(rendered.value.files.map(({ path, content }) => [path, content])),
+    surfaces: rendered.value.surfaces,
+  });
+  assert.equal(surfaces.ok, true);
   const state = {
     schemaVersion: "2.0.0", builderVersion: "0.0.0", projectSchemaVersion: "2.0.0",
     origin: { profile: "app", recipeVersion: "0.3.0" },
     installedCapabilities: createInstalledManifest(rendered.value.resolved),
-    appliedMigrations: [], managedSurfaces: [], ejections: [],
+    appliedMigrations: [], managedSurfaces: surfaces.value, ejections: [],
     compatibility: { node: "22.23.2", pnpm: "11.28.1", platformAdapter: "cloudflare-workers" },
     lastSuccessfulVerification: { kind: "generation", checks: ["contracts", "pre-state-inference", ...persistenceGenerationVerificationChecks, "post-state-inference"] },
   };

@@ -24,8 +24,8 @@ const commandTimeoutMilliseconds = 15 * 60 * 1000;
 const lifecycleCommandTimeoutMilliseconds = 45 * 60 * 1000;
 const profiles = Object.freeze(["portfolio", "site"]);
 const subject = Object.freeze({
-  "descriptorVersion": "0.1.0",
-  "behaviorContractDigest": "sha256:48a3ac0f39e8f356fbc9bc63b95f2d4fb7d334aee8cbef0726800ee10fbd9891"
+  "descriptorVersion": "0.1.1",
+  "behaviorContractDigest": "sha256:76f26b43ab7b952f23e472abde9958efe844b2f5730c4a7edb3d0a9acde27615"
 });
 const commonCapabilities = Object.freeze([
   "standards",
@@ -194,7 +194,7 @@ function configurationFor(profile, revision) {
       : Object.freeze([...commonCapabilities, "site-routing", "multilingual"]),
     expectedCapabilitySettings: isPortfolio ? { "booking-calendly": { mode: "popup" } } : {},
     capabilityIdentifier: "multilingual",
-    capabilityVersion: "0.1.0",
+    capabilityVersion: subject.descriptorVersion,
     expectedRecipeVersion: isPortfolio ? "0.12.0" : "0.13.0",
     verifierIdentifier: isPortfolio
       ? "portfolio-multilingual-calendly"
@@ -384,7 +384,7 @@ function requireJourneyResult(configuration, result) {
   if (
     result?.ok !== true ||
     result.capability !== "multilingual" ||
-    result.version !== "0.1.0" ||
+    result.version !== subject.descriptorVersion ||
     result.profile !== configuration.profile ||
     result.subject?.descriptorVersion !== subject.descriptorVersion ||
     result.subject?.behaviorContractDigest !== subject.behaviorContractDigest ||
@@ -495,7 +495,7 @@ async function certifyWithAuthority(input, adapters) {
   return Object.freeze({
     ok: true,
     capability: "multilingual",
-    version: "0.1.0",
+    version: subject.descriptorVersion,
     profiles,
     subject,
     evidenceRevision: revision,

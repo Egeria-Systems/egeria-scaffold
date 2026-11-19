@@ -1,3 +1,4 @@
+import { multilingualCapabilityVersion } from "../contracts/capability.js";
 import { createHash } from "node:crypto";
 
 import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
@@ -49,7 +50,7 @@ export type CapabilityAdditionPlan = Readonly<{
   profile: ProfileIdentifier;
   capability: Readonly<{
     identifier: "multilingual";
-    version: "0.1.0";
+    version: typeof multilingualCapabilityVersion;
   }> | Readonly<{ identifier: "analytics" | "contact-form-web3forms" | "booking-calendly" | "transactional-email-resend"; version: "0.1.0" | "0.2.0" }>
     | Readonly<{ identifier: "application-persistence"; version: "0.1.1" | "0.2.0" }>
     | Readonly<{ identifier: "background-job-delivery"; version: "0.2.0" }>;
@@ -623,7 +624,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     ({ identifier }) => identifier === capabilityValue,
   );
 
-  if (descriptor?.version !== (capabilityValue === "multilingual" ? "0.1.0" : "0.2.0")) {
+  if (descriptor?.version !== (capabilityValue === "multilingual" ? multilingualCapabilityVersion : "0.2.0")) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }
 
@@ -676,7 +677,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
       profile: project.originProfile,
       capability: capabilityValue === "analytics" || capabilityValue === "contact-form-web3forms" || capabilityValue === "booking-calendly" || capabilityValue === "application-persistence" || capabilityValue === "transactional-email-resend"
         ? { identifier: capabilityValue, version: "0.2.0" }
-        : { identifier: capabilityValue, version: "0.1.0" },
+        : { identifier: capabilityValue, version: multilingualCapabilityVersion },
       settings:
         parsedAnalyticsSettings !== undefined
           ? {

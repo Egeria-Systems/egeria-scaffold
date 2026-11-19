@@ -175,3 +175,5 @@ export type ManagedSurfaceDescriptor = z.infer<
   typeof managedSurfaceDescriptorSchema
 >;
 export type CapabilityDescriptor = z.infer<typeof capabilityDescriptorSchema>;
+
+export const multilingualCapabilityVersion = "0.1.1";

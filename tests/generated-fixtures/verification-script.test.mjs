@@ -472,12 +472,12 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "site-multilingual",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-multilingual-0.13.0-next-16.4.5",
+        relativeRoot: "fixtures/generated/site-multilingual-0.13.0-next-16.4.5-multilingual-0.1.1",
       },
       {
         identifier: "site-public-integrations",
         profile: "site",
-        relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5",
+        relativeRoot: "fixtures/generated/site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
       },
       {
         identifier: "app",
@@ -487,7 +487,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       {
         identifier: "app-all-optional-integrations",
         profile: "app",
-        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5",
+        relativeRoot: "fixtures/generated/app-all-optional-integrations-0.3.0-next-16.4.5-multilingual-0.1.1",
       },
       {
         identifier: "app-persistence", profile: "app",
@@ -529,7 +529,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       contract.identifier === "site-multilingual" ||
         contract.identifier === "site-public-integrations" ||
         contract.identifier === "app-all-optional-integrations"
-        ? "0.1.0"
+        ? "0.1.1"
         : null,
     );
     assert.equal(
@@ -537,8 +537,8 @@ test("fixture inspection accepts only the exact portable generated trees", async
       ["site-public-integrations", "app-all-optional-integrations"].includes(contract.identifier) ? "0.2.0" : null,
     );
     const surfaces = {
-      portfolio: 134, "portfolio-calendly": 143, site: 150, "site-multilingual": 166,
-      "site-public-integrations": 208, app: 170, "app-all-optional-integrations": 212,
+      portfolio: 134, "portfolio-calendly": 143, site: 150, "site-multilingual": 167,
+      "site-public-integrations": 209, app: 170, "app-all-optional-integrations": 213,
       "app-persistence": 191, "portfolio-email": 163, "app-persistence-email": 200,
       "site-contact-form": 166, "app-jobs": 183, "app-persistence-jobs-email": 213,
     };
@@ -572,8 +572,8 @@ test("fixture inspection accepts only the exact portable generated trees", async
   );
   assert.equal(basePortfolio.expectedFiles.length, 80);
   assert.equal(site.expectedFiles.length, 96);
-  assert.equal(multilingualSite.expectedFiles.length, 112);
-  assert.equal(analyticsSite.expectedFiles.length, 154);
+  assert.equal(multilingualSite.expectedFiles.length, 113);
+  assert.equal(analyticsSite.expectedFiles.length, 155);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
     basePortfolio.expectedFiles.length - 1 + 10,
@@ -665,6 +665,7 @@ test("fixture inspection accepts only the exact portable generated trees", async
       "apps/web/tests/e2e/multilingual-routing.spec.ts",
       "apps/web/tests/unit/locale.test.ts",
       "apps/web/tests/unit/localized-content.test.ts",
+      "docs/multilingual.md",
     ],
   );
   assert.deepEqual(

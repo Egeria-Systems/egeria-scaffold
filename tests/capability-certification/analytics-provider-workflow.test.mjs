@@ -758,7 +758,7 @@ test("analytics candidate preparation executes the current recipe guard and dete
             { identifier: "app-foundation", version: "0.3.0" },
             { identifier: "site-routing", version: "0.5.0" },
             { identifier: "analytics", version: "0.2.0" },
-            { identifier: "multilingual", version: "0.1.0" },
+            { identifier: "multilingual", version: "0.1.1" },
           ],
         } } },
       }));
