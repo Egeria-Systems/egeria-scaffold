@@ -15,6 +15,27 @@ The copy externalization factory accepts optional `files` and `invariantLiterals
 
 This copy API is included in version `0.2.0`. Publication and generated-project adoption remain separate explicitly approved steps.
 
+## Cloudflare isolation
+
+The `cloudflareIsolation` named export remains a single flat-config object for existing consumers. To opt into the full static import policy, select the `cloudflareIsolationConfigs` array from the same entry and spread it after the Next.js presets.
+
+```js
+import { cloudflareIsolationConfigs } from "@egeria-systems/standards/eslint/cloudflare-isolation";
+import { defineConfig } from "eslint/config";
+import nextCoreWebVitals from "eslint-config-next/core-web-vitals";
+import nextTypeScript from "eslint-config-next/typescript";
+
+export default defineConfig([
+  ...nextCoreWebVitals,
+  ...nextTypeScript,
+  ...cloudflareIsolationConfigs,
+]);
+```
+
+The policy checks static imports and re-exports, including type-only statements when the consuming config supplies a TypeScript parser. It recognizes the generated `@/src/infrastructure/cloudflare` alias and relative spellings for that layout, including sibling Cloudflare paths from infrastructure. It checks the literal module specifier. Dynamic imports, CommonJS, mock references, alternate aliases and arbitrary path detours fall outside its coverage.
+
+Cloudflare infrastructure, `next.config.ts`, `open-next.config.ts` and the jobs `worker.mjs` can import Cloudflare providers and adapters. The same policy applies to the dedicated `tests/integration/cloudflare/` lane and the named health, jobs, compatibility, Queue-topology and D1 integration files and their Worker fixtures. Composition under `src/composition/` and the explicit `app/api/health/route.ts` and `app/api/compatibility/route.ts` bootstrap routes can import the adapters. Ordinary application code and tests are protected from both kinds of imports.
+
 The package has no root export or runtime application code. Its manifest limits both the public API and package contents. Publication remains a separate explicitly approved external action.
 
 The canonical API and lifecycle owner is [package ownership](../../docs/architecture/package-ownership.md).
