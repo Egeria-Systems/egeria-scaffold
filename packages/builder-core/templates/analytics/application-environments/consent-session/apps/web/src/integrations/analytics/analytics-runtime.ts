@@ -318,11 +318,12 @@ function applyReductionEffects(
   settings: AnalyticsSettings,
   removedPurposes: readonly AnalyticsPurposeIdentifier[],
   browser: AnalyticsBrowser,
-): void {
+): readonly AnalyticsPurposeIdentifier[] {
   const removed = new Set(removedPurposes);
   const declarations = createAnalyticsProviderDeclarations(settings).filter(
     ({ purpose }) => removed.has(purpose),
   );
+  const retired: AnalyticsPurposeIdentifier[] = [];
 
   for (const declaration of declarations) {
     switch (declaration.identifier) {
@@ -339,9 +340,14 @@ function applyReductionEffects(
         break;
     }
 
-    browser.document.getElementById(declaration.scriptId)?.remove();
+    const script = browser.document.getElementById(declaration.scriptId);
+    if (script !== null) {
+      script.remove();
+      retired.push(declaration.purpose);
+    }
   }
   clearAccessibleCookies(settings, browser, declarations);
+  return retired;
 }
 
 type StoredConsentRead = Readonly<{
@@ -479,7 +485,7 @@ function immutableDecisions(decisions: readonly AnalyticsPurposeDecision[]): rea
 
 type BrowserConsentSession = Readonly<{
   session: AnalyticsConsentSession;
-  stop: () => boolean;
+  stop: () => (() => void) | undefined;
 }>;
 
 type DocumentConsentSessions = {
@@ -492,11 +498,12 @@ const consentByDocument = new WeakMap<Document, DocumentConsentSessions>();
 function createBrowserConsentSession(
   settings: AnalyticsSettings,
   browser: AnalyticsBrowser,
-  activate: () => void,
+  runWithActiveSession: <Result>(operation: () => Result) => Result,
 ): BrowserConsentSession {
   const denied = immutableDecisions(deniedDecisions(settings));
   const initialSnapshot: AnalyticsConsentSnapshot = Object.freeze({ decisions: denied, hasChoice: false, undecidedReason: "missing" });
   const subscribers = new Set<() => void>();
+  const retiredPurposes = new Set<AnalyticsPurposeIdentifier>();
   let snapshot = initialSnapshot;
   let observedStorage: StoredConsentRead | undefined;
   let pending: PendingWithdrawal | undefined;
@@ -504,7 +511,21 @@ function createBrowserConsentSession(
   let active = false;
   let reloading = false;
 
-  function publish(next: AnalyticsConsentSnapshot, applyEffects?: () => void, reload = false): void {
+  function notifySubscribers(): void {
+    for (const subscriber of subscribers) {
+      try {
+        subscriber();
+      } catch {
+        console.error("ANALYTICS_CONSENT_SUBSCRIBER_FAILED");
+      }
+    }
+  }
+
+  function reduce(purposes: readonly AnalyticsPurposeIdentifier[]): void {
+    for (const purpose of applyReductionEffects(settings, purposes, browser)) retiredPurposes.add(purpose);
+  }
+
+  function publish(next: AnalyticsConsentSnapshot, applyEffects?: () => void, reload = false, deferNotification = false): boolean {
     const changed = JSON.stringify(snapshot) !== JSON.stringify(next);
     if (changed) {
       snapshot = Object.freeze({
@@ -517,14 +538,8 @@ function createBrowserConsentSession(
     applyEffects?.();
     updateListener();
     if (reload) browser.window.location.reload();
-    if (!changed) return;
-    for (const subscriber of subscribers) {
-      try {
-        subscriber();
-      } catch {
-        console.error("ANALYTICS_CONSENT_SUBSCRIBER_FAILED");
-      }
-    }
+    if (changed && !deferNotification) notifySubscribers();
+    return changed;
   }
 
   function reflectStorage(stored: StoredConsentRead, notified?: AnalyticsConsentResolution): void {
@@ -538,7 +553,7 @@ function createBrowserConsentSession(
         const { removed } = compareAnalyticsPurposeDecisions(previous, storedSnapshot.decisions);
         pending = undefined;
         reloading = true;
-        publish(storedSnapshot, () => applyReductionEffects(settings, removed, browser), true);
+        publish(storedSnapshot, () => reduce(removed), true);
       } else {
         const absent = notified?.status === "valid" ? grantedPurposes(notified.record.purposes) : [];
         const removed = grantedPurposes(previous).filter(purpose =>
@@ -546,7 +561,7 @@ function createBrowserConsentSession(
           (notified !== undefined && !absent.includes(purpose)));
         if (removed.length === 0) return;
         publish({ ...snapshot, decisions: restrictDecisions(previous, removed) },
-          () => applyReductionEffects(settings, removed, browser));
+          () => reduce(removed));
       }
       return;
     }
@@ -581,7 +596,7 @@ function createBrowserConsentSession(
         next = { ...next, hasChoice: true, persistence: "stale-grant-retained", retry: pending.requested };
       }
       reloading = safe;
-      publish(next, () => applyReductionEffects(settings, removed, browser), safe);
+      publish(next, () => reduce(removed), safe);
       return;
     }
 
@@ -635,7 +650,6 @@ function createBrowserConsentSession(
   }
 
   function save(requested: readonly AnalyticsPurposeDecision[]): AnalyticsConsentSaveResult {
-    activate();
     active = true;
     // A direct action before subscription must not publish a grant it is about to withdraw.
     const previous = observedStorage === undefined
@@ -653,9 +667,9 @@ function createBrowserConsentSession(
     const retained = storageSnapshot(remaining, denied).decisions;
     const conflicts = compareAnalyticsPurposeDecisions(retained, next).removed;
     const locallyRemoved = remaining.readable ? compareAnalyticsPurposeDecisions(previous, retained).removed : [];
+    const requestedGrants = grantedPurposes(next);
 
     if (conflicts.length > 0 || (withdrawing && !remaining.readable)) {
-      const requestedGrants = grantedPurposes(next);
       const purposes = [...new Set([
         ...(pending?.purposes ?? []).filter(purpose => !requestedGrants.includes(purpose)),
         ...transition.removed, ...firstConflicts, ...conflicts,
@@ -665,38 +679,44 @@ function createBrowserConsentSession(
       const removed = [...purposes, ...locallyRemoved];
       publish(
         { decisions: restrictDecisions(previous, removed), hasChoice: true, persistence: "stale-grant-retained", retry: pending.requested },
-        () => applyReductionEffects(settings, removed, browser),
+        () => reduce(removed),
       );
       return { persistence: "stale-grant-retained", reloading: false };
     }
 
     const persistence = persisted ? "persisted" : "session-only";
+    // Retired loaders can still have executed code. Restore those grants in a fresh document.
+    const supersedesDispute = persisted && pending !== undefined && transition.removed.length === 0 &&
+      pending.purposes.every(purpose => requestedGrants.includes(purpose)) &&
+      !requestedGrants.some(purpose => retiredPurposes.has(purpose));
     pending = undefined;
-    reloading = withdrawing;
+    const shouldReload = withdrawing && !supersedesDispute;
+    reloading = shouldReload;
     const effective = withdrawing && !persisted ? retained : next;
     publish({ decisions: effective, hasChoice: true, persistence }, () => {
-      if (withdrawing) applyReductionEffects(settings, [...transition.removed, ...firstConflicts, ...locallyRemoved], browser);
+      if (shouldReload) reduce([...transition.removed, ...firstConflicts, ...locallyRemoved]);
       else loadPurposes(settings, transition.added, browser);
-    }, withdrawing);
-    return { persistence, reloading: withdrawing };
+    }, shouldReload);
+    return { persistence, reloading: shouldReload };
+  }
+
+  function subscribe(listener: () => void): () => void {
+    const needsStorageCheck = !active || subscribers.size === 0;
+    active = true;
+    subscribers.add(listener);
+    if (needsStorageCheck && !reloading) reflectStorage(readStoredConsent(browser, settings));
+    updateListener();
+    return () => {
+      subscribers.delete(listener);
+      updateListener();
+    };
   }
 
   return {
     session: {
       getSnapshot: () => snapshot,
-      subscribe(listener) {
-        const needsStorageCheck = !active || subscribers.size === 0;
-        activate();
-        active = true;
-        subscribers.add(listener);
-        if (needsStorageCheck && !reloading) reflectStorage(readStoredConsent(browser, settings));
-        updateListener();
-        return () => {
-          subscribers.delete(listener);
-          updateListener();
-        };
-      },
-      save,
+      subscribe: listener => runWithActiveSession(() => subscribe(listener)),
+      save: requested => runWithActiveSession(() => save(requested)),
     },
     stop() {
       active = false;
@@ -706,10 +726,10 @@ function createBrowserConsentSession(
       if (!retainDispute) observedStorage = undefined;
       reloading = false;
       // Retain the retry and disputed purposes, without leaving any providers active.
-      publish(retainDispute ? { ...snapshot, decisions: denied } : initialSnapshot, () => {
-        if (grants.length > 0) applyReductionEffects(settings, grants, browser);
-      });
-      return retainDispute;
+      const changed = publish(retainDispute ? { ...snapshot, decisions: denied } : initialSnapshot, () => {
+        if (grants.length > 0) reduce(grants);
+      }, false, true);
+      return changed ? notifySubscribers : undefined;
     },
   };
 }
@@ -729,14 +749,19 @@ export function getBrowserAnalyticsConsentSession(settings: AnalyticsSettings): 
   const owner = documentSessions;
   const existing = owner.sessions.get(key);
   if (existing !== undefined) return existing.session;
-  const created = createBrowserConsentSession(settings, browser, () => {
+  const created = createBrowserConsentSession(settings, browser, operation => {
     const previous = owner.active;
-    if (previous !== undefined && previous !== key) {
-      if (!owner.sessions.get(previous)?.stop()) owner.sessions.delete(previous);
-    }
-    owner.sessions.set(key, created);
     owner.active = key;
+    if (previous === undefined || previous === key) return operation();
+    const notifyStoppedSession = owner.sessions.get(previous)?.stop();
+    // A callback can take ownership again, so notify after the incoming transition settles.
+    try {
+      return operation();
+    } finally {
+      notifyStoppedSession?.();
+    }
   });
+  // Custom controls can retain a handle after its context stops. Keep it canonical for this document.
   owner.sessions.set(key, created);
   return created.session;
 }

@@ -139,6 +139,8 @@ function AnalyticsConsentControl({
           focusRequestReference.current = "choose";
         }
         setDraft(snapshot.decisions);
+      } else if (chooseButtonReference.current?.matches(":focus")) {
+        focusRequestReference.current = "manage";
       }
       setView({ session, snapshot });
     }
@@ -199,6 +201,7 @@ function AnalyticsConsentControl({
     const result = session.save(requested);
     if (result.persistence === "stale-grant-retained") {
       setDraft(requested);
+      if (!managing) focusRequestReference.current = "management";
       setManaging(true);
       return;
     }

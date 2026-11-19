@@ -252,17 +252,18 @@ async function assertQueues(page: Page, selected: readonly AnalyticsProviderIden
   expect(globals.data).toBe(selected.includes("google-analytics-4") ? "object" : "undefined");
   expect(globals.clarity).toBe(selected.includes("microsoft-clarity") ? "function" : "undefined");
 }
-async function assertProviders(page: Page, requested: readonly AnalyticsProviderIdentifier[]) {
+async function assertProviders(page: Page, requested: readonly AnalyticsProviderIdentifier[], requestsBefore = 0) {
   const selected = active ? requested : [];
+  const relevantRequests = () => auditFor(page).requests.slice(requestsBefore).filter(value => value.page === page);
   for (const declaration of declarations) await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(selected.includes(declaration.identifier) ? 1 : 0);
   for (const provider of selected) {
     const collectionUrl = provider === "cloudflare-web-analytics" ? `https://cloudflareinsights.com/cdn-cgi/rum?token=${expectedCloudflareToken}` :
       provider === "google-analytics-4" ? `https://www.google-analytics.com/g/collect?tid=${expectedGoogleId}` :
         `https://www.clarity.ms/collect?project=${expectedClarityId}`;
-    await expect.poll(() => auditFor(page).requests.some(value => value.page === page && value.url === collectionUrl)).toBe(true);
+    await expect.poll(() => relevantRequests().some(value => value.url === collectionUrl)).toBe(true);
   }
-  const requests = auditFor(page).requests.filter(value => value.page === page);
-  expect([...new Set(requests.filter(value => value.script).map(value => value.provider))].sort()).toEqual([...selected].sort());
+  const requests = relevantRequests();
+  expect([...new Set(requests.map(value => value.provider))].sort()).toEqual([...selected].sort());
   await assertQueues(page, selected);
   for (const provider of selected) {
     const scripts = requests.filter(value => value.provider === provider && value.script);
@@ -307,6 +308,20 @@ test("metadata belongs only to the expected production property and first visit 
 });
 
 if (declarations.length > 0) {
+  test("a remote saved denial moves keyboard focus from Choose to Manage", async ({ context, openApplicationPage, page }) => {
+    const other = await context.newPage();
+    await Promise.all([visit(page, openApplicationPage, primaryPath), visit(other, openApplicationPage, primaryPath)]);
+    await focusWithTab(page, action(page, "choose"));
+    const originalDocument = await page.evaluateHandle(() => document);
+
+    await action(other, "decline").click();
+    await expect(action(page, "manage")).toBeFocused();
+    expect((await readRecord(page)).purposes).toEqual(decisions([]));
+    await assertProviders(page, []);
+    expect(await originalDocument.evaluate(original => original === document)).toBe(true);
+    await originalDocument.dispose();
+  });
+
   test("denial remains authoritative across queued grant events and reload", async ({ openApplicationPage, page }) => {
     await visit(page, openApplicationPage, primaryPath);
     await action(page, "decline").click();
@@ -429,12 +444,7 @@ if (declarations.length > 0) {
         if (retainClarity) expect(observed.cookies).toEqual(expect.arrayContaining(["_clck", "_clsk"]));
         await expect(action(page, "manage")).toBeVisible();
         expect((await readRecord(page)).purposes).toEqual(decisions(retained));
-        for (const declaration of declarations) {
-          await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(retainClarity && declaration.identifier === "microsoft-clarity" ? 1 : 0);
-        }
-        await assertQueues(page, retainClarity ? ["microsoft-clarity"] : []);
-        if (retainClarity) await expect.poll(() => auditFor(page).requests.slice(requestsBefore).some(request => request.provider === "microsoft-clarity" && !request.script)).toBe(true);
-        expect(auditFor(page).requests.slice(requestsBefore).filter(request => !retainClarity || request.provider !== "microsoft-clarity")).toEqual([]);
+        await assertProviders(page, retainClarity ? ["microsoft-clarity"] : [], requestsBefore);
         await page.evaluate(key => sessionStorage.removeItem(key), observationKey);
       });
     }
@@ -582,12 +592,12 @@ if (declarations.length > 0) {
     await assertProviders(second, declarations.map(value => value.identifier));
     await first.evaluate(() => { document.cookie = "_ga=unrelated; Path=/; SameSite=Lax"; document.cookie = "egeria_unrelated_ga=unrelated; Path=/; SameSite=Lax"; });
     const reloads = [first, second].map(page => page.waitForEvent("framenavigated", { predicate: frame => frame === page.mainFrame() }));
-    auditFor(first).requests.length = 0;
+    const requestsBefore = auditFor(first).requests.length;
     await action(first, "withdraw").click();
     await Promise.all(reloads);
     for (const page of [first, second]) {
       await expect(action(page, "manage")).toBeVisible();
-      await assertProviders(page, []);
+      await assertProviders(page, [], requestsBefore);
       expect((await readRecord(page)).purposes).toEqual(decisions([]));
     }
     const cookies = await context.cookies(first.url());
@@ -619,9 +629,14 @@ if (declarations.length > 0) {
 
     if (active) test(`failed storage retains an honest incomplete choice in ${locale}`, async ({ openApplicationPage, page, screenshot }, information) => {
       await visit(page, openApplicationPage, path);
-      const initial = declarations.filter(value => value.identifier !== "cloudflare-web-analytics");
+      const otherProviders = declarations.filter(value => value.identifier !== "cloudflare-web-analytics");
+      const cloudflareOnly = otherProviders.length === 0;
+      const initial = cloudflareOnly ? declarations : otherProviders;
+      const requested = cloudflareOnly ? [] : declarations.filter(value => value.identifier === "cloudflare-web-analytics");
       await select(page, initial.map(value => value.purpose));
       await assertProviders(page, initial.map(value => value.identifier));
+      const requestsBefore = auditFor(page).requests.length;
+      const originalDocument = await page.evaluateHandle(() => document);
       const storageFailure = await page.evaluateHandle(() => {
         const methods = Object.getPrototypeOf(localStorage) as Storage;
         const original = { getItem: methods.getItem, setItem: methods.setItem, removeItem: methods.removeItem };
@@ -633,25 +648,28 @@ if (declarations.length > 0) {
       const original = page.url();
       const control = page.locator('[aria-labelledby="analytics-consent-heading"]');
       const status = control.getByRole("status");
-      await action(page, "manage").click();
-      for (const declaration of declarations) await choice(page, declaration.purpose).setChecked(declaration.identifier === "cloudflare-web-analytics");
-      await action(page, "save").click();
+      if (cloudflareOnly) {
+        await focusWithTab(page, action(page, "withdraw"));
+        await page.keyboard.press("Enter");
+        await expect(page.locator("#analytics-consent-management-heading")).toBeFocused();
+      } else {
+        await action(page, "manage").click();
+        for (const declaration of declarations) await choice(page, declaration.purpose).setChecked(requested.includes(declaration));
+        await action(page, "save").click();
+      }
       await expect(status).toHaveText(localeText(locale, "staleGrantRetainedStatus"));
       expect(page.url()).toBe(original);
       expect((await readRecord(page)).purposes).toEqual(decisions(initial.map(value => value.purpose)));
       await expect(action(page, "save")).toBeVisible();
       for (const declaration of declarations) await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(0);
-      expect(auditFor(page).requests.some(value => value.provider === "cloudflare-web-analytics")).toBe(false);
-      const originalDocument = await page.evaluateHandle(() => document);
       const stillGranted = initial.slice(0, 1).map(value => value.purpose);
-      const requestsBefore = auditFor(page).requests.length;
       const trusted = await clearFromAnotherDocument(page, JSON.stringify(consentRecord(stillGranted)));
       expect(trusted).toEqual([true, true]);
       await expect(status).toHaveText(localeText(locale, "staleGrantRetainedStatus"));
       await action(page, "close").click();
       await action(page, "manage").click();
       for (const declaration of declarations) {
-        await expect(choice(page, declaration.purpose)).toBeChecked({ checked: declaration.identifier === "cloudflare-web-analytics" });
+        await expect(choice(page, declaration.purpose)).toBeChecked({ checked: requested.includes(declaration) });
         await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(0);
       }
       const reallowed = initial[1];
@@ -676,17 +694,11 @@ if (declarations.length > 0) {
       expect(auditFor(page).requests.slice(requestsBefore)).toEqual([]);
       await storageFailure.evaluate(failure => failure.restore());
       await storageFailure.dispose();
-      if (reallowed !== undefined) {
-        await Promise.all([page.waitForEvent("domcontentloaded"), action(page, "save").click()]);
-        await expect(action(page, "manage")).toBeVisible();
-        expect((await readRecord(page)).purposes).toEqual(decisions([reallowed.purpose]));
-        for (const declaration of declarations) await expect(page.locator(`#${declaration.scriptId}`)).toHaveCount(declaration === reallowed ? 1 : 0);
-        await assertQueues(page, [reallowed.identifier]);
-        const newRequests = () => auditFor(page).requests.slice(requestsBefore);
-        await expect.poll(() => newRequests().some(request => request.provider === reallowed.identifier && !request.script)).toBe(true);
-        expect(newRequests().filter(request => request.script).map(request => request.provider)).toEqual([reallowed.identifier]);
-        expect(newRequests().every(request => request.provider === reallowed.identifier)).toBe(true);
-      }
+      const verifiedChoice = reallowed === undefined ? requested : [reallowed];
+      await Promise.all([page.waitForEvent("domcontentloaded"), action(page, "save").click()]);
+      await expect(action(page, "manage")).toBeVisible();
+      expect((await readRecord(page)).purposes).toEqual(decisions(verifiedChoice.map(value => value.purpose)));
+      await assertProviders(page, verifiedChoice.map(value => value.identifier), requestsBefore);
     });
   }
 

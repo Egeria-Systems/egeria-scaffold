@@ -433,6 +433,41 @@ describe("analytics consent", () => {
     expect(screen.getByRole("button", { name: content.choosePurposesLabel })).toHaveFocus();
   });
 
+  it("moves keyboard focus from Choose to Manage when a remote denial is saved", async () => {
+    const user = userEvent.setup();
+    const { content, runtime } = await renderConsent();
+    const choose = screen.getByRole("button", { name: content.choosePurposesLabel });
+    for (let index = 0; index < 3; index++) await user.tab();
+    expect(choose).toHaveFocus();
+
+    act(() => runtime.synchronize(allDenied));
+    expect(screen.getByRole("button", { name: content.manageChoicesLabel })).toHaveFocus();
+  });
+
+  it("focuses the management heading when keyboard withdrawal opens a disputed retry", async () => {
+    vi.stubEnv("NEXT_PUBLIC_ANALYTICS_ENABLED", "false");
+    const user = userEvent.setup();
+    seedConsent(partiallyGranted);
+    const content = readAnalyticsContent("en-CA");
+    render(<AnalyticsConsent settings={analyticsSettings} content={content} />);
+    const withdraw = await screen.findByRole("button", { name: content.turnOffLabel });
+    await user.tab();
+    await user.tab();
+    expect(withdraw).toHaveFocus();
+    const blocked = () => { throw new Error("storage unavailable"); };
+    const writes = vi.spyOn(Storage.prototype, "setItem").mockImplementation(blocked);
+    const removals = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(blocked);
+    try {
+      await user.keyboard("[Enter]");
+      expect(withdraw).not.toBeInTheDocument();
+      expect(screen.getByRole("status")).toHaveTextContent(content.staleGrantRetainedStatus);
+      expect(screen.getByRole("heading", { name: content.manageChoicesLabel })).toHaveFocus();
+    } finally {
+      writes.mockRestore();
+      removals.mockRestore();
+    }
+  });
+
   it("keeps the exact mixed withdrawal retry after all controls remount", async () => {
     vi.stubEnv("NEXT_PUBLIC_ANALYTICS_ENABLED", "false");
     vi.stubEnv("NEXT_PUBLIC_SITE_URL", "http://localhost:3101");

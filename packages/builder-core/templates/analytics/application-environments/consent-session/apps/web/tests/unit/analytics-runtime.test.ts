@@ -337,6 +337,74 @@ describe("analytics consent runtime", () => {
     expect(present(second)).toEqual([]);
   });
 
+  it("completes a handoff before an outgoing subscriber activates a third session", () => {
+    const browser = createTestBrowser({ [key]: record(google) });
+    const first = getBrowserAnalyticsConsentSession(analyticsSettings);
+    const middle = getBrowserAnalyticsConsentSession({ ...analyticsSettings, providers: { googleAnalytics4: true } });
+    const lastSettings: AnalyticsSettings = {
+      ...analyticsSettings,
+      providers: { microsoftClarity: { audience: "not-directed-to-minors" } },
+    };
+    const last = getBrowserAnalyticsConsentSession(lastSettings);
+    let unsubscribeLast: (() => void) | undefined;
+    const unsubscribeFirst = first.subscribe(() => {
+      if (first.getSnapshot().hasChoice) return;
+      browser.storedValues.set(key, JSON.stringify(storedRecord(lastSettings, [clarity])));
+      unsubscribeLast = last.subscribe(() => {});
+    });
+    expect(present(browser)).toEqual(["analytics-google-analytics-4"]);
+
+    const unsubscribeMiddle = middle.subscribe(() => {});
+    expect(present(browser)).toEqual(["analytics-microsoft-clarity"]);
+    expect(storageListeners(browser)).toBe(1);
+    expect(middle.getSnapshot().hasChoice).toBe(false);
+    unsubscribeFirst();
+    unsubscribeMiddle();
+    unsubscribeLast?.();
+    expect(storageListeners(browser)).toBe(1);
+
+    const denial = JSON.stringify(storedRecord(lastSettings, []));
+    browser.storedValues.set(key, denial);
+    browser.dispatchStorage(denial);
+    expect(browser.reload).toHaveBeenCalledOnce();
+    expect(present(browser)).toEqual([]);
+    expect(storageListeners(browser)).toBe(0);
+  });
+
+  it.each(["subscribe", "save"] as const)("keeps one owner when a retained handle calls %s after revisiting its context", action => {
+    const browser = createTestBrowser({ [key]: record() });
+    const original = getBrowserAnalyticsConsentSession(analyticsSettings);
+    const unsubscribeOriginal = original.subscribe(() => {});
+    const other = getBrowserAnalyticsConsentSession({ ...analyticsSettings, providers: { cloudflareWebAnalytics: true } });
+    const unsubscribeOther = other.subscribe(() => {});
+    expect(storageListeners(browser)).toBe(1);
+    expect(present(browser)).toEqual([]);
+
+    browser.storedValues.set(key, record(google));
+    const revisited = getBrowserAnalyticsConsentSession(structuredClone(analyticsSettings));
+    const unsubscribeRevisited = revisited.subscribe(() => {});
+    expect(present(browser)).toEqual(["analytics-google-analytics-4"]);
+    expect(storageListeners(browser)).toBe(1);
+
+    let unsubscribeLate: (() => void) | undefined;
+    if (action === "subscribe") unsubscribeLate = original.subscribe(() => {});
+    else expect(original.save(decide(google))).toEqual({ persistence: "persisted", reloading: false });
+    expect(storageListeners(browser)).toBe(1);
+    expect(revisited).toBe(original);
+    expect(browser.effects.filter(effect => effect === "append:analytics-google-analytics-4")).toHaveLength(1);
+
+    const denial = record();
+    browser.storedValues.set(key, denial);
+    browser.dispatchStorage(denial);
+    expect(browser.reload).toHaveBeenCalledOnce();
+    expect(present(browser)).toEqual([]);
+    unsubscribeLate?.();
+    unsubscribeRevisited();
+    unsubscribeOther();
+    unsubscribeOriginal();
+    expect(storageListeners(browser)).toBe(0);
+  });
+
   it.each(["corrupt", "expired", "wrong context", "absent", "unreadable"] as const)(
     "begins denied when storage is %s",
     state => {
@@ -418,6 +486,22 @@ describe("analytics consent runtime", () => {
     expect(browser.reload).toHaveBeenCalledOnce();
     expect(session.getSnapshot()).toEqual({ decisions: mixed, hasChoice: true, persistence: "persisted" });
     expect(present(browser)).toEqual([]);
+  });
+
+  it.each([false, true])("re-allows the entire disputed choice after verified read-back with an initialized loader: %s", initialized => {
+    const browser = createTestBrowser({ [key]: record(google) }, "", true);
+    const session = getBrowserAnalyticsConsentSession(analyticsSettings);
+    if (initialized) session.subscribe(() => {});
+    browser.localStorage.setItem.mockImplementationOnce(failStorage);
+    browser.localStorage.removeItem.mockImplementationOnce(failStorage);
+    expect(session.save(denied)).toEqual({ persistence: "stale-grant-retained", reloading: false });
+    expect(present(browser)).toEqual([]);
+
+    expect(session.save(decide(google))).toEqual({ persistence: "persisted", reloading: initialized });
+    expect(session.getSnapshot()).toEqual({ decisions: decide(google), hasChoice: true, persistence: "persisted" });
+    expect(browser.reload).toHaveBeenCalledTimes(initialized ? 1 : 0);
+    expect(present(browser)).toEqual(initialized ? [] : ["analytics-google-analytics-4"]);
+    expect(browser.effects.filter(effect => effect === "append:analytics-google-analytics-4")).toHaveLength(1);
   });
 
   it.each(["save", "storage event", "disputed save"] as const)(
