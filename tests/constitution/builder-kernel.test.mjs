@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { readPathIdentity } from "../../scripts/lib/isolated-process.mjs";
 import {
   formatGeneratedFixtureFailure,
-  generatedFixtureContracts,
+  withCurrentGeneratedFixture,
   verifyGeneratedProjectForTesting,
 } from "../../scripts/verify-generated-skeletons.mjs";
 
@@ -442,9 +442,7 @@ test("the public kernel report retains generated skeleton failure codes", { time
   ];
   const skeletonFailures = [];
   for (const [failedCommand, code, identifier = "portfolio"] of commandFailures) {
-    const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === identifier);
-    const fixture = fileURLToPath(new URL("../../" + relativeRoot, import.meta.url));
-    await assert.rejects(verifyGeneratedProjectForTesting(fixture, identifier, {
+    await withCurrentGeneratedFixture(identifier, fixture => assert.rejects(verifyGeneratedProjectForTesting(fixture, identifier, {
       createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
       runCommand: async ({ arguments: arguments_ }) => {
         if (arguments_.join(" ") === failedCommand) throw new Error(privateValue);
@@ -455,7 +453,7 @@ test("the public kernel report retains generated skeleton failure codes", { time
       assert.deepEqual(failure, { ok: false, code });
       skeletonFailures.push({ ...failure, privateValue });
       return true;
-    });
+    }));
   }
   const unknownCode = "UNRECOGNIZED_FIXTURE_FAILURE";
   skeletonFailures.push({ ok: false, code: unknownCode, privateValue });
@@ -580,8 +578,6 @@ test("the kernel retains fixed visual and export failure codes without claiming 
   const ownerParent = await mkdtemp(join(tmpdir(), "kernel-visual-diagnostics-"));
   context.after(() => rm(ownerParent, { recursive: true, force: true }));
   const privateValue = "fixtureSecretValueNeverRetain";
-  const { relativeRoot } = generatedFixtureContracts.find(contract => contract.identifier === "portfolio");
-  const fixture = fileURLToPath(new URL("../../" + relativeRoot, import.meta.url));
   const subtests = [];
   for (const [failingScript, failureCode] of [
     ["test:visual", "VISUAL_REGRESSION_FAILED"],
@@ -589,7 +585,7 @@ test("the kernel retains fixed visual and export failure codes without claiming 
   ]) {
     subtests.push(context.test(failureCode, async failureContext => {
       let visualFailure;
-      await assert.rejects(verifyGeneratedProjectForTesting(fixture, "portfolio", {
+      await withCurrentGeneratedFixture("portfolio", fixture => assert.rejects(verifyGeneratedProjectForTesting(fixture, "portfolio", {
         createOwner: async () => readPathIdentity(await mkdtemp(join(ownerParent, "fixture-"))),
         runCommand: async ({ arguments: arguments_ }) => {
           if (arguments_.at(-1) === failingScript) throw new Error(privateValue);
@@ -599,7 +595,7 @@ test("the kernel retains fixed visual and export failure codes without claiming 
       }, undefined, { includeVisual: true }), error => {
         visualFailure = { ...formatGeneratedFixtureFailure(error), privateValue };
         return true;
-      });
+      }));
 
       const invocation = await fixtureInvocation(failureContext, { arguments: ["--", "--include-fixed-visuals"], visualFailure });
       const result = await invocation.finish();

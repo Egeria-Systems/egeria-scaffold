@@ -6,6 +6,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
+import { withCurrentGeneratedFixture } from "../../../scripts/verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -914,6 +915,49 @@ test("installed deployment verification files must match the selected recipe eve
       }
     });
   }
+});
+
+test("successor managed build inputs refuse missing declarations and consistent but noncanonical bytes", async () => {
+  await withCurrentGeneratedFixture("site-public-integrations", async root => {
+    const source = core.createFileSystemRepositoryReader(root);
+    const originalSnapshot = await core.readVerifiedProjectSnapshot(source);
+    assert.equal(originalSnapshot.ok, true);
+    const state = JSON.parse((await source.readText(".egeria/state.json")).content);
+    for (const path of ["apps/web/src/configuration/public-build.ts", "apps/web/src/configuration/document-metadata.ts"]) {
+      const omitted = structuredClone(state);
+      omitted.managedSurfaces = omitted.managedSurfaces.filter(surface => surface.path !== path);
+      const wrongOwner = structuredClone(state);
+      wrongOwner.managedSurfaces.find(surface => surface.path === path).owner = { kind: "builder-kernel" };
+      const wrongTarget = structuredClone(state);
+      Object.assign(wrongTarget.managedSurfaces.find(surface => surface.path === path), {
+        ownership: "merge-managed", fingerprintTarget: { kind: "json-value", pointer: "/value" }, mergeStrategy: "json-property",
+      });
+      const ejected = { ...state, ejections: [path] };
+      for (const [invalid, status] of [[omitted, "missing"], [wrongOwner, "drifted"], [wrongTarget, "drifted"], [ejected, "drifted"]]) {
+        const reader = { readText: requested => requested === ".egeria/state.json"
+          ? Promise.resolve({ kind: "file", content: JSON.stringify(invalid) }) : source.readText(requested) };
+        assert.equal((await core.readVerifiedProjectSnapshot(reader)).ok, false, path);
+        const inference = await core.inferRepository({ reader, catalog: originalSnapshot.value.catalog });
+        assert.equal(inference.state.kind, "valid", path);
+        const expectedCode = status === "missing" ? "DEPLOYMENT_SURFACE_DECLARATION_MISSING" : "DEPLOYMENT_SURFACE_DECLARATION_MISMATCH";
+        const surface = inference.surfaces.find(surface => surface.path === path);
+        assert.equal(surface?.status, status, path);
+        assert.equal(surface?.code, expectedCode, path);
+      }
+      const replacement = (await source.readText(path)).content + "\n// Synthetic source drift.\n";
+      const modified = structuredClone(state);
+      modified.managedSurfaces.find(surface => surface.path === path).fingerprint = core.fingerprintFileContent(encoder.encode(replacement));
+      const reader = { readText: async requested => {
+        if (requested === ".egeria/state.json") return { kind: "file", content: core.serializeStateJson(modified) };
+        if (requested === path) return { kind: "file", content: replacement };
+        return source.readText(requested);
+      } };
+      const snapshot = await core.readVerifiedProjectSnapshot(reader);
+      assert.equal(snapshot.ok, true, path);
+      const inference = await core.inferRepository(snapshot.value);
+      assert.equal(inference.surfaces.find(surface => surface.path === path)?.status, "drifted", path);
+    }
+  });
 });
 
 test("current standards refuse retired Vitest declarations and detect managed drift", async () => {

@@ -1,4 +1,4 @@
-import type { CapabilityDescriptor } from "../contracts/capability.js";
+import { deploymentVersionsFor, publicBuildManagedFiles, type CapabilityDescriptor } from "../contracts/capability.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
 import { projectConfigurationSchema, type ProjectConfiguration } from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
@@ -15,10 +15,7 @@ import { resolveCapabilities } from "../resolution/resolve-capabilities.js";
 import { stringifyCanonicalJson } from "../serialization/canonical-json.js";
 import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 import {
-  applicationEnvironmentCatalogSnapshot,
-  applicationEnvironmentPersistenceCatalogSnapshot,
-  applicationEnvironmentJobsCatalogSnapshot,
-  applicationEnvironmentPersistenceJobsCatalogSnapshot,
+  applicationEnvironmentSnapshotFor,
   createCapabilityCatalog,
   createCapabilityCatalogSnapshot,
 } from "./capability-catalog.js";
@@ -38,8 +35,9 @@ export function createGenerationRenderingContext(
   backgroundJobs = false,
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
+  retainDeployment = false,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -88,12 +86,29 @@ export function createVerifiedProjectSnapshot(
   if (retainedConsentCount !== 0 && retainedConsentCount !== retainedAnalyticsConsentTemplates.length) {
     return invalidProjectSnapshot();
   }
+  const persistence = projectValue.selectedCapabilities.includes("application-persistence");
+  const jobs = projectValue.selectedCapabilities.includes("background-job-delivery");
+  const deploymentVersion = stateValue.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version;
+  const { retained, current } = deploymentVersionsFor(persistence, jobs);
+  if (deploymentVersion !== retained && deploymentVersion !== current) return invalidProjectSnapshot();
+  const retainsDeployment = deploymentVersion === retained;
+  const matchesDeploymentInventory = publicBuildManagedFiles.every(([identifier, path]) => {
+    const declarations = stateValue.managedSurfaces.filter(surface => surface.identifier === identifier || surface.path === path);
+    if (retainsDeployment) return declarations.length === 0;
+    const [surface] = declarations;
+    return declarations.length === 1 && surface?.identifier === identifier && surface.path === path &&
+      surface.owner.kind === "capability" && surface.owner.identifier === "deployment-cloudflare" &&
+      surface.ownership === "managed" && surface.fingerprintTarget.kind === "file" && surface.mergeStrategy === "replace-file" &&
+      !stateValue.ejections.includes(path) && !projectValue.ejectedAreas.includes(path);
+  });
+  if (!matchesDeploymentInventory) return invalidProjectSnapshot();
   const renderingContext = createGenerationRenderingContext(
-    projectValue.selectedCapabilities.includes("application-persistence"),
+    persistence,
     projectValue.selectedCapabilities.includes("app-foundation"),
-    projectValue.selectedCapabilities.includes("background-job-delivery"),
+    jobs,
     retainsNext ? retainedNextVersion : undefined,
     retainedConsentCount === retainedAnalyticsConsentTemplates.length ? true : undefined,
+    retainsDeployment,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -129,15 +144,14 @@ export function createApplicationEnvironmentRenderingContext(
   backgroundJobs = false,
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
+  retainDeployment = false,
 ): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
     ...(retainedNext === undefined ? {} : { retainedNextVersion: retainedNext }),
     ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     ...(retainAnalyticsConsent ? { retainAnalyticsConsent: true } : {}),
-    catalogSnapshot: backgroundJobs
-      ? (applicationPersistence ? applicationEnvironmentPersistenceJobsCatalogSnapshot : applicationEnvironmentJobsCatalogSnapshot)
-      : (applicationPersistence ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot),
+    catalogSnapshot: applicationEnvironmentSnapshotFor(applicationPersistence, backgroundJobs, retainDeployment),
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
 }
@@ -151,7 +165,8 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
     const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
-        [false, true].some((jobs) => serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent)))),
+        [false, true].some((jobs) => [false, true].some(retainDeployment =>
+          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment))))),
     );
   } catch {
     return false;

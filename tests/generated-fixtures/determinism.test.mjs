@@ -8,7 +8,12 @@ import { promisify } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
-import { generatedFixtureContracts, inspectGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
+import {
+  contractForGeneratedProject,
+  generatedFixtureContracts,
+  inspectGeneratedFixture,
+  withCurrentGeneratedFixture,
+} from "../../scripts/verify-generated-skeletons.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -149,7 +154,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
 
-test("current security fixtures declare corrected Next with matching installed fingerprints", async () => {
+test("retained security fixtures declare corrected Next with matching installed fingerprints", async () => {
   for (const fixture of generatedFixtureContracts) {
     const root = resolve(repositoryRoot, fixture.relativeRoot);
     const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
@@ -160,69 +165,96 @@ test("current security fixtures declare corrected Next with matching installed f
   }
 });
 
-test("representative app fixtures retain exact descriptor ownership, production-site output and workflow ordering", async () => {
-  for (const fixture of generatedFixtureContracts.filter(({ profile }) => profile === "app")) {
+function requestForFixture(fixture) {
+  return {
+    profile: fixture.profile, projectName: fixture.projectName, displayName: fixture.displayName,
+    packageVersions: { standards: "0.1.0", observability: "0.3.0" },
+    ...(fixture.expectedBookingCalendlyVersion ? { bookingCalendly: fixture.expectedCapabilitySettings["booking-calendly"] } : {}),
+    ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
+    ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
+    ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
+    ...(fixture.expectedTransactionalEmailVersion ? { transactionalEmailResend: true } : {}),
+    ...(fixture.expectedBackgroundJobVersion ? { backgroundJobDelivery: true } : {}),
+    ...(fixture.expectedContactFormVersion ? { contactFormWeb3Forms: true } : {}),
+  };
+}
+
+test("retained fixtures still render every original application byte using installed controls", async () => {
+  for (const fixture of generatedFixtureContracts) {
     const root = resolve(repositoryRoot, fixture.relativeRoot);
-    const rendered = await core.renderSkeleton({
-      profile: "app", projectName: fixture.projectName, displayName: fixture.displayName,
-      packageVersions: { standards: "0.1.0", observability: "0.3.0" },
-      ...(fixture.expectedBookingCalendlyVersion ? { bookingCalendly: fixture.expectedCapabilitySettings["booking-calendly"] } : {}),
-      ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
-      ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
-      ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
-      ...(fixture.expectedTransactionalEmailVersion ? { transactionalEmailResend: true } : {}),
-      ...(fixture.expectedBackgroundJobVersion ? { backgroundJobDelivery: true } : {}),
-      ...(fixture.expectedContactFormVersion ? { contactFormWeb3Forms: true } : {}),
-    });
-    assert.equal(rendered.ok, true);
+    const reader = core.createFileSystemRepositoryReader(root);
+    const installed = await core.readVerifiedProjectSnapshot(reader);
+    assert.equal(installed.ok, true, JSON.stringify(installed.issues));
+    const rendered = await core.renderSkeleton(requestForFixture(fixture), installed.value.renderingContext);
+    assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
     for (const { path, content } of rendered.value.files) {
-      assert.deepEqual(await readFile(join(root, path)), Buffer.from(content), path);
+      assert.deepEqual(await readFile(join(root, path)), Buffer.from(content), fixture.identifier + ":" + path);
     }
     assert.deepEqual(
       [...rendered.value.files.map(({ path }) => path), ".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl", "pnpm-lock.yaml"].sort(codePointCompare),
       fixture.expectedFiles,
     );
+    const lockIdentity = core.fingerprintFileContent(await readFile(join(root, "pnpm-lock.yaml")));
     const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.3.0" });
-    assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
-    for (const surface of rendered.value.surfaces) {
-      const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
-      assert.ok(installed, surface.identifier);
-      for (const key of ["owner", "path", "ownership", "fingerprintTarget", "mergeStrategy"]) {
-        assert.deepEqual(installed[key], surface[key], `${surface.identifier}: ${key}`);
-      }
-    }
-    const foundation = rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
-    assert.equal(foundation.managedSurfaces.length, 18 + 2, "eighteen files and two package members");
-    assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
-      .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
-    assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml")));
-    const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
-    assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
-    assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");
-    for (const path of [".github/workflows/quality.yml", ".github/workflows/deploy.yml"]) {
-      const document = parseDocument(await readFile(join(root, path), "utf8"));
-      assert.deepEqual(document.errors, []);
-      const jobs = document.toJS().jobs;
-      const local = path.endsWith("quality.yml") ? jobs.verify : jobs["verify-source"];
-      assert.equal(local.env.APPLICATION_ENVIRONMENT, "development");
-      assert.equal(local.env.NEXT_PUBLIC_SITE_URL, "http://localhost:3000");
-      const commands = local.steps.flatMap(({ run }) => run?.split("\n").map(line => line.trim()).filter(Boolean) ?? []);
-      const integration = commands.indexOf("pnpm --dir apps/web run --if-present test:integration:cloudflare");
-      const build = commands.indexOf("pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
-      assert.ok(build >= 0 && integration > build);
-      assert.equal(commands.filter(command => command === commands[integration]).length, 1);
-      for (const target of path.endsWith("deploy.yml") ? ["staging", "production"] : []) {
-        const steps = jobs[target].steps;
-        const record = steps.findIndex(({ run }) => run?.includes("check:prepared-artifact record"));
-        const deploy = steps.findIndex(({ run }) => run?.includes("opennextjs-cloudflare deploy ") && run.includes(`--env ${target}`));
-        assert.ok(record >= 0 && deploy > record);
-        assert.ok(steps[deploy].run.includes("check:prepared-artifact verify"));
-        assert.equal(jobs[target].env.APPLICATION_ENVIRONMENT, target);
-      }
-
-    }
+    assert.equal(state.managedSurfaces.find(({ path }) => path === "pnpm-lock.yaml").fingerprint, lockIdentity);
     await assertReadOnlyAgreement(root, await snapshotTree(root));
+  }
+});
+
+test("representative current app witnesses retain exact descriptor ownership, production-site output and workflow ordering", async () => {
+  for (const { identifier } of generatedFixtureContracts.filter(({ profile }) => profile === "app")) {
+    await withCurrentGeneratedFixture(identifier, async (root, fixture) => {
+      const rendered = await core.renderSkeleton(requestForFixture(fixture));
+      assert.equal(rendered.ok, true);
+      for (const { path, content } of rendered.value.files) {
+        assert.deepEqual(await readFile(join(root, path)), Buffer.from(content), path);
+      }
+      assert.deepEqual(
+        [...rendered.value.files.map(({ path }) => path), ".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl", "pnpm-lock.yaml"].sort(codePointCompare),
+        fixture.expectedFiles,
+      );
+      const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
+      assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.3.0" });
+      assert.equal(state.managedSurfaces.length, rendered.value.surfaces.length + 3);
+      for (const surface of rendered.value.surfaces) {
+        const installed = state.managedSurfaces.find(({ identifier }) => identifier === surface.identifier);
+        assert.ok(installed, surface.identifier);
+        for (const key of ["owner", "path", "ownership", "fingerprintTarget", "mergeStrategy"]) {
+          assert.deepEqual(installed[key], surface[key], `${surface.identifier}: ${key}`);
+        }
+      }
+      const foundation = rendered.value.resolved.capabilities.find(({ identifier }) => identifier === "app-foundation");
+      assert.equal(foundation.managedSurfaces.length, 18 + 2, "eighteen files and two package members");
+      assert.deepEqual(foundation.managedSurfaces.filter(({ fingerprintTarget }) => fingerprintTarget.kind === "json-value")
+        .map(({ fingerprintTarget }) => fingerprintTarget.pointer).sort(), ["/dependencies/effect", "/scripts/test:integration:cloudflare"]);
+      assert.deepEqual(await readFile(join(root, "pnpm-lock.yaml")), await readFile(resolve(repositoryRoot, fixture.expectedApplicationPersistenceVersion ? "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml" : "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml")));
+      const wrangler = JSON.parse(await readFile(join(root, "apps/web/wrangler.jsonc"), "utf8"));
+      assert.ok(wrangler.compatibility_flags.includes("enable_request_signal"));
+      assert.equal(state.managedSurfaces.find(({ path }) => path === "apps/web/wrangler.jsonc").owner.identifier, "deployment-cloudflare");
+      for (const path of [".github/workflows/quality.yml", ".github/workflows/deploy.yml"]) {
+        const document = parseDocument(await readFile(join(root, path), "utf8"));
+        assert.deepEqual(document.errors, []);
+        const jobs = document.toJS().jobs;
+        const local = path.endsWith("quality.yml") ? jobs.verify : jobs["verify-source"];
+        assert.equal(local.env.APPLICATION_ENVIRONMENT, "development");
+        assert.equal(local.env.NEXT_PUBLIC_SITE_URL, "http://localhost:3000");
+        const commands = local.steps.flatMap(({ run }) => run?.split("\n").map(line => line.trim()).filter(Boolean) ?? []);
+        const integration = commands.indexOf("pnpm --dir apps/web run --if-present test:integration:cloudflare");
+        const build = commands.indexOf("pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild");
+        assert.ok(build >= 0 && integration > build);
+        assert.equal(commands.filter(command => command === commands[integration]).length, 1);
+        for (const target of path.endsWith("deploy.yml") ? ["staging", "production"] : []) {
+          const steps = jobs[target].steps;
+          const record = steps.findIndex(({ run }) => run?.includes("check:prepared-artifact record"));
+          const deploy = steps.findIndex(({ run }) => run?.includes("opennextjs-cloudflare deploy ") && run.includes(`--env ${target}`));
+          assert.ok(record >= 0 && deploy > record);
+          assert.ok(steps[deploy].run.includes("check:prepared-artifact verify"));
+          assert.equal(jobs[target].env.APPLICATION_ENVIRONMENT, target);
+        }
+
+      }
+      await assertReadOnlyAgreement(root, await snapshotTree(root));
+    });
   }
 });
 
@@ -245,7 +277,8 @@ test("compiled project generation matches every committed fixture identifier", a
   const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-determinism-"));
 
   try {
-    for (const fixtureCase of generatedFixtureContracts) {
+    for (const { identifier } of generatedFixtureContracts) {
+      const fixtureCase = contractForGeneratedProject(identifier);
       let fixtureFailure;
       await context.test(fixtureCase.identifier, async () => {
         try {
@@ -396,9 +429,7 @@ test("compiled project generation matches every committed fixture identifier", a
           }
 
           assert.deepEqual(generatedSnapshots[1], generatedSnapshots[0]);
-          const committedSnapshot = await snapshotTree(
-            resolve(repositoryRoot, fixtureCase.relativeRoot),
-          );
+          const committedSnapshot = await withCurrentGeneratedFixture(fixtureCase.identifier, snapshotTree);
           assert.deepEqual(committedSnapshot, generatedSnapshots[0]);
           context.diagnostic(
             `${fixtureCase.identifier}: ${committedSnapshot.length} byte-stable files`,

@@ -2400,7 +2400,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
       verifier: {
         async prepareLockfile(root) {
           const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
@@ -2415,6 +2415,84 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     return await loadTextEntries(destination);
   } finally { await rm(owner, { recursive: true, force: true }); }
 }
+
+test("combined public selections recompose exactly within each installed deployment family", async () => {
+  const capabilities = [
+    ["contact-form-web3forms", "contact", true],
+    ["booking-calendly", "booking", "popup"],
+    ["analytics", "analytics", environmentAnalyticsSelection],
+    ["multilingual", "multilingual", true],
+  ];
+  for (const retainDeployment of [false, true]) {
+    const selection = { retainDeployment, ...Object.fromEntries(capabilities.map(([, option, value]) => [option, value])) };
+    const combined = await environmentContactEntries("site", selection);
+    for (const [capability, option] of capabilities) {
+      const repository = createRepository(combined);
+      const withoutCapability = await environmentContactEntries("site", { ...selection, [option]: undefined });
+      for (const [plan, apply, expected] of [
+        [core.planCapabilityRemoval, core.applyCapabilityRemoval, withoutCapability],
+        [core.planCapabilityAddition, core.applyCapabilityAddition, combined],
+      ]) {
+        const addingProvider = apply === core.applyCapabilityAddition && (option === "booking" || option === "analytics");
+        const common = { reader: repository.reader, git, capability,
+          inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+          ...(addingProvider ? { settings: option === "booking" ? { mode: "popup" } : environmentAnalyticsSelection } : {}),
+        };
+        const planned = await plan(common);
+        assert.equal(planned.ok, true, `${capability}: ${JSON.stringify(planned)}`);
+        const result = await apply({ ...common, root, writer: repository.writer,
+          approvedPlanFingerprint: planned.value.planFingerprint, verifier: successfulVerifier([]),
+          inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }),
+          inspectExpectedChanges: async () => ({ ok: true }),
+        });
+        assert.equal(result.ok, true, `${capability}: ${JSON.stringify(result)}`);
+        assert.deepEqual([...repository.files.keys()].sort(), [...expected.keys()].sort(), capability);
+        for (const [path, content] of expected) {
+          if (path !== ".egeria/state.json" && path !== ".egeria/migrations.jsonl") {
+            assert.equal(repository.files.get(path), content, `${capability}: ${path}`);
+          }
+        }
+        const state = JSON.parse(repository.files.get(".egeria/state.json"));
+        const expectedState = JSON.parse(expected.get(".egeria/state.json"));
+        assert.deepEqual(state.installedCapabilities, expectedState.installedCapabilities);
+        const migrationPath = ".egeria/migrations.jsonl";
+        const migrationSource = repository.files.get(migrationPath);
+        assert.deepEqual(state.managedSurfaces, expectedState.managedSurfaces.map(surface =>
+          surface.path === migrationPath ? { ...surface, fingerprint: core.fingerprintFileContent(encoder.encode(migrationSource)) } : surface,
+        ));
+        const migrations = core.parseMigrationLog(migrationSource);
+        assert.equal(migrations.ok, true);
+        assert.deepEqual(migrations.value.map(({ identifier }) => identifier), state.appliedMigrations);
+        assert.equal(migrations.value.length, apply === core.applyCapabilityRemoval ? 1 : 2);
+      }
+    }
+  }
+});
+
+test("partial public build custody refuses capability changes before writes", async () => {
+  const entries = await environmentContactEntries("site", { booking: "popup" });
+  const state = JSON.parse(entries.get(".egeria/state.json"));
+  state.managedSurfaces = state.managedSurfaces.filter(({ identifier }) => identifier !== "deployment-document-metadata");
+  entries.set(".egeria/state.json", core.serializeStateJson(state));
+  const repository = createRepository(entries);
+  for (const [plan, apply, capability] of [
+    [core.planCapabilityAddition, core.applyCapabilityAddition, "contact-form-web3forms"],
+    [core.planCapabilityRemoval, core.applyCapabilityRemoval, "booking-calendly"],
+  ]) {
+    const common = { reader: repository.reader, git, capability,
+      inspectRepositoryInventory: inventoryInspectorForFiles(repository.files) };
+    const planned = await plan(common);
+    assert.equal(planned.issues?.[0]?.code, "PROJECT_INSPECTION_INVALID");
+    const applied = await apply({ ...common, root, writer: repository.writer,
+      approvedPlanFingerprint: `sha256:${"a".repeat(64)}`,
+      inspectWorktree: async () => git,
+      verifier: { async verifyInIsolatedCopy() { assert.fail("partial custody must not verify"); } },
+    });
+    assert.deepEqual(applied, { ok: false, code: "PROJECT_INSPECTION_INVALID", phase: "precondition", recovery: "not-required" });
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(repository.files, entries);
+  }
+});
 
 test("environment contact lifecycle preserves all profile and multilingual neighbors across re-add", async () => {
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
@@ -2613,9 +2691,9 @@ const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtim
 
 test("removing a neighbor preserves installed consent and re-add chooses the successor", async () => {
   const retainedFile = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath), "utf8");
-  for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
     for (const retainConsent of [undefined, true]) {
-      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", retainedNext, retainConsent });
+      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", retainedNext, retainConsent, retainDeployment });
       const repository = createRepository(entries);
       const priorSource = repository.files.get(consentRuntimePath);
       assert.equal(priorSource === retainedFile, retainConsent === true);
@@ -2638,6 +2716,8 @@ test("removing a neighbor preserves installed consent and re-add chooses the suc
         assert.equal(result.ok, true, JSON.stringify(result));
         assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
         const state = JSON.parse(repository.files.get(".egeria/state.json"));
+        assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, retainDeployment ? "0.9.0" : "0.13.0");
+        assert.equal(repository.files.has("apps/web/src/configuration/public-build.ts"), !retainDeployment);
         const runtime = repository.files.get(consentRuntimePath);
         if (capability === "booking-calendly") assert.equal(runtime, priorSource);
         else if (add) assert.notEqual(runtime, retainedFile);

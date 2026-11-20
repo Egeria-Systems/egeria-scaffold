@@ -7,7 +7,7 @@ import {
   isApplicationEnvironmentRenderingContext,
   verifiedCapabilityPackageVersions,
 } from "../catalog/verified-package-versions.js";
-import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { createCapabilityCatalogSnapshot, retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
@@ -513,6 +513,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     false,
     environmentContext.retainedNextVersion,
     environmentContext.retainAnalyticsConsent,
+    retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

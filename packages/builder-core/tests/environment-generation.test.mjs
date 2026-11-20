@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import * as core from "../dist/index.js";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { ordinaryGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
@@ -15,6 +16,27 @@ function success(result) {
   return result.value;
 }
 
+test("fresh generation and installed inspection select exact deployment versions independently", async () => {
+  for (const [fixture, persistence, jobs, retained, fresh] of [
+    ["portfolio-0.12.0-next-16.4.5", false, false, "0.9.0", "0.13.0"],
+    ["app-persistence-0.3.0-next-16.4.5", true, false, "0.10.0", "0.14.0"],
+    ["app-jobs-recovery-composition-0.3.0-next-16.4.5", false, true, "0.11.0", "0.15.0"],
+    ["app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.16.0"],
+  ]) {
+    const reader = core.createFileSystemRepositoryReader(fileURLToPath(new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url)));
+    const installed = success(await core.readVerifiedProjectSnapshot(reader));
+    assert.equal(installed.catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, retained);
+    const context = createGenerationRenderingContext(persistence, false, jobs);
+    const catalog = success(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, context.catalogSnapshot));
+    assert.equal(catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, fresh);
+    for (const version of ["0.8.0", "0.17.0", persistence ? "0.13.0" : "0.14.0"]) {
+      assert.equal(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
+        ...context.catalogSnapshot, deploymentCloudflare: version,
+      }).ok, false);
+    }
+  }
+});
+
 for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.0"], ["app", "0.3.0"]]) {
   test(`default ${profile} generation materializes the complete environment contract`, async () => {
     const rendered = success(await core.renderSkeleton({ ...request, profile }));
@@ -22,7 +44,7 @@ for (const [profile, recipeVersion] of [["portfolio", "0.12.0"], ["site", "0.13.
     assert.equal(rendered.project.recipeVersion, recipeVersion);
     assert.ok(rendered.files.some(({ path }) => path === "docs/environments.md"));
     assert.equal(rendered.resolved.capabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
-    assert.equal(rendered.resolved.capabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
+    assert.equal(rendered.resolved.capabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.13.0");
   });
 }
 

@@ -132,13 +132,13 @@ jobs:
           pnpm --dir "$CERTIFICATION_ROOT/apps/web" run test:integration:cloudflare
           node --input-type=module -e '
             import { readFileSync, writeFileSync } from "node:fs";
-            import { generatedFixtureContracts } from "./scripts/verify-generated-skeletons.mjs";
+            import { contractForGeneratedProject } from "./scripts/verify-generated-skeletons.mjs";
             import { inspectAppEffectBuild } from "./scripts/verify-app-transition-visuals.mjs";
             import { requireAppRuntimeEvidence } from "./scripts/certify-app-local.mjs";
             try {
               const root = process.env.CERTIFICATION_ROOT;
               const paths = [
-                ...generatedFixtureContracts.find(({ identifier }) => identifier === "app").expectedFiles,
+                ...contractForGeneratedProject("app").expectedFiles,
                 "apps/web/app/certification/diagnostics/page.tsx",
                 "apps/web/app/api/certification/diagnostics/route.ts",
               ];

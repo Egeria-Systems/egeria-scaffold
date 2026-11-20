@@ -171,7 +171,7 @@ test("environment persistence removal requires reviewed evidence and permits exa
   const state = core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json")), "2.0.0");
   assert.equal(state.ok, true, JSON.stringify(state));
   assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
-  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
+  assert.equal(state.value.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.13.0");
   assert.ok(state.value.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
   assert.equal(repo.files.has("apps/web/src/configuration/application-database.ts"), false);
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
@@ -211,7 +211,7 @@ test("persistence removal requires evidence review and restores the default app 
   assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);
   const finalState = JSON.parse(decoder.decode(repo.files.get(".egeria/state.json")));
   assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
-  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
+  assert.equal(finalState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.13.0");
   assert.equal(finalState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   const finalManifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
   assert.equal(finalManifest.scripts.custom, "node scripts/custom.mjs");
@@ -235,8 +235,8 @@ test("persistence removal requires evidence review and restores the default app 
 });
 
 test("persistence lifecycle preserves current declarations and custom metadata", async () => {
-  for (const transactionalEmailResend of [false, true]) {
-    const context = createGenerationRenderingContext(true, transactionalEmailResend);
+  for (const retainDeployment of [false, true]) for (const transactionalEmailResend of [false, true]) {
+    const context = createGenerationRenderingContext(true, transactionalEmailResend, false, undefined, undefined, retainDeployment);
     const repo = await repository({ transactionalEmailResend, context });
     const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
     manifest.description = "Custom persistence project";
@@ -257,6 +257,9 @@ test("persistence lifecycle preserves current declarations and custom metadata",
       assert.deepEqual(state.origin, { profile: "app", recipeVersion: "0.3.0" });
       assert.equal(project.recipeVersion, "0.3.0");
       assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), persistent);
+      assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version,
+        persistent ? (retainDeployment ? "0.10.0" : "0.14.0") : (retainDeployment ? "0.9.0" : "0.13.0"));
+      assert.equal(repo.files.has("apps/web/src/configuration/public-build.ts"), !retainDeployment);
       assert.equal(state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend"), transactionalEmailResend);
       assert.deepEqual(repo.files.get("pnpm-lock.yaml"), new Uint8Array(await readFile(new URL(`../lockfiles/${persistent ? "web-recipe-app-0.2.7-persistence-next-16.4.5" : "web-recipe-app-0.3.0-next-16.4.5"}/pnpm-lock.yaml`, import.meta.url))));
       assert.deepEqual(repo.writes.slice(-2), [[".egeria/migrations.jsonl"], [".egeria/state.json"]]);

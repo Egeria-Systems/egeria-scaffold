@@ -129,6 +129,12 @@ This activation replaces only the recipe endpoints retained by [ADR-0013](0013-c
 
 The [current generation boundary](../architecture/capability-model.md#current-environment-generation) owns the finite installed tuples, optional lifecycle, fixture identities and source/runtime/hosted acceptance distinction. The remaining consumer reconciliation, runtime/security checks, visual acceptance and separate subject renewals still gate release.
 
+### Public build configuration successor
+
+Fresh generation selects the deployment descriptor successors in the [current generation boundary](../architecture/capability-model.md#current-environment-generation). The exact installed deployment tuple selects the matching descriptor inventory and source templates. Capability changes and incoming app transitions preserve that family. The Next dependency and Analytics consent selectors remain independent. This successor adds no upgrade edge or automatic replacement of installed source.
+
+The same boundary defines the immutable fixture ancestors and current generated witnesses. Verification reconstructs the full current tree in isolated scratch and continues to check exact generation, runtime and audit evidence. Historical fixture bytes, visual admission and certification records keep their exact identities.
+
 ## Consequences
 
 - Local work can omit optional public destinations without accidental provider calls; deployments require deliberate target configuration.

@@ -154,8 +154,7 @@ function expectedActions() {
     { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
     { kind: "create-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
-    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
-    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: "apps/web/src/configuration/public-build.ts", ownership: "managed", owner: "deployment-cloudflare" },
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
@@ -344,7 +343,7 @@ test("analytics addition redacts public identifiers and composes after multiling
       result.value.actions
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
-      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs"],
+      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/src/configuration/public-build.ts"],
     );
     assert.doesNotMatch(
       JSON.stringify(result.value),

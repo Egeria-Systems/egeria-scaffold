@@ -356,6 +356,7 @@ export function createTemplateCatalog(
   includeWeb3Forms = false,
   includeBackgroundJobs = false,
   retainAnalyticsConsent?: true,
+  retainDeployment = true,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -635,10 +636,26 @@ export function createTemplateCatalog(
       ? { ...entry, source: entry.source.replace(common ? "common/" : "app-foundation/", common ? "common/application-environments/" : "app-foundation/application-environments/"), destinationSource: entry.source }
       : entry;
   });
+  const buildSources = retainDeployment ? selectedSources : selectedSources.map(entry => {
+    const destinationSource = entry.destinationSource ?? entry.source;
+    if (destinationSource === "common/apps/web/next.config.ts" || destinationSource === "common/apps/web/scripts/check-application-environment.mjs") {
+      return { ...entry, source: destinationSource.replace("common/", "common/application-environments/public-build/"), destinationSource };
+    }
+    if (destinationSource.endsWith("/apps/web/app/layout.tsx")) {
+      return { ...entry, source: entry.source.replace("/application-environments/", "/application-environments/public-build/"), destinationSource };
+    }
+    return entry;
+  });
+  if (!retainDeployment) {
+    for (const file of ["public-build.ts.template", "document-metadata.ts"]) {
+      const destinationSource = `common/apps/web/src/configuration/${file}`;
+      buildSources.push({ source: destinationSource.replace("common/", "common/application-environments/"), destinationSource, contentKind: "text" });
+    }
+  }
   const destinations = new Set<string>();
   const entries: TemplateCatalogEntry[] = [];
 
-  for (const [index, { source, destinationSource, contentKind }] of selectedSources.entries()) {
+  for (const [index, { source, destinationSource, contentKind }] of buildSources.entries()) {
     const destinationResult = deriveTemplateDestination(
       destinationSource ?? source,
     );

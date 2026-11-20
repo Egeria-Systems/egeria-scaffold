@@ -238,8 +238,7 @@ function expectedActions(overrides = new Map()) {
     { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
     { kind: "delete-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "delete-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
-    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
-    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    { kind: "replace-file", path: "apps/web/src/configuration/public-build.ts", ownership: "managed", owner: "deployment-cloudflare" },
     { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
     { kind: "delete-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
@@ -298,6 +297,14 @@ const expectedAnalyticsReferenceWarningRequirement = Object.freeze({
     Object.freeze({
       code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
       path: "apps/web/AGENTS.md",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "apps/web/next.config.ts",
+    }),
+    Object.freeze({
+      code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
+      path: "apps/web/scripts/check-application-environment.mjs",
     }),
     Object.freeze({
       code: "CAPABILITY_REMOVAL_HEURISTIC_REFERENCE_POSSIBLE",
@@ -913,7 +920,7 @@ test("analytics removal restores the composed layout and requires provider dispo
       result.value.actions
         .filter(({ kind }) => kind === "replace-file")
         .map(({ path }) => path),
-      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs"],
+      [".github/workflows/deploy.yml", ".github/workflows/quality.yml", "apps/web/.env.example", "apps/web/app/layout.tsx", "apps/web/src/configuration/public-build.ts"],
     );
     assert.deepEqual(result.value.reviewRequirements, [
       {
@@ -1590,7 +1597,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = options.persistence ? core.persistenceGenerationVerificationChecks : profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.persistence ? { applicationPersistence: true } : {}), ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(options.persistence === true, false, false, options.retainedNext, options.retainConsent),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(options.persistence === true, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
       verifier: {
         async prepareLockfile(root) {
           const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
@@ -1614,7 +1621,7 @@ test("environment contact removal preserves shared ownership and refuses survivi
   assert.equal(accepted.ok, true, JSON.stringify(accepted.issues));
   assert.deepEqual(accepted.value.capability, { identifier: "contact-form-web3forms", version: "0.2.0" });
   assert.ok(accepted.value.desiredCapabilities.includes("multilingual"));
-  for (const path of ["apps/web/.env.example", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/app/layout.tsx"]) {
+  for (const path of ["apps/web/.env.example", "apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/src/configuration/public-build.ts", "apps/web/src/configuration/document-metadata.ts", "apps/web/app/layout.tsx"]) {
     const changed = new Map(entries); changed.set(path, changed.get(path) + "\n# user-owned sentinel\n");
     assert.equal((await plan(changed)).ok, false, path);
   }
@@ -1696,15 +1703,16 @@ test("environment analytics removal preserves neighbors and refuses surviving re
 const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
 
 test("intact retained and current consent are removable while actual managed drift still refuses", async () => {
-  for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
     for (const retainConsent of [undefined, true]) {
-      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, multilingual: true, retainedNext, retainConsent });
+      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, multilingual: true, retainedNext, retainConsent, retainDeployment });
       const fingerprint = JSON.parse(entries.get(".egeria/state.json")).managedSurfaces.find(({ path }) => path === consentRuntimePath).fingerprint;
       const archive = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath));
       assert.equal(fingerprint === core.fingerprintFileContent(archive), retainConsent === true);
       const plan = await planFromEntries(entries, { capability: "analytics" });
       assert.equal(plan.ok, true, JSON.stringify(plan));
       assert.ok(plan.value.actions.some(action => action.path === consentRuntimePath && action.kind === "delete-file"));
+      assert.equal(plan.value.actions.some(action => action.path === "apps/web/src/configuration/public-build.ts" && action.kind === "replace-file"), !retainDeployment);
       const modified = new Map(entries);
       modified.set(consentRuntimePath, entries.get(consentRuntimePath) + "\n// Drift.\n");
       assertFailure(await planFromEntries(modified, { capability: "analytics" }), "PROJECT_DRIFT_DETECTED");

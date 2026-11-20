@@ -144,7 +144,7 @@ function cleanGitInspection(overrides = {}) {
   };
 }
 
-function expectedPlanActions() {
+function expectedPlanActions(usesPublicBuild = false) {
   return [
     { kind: "replace-project-configuration", path: ".egeria/project.yaml", ownership: "managed", owner: "builder-kernel" },
     { kind: "replace-file", path: ".github/workflows/deploy.yml", ownership: "managed", owner: "deployment-cloudflare" },
@@ -153,8 +153,12 @@ function expectedPlanActions() {
     { kind: "replace-file", path: "apps/web/app/page.tsx", ownership: "application-owned", owner: "builder-kernel" },
     { kind: "create-file", path: "apps/web/content/en-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/content/fr-CA/booking-calendly.yaml", ownership: "application-owned", owner: "booking-calendly" },
-    { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
-    { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    ...(usesPublicBuild ? [
+      { kind: "replace-file", path: "apps/web/src/configuration/public-build.ts", ownership: "managed", owner: "deployment-cloudflare" },
+    ] : [
+      { kind: "replace-file", path: "apps/web/next.config.ts", ownership: "managed", owner: "deployment-cloudflare" },
+      { kind: "replace-file", path: "apps/web/scripts/check-application-environment.mjs", ownership: "managed", owner: "deployment-cloudflare" },
+    ]),
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-content.ts", ownership: "application-owned", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/booking-settings.ts", ownership: "managed", owner: "booking-calendly" },
     { kind: "create-file", path: "apps/web/src/integrations/booking-calendly/calendly-booking.tsx", ownership: "application-owned", owner: "booking-calendly" },
@@ -165,7 +169,7 @@ function expectedPlanActions() {
   ];
 }
 
-function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup") {
+function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup", usesPublicBuild = false) {
   const currentCapabilities = [
     "content-files",
     "deployment-cloudflare",
@@ -188,7 +192,7 @@ function expectedAdditionPlan(profile, revision, planFingerprint, mode = "popup"
     settings: { mode },
     currentCapabilities,
     desiredCapabilities: ["booking-calendly", ...currentCapabilities].sort(),
-    actions: expectedPlanActions(),
+    actions: expectedPlanActions(usesPublicBuild),
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
       "transform",
@@ -239,6 +243,7 @@ function expectedRemovalPlan(
   revision,
   planFingerprint,
   reviewRequirements = generatedRemovalReviewRequirements,
+  usesPublicBuild = false,
 ) {
   const desiredCapabilities = [
     "content-files",
@@ -261,7 +266,7 @@ function expectedRemovalPlan(
     },
     currentCapabilities: ["booking-calendly", ...desiredCapabilities].sort(),
     desiredCapabilities,
-    actions: expectedPlanActions().map(action => action.kind === "create-file" ? { ...action, kind: "delete-file" } : action),
+    actions: expectedPlanActions(usesPublicBuild).map(action => action.kind === "create-file" ? { ...action, kind: "delete-file" } : action),
     reviewRequirements,
     requiredApprovals: ["transform", "verified-final-diff"],
     persistenceOrder: [
@@ -831,7 +836,7 @@ test("application persistence creation reaches installed state through the gener
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.10.0");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.10.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.14.0");
   } finally {
     await rm(owner, { recursive: true, force: false });
   }
@@ -867,7 +872,7 @@ test("environment persistence creation reaches installed state through the gener
     assert.equal(project.selectedCapabilities.includes("application-persistence"), true);
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence")?.version, "0.2.0");
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards")?.version, "0.10.0");
-    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.10.0");
+    assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version, "0.14.0");
   } finally {
     await rm(owner, { recursive: true, force: false });
   }
@@ -2707,6 +2712,8 @@ test("plan-add emits the complete approval-required envelope after two matching 
       "portfolio",
       inspection.identity.revision,
       emitted.result.planFingerprint,
+      "popup",
+      true,
     ),
   });
   assert.doesNotMatch(
@@ -2751,6 +2758,7 @@ test("plan-remove emits the complete approval-required plan after two matching i
         inspection.identity.revision,
         emitted.plan.planFingerprint,
         manualRemovalReviewRequirements,
+        true,
       ),
     });
     assert.doesNotMatch(
@@ -4331,6 +4339,8 @@ test("the compiled plan-remove command emits exact portfolio and site plans with
             profile,
             revision,
             emitted.plan.planFingerprint,
+            generatedRemovalReviewRequirements,
+            true,
           ),
         });
         assert.deepEqual(after, before);
@@ -5235,7 +5245,7 @@ test("compiled removal preserves modified and already-ejected application surfac
       assert.deepEqual(finalProject.value.ejectedAreas, envelope.result.preservedPaths);
       assert.deepEqual(finalState.value.ejections, envelope.result.preservedPaths);
       const changedSurfacePaths = new Set([
-        ...expectedPlanActions().map(({ path }) => path),
+        ...expectedPlanActions(true).map(({ path }) => path),
         ".egeria/migrations.jsonl",
       ]);
       for (const priorSurface of ejectedState.managedSurfaces) {
@@ -5518,7 +5528,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       const { createGenerationRenderingContext } = await import(pathToFileURL(resolve(
         repositoryRoot, "packages/builder-core/dist/catalog/verified-package-versions.js",
       )));
-      const renderingContext = createGenerationRenderingContext(false, true);
+      const renderingContext = createGenerationRenderingContext(false, true, false, undefined, undefined, true);
       const capability = "transactional-email-resend";
       const migrations = [];
       for (const operation of ["add", "remove", "add"]) {
@@ -6226,7 +6236,7 @@ test("application environment CLI generates exact jobs compositions with simulat
       const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
       const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
       assert.equal(versions.standards, persistence ? "0.10.0" : "0.9.0");
-      assert.equal(versions["deployment-cloudflare"], persistence ? "0.12.0" : "0.11.0");
+      assert.equal(versions["deployment-cloudflare"], persistence ? "0.16.0" : "0.15.0");
       assert.equal(versions["background-job-delivery"], "0.3.0");
       assert.equal(versions["app-foundation"], "0.3.0");
       assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);

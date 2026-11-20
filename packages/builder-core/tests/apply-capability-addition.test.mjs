@@ -1108,7 +1108,7 @@ test("application persistence addition preserves custom scripts and installs the
   assert.equal(result.ok, true, JSON.stringify(result));
   const state = JSON.parse(repository.files.get(".egeria/state.json"));
   assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.10.0");
-  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.10.0");
+  assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.14.0");
   assert.ok(state.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.equal(JSON.parse(repository.files.get("apps/web/package.json")).scripts.custom, "node custom.mjs");
   assert.equal(repository.files.get("pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml"), "utf8"));
@@ -1208,7 +1208,7 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
       verifier: {
         async prepareLockfile(root) {
           const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
@@ -1441,11 +1441,11 @@ const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtim
 
 test("adding a neighbor preserves installed consent and adding consent selects current bytes", async () => {
   const archive = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath), "utf8");
-  for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
     for (const initial of ["retained", "current", "absent"]) {
       const addingAnalytics = initial === "absent";
       const entries = await environmentContactEntries("site", {
-        retainedNext, retainConsent: initial === "retained" ? true : undefined,
+        retainedNext, retainDeployment, retainConsent: initial === "retained" ? true : undefined,
         ...(addingAnalytics ? {} : { analytics: environmentAnalyticsSelection }),
       });
       const repository = createRepository(entries);
@@ -1467,6 +1467,8 @@ test("adding a neighbor preserves installed consent and adding consent selects c
       if (!addingAnalytics) assert.equal(text, entries.get(consentRuntimePath));
       assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
       const state = JSON.parse(repository.files.get(".egeria/state.json"));
+      assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, retainDeployment ? "0.9.0" : "0.13.0");
+      assert.equal(repository.files.has("apps/web/src/configuration/public-build.ts"), !retainDeployment);
       assert.equal(state.managedSurfaces.find(({ path }) => path === consentRuntimePath).fingerprint,
         core.fingerprintFileContent(new TextEncoder().encode(text)));
     }

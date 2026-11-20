@@ -93,7 +93,7 @@ const expectedInstalledCapabilities = [
   { identifier: "standards", version: "0.9.0" },
   { identifier: "content-files", version: "0.4.0" },
   { identifier: "section-composition", version: "0.3.0" },
-  { identifier: "deployment-cloudflare", version: "0.9.0" },
+  { identifier: "deployment-cloudflare", version: "0.13.0" },
   { identifier: "observability", version: "0.4.0" },
   { identifier: "site-routing", version: "0.5.0" },
   { identifier: "analytics", version: "0.2.0" },

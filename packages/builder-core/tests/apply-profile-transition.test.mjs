@@ -748,10 +748,10 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
 
 const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
 
-test("site-to-app preserves its installed consent bytes and Next graph", async () => {
-  for (const retainedNext of [undefined, "16.4.1"]) {
+test("site-to-app preserves its installed deployment, consent bytes and Next graph", async () => {
+  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
     for (const retainConsent of [undefined, true]) {
-      const context = createGenerationRenderingContext(false, false, false, retainedNext, retainConsent);
+      const context = createGenerationRenderingContext(false, false, false, retainedNext, retainConsent, retainDeployment);
       const source = await appTransitionSource("site", 4, "current", context);
       const oldState = JSON.parse(decode(source.get(".egeria/state.json")));
       const repository = createRepository(source);
@@ -766,34 +766,44 @@ test("site-to-app preserves its installed consent bytes and Next graph", async (
       assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot,
         `lockfiles/web-recipe-app-0.3.0${lockSuffix}/pnpm-lock.yaml`))));
       const state = JSON.parse(decode(repository.files.get(".egeria/state.json")));
+      for (const surfacePath of ["apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/src/configuration/public-build.ts", "apps/web/src/configuration/document-metadata.ts"]) {
+        assert.deepEqual(repository.files.get(surfacePath), source.get(surfacePath), surfacePath);
+      }
+      assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, retainDeployment ? "0.9.0" : "0.13.0");
       assert.deepEqual(state.managedSurfaces.find(({ path }) => path === consentRuntimePath),
         oldState.managedSurfaces.find(({ path }) => path === consentRuntimePath));
     }
   }
 });
 
-test("successor portfolio execution refuses unadmitted visual inputs before writes or verification", async () => {
-  const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5"));
-  const repository = createRepository(source);
-  const result = await core.applyProfileTransition({
-    root: git.identity.root,
-    toProfile: "app",
-    approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
-    reader: repository.reader,
-    writer: repository.writer,
-    inspectWorktree: async () => git,
-    inspectCreateTargets: async () => ({ ok: true }),
-    inspectExpectedChanges: async () => ({ ok: true }),
-    verifier: { async verifyInIsolatedCopy() { throw new Error("unadmitted transition must not verify"); } },
-  });
-  assertFailure(result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });
-  assert.deepEqual(repository.writes, []);
-  assert.deepEqual(repository.files, source);
+test("portfolio execution refuses unadmitted retained and fresh visual inputs before writes", async () => {
+  const sources = [
+    await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5")),
+    await appTransitionSource("portfolio"),
+  ];
+  for (const source of sources) {
+    const repository = createRepository(source);
+    const result = await core.applyProfileTransition({
+      root: git.identity.root,
+      toProfile: "app",
+      approvedPlanFingerprint: `sha256:${"0".repeat(64)}`,
+      reader: repository.reader,
+      writer: repository.writer,
+      inspectWorktree: async () => git,
+      inspectCreateTargets: async () => ({ ok: true }),
+      inspectExpectedChanges: async () => ({ ok: true }),
+      verifier: { async verifyInIsolatedCopy() { throw new Error("unadmitted transition must not verify"); } },
+    });
+    assertFailure(result, { code: "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED", phase: "precondition", recovery: "not-required" });
+    assert.deepEqual(repository.writes, []);
+    assert.deepEqual(repository.files, source);
+  }
 });
 
 test("unapproved current site and mixed controls refuse before any write", async () => {
   const cases = [
     { generation: "current", profile: "site", code: "PROFILE_TRANSITION_PLAN_APPROVAL_INVALID" },
+    { generation: "current", profile: "site", missingHelper: "deployment-document-metadata", code: "PROJECT_STATE_INCOMPATIBLE" },
     { generation: "current", profile: "portfolio", stateRecipe: "0.11.3", code: "PROJECT_STATE_INCOMPATIBLE" },
     { generation: "current", profile: "site", stateRecipe: "0.12.3", code: "PROJECT_STATE_INCOMPATIBLE" },
     { generation: "current", profile: "portfolio", stateRecipe: "9.9.9", code: "PROJECT_STATE_INCOMPATIBLE" },
@@ -801,9 +811,10 @@ test("unapproved current site and mixed controls refuse before any write", async
   ];
   for (const entry of cases) {
     const source = await appTransitionSource(entry.profile, 0, entry.generation);
-    if (entry.stateRecipe) {
+    if (entry.stateRecipe || entry.missingHelper) {
       const state = JSON.parse(decode(source.get(".egeria/state.json")));
-      state.origin.recipeVersion = entry.stateRecipe;
+      if (entry.stateRecipe) state.origin.recipeVersion = entry.stateRecipe;
+      if (entry.missingHelper) state.managedSurfaces = state.managedSurfaces.filter(({ identifier }) => identifier !== entry.missingHelper);
       source.set(".egeria/state.json", bytes(JSON.stringify(state)));
     }
     const repository = createRepository(source);

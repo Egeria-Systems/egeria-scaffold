@@ -2,7 +2,7 @@ import { multilingualCapabilityVersion } from "../contracts/capability.js";
 import { createHash } from "node:crypto";
 
 import { createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext, readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
-import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { createCapabilityCatalogSnapshot, retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 import { fingerprintFileContent, fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { prepareCapabilityDependencyChange } from "./prepare-capability-dependency-change.js";
 import { readControlSnapshot } from "./lifecycle-control-snapshot.js";
@@ -580,6 +580,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     false,
     environmentContext.retainedNextVersion,
     environmentContext.retainAnalyticsConsent,
+    retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");

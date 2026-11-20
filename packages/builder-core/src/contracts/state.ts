@@ -4,6 +4,7 @@ import {
   capabilityDeliveryModeSchema,
   capabilityRemovalPolicySchema,
   capabilityStateClassificationsSchema,
+  deploymentVersionsFor,
   fingerprintTargetSchema,
   multilingualCapabilityVersion,
   surfaceOwnerSchema,
@@ -317,11 +318,13 @@ export const installedStateSchema = z
   const foundation = state.installedCapabilities.some(({ identifier }) => identifier === "app-foundation");
   const email = state.installedCapabilities.some(({ identifier }) => identifier === "transactional-email-resend");
   const jobs = state.installedCapabilities.some(({ identifier }) => identifier === "background-job-delivery");
+  const deploymentVersions = deploymentVersionsFor(persistence, jobs);
+  const deploymentVersion = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version;
   const versions: Readonly<Record<string, string>> = {
     standards: persistence ? "0.10.0" : "0.9.0",
     "content-files": "0.4.0",
     "section-composition": "0.3.0",
-    "deployment-cloudflare": jobs ? (persistence ? "0.12.0" : "0.11.0") : (persistence ? "0.10.0" : "0.9.0"),
+    "deployment-cloudflare": deploymentVersion === deploymentVersions.retained ? deploymentVersions.retained : deploymentVersions.current,
     observability: "0.4.0",
     ...(state.origin.profile !== "portfolio" ? { "site-routing": "0.5.0" } : {}),
     ...(state.origin.profile === "app" || foundation ? { "app-foundation": "0.3.0" } : {}),
