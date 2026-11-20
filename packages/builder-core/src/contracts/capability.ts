@@ -177,3 +177,23 @@ export type ManagedSurfaceDescriptor = z.infer<
 export type CapabilityDescriptor = z.infer<typeof capabilityDescriptorSchema>;
 
 export const multilingualCapabilityVersion = "0.1.1";
+
+export const publicBuildManagedFiles = [
+  ["deployment-public-build-configuration", "apps/web/src/configuration/public-build.ts"],
+  ["deployment-document-metadata", "apps/web/src/configuration/document-metadata.ts"],
+] as const;
+
+const deploymentVersionPairs = {
+  ordinary: { retained: "0.9.0", current: "0.13.0" },
+  persistence: { retained: "0.10.0", current: "0.14.0" },
+  jobs: { retained: "0.11.0", current: "0.15.0" },
+  persistenceAndJobs: { retained: "0.12.0", current: "0.16.0" },
+} as const;
+
+type DeploymentVersionPair = typeof deploymentVersionPairs[keyof typeof deploymentVersionPairs];
+export type DeploymentCapabilityVersion = DeploymentVersionPair[keyof DeploymentVersionPair];
+
+export function deploymentVersionsFor(persistence: boolean, jobs: boolean): DeploymentVersionPair {
+  if (jobs) return persistence ? deploymentVersionPairs.persistenceAndJobs : deploymentVersionPairs.jobs;
+  return persistence ? deploymentVersionPairs.persistence : deploymentVersionPairs.ordinary;
+}

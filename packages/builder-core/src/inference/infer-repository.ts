@@ -1,6 +1,7 @@
+import { retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 import { createVerifiedProjectSnapshot } from "../catalog/verified-package-versions.js";
 import { renderProjectTemplates } from "../generation/render-skeleton.js";
-import type { CapabilityDescriptor } from "../contracts/capability.js";
+import { publicBuildManagedFiles, type CapabilityDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type {
   InstalledCapability,
@@ -309,28 +310,39 @@ async function verifyDeploymentSurfaces(
   const installed = state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare");
   if (deployment === undefined || deployment.version !== installed?.version) return;
   const required = deployment.managedSurfaces.filter(({ identifier }) =>
-    identifier === "deployment-cloudflare-workflow" || identifier === "deployment-cloudflare-ci-git",
+    identifier === "deployment-cloudflare-workflow" || identifier === "deployment-cloudflare-ci-git" ||
+      publicBuildManagedFiles.some(([fileIdentifier]) => fileIdentifier === identifier),
   );
   if (required.length === 0) return;
 
   const projectFile = await reader.readText(".egeria/project.yaml");
-  if (projectFile.kind !== "file") return;
-  const project = parseProjectYaml(projectFile.content);
-  if (!project.ok || !createVerifiedProjectSnapshot(project.value, state).ok) return;
-  const templates = await renderProjectTemplates(project.value, new Set(required.map(surface => surface.path)));
+  const project = projectFile.kind === "file" ? parseProjectYaml(projectFile.content) : undefined;
+  const snapshot = project?.ok ? createVerifiedProjectSnapshot(project.value, state) : undefined;
+  const renderingContext = snapshot?.ok ? snapshot.value.renderingContext : undefined;
+  const templates = project?.ok && renderingContext !== undefined
+    ? await renderProjectTemplates(project.value, new Set(required.map(surface => surface.path)),
+      renderingContext.retainAnalyticsConsent, retainsDeploymentConfiguration(renderingContext.catalogSnapshot))
+    : undefined;
   for (const descriptor of required) {
-    const record = state.managedSurfaces.find(surface => surface.identifier === descriptor.identifier);
+    const helper = publicBuildManagedFiles.some(([identifier]) => identifier === descriptor.identifier);
+    if (templates === undefined && !helper) continue;
+    const declarations = state.managedSurfaces.filter(surface =>
+      surface.identifier === descriptor.identifier || (helper && surface.path === descriptor.path),
+    );
+    const [record] = declarations;
     let result: SurfaceEvidence;
     if (record === undefined) {
       result = surfaceEvidence(descriptor, "missing", "DEPLOYMENT_SURFACE_DECLARATION_MISSING");
     } else if (
-      record.path !== descriptor.path || record.ownership !== descriptor.ownership ||
+      (helper && (declarations.length !== 1 || state.ejections.includes(descriptor.path) ||
+        (project?.ok && project.value.ejectedAreas.includes(descriptor.path)))) ||
+      record.identifier !== descriptor.identifier || record.path !== descriptor.path || record.ownership !== descriptor.ownership ||
       record.owner.kind !== "capability" || record.owner.identifier !== deployment.identifier ||
       record.fingerprintTarget.kind !== "file" || record.mergeStrategy !== descriptor.mergeStrategy
     ) {
       result = surfaceEvidence(descriptor, "drifted", "DEPLOYMENT_SURFACE_DECLARATION_MISMATCH");
     } else {
-      if (evidence.get(record.identifier)?.status !== "confirmed") continue;
+      if (templates === undefined || evidence.get(record.identifier)?.status !== "confirmed") continue;
       const expected = templates.ok ? templates.value.find(file => file.path === descriptor.path) : undefined;
       if (expected === undefined) {
         result = surfaceEvidence(descriptor, "ambiguous", "DEPLOYMENT_TEMPLATE_UNAVAILABLE");

@@ -112,7 +112,7 @@ for (const [profile, lockfile] of [
     assert.equal(versions["transactional-email-resend"], "0.2.0");
     assert.equal(versions["app-foundation"], "0.3.0");
     assert.equal(versions.standards, "0.9.0");
-    assert.equal(versions["deployment-cloudflare"], "0.9.0");
+    assert.equal(versions["deployment-cloudflare"], "0.13.0");
     assert.equal(versions["application-persistence"], undefined);
     assert.equal(versions["site-routing"], profile === "portfolio" ? undefined : "0.5.0");
     const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
@@ -143,7 +143,7 @@ test("environment email composes with independently selected current persistence
   assert.equal(versions["app-foundation"], "0.3.0");
   assert.equal(versions["application-persistence"], "0.2.0");
   assert.equal(versions.standards, "0.10.0");
-  assert.equal(versions["deployment-cloudflare"], "0.10.0");
+  assert.equal(versions["deployment-cloudflare"], "0.14.0");
   const manifest = JSON.parse(new TextDecoder().decode(files.find(({ path }) => path === "apps/web/package.json").content));
   assert.equal(resolveRecipeLockfileVersion(project, manifest), "app-0.2.7-persistence-next-16.4.5");
 });

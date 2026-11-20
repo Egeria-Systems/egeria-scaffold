@@ -5,8 +5,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
-import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
-const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+import { withCurrentGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
 
 import { certifyAppLocalForTesting } from "../../scripts/certify-app-local.mjs";
 import { certifyFreshScaffoldForTesting } from "../../scripts/lib/certify-fresh-scaffold.mjs";
@@ -22,7 +21,7 @@ const fixedChecks = [
   "next-build", "opennext-build", "prepared-artifact", "browser-install",
   "browser-development", "browser-preview",
 ];
-const fixtureState = JSON.parse(await readFile(join(repositoryRoot, fixtureRoot("app"), ".egeria/state.json"), "utf8"));
+const fixtureState = await withCurrentGeneratedFixture("app", async root => JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
 
 class TestCertificationError extends Error {
   constructor(code) { super(code); this.code = code; }
@@ -71,7 +70,7 @@ function adaptersFor({ changeInference, changeProject, changeVerification, failC
       if (command === "create") {
         root = input.arguments[input.arguments.indexOf("--directory") + 1];
         identifier = input.arguments.includes("--multilingual") ? "app-all-optional-integrations" : "app";
-        await cp(join(repositoryRoot, fixtureRoot(identifier)), root, { recursive: true, errorOnExist: true, force: false });
+        await withCurrentGeneratedFixture(identifier, current => cp(current, root, { recursive: true, errorOnExist: true, force: false }));
         if (changeProject) {
           const projectPath = join(root, ".egeria/project.yaml");
           await writeFile(projectPath, changeProject(await readFile(projectPath, "utf8")));

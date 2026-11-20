@@ -339,6 +339,8 @@ const portfolioPaths = [
   "apps/web/scripts/prepare-ci-git.sh",
   "apps/web/src/configuration/application-build.ts",
   "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/document-metadata.ts",
+  "apps/web/src/configuration/public-build.ts",
   "apps/web/src/configuration/site-origin.ts",
   "apps/web/tests/e2e/application-test.ts",
   "apps/web/tests/e2e/application-transport.ts",
@@ -433,6 +435,8 @@ const sitePaths = [
   "apps/web/scripts/prepare-ci-git.sh",
   "apps/web/src/configuration/application-build.ts",
   "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/document-metadata.ts",
+  "apps/web/src/configuration/public-build.ts",
   "apps/web/src/configuration/site-origin.ts",
   "apps/web/tests/e2e/application-test.ts",
   "apps/web/tests/e2e/application-transport.ts",
@@ -5534,8 +5538,8 @@ test("profiles remain narrow and exclude later capabilities and surfaces", async
 test("ownership descriptors cover every generated surface without overlap", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   for (const [profile, expectedCount] of [
-    ["portfolio", 131],
-    ["site", 147],
+    ["portfolio", 133],
+    ["site", 149],
   ]) {
     const rendered = assertSuccess(
       await renderSkeleton({
@@ -5682,7 +5686,7 @@ test("ownership descriptors cover every generated surface without overlap", asyn
       packageVersions,
     }),
   );
-  assert.equal(selected.surfaces.length, 140);
+  assert.equal(selected.surfaces.length, 142);
   assert.deepEqual(
     selected.surfaces
       .filter(
@@ -5833,7 +5837,7 @@ test("rendering returns isolated byte arrays and performs no repository write", 
 
 const applicationEnvironmentContext = {
   projectSchemaVersion: "2.0.0",
-  catalogSnapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.9.0", transactionalEmailResend: "0.2.0" },
+  catalogSnapshot: { standards: "0.9.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.13.0", transactionalEmailResend: "0.2.0" },
   profiles: [
     { identifier: "portfolio", schemaVersion: "1.0.0", recipeVersion: "0.12.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability"] },
     { identifier: "site", schemaVersion: "1.0.0", recipeVersion: "0.13.0", defaultCapabilities: ["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "site-routing"] },
@@ -5865,14 +5869,14 @@ test("environment build compositions bind target and revision while preserving n
     }));
     const root = await mkdtemp(join(tmpdir(), "environment-build-composition-"));
     try {
-      for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || path.startsWith("apps/web/src/configuration/") || path.startsWith("apps/web/src/integrations/"))) {
+      for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || path === "apps/web/scripts/check-application-environment.mjs" || path.startsWith("apps/web/src/configuration/") || path.startsWith("apps/web/src/integrations/"))) {
         const destination = join(root, file.path); await mkdir(join(destination, ".."), { recursive: true }); await writeFile(destination, file.content);
       }
       const fixture = join(root, "apps/web/node_modules/@opennextjs/cloudflare");
       await mkdir(fixture, { recursive: true });
       await writeFile(join(fixture, "package.json"), JSON.stringify({ type: "module", exports: "./index.js" }));
       await writeFile(join(fixture, "index.js"), "export function initOpenNextCloudflareForDev() {}\n");
-      const code = 'const { default: config } = await import("./next.config.ts"); console.log(JSON.stringify({ env: config.env, buildId: await config.generateBuildId?.() }));';
+      const code = 'const { default: config } = await import("./next.config.ts"); const { resolvePublicBuild, readPublicBuildEnvironment } = await import("./src/configuration/public-build.ts"); console.log(JSON.stringify({ env: config.env, buildId: await config.generateBuildId?.(), resolved: resolvePublicBuild(readPublicBuildEnvironment(), "local") }));';
       const revision = "a".repeat(40);
       const env = { APPLICATION_ENVIRONMENT: "staging", NEXT_PUBLIC_SITE_URL: "https://release.example.test", BUILD_SOURCE_REVISION: revision,
         NEXT_PUBLIC_ANALYTICS_ENABLED: "false", NEXT_PUBLIC_CALENDLY_URL: "https://calendly.com/example/consultation", NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: "00000000-0000-4000-8000-000000000000" };
@@ -5882,11 +5886,70 @@ test("environment build compositions bind target and revision while preserving n
       const config = JSON.parse(result.stdout);
       assert.equal(config.buildId, `egeria-staging-${revision}`);
       assert.equal(config.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT, "staging");
+      assert.deepEqual(config.resolved, { ok: true, value: { build: { target: "staging", siteOrigin: "https://release.example.test", buildId: config.buildId }, publicValues: config.env } });
+      assert.deepEqual(Object.keys(config.env).sort(), [
+        "NEXT_PUBLIC_APPLICATION_ENVIRONMENT",
+        ...(contact ? ["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY"] : []),
+        ...(booking ? ["NEXT_PUBLIC_CALENDLY_URL"] : []),
+        ...(analytics ? ["NEXT_PUBLIC_ANALYTICS_ENABLED", "NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN", "NEXT_PUBLIC_GA4_MEASUREMENT_ID", "NEXT_PUBLIC_CLARITY_PROJECT_ID", "NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION"] : []),
+      ].sort());
       assert.equal(Object.hasOwn(config.env, "NEXT_PUBLIC_SITE_URL"), false);
       for (const invalid of [{ NEXT_PUBLIC_SITE_URL: "" }, { NEXT_PUBLIC_SITE_URL: "https://release.example.test/path" }, { BUILD_SOURCE_REVISION: "not-a-revision" }, { NEXT_DEPLOYMENT_ID: "override" }]) {
         assert.equal(invoke({ ...env, ...invalid }).status, 1, JSON.stringify(invalid));
       }
+      const runPreflight = (environment, args) => spawnSync(process.execPath, ["scripts/check-application-environment.mjs", ...args], { cwd: join(root, "apps/web"), env: environment, encoding: "utf8" });
+      const invalidUsage = runPreflight(env, ["--local", "--deployment"]);
+      assert.equal(invalidUsage.status, 2);
+      assert.deepEqual(JSON.parse(invalidUsage.stderr), { code: "APPLICATION_ENVIRONMENT_ARGUMENT_INVALID" });
+      const validPreflight = runPreflight(env, ["--local"]);
+      assert.equal(validPreflight.status, 0, validPreflight.stderr);
+      const failures = [
+        ["NEXT_PUBLIC_SITE_URL", "APPLICATION_BUILD_INVALID", "APPLICATION_ENVIRONMENT_INVALID"],
+        ...(contact ? [["NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY", "CONTACT_CONFIGURATION_INVALID", "CONTACT_CONFIGURATION_INVALID"]] : []),
+        ...(booking ? [["NEXT_PUBLIC_CALENDLY_URL", "BOOKING_CONFIGURATION_INVALID", "BOOKING_CONFIGURATION_INVALID"]] : []),
+        ...(analytics ? [["NEXT_PUBLIC_GA4_MEASUREMENT_ID", "ANALYTICS_CONFIGURATION_INVALID", "ANALYTICS_CONFIGURATION_INVALID"]] : []),
+      ];
+      const rejected = { ...env, ...Object.fromEntries(failures.map(([field]) => [field, "synthetic-private-value"])) };
+      for (const [field, nextCode, preflightCode] of failures) {
+        const next = invoke(rejected);
+        const preflight = runPreflight(rejected, ["--local"]);
+        assert.equal(next.status, 1);
+        assert.match(next.stderr, new RegExp(`Error: ${nextCode}:${field}:invalid`));
+        assert.equal(preflight.status, 1);
+        assert.deepEqual(JSON.parse(preflight.stderr), { code: preflightCode, field, reason: "invalid" });
+        assert.doesNotMatch(next.stdout + next.stderr + preflight.stdout + preflight.stderr, /synthetic-private-value/u);
+        if (env[field] === undefined) delete rejected[field]; else rejected[field] = env[field];
+      }
     } finally { await rm(root, { recursive: true, force: true }); }
+  }
+});
+
+test("document metadata shares the compiled origin and target without imposing production robots", async () => {
+  for (const multilingual of [false, true]) for (const contact of [false, true]) for (const analytics of [false, true]) {
+    const selected = assertSuccess(await renderApplicationEnvironment("site", {
+      ...(multilingual ? { multilingual: true } : {}),
+      ...(contact ? { contactFormWeb3Forms: true } : {}),
+      ...(analytics ? { analytics: { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} } } : {}),
+    }));
+    assert.match(indexFiles(selected.files).get("apps/web/app/layout.tsx"), /\.\.\.createDocumentMetadata\(readCompiledSiteOrigin\(\), process\.env\.NEXT_PUBLIC_APPLICATION_ENVIRONMENT\)/u, JSON.stringify({ multilingual, contact, analytics }));
+  }
+  const candidate = assertSuccess(await renderApplicationEnvironment("portfolio"));
+  const path = "apps/web/src/configuration/document-metadata.ts";
+  const file = candidate.files.find(entry => entry.path === path);
+  assert.ok(file, "the managed root metadata helper must be generated");
+  const owner = await mkdtemp(join(tmpdir(), "environment-document-metadata-"));
+  try {
+    const entry = join(owner, "document-metadata.ts");
+    await writeFile(entry, file.content);
+    const { createDocumentMetadata } = await import(pathToFileURL(entry));
+    for (const target of ["development", "staging", "production"]) {
+      const result = createDocumentMetadata("https://example.test", target);
+      assert.equal(result.metadataBase.href, "https://example.test/");
+      if (target === "production") assert.equal(Object.hasOwn(result, "robots"), false);
+      else assert.deepEqual(result.robots, { index: false, follow: false });
+    }
+  } finally {
+    await rm(owner, { recursive: true, force: true });
   }
 });
 
@@ -5990,7 +6053,7 @@ test("application environment generated preflight rejects unsafe targets without
   const files = new Map(rendered.files.map(({ path, content }) => [path, content]));
   const root = await mkdtemp(join(tmpdir(), "application-environment-preflight-"));
   try {
-    for (const path of ["apps/web/src/configuration/application-environment.ts", "apps/web/src/configuration/application-build.ts", "apps/web/src/configuration/site-origin.ts", "apps/web/scripts/check-application-environment.mjs"]) {
+    for (const path of ["apps/web/src/configuration/application-environment.ts", "apps/web/src/configuration/application-build.ts", "apps/web/src/configuration/public-build.ts", "apps/web/src/configuration/site-origin.ts", "apps/web/scripts/check-application-environment.mjs"]) {
       const destination = join(root, path);
       await mkdir(join(destination, ".."), { recursive: true });
       await writeFile(destination, files.get(path));
@@ -6225,7 +6288,7 @@ async function withEnvironmentAnalyticsNextConfiguration(selection, analytics, c
   }));
   const root = await mkdtemp(join(tmpdir(), "analytics-next-configuration-"));
   try {
-    for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || /(?:application-environment|application-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path))) {
+    for (const file of rendered.files.filter(({ path }) => path === "apps/web/next.config.ts" || /(?:application-environment|application-build|public-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path))) {
       const destination = join(root, file.path);
       await mkdir(join(destination, ".."), { recursive: true });
       await writeFile(destination, file.content);
@@ -6404,7 +6467,7 @@ test("environment booking validates generated destinations before process effect
     const rendered = assertSuccess(await renderApplicationEnvironment("portfolio", { bookingCalendly: { mode: "popup" }, ...(contact ? { contactFormWeb3Forms: true } : {}) }));
     const root = await mkdtemp(join(tmpdir(), "booking-environment-configuration-"));
     try {
-      for (const file of rendered.files.filter(({ path }) => path.endsWith("application-environment.ts") || path.endsWith("application-build.ts") || path.endsWith("site-origin.ts") || path.endsWith("booking-settings.ts") || path.endsWith("contact-settings.ts") || path.endsWith("check-application-environment.mjs"))) {
+      for (const file of rendered.files.filter(({ path }) => path.endsWith("application-environment.ts") || path.endsWith("application-build.ts") || path.endsWith("public-build.ts") || path.endsWith("site-origin.ts") || path.endsWith("booking-settings.ts") || path.endsWith("contact-settings.ts") || path.endsWith("check-application-environment.mjs"))) {
         const destination = join(root, file.path);
         await mkdir(join(destination, ".."), { recursive: true });
         await writeFile(destination, file.content);
@@ -6453,7 +6516,7 @@ test("environment analytics preflight validates all compositions with field-only
         ...(selection & 2 ? { bookingCalendly: { mode: "popup" } } : {}),
       }));
       const root = await mkdtemp(join(tmpdir(), "analytics-environment-preflight-"));
-      for (const file of rendered.files.filter(({ path }) => /(?:application-environment|application-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path) || path.endsWith("check-application-environment.mjs"))) {
+      for (const file of rendered.files.filter(({ path }) => /(?:application-environment|application-build|public-build|site-origin|booking-settings|contact-settings|analytics-configuration|analytics-settings)\.ts$/u.test(path) || path.endsWith("check-application-environment.mjs"))) {
         const destination = join(root, file.path);
         await mkdir(join(destination, ".."), { recursive: true });
         await writeFile(destination, file.content);

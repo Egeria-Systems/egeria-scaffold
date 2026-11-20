@@ -16,7 +16,7 @@ const descriptorDigests = Object.freeze({
   "booking-calendly": "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08",
   "contact-form-web3forms": "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
   "content-files": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
-  "deployment-cloudflare": "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6",
+  "deployment-cloudflare": "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478",
   "multilingual": "sha256:76f26b43ab7b952f23e472abde9958efe844b2f5730c4a7edb3d0a9acde27615",
   "observability": "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
   "section-composition": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
@@ -32,7 +32,7 @@ const descriptorVersions = Object.freeze({
   "booking-calendly": "0.2.0",
   "contact-form-web3forms": "0.2.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.12.0",
+  "deployment-cloudflare": "0.16.0",
   "multilingual": "0.1.1",
   "observability": "0.4.0",
   "section-composition": "0.3.0",
@@ -85,7 +85,9 @@ function createRecord(identifier) {
       ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
       : identifier === "multilingual"
         ? ["docs/superpowers/plans/capability-repairs/2026-11-18-multilingual-section-links", "gate", "2.md"].join("-")
-        : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
+        : identifier === "deployment-cloudflare"
+          ? "docs/superpowers/plans/2026-11-19-deployment-public-build-certification-handoff.md"
+          : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
     evidence: [],
   };
 }
@@ -194,10 +196,9 @@ test("certification subjects bind the descriptor and required evidence", () => {
     behaviorContractDigest: "sha256:278d07e3e3d57cff287b3fefed0e067f6023c530401dd901b3bdb31c91e1551c",
   });
   assert.deepEqual(core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare"), requiredEvidence["deployment-cloudflare"]), {
-    descriptorVersion: "0.9.0",
-    behaviorContractDigest: "sha256:8868b0a7241f9891d2e03ec676fbfc31c80d1bbddfc0b9c0ee16b642104afd5f",
+    descriptorVersion: "0.13.0",
+    behaviorContractDigest: "sha256:d04ee42864a5e16471c5ee4276fffc181b407470205e05349de586b37eb3aa41",
   });
-  assert.equal(defaultCatalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
   assert.notDeepEqual(
     core.createCertificationSubject(defaultCatalog.find(({ identifier }) => identifier === "standards"), requiredEvidence.standards),
     registry.records.standards.subject,
@@ -278,6 +279,7 @@ test("repository artifacts bind evidence to its plan, subject, revision, and rev
     [registry.records.standards.taskPlan]: "# current generation certification renewal",
     [registry.records["background-job-delivery"].taskPlan]: "# current jobs recovery and composition certification renewal",
     [registry.records.multilingual.taskPlan]: "# current multilingual section-link certification renewal",
+    [registry.records["deployment-cloudflare"].taskPlan]: "# current deployment public build certification renewal",
     [evidencePath]: createEvidenceDocument(),
   };
 
@@ -439,6 +441,22 @@ test("hosted contact cannot borrow email evidence or omit provider and cleanup o
   const candidates = cloneRegistry();candidates.records["contact-form-web3forms"]=changed;
   assert.equal(core.validateCertificationAdmission({catalog,registry:candidates}).ok,false);
   assert.equal(core.validateCertificationClosure({catalog,registry:committedRegistry}).ok,false);
+});
+
+test("deployment subjects bind both exact installed descriptor families", () => {
+  for (const [persistence, jobs, retainedVersion, retainedDigest, freshVersion, freshDigest] of [
+    [false, false, "0.9.0", "sha256:8868b0a7241f9891d2e03ec676fbfc31c80d1bbddfc0b9c0ee16b642104afd5f", "0.13.0", "sha256:d04ee42864a5e16471c5ee4276fffc181b407470205e05349de586b37eb3aa41"],
+    [true, false, "0.10.0", "sha256:0ed9172c7461266a86a34c32ebed9242ab926b4575f19f435580f1a75ddcd9fe", "0.14.0", "sha256:2d2dc3788da925581c0b1e33e8b4f948ea855621814fa88099dcb2883be50e71"],
+    [false, true, "0.11.0", "sha256:135f6f93738601fa0fa8e6a1be4f82e3f531d89eb317e65ffd903db2afdc04b1", "0.15.0", "sha256:3bbc8f133913211fb984206bbd329ba3e0edebaf86b087faf217f9e569c04004"],
+    [true, true, "0.12.0", "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6", "0.16.0", "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478"],
+  ]) {
+    for (const [retained, descriptorVersion, behaviorContractDigest] of [[true, retainedVersion, retainedDigest], [false, freshVersion, freshDigest]]) {
+      const { catalogSnapshot } = core.createGenerationRenderingContext(persistence, false, jobs, undefined, undefined, retained);
+      const descriptors = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, catalogSnapshot));
+      const deployment = descriptors.find(({ identifier }) => identifier === "deployment-cloudflare");
+      assert.deepEqual(core.createCertificationSubject(deployment, requiredEvidence["deployment-cloudflare"]), { descriptorVersion, behaviorContractDigest });
+    }
+  }
 });
 
 test("renewed deployment admission requires a new plan and its private artifact", () => {

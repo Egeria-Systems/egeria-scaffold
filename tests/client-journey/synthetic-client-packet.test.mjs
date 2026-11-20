@@ -215,6 +215,7 @@ async function createProjectFixture({ preserveFixtureIdentity = false } = {}) {
     const statePath = resolve(projectRoot, ".egeria/state.json");
     const state = JSON.parse(await readFile(statePath, "utf8"));
     state.installedCapabilities = state.installedCapabilities.filter(({ identifier }) => project.selectedCapabilities.includes(identifier));
+    state.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version = "0.13.0";
     await writeFile(statePath, `${JSON.stringify(state, null, 2)}\n`);
   }
   await runGit(projectRoot, ["init", "-b", "main"]);

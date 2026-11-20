@@ -53,9 +53,14 @@ const templateTokenNames = new Set([
   "calendlyModeJson",
   "analyticsSettingsJson",
   "web3FormsAccessKeyJson",
+  "publicBuildProviderImports",
+  "publicBuildProviderInputFields",
+  "publicBuildProviderReads",
+  "publicBuildProviderValidation",
+  "publicBuildProviderValues",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubSourceRevisionOutputExpression|githubVerifiedRevisionExpression|githubTokenExpression|githubSiteOriginExpression|githubExpectedStagingDatabaseIdExpression|githubExpectedProductionDatabaseIdExpression|githubStagingJobRetentionReviewedExpression|githubProductionJobRetentionReviewedExpression|githubAccessClientIdExpression|githubAccessClientSecretExpression|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson)}}/g;
+  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubSourceRevisionOutputExpression|githubVerifiedRevisionExpression|githubTokenExpression|githubSiteOriginExpression|githubExpectedStagingDatabaseIdExpression|githubExpectedProductionDatabaseIdExpression|githubStagingJobRetentionReviewedExpression|githubProductionJobRetentionReviewedExpression|githubAccessClientIdExpression|githubAccessClientSecretExpression|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson|publicBuildProviderImports|publicBuildProviderInputFields|publicBuildProviderReads|publicBuildProviderValidation|publicBuildProviderValues)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -70,6 +75,14 @@ const analyticsSettingsSource =
 const applicationEnvironmentAnalyticsSettingsSource =
   "analytics/application-environments/apps/web/src/integrations/analytics/analytics-settings.ts.template";
 const analyticsTokenNames = new Set(["analyticsSettingsJson"]);
+const publicBuildSource = "common/application-environments/apps/web/src/configuration/public-build.ts.template";
+const publicBuildTokenNames = new Set([
+  "publicBuildProviderImports",
+  "publicBuildProviderInputFields",
+  "publicBuildProviderReads",
+  "publicBuildProviderValidation",
+  "publicBuildProviderValues",
+]);
 const fixedTemplateTokens = {
   githubSourceRevisionOutputExpression: "${{ steps.source.outputs.revision }}",
   githubVerifiedRevisionExpression: "${{ needs.verify-source.outputs.revision }}",
@@ -110,6 +123,11 @@ export type TemplateTokens = Readonly<{
   calendlyModeJson?: string;
   analyticsSettingsJson?: string;
   web3FormsAccessKeyJson?: string;
+  publicBuildProviderImports?: string;
+  publicBuildProviderInputFields?: string;
+  publicBuildProviderReads?: string;
+  publicBuildProviderValidation?: string;
+  publicBuildProviderValues?: string;
 }>;
 
 type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
@@ -175,6 +193,7 @@ function validateTemplateSyntax(
     (_match, token: string): string => {
       if (
         templateTokenNames.has(token) &&
+        (!publicBuildTokenNames.has(token) || source === publicBuildSource) &&
         (!bookingCalendlyTokenNames.has(token) ||
           source === bookingCalendlySettingsSource ||
           (token === "calendlyModeJson" && source === applicationEnvironmentBookingSettingsSource)) &&
@@ -191,8 +210,8 @@ function validateTemplateSyntax(
       }
 
       reason =
-        bookingCalendlyTokenNames.has(token) &&
-        source !== bookingCalendlySettingsSource
+        (publicBuildTokenNames.has(token) && source !== publicBuildSource) ||
+        (bookingCalendlyTokenNames.has(token) && source !== bookingCalendlySettingsSource)
           ? "unavailable-token"
           : analyticsTokenNames.has(token) && source !== analyticsSettingsSource && source !== applicationEnvironmentAnalyticsSettingsSource
             ? "unavailable-token"

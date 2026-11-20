@@ -1,7 +1,10 @@
 import {
   capabilityDescriptorSchema,
+  deploymentVersionsFor,
   multilingualCapabilityVersion,
+  publicBuildManagedFiles,
   type CapabilityDescriptor,
+  type DeploymentCapabilityVersion,
   type InferenceProbe,
   type ManagedSurfaceDescriptor,
 } from "../contracts/capability.js";
@@ -24,7 +27,7 @@ export type CapabilityCatalogSnapshot = Readonly<{
   standards: "0.9.0" | "0.10.0";
   siteRouting: "0.5.0";
   appFoundation: "0.3.0";
-  deploymentCloudflare: "0.9.0" | "0.10.0" | "0.11.0" | "0.12.0";
+  deploymentCloudflare: DeploymentCapabilityVersion;
   backgroundJobDelivery?: "0.3.0";
   applicationPersistence?: "0.2.0";
   transactionalEmailResend: "0.2.0";
@@ -34,28 +37,48 @@ export const applicationEnvironmentCatalogSnapshot: CapabilityCatalogSnapshot = 
   standards: "0.9.0",
   siteRouting: "0.5.0",
   appFoundation: "0.3.0",
-  deploymentCloudflare: "0.9.0",
+  deploymentCloudflare: deploymentVersionsFor(false, false).current,
   transactionalEmailResend: "0.2.0",
 });
 
 export const applicationEnvironmentPersistenceCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...applicationEnvironmentCatalogSnapshot,
   standards: "0.10.0",
-  deploymentCloudflare: "0.10.0",
+  deploymentCloudflare: deploymentVersionsFor(true, false).current,
   applicationPersistence: "0.2.0",
 });
 
 export const applicationEnvironmentJobsCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...applicationEnvironmentCatalogSnapshot,
-  deploymentCloudflare: "0.11.0",
+  deploymentCloudflare: deploymentVersionsFor(false, true).current,
   backgroundJobDelivery: "0.3.0",
 });
 
 export const applicationEnvironmentPersistenceJobsCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...applicationEnvironmentPersistenceCatalogSnapshot,
-  deploymentCloudflare: "0.12.0",
+  deploymentCloudflare: deploymentVersionsFor(true, true).current,
   backgroundJobDelivery: "0.3.0",
 });
+
+export function applicationEnvironmentSnapshotFor(persistence: boolean, jobs: boolean, retainDeployment: boolean): CapabilityCatalogSnapshot {
+  const snapshot = jobs
+    ? (persistence ? applicationEnvironmentPersistenceJobsCatalogSnapshot : applicationEnvironmentJobsCatalogSnapshot)
+    : (persistence ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot);
+  return retainDeployment
+    ? { ...snapshot, deploymentCloudflare: deploymentVersionsFor(persistence, jobs).retained }
+    : snapshot;
+}
+
+export function retainsDeploymentConfiguration(snapshot: CapabilityCatalogSnapshot): boolean {
+  return snapshot.deploymentCloudflare === deploymentVersionsFor(
+    snapshot.applicationPersistence !== undefined,
+    snapshot.backgroundJobDelivery !== undefined,
+  ).retained;
+}
+
+const supportedEnvironmentSnapshots = [false, true].flatMap(persistence =>
+  [false, true].flatMap(jobs =>
+    [false, true].map(retainDeployment => applicationEnvironmentSnapshotFor(persistence, jobs, retainDeployment))));
 
 export const applicationEnvironmentScripts = Object.freeze({
   "check:environment": "node scripts/check-application-environment.mjs --local",
@@ -1351,6 +1374,8 @@ function createDescriptors(
       adapterSemanticRequirements: ["node-runtime", "worker-static-assets", ...(jobs ? ["shared-worker-queue-composition", "required-dead-letter-target", "explicit-queue-environments", "automatic-provisioning-disabled"] : []), ...(persistence ? ["explicit-environment-bindings", "automatic-provisioning-disabled"] : [])],
       ...projectEvidencePoints([
         ...deploymentCloudflareEvidencePoints,
+        ...(!retainsDeploymentConfiguration(snapshot) ? publicBuildManagedFiles.map(([identifier, path]) =>
+          createFileEvidencePoint(identifier, "deployment-cloudflare", path, "managed")) : []),
         ...(jobs ? [
           createFileEvidencePoint("deployment-job-worker-entry", "deployment-cloudflare", "apps/web/worker.mjs", "managed"),
           createFileEvidencePoint("deployment-job-preflight", "deployment-cloudflare", "apps/web/scripts/check-job-delivery.mjs", "managed"),
@@ -1962,12 +1987,7 @@ export function createCapabilityCatalogSnapshot(
 ): ValidationResult<readonly CapabilityDescriptor[]> {
   const versionIssues: ContractIssue[] = [];
   const snapshotInput: unknown = snapshot;
-  const supportedSnapshot = [
-    applicationEnvironmentCatalogSnapshot,
-    applicationEnvironmentPersistenceCatalogSnapshot,
-    applicationEnvironmentJobsCatalogSnapshot,
-    applicationEnvironmentPersistenceJobsCatalogSnapshot,
-  ].find((candidate) => snapshotInput !== null && typeof snapshotInput === "object" &&
+  const supportedSnapshot = supportedEnvironmentSnapshots.find((candidate) => snapshotInput !== null && typeof snapshotInput === "object" &&
     Object.keys(snapshotInput).length === Object.keys(candidate).length &&
     Object.entries(candidate).every(([key, value]) => Reflect.get(snapshotInput, key) === value));
 

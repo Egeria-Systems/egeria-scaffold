@@ -679,11 +679,19 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
-  const retainedContext = { ...context, retainAnalyticsConsent: true };
+  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const retainedContext = { ...predecessorContext, retainAnalyticsConsent: true };
   const subsets = {};
   const consentFiles = [
     "apps/web/src/integrations/analytics/analytics-consent.tsx",
     "apps/web/src/integrations/analytics/analytics-runtime.ts",
+  ];
+  const buildFiles = [
+    "apps/web/app/layout.tsx",
+    "apps/web/next.config.ts",
+    "apps/web/scripts/check-application-environment.mjs",
+    "apps/web/src/configuration/document-metadata.ts",
+    "apps/web/src/configuration/public-build.ts",
   ];
   async function prepare(request, renderingContext) {
     const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, renderingContext);
@@ -705,18 +713,24 @@ test("current preparation fingerprints and canonical admission protect exact bas
       ...(subset & 4 ? { analytics: policy.appTransitionVisualAnalyticsSettings } : {}),
     };
     const retained = await prepare(request, retainedContext);
+    const predecessor = await prepare(request, predecessorContext);
     const current = await prepare(request, context);
     const optionalCapabilities = current.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const priorFingerprints = retained.prepared.influencingFingerprints;
+    const predecessorFingerprints = predecessor.prepared.influencingFingerprints;
     const currentFingerprints = current.prepared.influencingFingerprints;
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(priorFingerprints);
-    assert.deepEqual(currentFingerprints.map(({ path }) => path), priorFingerprints.map(({ path }) => path));
-    const changedInputs = currentFingerprints.filter(({ fingerprint }, index) => fingerprint !== priorFingerprints[index].fingerprint);
-    assert.deepEqual(changedInputs.map(({ path }) => path), subset & 4 ? consentFiles : []);
+    const priorByPath = new Map(priorFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
+    const predecessorByPath = new Map(predecessorFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
+    assert.deepEqual(predecessorFingerprints.map(({ path }) => path), priorFingerprints.map(({ path }) => path));
+    assert.deepEqual(predecessorFingerprints.filter(({ path, fingerprint }) => priorByPath.get(path) !== fingerprint).map(({ path }) => path),
+      subset & 4 ? consentFiles : []);
+    assert.deepEqual(currentFingerprints.filter(({ path, fingerprint }) => predecessorByPath.get(path) !== fingerprint).map(({ path }) => path), buildFiles);
     const identity = { optionalCapabilities, influencingFingerprints: currentFingerprints, targetLockfileFingerprint };
     const retainedIdentity = { ...identity, influencingFingerprints: priorFingerprints };
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current preparation remains unadmitted");
     assert.equal(policy.verifyAppTransitionVisualInputRecord(retainedIdentity).ok, false, "retained preparation remains unadmitted");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, influencingFingerprints: predecessorFingerprints }).ok, false);
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok, true);
     const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({
       path, content: await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${subset & 2 ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url)),
@@ -732,8 +746,7 @@ test("current preparation fingerprints and canonical admission protect exact bas
     };
     assert.equal(policy.selectAppTransitionVisuals({ ...retained, evidence: retainedEvidence }).ok, true);
     const usingRetainedEvidence = policy.selectAppTransitionVisuals({ ...current, evidence: retainedEvidence });
-    if (subset & 4) assert.equal(usingRetainedEvidence.issues?.[0]?.code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
-    else assert.equal(usingRetainedEvidence.ok, true);
+    assert.equal(usingRetainedEvidence.issues?.[0]?.code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
   }
   assert.deepEqual(subsets, {
   "none": "sha256:b95793876632bc0532d66fbcd110368ae2c47e03b44b16adb849679064473366",

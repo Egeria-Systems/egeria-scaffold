@@ -1461,7 +1461,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(removed.result.status, "verified-final-diff-approval-required");
   const removedState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
   assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "standards").version, "0.9.0");
-  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.9.0");
+  assert.equal(removedState.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare").version, "0.13.0");
   assert.equal(removedState.installedCapabilities.some(({ identifier }) => identifier === "application-persistence"), false);
   assert.equal(removedState.lastSuccessfulVerification.checks.includes("binding-integration"), false);
   await commitFixture("removed-persistence", linked);
@@ -1472,7 +1472,7 @@ process.exitCode = await run(${JSON.stringify(arguments_)}, { write: value => pr
   assert.equal(added.result.status, "verified-final-diff-approval-required");
   const finalState = JSON.parse(await readFile(join(linked, ".egeria/state.json"), "utf8"));
   assert.deepEqual(finalState.appliedMigrations, ["remove-application-persistence-0-2-0", "add-application-persistence-0-2-0"]);
-  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.10.0"], ["deployment-cloudflare", "0.10.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
+  for (const [identifier, version] of [["application-persistence", "0.2.0"], ["standards", "0.10.0"], ["deployment-cloudflare", "0.14.0"], ["app-foundation", "0.3.0"]]) assert.equal(finalState.installedCapabilities.find(capability => capability.identifier === identifier).version, version);
   assert.ok(finalState.lastSuccessfulVerification.checks.includes("binding-integration"));
   assert.deepEqual(await readFile(join(linked, ".egeria/project.yaml")), initialProject);
   assert.deepEqual(await readFile(join(linked, "pnpm-lock.yaml")), initialLock);

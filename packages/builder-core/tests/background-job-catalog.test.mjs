@@ -17,14 +17,14 @@ const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example"
 
 const excludedOperatorFiles = ["apps/web/scripts/job-operator.mjs", "apps/web/src/infrastructure/cloudflare/job-operations.ts", "apps/web/tests/unit/job-operations.test.ts"];
 
-test("application environment catalog admits exactly the four deployment compositions", () => {
-  for (const [persistence, jobs, standards, deployment] of [
-    [false, false, "0.9.0", "0.9.0"],
-    [true, false, "0.10.0", "0.10.0"],
-    [false, true, "0.9.0", "0.11.0"],
-    [true, true, "0.10.0", "0.12.0"],
-  ]) {
-    const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs);
+test("application environment catalog admits exactly the retained and fresh deployment compositions", () => {
+  for (const [persistence, jobs, standards, predecessor, successor] of [
+    [false, false, "0.9.0", "0.9.0", "0.13.0"],
+    [true, false, "0.10.0", "0.10.0", "0.14.0"],
+    [false, true, "0.9.0", "0.11.0", "0.15.0"],
+    [true, true, "0.10.0", "0.12.0", "0.16.0"],
+  ]) for (const [retained, deployment] of [[true, predecessor], [false, successor]]) {
+    const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs, undefined, undefined, retained);
     assert.equal(isApplicationEnvironmentRenderingContext(context), true);
     assert.equal(context.catalogSnapshot.standards, standards);
     assert.equal(context.catalogSnapshot.deploymentCloudflare, deployment);
@@ -47,7 +47,7 @@ test("application environment catalog admits exactly the four deployment composi
     }
     for (const changed of [
       { standards: persistence ? "0.9.0" : "0.10.0" },
-      { deploymentCloudflare: deployment === "0.9.0" ? "0.11.0" : "0.9.0" },
+      { deploymentCloudflare: jobs ? "0.13.0" : "0.15.0" },
       { siteRouting: "0.4.0" },
       { backgroundJobDelivery: jobs ? "0.2.0" : "0.3.0" },
     ]) {

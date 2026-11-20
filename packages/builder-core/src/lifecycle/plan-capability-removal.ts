@@ -1,7 +1,7 @@
 import { multilingualCapabilityVersion } from "../contracts/capability.js";
 import { createHash } from "node:crypto";
 
-import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
+import { createCapabilityCatalogSnapshot, retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 import {
   createApplicationEnvironmentRenderingContext, createGenerationRenderingContext, isApplicationEnvironmentRenderingContext,
   readVerifiedProjectSnapshot,
@@ -993,6 +993,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       false,
       environmentContext.retainedNextVersion,
       capabilityValue === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
+      retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     )),
   ]);
 

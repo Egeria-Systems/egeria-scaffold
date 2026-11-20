@@ -1433,9 +1433,62 @@ function contractForIdentifier(identifier) {
   return contract;
 }
 
+const publicBuildWitnessDirectory = "tests/generated-fixtures/fixtures/public-build";
+const publicBuildWitnessPaths = Object.freeze([
+  ".egeria/state.json",
+  "apps/web/app/layout.tsx",
+  "apps/web/next.config.ts",
+  "apps/web/scripts/check-application-environment.mjs",
+  "apps/web/src/configuration/document-metadata.ts",
+  "apps/web/src/configuration/public-build.ts",
+]);
+const retainedFixtureDigests = Object.freeze({
+  "portfolio": "8eb404916e43d7d3cfb6d2fc2c42c9a62cc2874f4f6690a976775bdf96b75cf4",
+  "portfolio-calendly": "38887cc49a9782ed75327f9e1c95d05cc6c6ff99f986069a58249513c3302770",
+  "site": "85aca4d30591100a04e16aef620655d4089d359fe0da146ae23cde138758ccb3",
+  "site-multilingual": "28ddc8ea570a20fbed0f9679eb702248cc26db40305825057d61f59d62bd4e8e",
+  "site-public-integrations": "c4272d9ad68eb7e53773edb6ae56084db05c6992e652a2d4f5c5775a863affa6",
+  "app": "d2e36928bb5142c31a241d10c1239ccc182965fba2377d6edfb2daed429d5d5c",
+  "app-all-optional-integrations": "b83cf9976c7ce24586719f26522dfc7a1b0577c2c6417c441b2d8313d85b70e5",
+  "app-persistence": "174302b580953fd41ececd9e440b318c5b33c106af8e58d6b0f618fc618a0b85",
+  "portfolio-email": "80a1fa553ee53436e721f9fadcc30aac790a5c0fb61aac38dba1534a7232264d",
+  "app-persistence-email": "f27bad80efca9c2b1847b1121468ea374f4a2d07985ebad0411b6d7d9e1a0524",
+  "site-contact-form": "fd8c3ee291bcacf958619b380bfa3c926049462fa39505b7a3f3f19dd3dc8ffb",
+  "app-jobs": "bae3ec20b6597e06a3d63429e3fbc20db46b0a3cfaee5f32ac4f9f2bfe5c892e",
+  "app-persistence-jobs-email": "4fcc2a241639c20849fb697906b4371b820024d56770fcb0274095c61053f3e8",
+});
+const currentFixtureDigests = Object.freeze({
+  "portfolio": "b99697c5e430a1ffa493f06adb84f6c77bb123dcad1980027304fd83ef028908",
+  "portfolio-calendly": "e5f9cd0516c11a5e4469cc9fbbbfb6d7edc693b8de35a440afddb748692faa21",
+  "site": "acd5434db2c2dd70e5515fd6a9e976056ebc9d1f0a089fa3866f493e623a5cb0",
+  "site-multilingual": "55afd4ac0766c710a9d757f1dead9eef23ab7cf2714ed7bbb102f819b218220e",
+  "site-public-integrations": "871588a3d3219e755c9d926565aa1a92158a5550e2cb52668665b83c2462f4c3",
+  "app": "eef57916a8e67e1a53279eb541fa53fb8a595f10465894972b5a929339199d84",
+  "app-all-optional-integrations": "71977c46898f8d7273390a3c5bbeb3241d1ca8848dcc5bc9cc59b448729c1621",
+  "app-persistence": "334fd73d363554a678c4ef15fe70c4fd0911e90b18a6cef681290ddb58721ec3",
+  "portfolio-email": "289bb0c323bfbd78960e72f8ba34028442494dea4c3edfbda2a0cca26598d430",
+  "app-persistence-email": "9b391237237a80b67287ba3c51c321cd8f9d729390a9b657edfe175cc10ca667",
+  "site-contact-form": "bfd91b292b6770d52938fd9c86943af38ada7a2e109bd267e82872f0f7c1a10c",
+  "app-jobs": "f73f8313fa30dd09cc9822b311992d072bfc1f00e9bdb1397707fc81f2f91181",
+  "app-persistence-jobs-email": "3ba4a3116ecfa8094ec12b09281c1c4965130079807e7142949183abc86700e7",
+});
+const successorDeploymentVersions = Object.freeze({
+  "0.9.0": "0.13.0", "0.10.0": "0.14.0", "0.11.0": "0.15.0", "0.12.0": "0.16.0",
+});
+
+function currentFixtureContract(identifier) {
+  const retained = contractForIdentifier(identifier);
+  return Object.freeze({
+    ...retained,
+    expectedFiles: Object.freeze([...new Set([...retained.expectedFiles, ...publicBuildWitnessPaths])].sort(codePointCompare)),
+    expectedSurfaces: retained.expectedSurfaces + 2,
+    expectedDeploymentCloudflareVersion: successorDeploymentVersions[retained.expectedDeploymentCloudflareVersion],
+  });
+}
+
 export function contractForGeneratedProject(identifier, expectedProjectName) {
-  const app = identifier === "app-calendly" ? contractForIdentifier("app") : undefined;
-  const contract = app === undefined ? contractForIdentifier(identifier) : Object.freeze({
+  const app = identifier === "app-calendly" ? currentFixtureContract("app") : undefined;
+  const contract = app === undefined ? currentFixtureContract(identifier) : Object.freeze({
     ...app,
     identifier,
     projectName: "acme-app-calendly",
@@ -2248,6 +2301,119 @@ function requireAdapters(adapters) {
   }
 }
 
+async function requireFixtureWitnessInputs(input) {
+  try {
+    if (await realpath(input.retainedRoot) !== input.retainedRoot ||
+        await realpath(input.witnessRoot) !== input.witnessRoot) fail("FIXTURE_WITNESS_INVALID");
+    const [retained, witness] = await Promise.all([
+      inspectFixture(input.retainedRoot, input.retained),
+      snapshotTree(input.witnessRoot),
+    ]);
+    if (fingerprint(JSON.stringify(retained)) !== retainedFixtureDigests[input.retained.identifier] ||
+        !jsonMatches(witness.map(({ path }) => path), publicBuildWitnessPaths)) fail("FIXTURE_WITNESS_INVALID");
+    return witness;
+  } catch {
+    fail("FIXTURE_WITNESS_INVALID");
+  }
+}
+
+async function requireFixtureWitnessDirectory(witnessDirectory) {
+  if (await realpath(witnessDirectory) !== witnessDirectory) fail("FIXTURE_WITNESS_INVALID");
+  const entries = await readdir(witnessDirectory, { withFileTypes: true });
+  if (entries.some(entry => !entry.isDirectory()) || !jsonMatches(
+    entries.map(entry => entry.name).sort(codePointCompare),
+    generatedFixtureContracts.map(({ identifier }) => identifier).sort(codePointCompare),
+  )) fail("FIXTURE_WITNESS_INVALID");
+}
+
+async function writeFixtureWitness(reconstruction, path, content, retainedFingerprint) {
+  const destination = join(reconstruction, path);
+  const parent = dirname(destination);
+  if (await realpath(parent) !== parent) fail("FIXTURE_WITNESS_INVALID");
+  const existing = retainedFingerprint !== undefined;
+  const flags = fileConstants.O_RDWR | fileConstants.O_NOFOLLOW | fileConstants.O_NONBLOCK |
+    (existing ? 0 : fileConstants.O_CREAT | fileConstants.O_EXCL);
+  const file = await open(destination, flags, 0o644);
+  try {
+    const stats = await file.stat();
+    if (!stats.isFile() || stats.nlink !== 1) fail("FIXTURE_WITNESS_INVALID");
+    if (existing) {
+      if (fingerprint(await file.readFile()) !== retainedFingerprint) fail("FIXTURE_WITNESS_INVALID");
+      await file.truncate(0);
+    }
+    const { bytesWritten } = await file.write(content, 0, content.length, 0);
+    if (bytesWritten !== content.length) fail("FIXTURE_WITNESS_INVALID");
+  } finally {
+    await file.close();
+  }
+}
+
+async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, operation) {
+  let witnessDirectory;
+  let root;
+  try {
+    root = await realpath(fixtureRepositoryRoot);
+    witnessDirectory = resolve(root, publicBuildWitnessDirectory);
+    await requireFixtureWitnessDirectory(witnessDirectory);
+  } catch {
+    fail("FIXTURE_WITNESS_INVALID");
+  }
+  const inputs = identifiers.map(identifier => {
+    const retained = contractForIdentifier(identifier);
+    return {
+      retained,
+      retainedRoot: resolve(root, retained.relativeRoot),
+      witnessRoot: resolve(witnessDirectory, identifier),
+    };
+  });
+  const before = await Promise.all(inputs.map(requireFixtureWitnessInputs));
+  const owner = await createGeneratedFixtureOwner();
+  try {
+    const ownedRoot = await realpath(owner.path);
+    const sources = [];
+    for (const [index, input] of inputs.entries()) {
+      const identifier = input.retained.identifier;
+      const reconstruction = join(ownedRoot, identifier);
+      try {
+        if (!(await pathIdentityMatches(owner)) || await realpath(owner.path) !== ownedRoot) fail("FIXTURE_WITNESS_INVALID");
+        await cp(input.retainedRoot, reconstruction, { recursive: true, force: false, errorOnExist: true, dereference: false });
+        const copied = await snapshotTree(reconstruction);
+        if (fingerprint(JSON.stringify(copied)) !== retainedFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+        const retainedFingerprints = new Map(copied.map(({ path, fingerprint }) => [path, fingerprint]));
+        for (const { path, fingerprint: expected } of before[index]) {
+          const content = await readFile(join(input.witnessRoot, path));
+          if (fingerprint(content) !== expected || !(await pathIdentityMatches(owner))) fail("FIXTURE_WITNESS_INVALID");
+          await writeFixtureWitness(reconstruction, path, content, retainedFingerprints.get(path));
+        }
+      } catch {
+        fail("FIXTURE_WITNESS_INVALID");
+      }
+      const source = await sourceForRoot(reconstruction, currentFixtureContract(identifier));
+      if (fingerprint(JSON.stringify(source.snapshot)) !== currentFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+      sources.push(source);
+    }
+    return await operation(sources);
+  } finally {
+    try {
+      await requireFixtureWitnessDirectory(witnessDirectory);
+      const after = await Promise.all(inputs.map(requireFixtureWitnessInputs));
+      if (!jsonMatches(before, after)) fail("FIXTURE_SOURCE_CHANGED");
+    } catch {
+      fail("FIXTURE_SOURCE_CHANGED");
+    } finally {
+      if (!(await cleanupOwnedDirectory(owner))) fail("VERIFICATION_CLEANUP_FAILED");
+    }
+  }
+}
+
+export function withCurrentGeneratedFixture(identifier, operation) {
+  return withCurrentFixtureSources(repositoryRoot, [identifier], async ([source]) => {
+    const result = await operation(source.root, source.contract);
+    if (!jsonMatches(await inspectFixture(source.root, source.contract), source.snapshot)) fail("FIXTURE_SOURCE_CHANGED");
+    return result;
+  });
+}
+
 async function sourceForRoot(root, contract) {
   const fixedRoot = resolve(root);
   return {
@@ -2269,12 +2435,11 @@ export async function verifyGeneratedSkeletonsForTesting(
   const firstFixture = Object.hasOwn(options, "fromFixture")
     ? fixedFixtureIndex(fromFixture, "VERIFICATION_OPTION_INVALID")
     : 0;
-  const sources = await Promise.all(
-    generatedFixtureContracts.map((contract) =>
-      sourceForRoot(resolve(fixtureRepositoryRoot, contract.relativeRoot), contract),
-    ),
+  return withCurrentFixtureSources(
+    fixtureRepositoryRoot,
+    generatedFixtureContracts.map(({ identifier }) => identifier),
+    (sources) => verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture),
   );
-  return verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture);
 }
 
 export function verifyGeneratedProject(
@@ -2302,13 +2467,13 @@ export async function verifyGeneratedProjectForTesting(
   adapters,
   expectedProjectName,
   options = defaultVerificationOptions,
+  retained = false,
 ) {
   requireAdapters(adapters);
   requireVerificationOptions(options);
-  const contract = contractForGeneratedProject(
-    identifier,
-    expectedProjectName,
-  );
+  const contract = retained
+    ? { ...contractForIdentifier(identifier), ...(expectedProjectName === undefined ? {} : { projectName: expectedProjectName }) }
+    : contractForGeneratedProject(identifier, expectedProjectName);
   const source = await sourceForRoot(root, contract);
   return verifySourcesWithAdapters(adapters, [source], options);
 }

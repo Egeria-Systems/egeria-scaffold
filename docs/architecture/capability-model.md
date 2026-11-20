@@ -522,14 +522,16 @@ The [bounded jobs repair](../roadmaps/program-roadmap.md#one-time-2026-11-15-bac
 
 The public parser, runner, codecs and renderer now share schema `2.0.0` and the three recipes `portfolio@0.12.0`, `site@0.13.0` and `app@0.3.0`. This is an authored source candidate with acceptance still open. Literal provider destinations are rejected before adapter access; configuration supplies destinations at their owning build/runtime boundary. Missing, unknown, retired or mixed installed controls refuse and never select default generation implicitly. Read-only inference, diagnostics and diff do not install dependencies.
 
-| Installed selection | Standards | Deployment | Foundation/jobs when selected |
-| --- | --- | --- | --- |
-| Plain | `0.9.0` | `0.9.0` | foundation `0.3.0` |
-| Persistence | `0.10.0` | `0.10.0` | foundation `0.3.0` |
-| Jobs | `0.9.0` | `0.11.0` | foundation/jobs `0.3.0` |
-| Persistence and jobs | `0.10.0` | `0.12.0` | foundation/jobs `0.3.0` |
+| Installed selection | Standards | Retained deployment | Fresh deployment | Foundation/jobs when selected |
+| --- | --- | --- | --- | --- |
+| Plain | `0.9.0` | `0.9.0` | `0.13.0` | foundation `0.3.0` |
+| Persistence | `0.10.0` | `0.10.0` | `0.14.0` | foundation `0.3.0` |
+| Jobs | `0.9.0` | `0.11.0` | `0.15.0` | foundation/jobs `0.3.0` |
+| Persistence and jobs | `0.10.0` | `0.12.0` | `0.16.0` | foundation/jobs `0.3.0` |
 
 All tuples use content-files `0.4.0`, section-composition `0.3.0`, observability `0.4.0`, routing `0.5.0` when selected, multilingual `0.1.1`, and contact, booking, analytics, persistence and email `0.2.0`. The complete identifier-keyed admission catalog selects the maximal standards/deployment variants. Installed manifest selection independently chooses the actual tuple; no composite certificate or registry framework is introduced.
+
+The [public build configuration successor](../adr/0020-application-environments.md#public-build-configuration-successor) owns the shared generated build and root metadata helpers through deployment. The Next and preflight wrappers keep their own execution and diagnostic contracts, and the root layout remains application-owned. Installed reads require the helper declarations to match the selected deployment family. Addition and removal preserve that family even when persistence changes. The fresh deployment admission subject is pending, with separately bound evidence required for each composition.
 
 Fresh generation selects Next.js `16.4.5` from the six exact lock paths whose graph keys end in `-next-16.4.5`. They correspond to portfolio `0.12.0`, site `0.13.0`, app `0.3.0`, and the existing portfolio-foundation, site-foundation and app-persistence graphs. A supported installed project whose managed Next.js fingerprint records `16.4.1` retains its exact earlier lock and rendering policy under [ADR-0015](../adr/0015-vitest-five-generation.md#nextjs-1645-security-successor). The existing project, state and descriptor controls still identify the installed capabilities independently.
 
@@ -540,6 +542,8 @@ Current addition, removal and re-addition support contact, booking, analytics, m
 Incoming app transitions use only the two [ADR-0020 endpoints](../adr/0020-application-environments.md#public-environment-generation-activation). Site preserves customized UI and locale values; portfolio requires separately admitted visual evidence and remains closed while that evidence is absent. Retired upgrades and portfolio-to-site commands and certification routes refuse before writer/verifier access. A successful current apply still stops for verified-final-diff approval; interrupted operations retain their exact inspectable prefix.
 
 The [fixed fixture verifier](../../scripts/verify-generated-skeletons.mjs) targets thirteen immutable roots. The three multilingual contracts use the `-multilingual-0.1.1` successors within the Next.js `16.4.5` generation. The two analytics-enabled contracts select the `-consent-session` successors for the site and app compositions. Their earlier roots preserve the exact installed analytics view. The logical fixture contracts cover portfolio, portfolio-calendly and portfolio-email at `0.12.0`; site, site-multilingual, site-public-integrations and site-contact-form at `0.13.0`; app, app-all-optional-integrations, app-persistence, app-persistence-email, app-jobs and app-persistence-jobs-email at `0.3.0`. All thirteen roots originated in ordinary compiled CLI generation with the production verifier. The deployment workflow and helper updates matched independent renders, and the two jobs roots were regenerated after correcting their operator scope. Read-only `infer`, `doctor` and `diff` checks passed for each current fixture. The full generated runtime/browser/security matrix remains separate and incomplete. Historical fixture bytes stay unchanged. Four new portfolio transition images additionally require candidate generation, exact human image/manifest approval and no-update reproduction; historical accepted images cannot satisfy that gate.
+
+For the public build successor, those thirteen immutable roots are exact retained ancestors. Each current fixture adds a six-file generated witness containing the state, root layout, Next and preflight wrappers, and the two shared helpers. The fixed verifier checks both inputs and reconstructs the full current tree in identity-owned scratch before running the existing verification vector. Determinism compares both ordinary compiled-CLI creations against every path and byte of that reconstructed witness. Retained comparisons continue to use the exact immutable roots.
 
 All fourteen current registry records are pending with separate required evidence and no inherited successful receipt. At environment activation, eleven canonical subject digests changed. Content-files, section-composition and multilingual retained their descriptor digests at that activation and required renewal because recipes and consuming source changed. The multilingual section-link successor renews its descriptor and certification subject. Other installed variants require separately bound assertions even when one scenario is shared. Historical receipts remain reviewable at their exact identities; neither admission nor deterministic checks satisfy `all-certified` closure.
 

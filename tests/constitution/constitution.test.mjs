@@ -4051,6 +4051,7 @@ test("executable capability certification ownership is current", async () => {
   ]);
   const taskPlanOverrides = new Map([
     ["background-job-delivery", "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"],
+    ["deployment-cloudflare", "docs/superpowers/plans/2026-11-19-deployment-public-build-certification-handoff.md"],
     ["multilingual", `docs/superpowers/plans/capability-repairs/2026-11-18-multilingual-section-links-${compactLabel("gate", "-", "2")}.md`],
   ]);
   for (const [identifier, record] of Object.entries(registry.records)) {
