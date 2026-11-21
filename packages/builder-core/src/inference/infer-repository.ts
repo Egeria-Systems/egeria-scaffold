@@ -1,7 +1,7 @@
 import { retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 import { createVerifiedProjectSnapshot } from "../catalog/verified-package-versions.js";
 import { renderProjectTemplates } from "../generation/render-skeleton.js";
-import { publicBuildManagedFiles, type CapabilityDescriptor } from "../contracts/capability.js";
+import { backgroundJobDeliveryVersions, publicBuildManagedFiles, type CapabilityDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type {
   InstalledCapability,
@@ -321,7 +321,8 @@ async function verifyDeploymentSurfaces(
   const renderingContext = snapshot?.ok ? snapshot.value.renderingContext : undefined;
   const templates = project?.ok && renderingContext !== undefined
     ? await renderProjectTemplates(project.value, new Set(required.map(surface => surface.path)),
-      renderingContext.retainAnalyticsConsent, retainsDeploymentConfiguration(renderingContext.catalogSnapshot))
+      renderingContext.retainAnalyticsConsent, retainsDeploymentConfiguration(renderingContext.catalogSnapshot),
+      renderingContext.catalogSnapshot.backgroundJobDelivery === backgroundJobDeliveryVersions.current)
     : undefined;
   for (const descriptor of required) {
     const helper = publicBuildManagedFiles.some(([identifier]) => identifier === descriptor.identifier);

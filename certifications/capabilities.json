@@ -48,8 +48,8 @@
     },
     "background-job-delivery": {
       "subject": {
-        "descriptorVersion": "0.3.0",
-        "behaviorContractDigest": "sha256:7f42f615f573bc8594bbec10ea6b1cfca1d4317a616c6bbb7e2d4b68b9c8aa79"
+        "descriptorVersion": "0.4.0",
+        "behaviorContractDigest": "sha256:2f52231ed9b3cc5a8545e0d879481ff2ea08868c87615123c473ce3f15b2901f"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -59,7 +59,7 @@
         "provider-confirmed"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md",
+      "taskPlan": "docs/superpowers/plans/2026-11-20-background-job-checked-attempt-certification-handoff.md",
       "evidence": []
     },
     "booking-calendly": {
@@ -108,8 +108,8 @@
     },
     "deployment-cloudflare": {
       "subject": {
-        "descriptorVersion": "0.16.0",
-        "behaviorContractDigest": "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478"
+        "descriptorVersion": "0.18.0",
+        "behaviorContractDigest": "sha256:2a1928592d7db02e10d8a75750f92f822fea4838d3b87837fe43d99f20a30ab9"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -117,7 +117,7 @@
         "fresh-scaffold"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-11-19-deployment-public-build-certification-handoff.md",
+      "taskPlan": "docs/superpowers/plans/2026-11-20-deployment-job-build-identity-certification-handoff.md",
       "evidence": []
     },
     "multilingual": {

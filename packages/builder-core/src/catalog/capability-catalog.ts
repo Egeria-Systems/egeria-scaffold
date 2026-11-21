@@ -1,12 +1,16 @@
 import {
+  backgroundJobDeliveryVersions,
   capabilityDescriptorSchema,
   deploymentVersionsFor,
   multilingualCapabilityVersion,
   publicBuildManagedFiles,
+  supportedDeploymentViews,
+  type BackgroundJobDeliveryVersion,
   type CapabilityDescriptor,
   type DeploymentCapabilityVersion,
   type InferenceProbe,
   type ManagedSurfaceDescriptor,
+  type RetainedDeploymentView,
 } from "../contracts/capability.js";
 import { semanticVersionSchema } from "../contracts/identifiers.js";
 import type {
@@ -28,7 +32,7 @@ export type CapabilityCatalogSnapshot = Readonly<{
   siteRouting: "0.5.0";
   appFoundation: "0.3.0";
   deploymentCloudflare: DeploymentCapabilityVersion;
-  backgroundJobDelivery?: "0.3.0";
+  backgroundJobDelivery?: BackgroundJobDeliveryVersion;
   applicationPersistence?: "0.2.0";
   transactionalEmailResend: "0.2.0";
 }>;
@@ -51,22 +55,27 @@ export const applicationEnvironmentPersistenceCatalogSnapshot: CapabilityCatalog
 export const applicationEnvironmentJobsCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...applicationEnvironmentCatalogSnapshot,
   deploymentCloudflare: deploymentVersionsFor(false, true).current,
-  backgroundJobDelivery: "0.3.0",
+  backgroundJobDelivery: backgroundJobDeliveryVersions.current,
 });
 
 export const applicationEnvironmentPersistenceJobsCatalogSnapshot: CapabilityCatalogSnapshot = Object.freeze({
   ...applicationEnvironmentPersistenceCatalogSnapshot,
   deploymentCloudflare: deploymentVersionsFor(true, true).current,
-  backgroundJobDelivery: "0.3.0",
+  backgroundJobDelivery: backgroundJobDeliveryVersions.current,
 });
 
-export function applicationEnvironmentSnapshotFor(persistence: boolean, jobs: boolean, retainDeployment: boolean): CapabilityCatalogSnapshot {
+export function applicationEnvironmentSnapshotFor(persistence: boolean, jobs: boolean, retainDeployment: RetainedDeploymentView): CapabilityCatalogSnapshot {
   const snapshot = jobs
     ? (persistence ? applicationEnvironmentPersistenceJobsCatalogSnapshot : applicationEnvironmentJobsCatalogSnapshot)
     : (persistence ? applicationEnvironmentPersistenceCatalogSnapshot : applicationEnvironmentCatalogSnapshot);
-  return retainDeployment
-    ? { ...snapshot, deploymentCloudflare: deploymentVersionsFor(persistence, jobs).retained }
-    : snapshot;
+  const versions = deploymentVersionsFor(persistence, jobs);
+  const retainedVersion = retainDeployment === true ? versions.retained
+    : retainDeployment === "public-build" ? versions.publicBuild : undefined;
+  if (retainedVersion === undefined) return snapshot;
+  return {
+    ...snapshot, deploymentCloudflare: retainedVersion,
+    ...(jobs ? { backgroundJobDelivery: backgroundJobDeliveryVersions.retained } : {}),
+  };
 }
 
 export function retainsDeploymentConfiguration(snapshot: CapabilityCatalogSnapshot): boolean {
@@ -78,7 +87,7 @@ export function retainsDeploymentConfiguration(snapshot: CapabilityCatalogSnapsh
 
 const supportedEnvironmentSnapshots = [false, true].flatMap(persistence =>
   [false, true].flatMap(jobs =>
-    [false, true].map(retainDeployment => applicationEnvironmentSnapshotFor(persistence, jobs, retainDeployment))));
+    supportedDeploymentViews(jobs).map(retainDeployment => applicationEnvironmentSnapshotFor(persistence, jobs, retainDeployment))));
 
 export const applicationEnvironmentScripts = Object.freeze({
   "check:environment": "node scripts/check-application-environment.mjs --local",
@@ -276,7 +285,8 @@ function createDescriptors(
 ): readonly CapabilityDescriptor[] {
   const siteRoutingVersion = snapshot.siteRouting;
   const persistence = snapshot.applicationPersistence !== undefined;
-  const jobs = snapshot.backgroundJobDelivery !== undefined;
+  const jobsVersion = snapshot.backgroundJobDelivery;
+  const jobs = jobsVersion !== undefined;
   const sharedSupportedProfiles = (["portfolio", "site", "app"] as const);
   const siteRoutingSupportedProfiles = (["site", "app"] as const);
   const standardsEvidencePoints = [
@@ -1858,7 +1868,7 @@ function createDescriptors(
     } as const]),
     ...(jobs ? [{
       identifier: "background-job-delivery",
-      version: "0.3.0",
+      version: jobsVersion,
       deliveryMode: "hybrid",
       stateClassifications: ["repository-stateful", "external-stateful"],
       removalPolicy: "reviewed",
@@ -2007,9 +2017,7 @@ export function createCapabilityCatalogSnapshot(
   const catalog: CapabilityDescriptor[] = [];
   const catalogIssues: ContractIssue[] = [];
 
-  const descriptors = createDescriptors(packageVersions, supportedSnapshot).filter((descriptor) =>
-    supportedSnapshot.backgroundJobDelivery === "0.3.0" || descriptor.identifier !== "background-job-delivery",
-  );
+  const descriptors = createDescriptors(packageVersions, supportedSnapshot);
   for (const [index, descriptor] of descriptors.entries()) {
     const parsed = capabilityDescriptorSchema.safeParse(descriptor);
 

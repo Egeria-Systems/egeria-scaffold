@@ -20,7 +20,10 @@ const { build: { buildId }, publicValues } = result.value;
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),
+  generateBuildId: async () => {
+    if (buildId === undefined) throw new Error("APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing");
+    return buildId;
+  },
   env: publicValues,
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
