@@ -52,7 +52,9 @@ export type JobAttempt =
   | Readonly<{ kind: "executed"; job: JobEnvelope; decision: JobDecision }>;
 const operationPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const typePattern = /^[a-z][a-z0-9-]{0,63}$/u;
+const maximumEnvelopeBytes = 16_384;
 const encoder = new TextEncoder();
+type SnapshotBudget = { remaining: number };
 
 export function isJobEnvironment(value: unknown): value is JobEnvironment {
   return value === "local" || value === "staging" || value === "production";
@@ -61,32 +63,46 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value) &&
     (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
-function snapshotJsonValue(value: unknown, depth: number): JobValue | undefined {
+// Charge a lower bound on the JSON bytes before building more of the snapshot.
+// The exact UTF-8 check still accounts for escaping and the envelope fields.
+function reserveSnapshotBytes(budget: SnapshotBudget, minimumBytes: number): boolean {
+  budget.remaining -= minimumBytes;
+  return budget.remaining >= 0;
+}
+
+function snapshotJsonValue(value: unknown, depth: number, budget: SnapshotBudget): JobValue | undefined {
   if (depth > 5) return undefined;
-  if (value === null || typeof value === "boolean") return value;
-  if (typeof value === "number") return Number.isFinite(value) ? (value === 0 ? 0 : value) : undefined;
-  if (typeof value === "string") return value.length <= 2_048 ? value : undefined;
+  if (value === null || typeof value === "boolean") {
+    return reserveSnapshotBytes(budget, value === false ? 5 : 4) ? value : undefined;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) && reserveSnapshotBytes(budget, 1) ? (value === 0 ? 0 : value) : undefined;
+  }
+  if (typeof value === "string") {
+    return value.length <= 2_048 && reserveSnapshotBytes(budget, value.length + 2) ? value : undefined;
+  }
   if (Array.isArray(value)) {
     const length = value.length;
-    if (length > 64) return undefined;
+    if (length > 64 || !reserveSnapshotBytes(budget, 2 + Math.max(0, length - 1))) return undefined;
     const elements: JobValue[] = [];
     for (let index = 0; index < length; index++) {
-      const element = snapshotJsonValue(index in value ? value[index] : null, depth + 1);
+      const element = snapshotJsonValue(index in value ? value[index] : null, depth + 1, budget);
       if (element === undefined) return undefined;
       elements.push(element);
     }
     return Object.freeze(elements);
   }
-  return record(value) ? snapshotJsonRecord(value, depth) : undefined;
+  return record(value) ? snapshotJsonRecord(value, depth, budget) : undefined;
 }
 
-function snapshotJsonRecord(value: Record<string, unknown>, depth: number): Readonly<Record<string, JobValue>> | undefined {
+function snapshotJsonRecord(value: Record<string, unknown>, depth: number, budget: SnapshotBudget): Readonly<Record<string, JobValue>> | undefined {
+  if (!reserveSnapshotBytes(budget, 2)) return undefined;
   const keys = Object.keys(value);
-  if (keys.length > 64) return undefined;
+  if (keys.length > 64 || !reserveSnapshotBytes(budget, Math.max(0, keys.length - 1))) return undefined;
   const snapshot: Record<string, JobValue> = {};
   for (const key of keys) {
-    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/u.test(key)) return undefined;
-    const item = snapshotJsonValue(value[key], depth + 1);
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/u.test(key) || !reserveSnapshotBytes(budget, key.length + 3)) return undefined;
+    const item = snapshotJsonValue(value[key], depth + 1, budget);
     if (item === undefined) return undefined;
     snapshot[key] = item;
   }
@@ -115,10 +131,10 @@ export function parseJobEnvelope(value: unknown, environment: JobEnvironment): J
     if (version !== 1 || !isJobEnvironment(target) || typeof operationId !== "string" || !operationPattern.test(operationId) ||
       typeof jobType !== "string" || !typePattern.test(jobType) || typeof jobVersion !== "number" || !Number.isSafeInteger(jobVersion) ||
       !record(input)) throw new JobDeliveryFailure("job-validation");
-    const payload = snapshotJsonRecord(input, 0);
+    const payload = snapshotJsonRecord(input, 0, { remaining: maximumEnvelopeBytes });
     if (payload === undefined) throw new JobDeliveryFailure("job-validation");
     const job: JobEnvelope = { version, environment: target, operationId, jobType, jobVersion, payload };
-    if (encoder.encode(JSON.stringify(job)).byteLength > 16_384) throw new JobDeliveryFailure("job-validation");
+    if (encoder.encode(JSON.stringify(job)).byteLength > maximumEnvelopeBytes) throw new JobDeliveryFailure("job-validation");
     if (target !== environment) throw new JobDeliveryFailure("job-environment");
     return Object.freeze(job);
   } catch (error) {

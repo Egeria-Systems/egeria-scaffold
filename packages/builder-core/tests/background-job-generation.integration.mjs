@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { promisify } from "node:util";
+import { derivePnpmToolEnvironment } from "../dist/generation/verify-generated-project.js";
 import { createApplicationEnvironmentRenderingContext, createFileSystemRepositoryReader, createPnpmGeneratedProjectVerifier, generateProject, inferRepository, readVerifiedProjectSnapshot } from "../dist/index.js";
 import { assertCompositionSourcePreserved, createJobCompositionFixture, createEmailOnlyFixture, verifyEmailOnlyFixture } from "./helpers/job-composition-fixture.mjs";
 
@@ -16,8 +17,10 @@ async function verifyLocalQueuePreparation(source, owner) {
   const web = join(root, "apps/web");
   const home = join(owner, "preparation-home");
   await mkdir(home, { mode: 0o700 });
+  const path = process.env.PATH;
   const environment = {
-    PATH: process.env.PATH,
+    PATH: path,
+    ...await derivePnpmToolEnvironment("pnpm", { environment: { PATH: path } }),
     HOME: home,
     XDG_CONFIG_HOME: home,
     CI: "1",
@@ -29,6 +32,9 @@ async function verifyLocalQueuePreparation(source, owner) {
     cwd: root, env: { ...environment, ...extra }, encoding: "utf8", maxBuffer: 1024 * 1024, timeout: 240_000,
   });
   await command(["install", "--frozen-lockfile", "--store-dir", join(owner, "preparation-store")]);
+  await command(["--dir", "apps/web", "run", "cf-typegen"]);
+  await command(["run", "typecheck"]);
+  await access(join(web, ".next/types/routes.d.ts"));
   const artifact = join(web, ".open-next/assets/BUILD_ID");
   for (const args of [["run", "build"], ["run", "build:cloudflare"], ["--dir", "apps/web", "run", "preview"], ["run", "verify"]]) {
     for (const [reason, extra] of [["missing", {}], ["invalid", { BUILD_SOURCE_REVISION: "synthetic-invalid-revision" }]]) {

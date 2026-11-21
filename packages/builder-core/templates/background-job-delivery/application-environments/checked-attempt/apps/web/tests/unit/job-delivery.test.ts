@@ -51,6 +51,44 @@ it("a checked attempt reads a bounded JSON snapshot before declaration validatio
   expect(handle).toHaveBeenCalledOnce();
 });
 
+it("stops expanding oversized shared strings before visiting the rest of the payload", async () => {
+  const chunk = "a".repeat(2_048);
+  const read = vi.fn(() => chunk);
+  const shared = { get chunk() { return read(); } };
+  const entries = Array.from({ length: 12 }, () => shared);
+  const validate = vi.fn(() => true);
+  const handle = vi.fn(() => Effect.void);
+  const result = await runJobAttempt(envelope({ payload: { entries } }), "local", [{ ...definition(handle), validate }], 1);
+  expect(result).toEqual({ kind: "malformed-envelope", code: "job-validation", operationId });
+  expect(read.mock.calls.length).toBeLessThan(entries.length);
+  expect(validate).not.toHaveBeenCalled();
+  expect(handle).not.toHaveBeenCalled();
+});
+
+it("stops expanding oversized shared containers with short values", () => {
+  const read = vi.fn(() => null);
+  const shared = { get value() { return read(); } };
+  const row = Array.from({ length: 48 }, () => shared);
+  const rows = Array.from({ length: 32 }, () => row);
+  const handlers = [{ ...definition(() => Effect.void), validate: () => true }];
+  expect(() => validateJob(envelope({ payload: { rows } }), "local", handlers))
+    .toThrow(expect.objectContaining({ code: "job-validation" }));
+  expect(read.mock.calls.length).toBeLessThan(rows.length * row.length);
+});
+
+it("preserves the exact UTF-8 envelope boundary with shared values and JSON escaping", () => {
+  const shared = { chunk: "é".repeat(2_048) };
+  const entries = [shared, shared, shared, "a".repeat(2_048), '"\\\n'];
+  const encodedBytes = (job: JobEnvelope) => new TextEncoder().encode(JSON.stringify(job)).byteLength;
+  const atLimit = (padding: string) => envelope({ payload: { entries, padding } });
+  const padding = "x".repeat(16_384 - encodedBytes(atLimit("")));
+  const handlers = [{ ...definition(() => Effect.void), validate: () => true }];
+  expect(encodedBytes(atLimit(padding))).toBe(16_384);
+  expect(validateJob(atLimit(padding), "local", handlers)).toEqual(atLimit(padding));
+  expect(() => validateJob(atLimit(padding + "x"), "local", handlers))
+    .toThrow(expect.objectContaining({ code: "job-validation" }));
+});
+
 it("a checked attempt separates structural and declaration failures without executing either", async () => {
   const handle = vi.fn(() => Effect.void);
   const validate = vi.fn(() => true);

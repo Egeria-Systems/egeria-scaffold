@@ -5860,7 +5860,7 @@ test("public README follows the current staged release controls", async () => {
   assert.doesNotMatch(indexFiles(current.files).get("README.md"), /PLAYWRIGHT_DEPLOYED_URL/u);
 });
 
-test("fresh jobs require a source revision only for the Next production build phase", async () => {
+test("fresh jobs require a source revision when Next generates a build ID", async () => {
   const core = await import("../dist/index.js");
   const revision = "a".repeat(40);
   for (const [withJobs, retained] of [[true, false], [true, "public-build"], [true, true], [false, false]]) {
@@ -5868,7 +5868,7 @@ test("fresh jobs require a source revision only for the Next production build ph
     const rendered = assertSuccess(await core.renderSkeleton({ profile: "app", projectName: "jobs-build",
       displayName: "Jobs build", packageVersions: core.verifiedCapabilityPackageVersions,
       ...(withJobs ? { backgroundJobDelivery: true } : {}) }, context));
-    const root = await mkdtemp(join(tmpdir(), "jobs-production-build-phase-"));
+    const root = await mkdtemp(join(tmpdir(), "jobs-build-id-"));
     try {
       for (const { path, content } of rendered.files.filter(({ path }) =>
         path === "apps/web/next.config.ts" || path.startsWith("apps/web/src/configuration/"))) {
@@ -5885,27 +5885,27 @@ test("fresh jobs require a source revision only for the Next production build ph
       await writeFile(join(adapter, "index.js"), "export function initOpenNextCloudflareForDev() {}\n");
       await writeFile(join(next, "package.json"), JSON.stringify({ type: "module" }));
       await writeFile(join(next, "constants.js"), 'export const PHASE_PRODUCTION_BUILD = "phase-production-build";\n');
-      const script = 'const { default: config } = await import("./next.config.ts"); const actual = typeof config === "function" ? await config(process.env.TEST_NEXT_PHASE) : config; console.log(JSON.stringify({ buildId: await actual.generateBuildId?.() }));';
-      const invoke = (phase, buildRevision) => spawnSync(process.execPath, ["--input-type=module", "-e", script], {
+      const script = 'const { default: config } = await import("./next.config.ts"); const actual = typeof config === "function" ? await config(process.env.TEST_NEXT_PHASE) : config; console.log(JSON.stringify({ buildId: process.env.TEST_BUILD === "1" ? await actual.generateBuildId?.() : undefined }));';
+      const invoke = (phase, build, buildRevision) => spawnSync(process.execPath, ["--input-type=module", "-e", script], {
         cwd: web, encoding: "utf8", env: {
-          APPLICATION_ENVIRONMENT: "development", TEST_NEXT_PHASE: phase,
+          APPLICATION_ENVIRONMENT: "development", TEST_NEXT_PHASE: phase, TEST_BUILD: build ? "1" : "0",
           ...(buildRevision === undefined ? {} : { BUILD_SOURCE_REVISION: buildRevision }),
         },
       });
       const fresh = withJobs && retained === false;
-      const missing = invoke("phase-production-build");
+      const missing = invoke("phase-production-build", true);
       assert.equal(missing.status, fresh ? 1 : 0, missing.stderr);
       if (fresh) assert.match(missing.stderr, /APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing/u);
-      for (const phase of ["phase-development-server", "phase-production-server", "phase-export"]) {
-        const allowed = invoke(phase);
+      for (const phase of ["phase-production-build", "phase-development-server", "phase-production-server", "phase-export"]) {
+        const allowed = invoke(phase, false);
         assert.equal(allowed.status, 0, allowed.stderr);
         assert.deepEqual(JSON.parse(allowed.stdout), {});
       }
-      const invalid = invoke("phase-production-build", "synthetic-private-invalid-revision");
+      const invalid = invoke("phase-production-build", true, "synthetic-private-invalid-revision");
       assert.equal(invalid.status, 1, invalid.stderr);
       assert.match(invalid.stderr, /APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:invalid/u);
       assert.doesNotMatch(invalid.stderr, /synthetic-private-invalid-revision/u);
-      const valid = invoke("phase-production-build", revision);
+      const valid = invoke("phase-production-build", true, revision);
       assert.equal(valid.status, 0, valid.stderr);
       assert.deepEqual(JSON.parse(valid.stdout), { buildId: `egeria-development-${revision}` });
     } finally {

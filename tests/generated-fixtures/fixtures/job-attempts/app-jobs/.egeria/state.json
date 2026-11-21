@@ -1087,7 +1087,7 @@
       "path": "apps/web/scripts/prepare-ci-git.sh"
     },
     {
-      "fingerprint": "sha256:4beb02fc5f4ce779a138d86c49674f472673fc66fb31b3c4fc915513913ca874",
+      "fingerprint": "sha256:15e6c86452fba1444410cfce0dca288803a4d1a668d9fccb904472309017ba54",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1243,7 +1243,7 @@
       "path": "apps/web/src/configuration/site-origin.ts"
     },
     {
-      "fingerprint": "sha256:27a43bb0762341433894ec5ece597dc589b6d2c0587b6df38b158eb8c586bb35",
+      "fingerprint": "sha256:2a1a943878f5c771280a85ba65443fa9b937d13f4736d21ce3b188a1099eca67",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1257,7 +1257,7 @@
       "path": "apps/web/src/application/job-delivery.ts"
     },
     {
-      "fingerprint": "sha256:5f6ad2a3f267ba2e22d472815c20e942ab24a9feb9ceb64845021b75799d7baf",
+      "fingerprint": "sha256:f4efb92e73083f5acf6c0117d259facb3b308c84956c8a5fbcfc6ee673f487b4",
       "fingerprintTarget": {
         "kind": "file"
       },

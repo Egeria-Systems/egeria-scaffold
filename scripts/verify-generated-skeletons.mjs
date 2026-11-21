@@ -1458,11 +1458,11 @@ const jobAttemptWitnessPaths = Object.freeze([
 const jobAttemptWitnesses = Object.freeze({
   "app-jobs": {
     deploymentVersion: "0.17.0",
-    digest: "20699de3639eae7634fa8909e5daf2f8eccc53575ce5762b72aaab1ff86a34c4",
+    digest: "5d1cf472814f6da7b67d82a370ffd312f3ddd935164b23a37b7b373b052b86ac",
   },
   "app-persistence-jobs-email": {
     deploymentVersion: "0.18.0",
-    digest: "9ebaf91c59024a94cc0163f56eeb17300a8a41d0bc57e6d71c53a2e491c3c06b",
+    digest: "b1efbb84e637954dc43ea9412b74a84d57cbfa1ab6e4847cce3ead751af39ef0",
   },
 });
 const retainedFixtureDigests = Object.freeze({

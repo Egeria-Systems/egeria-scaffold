@@ -1,5 +1,5 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-{{jobBuildPhaseImport}}import type { NextConfig } from "next";
+import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
 import { readPublicBuildEnvironment, resolvePublicBuild } from "./src/configuration/public-build.ts";
@@ -20,7 +20,7 @@ const { build: { buildId }, publicValues } = result.value;
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),
+{{publicNextBuildIdConfiguration}}
   env: publicValues,
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
@@ -35,4 +35,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-{{publicNextConfigExport}}
+export default nextConfig;

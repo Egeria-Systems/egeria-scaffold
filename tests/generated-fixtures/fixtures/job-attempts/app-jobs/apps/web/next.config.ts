@@ -1,5 +1,4 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
-import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
@@ -21,7 +20,10 @@ const { build: { buildId }, publicValues } = result.value;
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
-  ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),
+  generateBuildId: async () => {
+    if (buildId === undefined) throw new Error("APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing");
+    return buildId;
+  },
   env: publicValues,
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
@@ -36,9 +38,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default function configure(phase: string): NextConfig {
-  if (phase === PHASE_PRODUCTION_BUILD && buildId === undefined) {
-    throw new Error("APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing");
-  }
-  return nextConfig;
-}
+export default nextConfig;
