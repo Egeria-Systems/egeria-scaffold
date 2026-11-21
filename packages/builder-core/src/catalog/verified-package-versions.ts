@@ -5,7 +5,7 @@ import type { ValidationResult } from "../contracts/result.js";
 import { installedStateSchema, type InstalledState } from "../contracts/state.js";
 import type { ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
 import { currentNextVersion, retainedNextVersion } from "../generation/recipe-lockfiles.js";
-import { retainedAnalyticsConsentTemplates } from "../generation/template-catalog.js";
+import { retainedAnalyticsConsentTemplates, retainedSectionTemplates } from "../generation/template-catalog.js";
 import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { createApplicationEnvironmentProfileRecipes } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
@@ -36,8 +36,9 @@ export function createGenerationRenderingContext(
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
+  retainSections?: true,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -101,6 +102,12 @@ export function createVerifiedProjectSnapshot(
       !stateValue.ejections.includes(path) && !projectValue.ejectedAreas.includes(path);
   });
   if (!matchesDeploymentInventory) return invalidProjectSnapshot();
+  const retainsSectionTemplates = retainedSectionTemplates.every(([identifier, owner, path, fingerprint]) =>
+    stateValue.managedSurfaces.some(surface => surface.identifier === identifier && surface.path === path &&
+      surface.owner.kind === "capability" && surface.owner.identifier === owner &&
+      surface.ownership === "application-owned" && surface.fingerprintTarget.kind === "file" &&
+      surface.fingerprint === fingerprint),
+  );
   const renderingContext = createGenerationRenderingContext(
     persistence,
     projectValue.selectedCapabilities.includes("app-foundation"),
@@ -108,6 +115,7 @@ export function createVerifiedProjectSnapshot(
     retainsNext ? retainedNextVersion : undefined,
     retainedConsentCount === retainedAnalyticsConsentTemplates.length ? true : undefined,
     deploymentView,
+    retainsSectionTemplates ? true : undefined,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -144,12 +152,14 @@ export function createApplicationEnvironmentRenderingContext(
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
+  retainSections?: true,
 ): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
     ...(retainedNext === undefined ? {} : { retainedNextVersion: retainedNext }),
     ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     ...(retainAnalyticsConsent ? { retainAnalyticsConsent: true } : {}),
+    ...(retainSections ? { retainSections: true } : {}),
     catalogSnapshot: applicationEnvironmentSnapshotFor(applicationPersistence, backgroundJobs, retainDeployment),
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
@@ -161,11 +171,13 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
       value.retainedNextVersion === retainedNextVersion ? retainedNextVersion : undefined;
     const retainAnalyticsConsent = typeof value === "object" && value !== null &&
       "retainAnalyticsConsent" in value && value.retainAnalyticsConsent === true ? true : undefined;
+    const retainSections = typeof value === "object" && value !== null &&
+      "retainSections" in value && value.retainSections === true ? true : undefined;
     const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
         [false, true].some((jobs) => supportedDeploymentViews(jobs).some(retainDeployment =>
-          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment))))),
+          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections))))),
     );
   } catch {
     return false;

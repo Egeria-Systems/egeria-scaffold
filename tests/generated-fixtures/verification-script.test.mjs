@@ -43,6 +43,12 @@ const repositoryRoot = resolve(
 );
 const execFileAsync = promisify(execFile);
 const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+const sectionWitnessTree = "tests/generated-fixtures/fixtures/section-contracts";
+const predecessorFixtureTrees = [
+  "fixtures/generated",
+  "tests/generated-fixtures/fixtures/public-build",
+  "tests/generated-fixtures/fixtures/job-attempts",
+];
 
 function verifyGeneratedProjectForTesting(root, identifier, adapters, expectedProjectName, options) {
   return verifyGeneratedProject(root, identifier, adapters, expectedProjectName, options, identifier !== "app-calendly");
@@ -84,6 +90,9 @@ test("fixed verification refuses missing current fixture witnesses before any co
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, relativeRoot), destination, { recursive: true, errorOnExist: true, force: false });
   }
+  for (const tree of ["tests/generated-fixtures/fixtures/job-attempts", sectionWitnessTree]) {
+    await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
+  }
   await expectFixtureError(() => verifySkeletons({
     createOwner: () => createKnownOwner(fixtureRepository),
     runCommand: () => assert.fail("missing current fixture bytes cannot reach the production command vector"),
@@ -94,7 +103,7 @@ test("fixed verification refuses missing current fixture witnesses before any co
 test("fixed verification refuses missing checked job attempt witnesses before any command", async (context) => {
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-job-attempt-witnesses-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build"]) {
+  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", sectionWitnessTree]) {
     const destination = resolve(fixtureRepository, tree);
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
@@ -106,11 +115,31 @@ test("fixed verification refuses missing checked job attempt witnesses before an
   }, { includeVisual: false, fromFixture: "app-jobs" }, fixtureRepository), "FIXTURE_WITNESS_INVALID");
 });
 
+test("fixed verification refuses missing section witnesses before any command", async (context) => {
+  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-section-witnesses-"));
+  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
+  for (const tree of predecessorFixtureTrees) {
+    await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
+  }
+  let commands = 0;
+  let audits = 0;
+  await expectFixtureError(() => verifySkeletons({
+    createOwner: () => createKnownOwner(fixtureRepository),
+    runCommand: input => { commands++; return successfulCommand(input); },
+    runAudit: async () => {
+      audits++;
+      return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
+    },
+  }, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+  assert.equal(commands, 0);
+  assert.equal(audits, 0);
+});
+
 test("fixed verification refuses changed witness bytes and different fixture ancestors before commands", async (context) => {
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-current-fixture-witnesses-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
   const jobAttemptTree = "tests/generated-fixtures/fixtures/job-attempts";
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", jobAttemptTree]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree]) {
     const destination = resolve(fixtureRepository, tree);
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
@@ -125,7 +154,9 @@ test("fixed verification refuses changed witness bytes and different fixture anc
   const retainedFile = resolve(fixtureRepository, fixtureRoot("portfolio"), "README.md");
   const priorJobsWrapper = resolve(fixtureRepository, "tests/generated-fixtures/fixtures/public-build/app-jobs/apps/web/next.config.ts");
   const jobAttemptFile = resolve(fixtureRepository, jobAttemptTree, "app-jobs/apps/web/next.config.ts");
-  for (const path of [witnessFile, retainedFile, priorJobsWrapper, jobAttemptFile]) {
+  const sharedSectionFile = resolve(fixtureRepository, sectionWitnessTree, "shared/apps/web/src/content/content-schema.ts");
+  const sectionState = resolve(fixtureRepository, sectionWitnessTree, "portfolio/.egeria/state.json");
+  for (const path of [witnessFile, retainedFile, priorJobsWrapper, jobAttemptFile, sharedSectionFile, sectionState]) {
     const original = await readFile(path);
     await writeFile(path, Buffer.concat([original, Buffer.from("\nsynthetic-drift\n")]));
     await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
@@ -135,6 +166,10 @@ test("fixed verification refuses changed witness bytes and different fixture anc
   await writeFile(extraPath, "Unexpected fixture member.\n");
   await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
   await rm(extraPath);
+  const extraSectionFile = resolve(fixtureRepository, sectionWitnessTree, "shared/extra.txt");
+  await writeFile(extraSectionFile, "Unexpected section witness.\n");
+  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+  await rm(extraSectionFile);
   assert.equal(commands, 0);
 
   const original = await readFile(jobAttemptFile);
@@ -142,6 +177,17 @@ test("fixed verification refuses changed witness bytes and different fixture anc
     ...adapters,
     async runCommand(input) {
       if (commands === 0) await writeFile(jobAttemptFile, Buffer.concat([original, Buffer.from("\nchanged-during-verification\n")]));
+      return adapters.runCommand(input);
+    },
+  }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
+  assert.ok(commands > 0);
+  await writeFile(jobAttemptFile, original);
+  commands = 0;
+  const originalSection = await readFile(sharedSectionFile);
+  await expectFixtureError(() => verifySkeletons({
+    ...adapters,
+    async runCommand(input) {
+      if (commands === 0) await writeFile(sharedSectionFile, Buffer.concat([originalSection, Buffer.from("\nchanged-during-verification\n")]));
       return adapters.runCommand(input);
     },
   }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
@@ -192,7 +238,7 @@ test("fixed verification detects a changed top-level witness inventory on exit",
   t.after(() => rm(parent, { recursive: true, force: true }));
   const isolatedRoot = join(parent, "inputs");
   const witnessTree = "tests/generated-fixtures/fixtures/public-build";
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/job-attempts", witnessTree]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
   }
   await expectFixtureError(() => verifySkeletons({
@@ -1315,7 +1361,7 @@ test("fixed verification detects a change to a skipped prefix fixture", async t 
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-prefix-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
   const isolatedRoot = join(parent, "inputs");
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", "tests/generated-fixtures/fixtures/job-attempts"]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
   }
   const prefixReadme = join(isolatedRoot, fixtureRoot("portfolio"), "README.md");

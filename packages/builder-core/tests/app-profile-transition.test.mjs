@@ -679,7 +679,8 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
-  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const preSectionContext = createGenerationRenderingContext(false, false, false, undefined, undefined, false, true);
+  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true, true);
   const retainedContext = { ...predecessorContext, retainAnalyticsConsent: true };
   const subsets = {};
   const consentFiles = [
@@ -692,6 +693,10 @@ test("current preparation fingerprints and canonical admission protect exact bas
     "apps/web/scripts/check-application-environment.mjs",
     "apps/web/src/configuration/document-metadata.ts",
     "apps/web/src/configuration/public-build.ts",
+  ];
+  const sectionFiles = [
+    "apps/web/src/content/content-schema.ts",
+    "apps/web/src/sections/section-registry.tsx",
   ];
   async function prepare(request, renderingContext) {
     const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, renderingContext);
@@ -714,18 +719,23 @@ test("current preparation fingerprints and canonical admission protect exact bas
     };
     const retained = await prepare(request, retainedContext);
     const predecessor = await prepare(request, predecessorContext);
+    const preSection = await prepare(request, preSectionContext);
     const current = await prepare(request, context);
     const optionalCapabilities = current.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const priorFingerprints = retained.prepared.influencingFingerprints;
     const predecessorFingerprints = predecessor.prepared.influencingFingerprints;
+    const preSectionFingerprints = preSection.prepared.influencingFingerprints;
     const currentFingerprints = current.prepared.influencingFingerprints;
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(priorFingerprints);
     const priorByPath = new Map(priorFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
     const predecessorByPath = new Map(predecessorFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
+    const preSectionByPath = new Map(preSectionFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
     assert.deepEqual(predecessorFingerprints.map(({ path }) => path), priorFingerprints.map(({ path }) => path));
     assert.deepEqual(predecessorFingerprints.filter(({ path, fingerprint }) => priorByPath.get(path) !== fingerprint).map(({ path }) => path),
       subset & 4 ? consentFiles : []);
-    assert.deepEqual(currentFingerprints.filter(({ path, fingerprint }) => predecessorByPath.get(path) !== fingerprint).map(({ path }) => path), buildFiles);
+    assert.deepEqual(preSectionFingerprints.filter(({ path, fingerprint }) => predecessorByPath.get(path) !== fingerprint).map(({ path }) => path), buildFiles);
+    assert.deepEqual(currentFingerprints.map(({ path }) => path), preSectionFingerprints.map(({ path }) => path));
+    assert.deepEqual(currentFingerprints.filter(({ path, fingerprint }) => preSectionByPath.get(path) !== fingerprint).map(({ path }) => path), sectionFiles);
     const identity = { optionalCapabilities, influencingFingerprints: currentFingerprints, targetLockfileFingerprint };
     const retainedIdentity = { ...identity, influencingFingerprints: priorFingerprints };
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current preparation remains unadmitted");

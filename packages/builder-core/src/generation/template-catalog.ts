@@ -193,6 +193,16 @@ export const retainedAnalyticsConsentTemplates = [
   ["analytics-browser-specification", "apps/web/tests/e2e/analytics-consent.spec.ts", "sha256:ad6c1bfe450fe2c12d06ce1650495381e108eec0c1c61d996ef9594393811035"],
 ] as const;
 
+export const retainedSectionTemplates = [
+  ["content-files-schema", "content-files", "apps/web/src/content/content-schema.ts", "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085"],
+  ["section-composition-registry", "section-composition", "apps/web/src/sections/section-registry.tsx", "sha256:f69d5ae9ce4eb7da4b6b76a209c699f8586d886ccdac196dc1299ea6f29720d6"],
+] as const;
+
+const retainedSectionSources = new Set([
+  "common/apps/web/AGENTS.md.template",
+  ...retainedSectionTemplates.map(([, , path]) => `common/${path}`),
+]);
+
 const successorAnalyticsConsentSources = new Set<string>(
   retainedAnalyticsConsentTemplates.map(([, path]) => `analytics/${path}`),
 );
@@ -358,6 +368,7 @@ export function createTemplateCatalog(
   retainAnalyticsConsent?: true,
   retainDeployment = true,
   checkedJobAttempts = false,
+  retainSections?: true,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -690,8 +701,11 @@ export function createTemplateCatalog(
       };
     }
 
+    const templateSource = retainSections && retainedSectionSources.has(destinationSource ?? source)
+      ? (destinationSource ?? source).replace("common/", "common/application-environments/retained-sections/")
+      : source;
     destinations.add(destinationResult.value);
-    entries.push({ source, destination: destinationResult.value, contentKind });
+    entries.push({ source: templateSource, destination: destinationResult.value, contentKind });
   }
 
   return {
