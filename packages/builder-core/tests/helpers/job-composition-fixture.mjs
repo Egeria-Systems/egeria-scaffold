@@ -414,7 +414,7 @@ function concurrentServicesSource(persistence) {
   return `import { expect, it, vi } from "vitest";
 import { jobHandlers } from "@/src/application/job-handlers";
 import { createJobHandlers } from "@/src/composition/job-handler-composition";
-import { executeJob, type JobEnvelope } from "@/src/application/job-delivery";
+import { runJobAttempt, type JobEnvelope } from "@/src/application/job-delivery";
 const { context } = vi.hoisted(() => ({ context: vi.fn(() => { throw new Error("HTTP_CONTEXT_UNAVAILABLE"); }) }));
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: context }));
 type Observation = { action: string; key?: string; target?: string; credentialMatches?: boolean; fromMatches?: boolean };
@@ -458,12 +458,12 @@ it("closes overlapping actual service Effects for each intended invocation witho
       return { definitions, job };
     });
     expect(records).toEqual([[], []]); expect(queues).toEqual([[], []]);
-    const pending = Promise.all(invocations.map(item => executeJob(item.job, item.definitions, 1)));
+    const pending = Promise.all(invocations.map(item => runJobAttempt(item.job, item.job.environment, item.definitions, 1)));
     await expect.poll(() => records.map(items => items.filter(item => item.action === "attempt").length)).toEqual([1, 1]);
     expect(records.map(items => items.filter(item => item.action === "provider").length)).toEqual([0, 0]);
     expect(queues).toEqual([[], []]);
     release();
-    expect(await pending).toEqual([{ outcome: "completed" }, { outcome: "completed" }]);
+    expect(await pending).toMatchObject(invocations.map(() => ({ kind: "executed", decision: { outcome: "completed" } })));
     for (const [index, target] of targets.entries()) {
       expect(records[index]?.filter(item => item.action === "provider").map(item => ({ key: item.key, target: item.target,
         credentialMatches: item.credentialMatches, fromMatches: item.fromMatches })))

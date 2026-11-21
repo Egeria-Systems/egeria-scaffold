@@ -12,11 +12,11 @@ const descriptorDigests = Object.freeze({
   "analytics": "sha256:5a8ac0ab5ae5b7adbd020c96f209c05d7ebe084215393a5a1f4293fe0480184b",
   "app-foundation": "sha256:2557256a72b6a62257298dcbafd587430b899285ef999141f45c1b9da91a749f",
   "application-persistence": "sha256:07740afcd637972b0de5cf5c538e697ae09a901eb52409eac30533a04d8374c7",
-  "background-job-delivery": "sha256:7f42f615f573bc8594bbec10ea6b1cfca1d4317a616c6bbb7e2d4b68b9c8aa79",
+  "background-job-delivery": "sha256:2f52231ed9b3cc5a8545e0d879481ff2ea08868c87615123c473ce3f15b2901f",
   "booking-calendly": "sha256:fd15608c0b956074a64aec1f48782851dfd0297421abb7e250b30612e644ac08",
   "contact-form-web3forms": "sha256:004b30987fb775d1942ed7facf0460c259518a6df4b004438716c4c815245e07",
   "content-files": "sha256:0e6519573a119a1e09b90421189c55ec81422382c8bd10429f977e1e129029c4",
-  "deployment-cloudflare": "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478",
+  "deployment-cloudflare": "sha256:2a1928592d7db02e10d8a75750f92f822fea4838d3b87837fe43d99f20a30ab9",
   "multilingual": "sha256:76f26b43ab7b952f23e472abde9958efe844b2f5730c4a7edb3d0a9acde27615",
   "observability": "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
   "section-composition": "sha256:9f9830fd6fc0674d3851e42ca6b7f3a14b2182b60a994bc470399043b98b771e",
@@ -28,11 +28,11 @@ const descriptorVersions = Object.freeze({
   "analytics": "0.2.0",
   "app-foundation": "0.3.0",
   "application-persistence": "0.2.0",
-  "background-job-delivery": "0.3.0",
+  "background-job-delivery": "0.4.0",
   "booking-calendly": "0.2.0",
   "contact-form-web3forms": "0.2.0",
   "content-files": "0.4.0",
-  "deployment-cloudflare": "0.16.0",
+  "deployment-cloudflare": "0.18.0",
   "multilingual": "0.1.1",
   "observability": "0.4.0",
   "section-composition": "0.3.0",
@@ -82,11 +82,11 @@ function createRecord(identifier) {
     requiredEvidence: requiredEvidence[identifier],
     status: "pending",
     taskPlan: identifier === "background-job-delivery"
-      ? "docs/superpowers/plans/capability-repairs/2026-11-15-background-job-reliability-composition-plan.md"
+      ? "docs/superpowers/plans/2026-11-20-background-job-checked-attempt-certification-handoff.md"
       : identifier === "multilingual"
         ? ["docs/superpowers/plans/capability-repairs/2026-11-18-multilingual-section-links", "gate", "2.md"].join("-")
         : identifier === "deployment-cloudflare"
-          ? "docs/superpowers/plans/2026-11-19-deployment-public-build-certification-handoff.md"
+          ? "docs/superpowers/plans/2026-11-20-deployment-job-build-identity-certification-handoff.md"
           : "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
     evidence: [],
   };
@@ -443,18 +443,29 @@ test("hosted contact cannot borrow email evidence or omit provider and cleanup o
   assert.equal(core.validateCertificationClosure({catalog,registry:committedRegistry}).ok,false);
 });
 
-test("deployment subjects bind both exact installed descriptor families", () => {
-  for (const [persistence, jobs, retainedVersion, retainedDigest, freshVersion, freshDigest] of [
-    [false, false, "0.9.0", "sha256:8868b0a7241f9891d2e03ec676fbfc31c80d1bbddfc0b9c0ee16b642104afd5f", "0.13.0", "sha256:d04ee42864a5e16471c5ee4276fffc181b407470205e05349de586b37eb3aa41"],
-    [true, false, "0.10.0", "sha256:0ed9172c7461266a86a34c32ebed9242ab926b4575f19f435580f1a75ddcd9fe", "0.14.0", "sha256:2d2dc3788da925581c0b1e33e8b4f948ea855621814fa88099dcb2883be50e71"],
-    [false, true, "0.11.0", "sha256:135f6f93738601fa0fa8e6a1be4f82e3f531d89eb317e65ffd903db2afdc04b1", "0.15.0", "sha256:3bbc8f133913211fb984206bbd329ba3e0edebaf86b087faf217f9e569c04004"],
-    [true, true, "0.12.0", "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6", "0.16.0", "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478"],
+test("deployment subjects bind exact retained and fresh descriptor families", () => {
+  for (const [persistence, jobs, retained, descriptorVersion, behaviorContractDigest] of [
+    [false, false, true, "0.9.0", "sha256:8868b0a7241f9891d2e03ec676fbfc31c80d1bbddfc0b9c0ee16b642104afd5f"],
+    [false, false, false, "0.13.0", "sha256:d04ee42864a5e16471c5ee4276fffc181b407470205e05349de586b37eb3aa41"],
+    [true, false, true, "0.10.0", "sha256:0ed9172c7461266a86a34c32ebed9242ab926b4575f19f435580f1a75ddcd9fe"],
+    [true, false, false, "0.14.0", "sha256:2d2dc3788da925581c0b1e33e8b4f948ea855621814fa88099dcb2883be50e71"],
+    [false, true, true, "0.11.0", "sha256:135f6f93738601fa0fa8e6a1be4f82e3f531d89eb317e65ffd903db2afdc04b1"],
+    [true, true, true, "0.12.0", "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6"],
+    [false, true, "public-build", "0.15.0", "sha256:3bbc8f133913211fb984206bbd329ba3e0edebaf86b087faf217f9e569c04004"],
+    [true, true, "public-build", "0.16.0", "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478"],
+    [false, true, false, "0.17.0", "sha256:f40fda98d448395ba53f2fcbd4111998bdcbf7f70c7004f43ff2358d06b50296"],
+    [true, true, false, "0.18.0", "sha256:2a1928592d7db02e10d8a75750f92f822fea4838d3b87837fe43d99f20a30ab9"],
   ]) {
-    for (const [retained, descriptorVersion, behaviorContractDigest] of [[true, retainedVersion, retainedDigest], [false, freshVersion, freshDigest]]) {
-      const { catalogSnapshot } = core.createGenerationRenderingContext(persistence, false, jobs, undefined, undefined, retained);
-      const descriptors = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, catalogSnapshot));
-      const deployment = descriptors.find(({ identifier }) => identifier === "deployment-cloudflare");
-      assert.deepEqual(core.createCertificationSubject(deployment, requiredEvidence["deployment-cloudflare"]), { descriptorVersion, behaviorContractDigest });
+    const { catalogSnapshot } = core.createGenerationRenderingContext(persistence, false, jobs, undefined, undefined, retained);
+    const descriptors = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, catalogSnapshot));
+    const deployment = descriptors.find(({ identifier }) => identifier === "deployment-cloudflare");
+    assert.deepEqual(core.createCertificationSubject(deployment, requiredEvidence["deployment-cloudflare"]), { descriptorVersion, behaviorContractDigest });
+    if (jobs && retained !== false) {
+      const installed = descriptors.find(({ identifier }) => identifier === "background-job-delivery");
+      assert.deepEqual(core.createCertificationSubject(installed, requiredEvidence["background-job-delivery"]), {
+        descriptorVersion: "0.3.0",
+        behaviorContractDigest: "sha256:7f42f615f573bc8594bbec10ea6b1cfca1d4317a616c6bbb7e2d4b68b9c8aa79",
+      });
     }
   }
 });

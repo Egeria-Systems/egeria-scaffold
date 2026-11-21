@@ -6236,8 +6236,8 @@ test("application environment CLI generates exact jobs compositions with simulat
       const state = assertSuccess(core.parseStateJson(await readFile(join(destination, ".egeria/state.json"), "utf8")));
       const versions = Object.fromEntries(state.installedCapabilities.map(({ identifier, version }) => [identifier, version]));
       assert.equal(versions.standards, persistence ? "0.10.0" : "0.9.0");
-      assert.equal(versions["deployment-cloudflare"], persistence ? "0.16.0" : "0.15.0");
-      assert.equal(versions["background-job-delivery"], "0.3.0");
+      assert.equal(versions["deployment-cloudflare"], persistence ? "0.18.0" : "0.17.0");
+      assert.equal(versions["background-job-delivery"], "0.4.0");
       assert.equal(versions["app-foundation"], "0.3.0");
       assert.equal(versions["application-persistence"], persistence ? "0.2.0" : undefined);
       assert.equal(versions["transactional-email-resend"], email ? "0.2.0" : undefined);

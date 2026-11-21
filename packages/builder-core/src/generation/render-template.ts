@@ -58,9 +58,11 @@ const templateTokenNames = new Set([
   "publicBuildProviderReads",
   "publicBuildProviderValidation",
   "publicBuildProviderValues",
+  "jobBuildPhaseImport",
+  "publicNextConfigExport",
 ]);
 const templateTokenPattern =
-  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubSourceRevisionOutputExpression|githubVerifiedRevisionExpression|githubTokenExpression|githubSiteOriginExpression|githubExpectedStagingDatabaseIdExpression|githubExpectedProductionDatabaseIdExpression|githubStagingJobRetentionReviewedExpression|githubProductionJobRetentionReviewedExpression|githubAccessClientIdExpression|githubAccessClientSecretExpression|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson|publicBuildProviderImports|publicBuildProviderInputFields|publicBuildProviderReads|publicBuildProviderValidation|publicBuildProviderValues)}}/g;
+  /{{(projectName|displayNameJson|workerName|workerEntryJson|githubSourceRevisionOutputExpression|githubVerifiedRevisionExpression|githubTokenExpression|githubSiteOriginExpression|githubExpectedStagingDatabaseIdExpression|githubExpectedProductionDatabaseIdExpression|githubStagingJobRetentionReviewedExpression|githubProductionJobRetentionReviewedExpression|githubAccessClientIdExpression|githubAccessClientSecretExpression|githubWorkflowExpression|githubRefExpression|githubShaExpression|githubExpectedRevisionExpression|githubJobRetentionReviewedExpression|githubDeployUrlExpression|githubCloudflareAccountIdExpression|githubCloudflareApiTokenExpression|githubApplicationDatabaseEnvironmentExpression|githubExpectedDatabaseIdExpression|githubMigrationSetSha256Expression|githubSourceReviewReferenceExpression|githubRecoveryPointReferenceExpression|githubStagingApplicationDatabaseIdExpression|githubProductionApplicationDatabaseIdExpression|calendlyDestinationJson|calendlyModeJson|analyticsSettingsJson|web3FormsAccessKeyJson|publicBuildProviderImports|publicBuildProviderInputFields|publicBuildProviderReads|publicBuildProviderValidation|publicBuildProviderValues|jobBuildPhaseImport|publicNextConfigExport)}}/g;
 const completeTokenPattern = /{{([^{}]*)}}/g;
 const bookingCalendlySettingsSource =
   "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template";
@@ -76,6 +78,8 @@ const applicationEnvironmentAnalyticsSettingsSource =
   "analytics/application-environments/apps/web/src/integrations/analytics/analytics-settings.ts.template";
 const analyticsTokenNames = new Set(["analyticsSettingsJson"]);
 const publicBuildSource = "common/application-environments/apps/web/src/configuration/public-build.ts.template";
+const publicNextConfigSource = "common/application-environments/public-build/apps/web/next.config.ts.template";
+const publicNextConfigTokenNames = new Set(["jobBuildPhaseImport", "publicNextConfigExport"]);
 const publicBuildTokenNames = new Set([
   "publicBuildProviderImports",
   "publicBuildProviderInputFields",
@@ -128,6 +132,8 @@ export type TemplateTokens = Readonly<{
   publicBuildProviderReads?: string;
   publicBuildProviderValidation?: string;
   publicBuildProviderValues?: string;
+  jobBuildPhaseImport?: string;
+  publicNextConfigExport?: string;
 }>;
 
 type TemplateTokenName = keyof TemplateTokens | keyof typeof fixedTemplateTokens;
@@ -193,6 +199,7 @@ function validateTemplateSyntax(
     (_match, token: string): string => {
       if (
         templateTokenNames.has(token) &&
+        (!publicNextConfigTokenNames.has(token) || source === publicNextConfigSource) &&
         (!publicBuildTokenNames.has(token) || source === publicBuildSource) &&
         (!bookingCalendlyTokenNames.has(token) ||
           source === bookingCalendlySettingsSource ||

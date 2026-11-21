@@ -1,4 +1,5 @@
 import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
+import { PHASE_PRODUCTION_BUILD } from "next/constants.js";
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
@@ -35,4 +36,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default function configure(phase: string): NextConfig {
+  if (phase === PHASE_PRODUCTION_BUILD && buildId === undefined) {
+    throw new Error("APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing");
+  }
+  return nextConfig;
+}

@@ -1442,6 +1442,29 @@ const publicBuildWitnessPaths = Object.freeze([
   "apps/web/src/configuration/document-metadata.ts",
   "apps/web/src/configuration/public-build.ts",
 ]);
+const jobAttemptWitnessDirectory = "tests/generated-fixtures/fixtures/job-attempts";
+const jobAttemptWitnessPaths = Object.freeze([
+  ".egeria/state.json",
+  "apps/web/next.config.ts",
+  "apps/web/src/application/job-delivery.ts",
+  "apps/web/src/infrastructure/cloudflare/job-delivery.ts",
+  "apps/web/src/infrastructure/memory/job-delivery.ts",
+  "apps/web/tests/integration/fixtures/job-worker.mjs",
+  "apps/web/tests/integration/job-worker.test.ts",
+  "apps/web/tests/unit/job-delivery.test.ts",
+  "apps/web/tests/unit/job-handler-composition.test.ts",
+  "docs/background-job-delivery.md",
+]);
+const jobAttemptWitnesses = Object.freeze({
+  "app-jobs": {
+    deploymentVersion: "0.17.0",
+    digest: "20699de3639eae7634fa8909e5daf2f8eccc53575ce5762b72aaab1ff86a34c4",
+  },
+  "app-persistence-jobs-email": {
+    deploymentVersion: "0.18.0",
+    digest: "9ebaf91c59024a94cc0163f56eeb17300a8a41d0bc57e6d71c53a2e491c3c06b",
+  },
+});
 const retainedFixtureDigests = Object.freeze({
   "portfolio": "8eb404916e43d7d3cfb6d2fc2c42c9a62cc2874f4f6690a976775bdf96b75cf4",
   "portfolio-calendly": "38887cc49a9782ed75327f9e1c95d05cc6c6ff99f986069a58249513c3302770",
@@ -1457,7 +1480,7 @@ const retainedFixtureDigests = Object.freeze({
   "app-jobs": "bae3ec20b6597e06a3d63429e3fbc20db46b0a3cfaee5f32ac4f9f2bfe5c892e",
   "app-persistence-jobs-email": "4fcc2a241639c20849fb697906b4371b820024d56770fcb0274095c61053f3e8",
 });
-const currentFixtureDigests = Object.freeze({
+const publicBuildFixtureDigests = Object.freeze({
   "portfolio": "b99697c5e430a1ffa493f06adb84f6c77bb123dcad1980027304fd83ef028908",
   "portfolio-calendly": "e5f9cd0516c11a5e4469cc9fbbbfb6d7edc693b8de35a440afddb748692faa21",
   "site": "acd5434db2c2dd70e5515fd6a9e976056ebc9d1f0a089fa3866f493e623a5cb0",
@@ -1478,11 +1501,13 @@ const successorDeploymentVersions = Object.freeze({
 
 function currentFixtureContract(identifier) {
   const retained = contractForIdentifier(identifier);
+  const jobAttempt = jobAttemptWitnesses[identifier];
   return Object.freeze({
     ...retained,
     expectedFiles: Object.freeze([...new Set([...retained.expectedFiles, ...publicBuildWitnessPaths])].sort(codePointCompare)),
     expectedSurfaces: retained.expectedSurfaces + 2,
-    expectedDeploymentCloudflareVersion: successorDeploymentVersions[retained.expectedDeploymentCloudflareVersion],
+    expectedDeploymentCloudflareVersion: jobAttempt?.deploymentVersion ?? successorDeploymentVersions[retained.expectedDeploymentCloudflareVersion],
+    ...(jobAttempt === undefined ? {} : { expectedBackgroundJobVersion: "0.4.0" }),
   });
 }
 
@@ -2055,7 +2080,7 @@ async function verifySourcesWithAdapters(
       );
       const hasWorkerIntegration = Object.hasOwn(webManifest.scripts, "test:integration:cloudflare");
       const hasBindingIntegration = source.contract.expectedApplicationPersistenceVersion === "0.2.0";
-      const hasJobs = source.contract.expectedBackgroundJobVersion === "0.3.0";
+      const hasJobs = source.contract.expectedBackgroundJobVersion !== undefined;
       if (!hasBindingIntegration) bindingIntegration.skipped.push(source.contract.identifier);
       const commandInput = (arguments_, timeout = commandTimeoutMilliseconds) => ({
         executable: "pnpm",
@@ -2304,25 +2329,28 @@ function requireAdapters(adapters) {
 async function requireFixtureWitnessInputs(input) {
   try {
     if (await realpath(input.retainedRoot) !== input.retainedRoot ||
-        await realpath(input.witnessRoot) !== input.witnessRoot) fail("FIXTURE_WITNESS_INVALID");
-    const [retained, witness] = await Promise.all([
+        await realpath(input.witnessRoot) !== input.witnessRoot ||
+        (input.jobAttemptRoot !== undefined && await realpath(input.jobAttemptRoot) !== input.jobAttemptRoot)) fail("FIXTURE_WITNESS_INVALID");
+    const [retained, publicBuild, jobAttempt] = await Promise.all([
       inspectFixture(input.retainedRoot, input.retained),
       snapshotTree(input.witnessRoot),
+      input.jobAttemptRoot === undefined ? undefined : snapshotTree(input.jobAttemptRoot),
     ]);
     if (fingerprint(JSON.stringify(retained)) !== retainedFixtureDigests[input.retained.identifier] ||
-        !jsonMatches(witness.map(({ path }) => path), publicBuildWitnessPaths)) fail("FIXTURE_WITNESS_INVALID");
-    return witness;
+        !jsonMatches(publicBuild.map(({ path }) => path), publicBuildWitnessPaths) ||
+        (jobAttempt !== undefined && !jsonMatches(jobAttempt.map(({ path }) => path), jobAttemptWitnessPaths))) fail("FIXTURE_WITNESS_INVALID");
+    return { publicBuild, jobAttempt };
   } catch {
     fail("FIXTURE_WITNESS_INVALID");
   }
 }
 
-async function requireFixtureWitnessDirectory(witnessDirectory) {
+async function requireFixtureWitnessDirectory(witnessDirectory, identifiers) {
   if (await realpath(witnessDirectory) !== witnessDirectory) fail("FIXTURE_WITNESS_INVALID");
   const entries = await readdir(witnessDirectory, { withFileTypes: true });
   if (entries.some(entry => !entry.isDirectory()) || !jsonMatches(
     entries.map(entry => entry.name).sort(codePointCompare),
-    generatedFixtureContracts.map(({ identifier }) => identifier).sort(codePointCompare),
+    [...identifiers].sort(codePointCompare),
   )) fail("FIXTURE_WITNESS_INVALID");
 }
 
@@ -2348,13 +2376,28 @@ async function writeFixtureWitness(reconstruction, path, content, retainedFinger
   }
 }
 
+async function applyFixtureWitness(reconstruction, owner, witnessRoot, witness, existingSnapshot) {
+  const existingFingerprints = new Map(existingSnapshot.map(({ path, fingerprint }) => [path, fingerprint]));
+  for (const { path, fingerprint: expected } of witness) {
+    const content = await readFile(join(witnessRoot, path));
+    if (fingerprint(content) !== expected || !(await pathIdentityMatches(owner))) fail("FIXTURE_WITNESS_INVALID");
+    await writeFixtureWitness(reconstruction, path, content, existingFingerprints.get(path));
+  }
+}
+
 async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, operation) {
   let witnessDirectory;
+  let jobAttemptDirectory;
   let root;
+  const requireWitnessDirectories = () => Promise.all([
+    requireFixtureWitnessDirectory(witnessDirectory, generatedFixtureContracts.map(({ identifier }) => identifier)),
+    requireFixtureWitnessDirectory(jobAttemptDirectory, Object.keys(jobAttemptWitnesses)),
+  ]);
   try {
     root = await realpath(fixtureRepositoryRoot);
     witnessDirectory = resolve(root, publicBuildWitnessDirectory);
-    await requireFixtureWitnessDirectory(witnessDirectory);
+    jobAttemptDirectory = resolve(root, jobAttemptWitnessDirectory);
+    await requireWitnessDirectories();
   } catch {
     fail("FIXTURE_WITNESS_INVALID");
   }
@@ -2364,6 +2407,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
       retained,
       retainedRoot: resolve(root, retained.relativeRoot),
       witnessRoot: resolve(witnessDirectory, identifier),
+      jobAttemptRoot: Object.hasOwn(jobAttemptWitnesses, identifier) ? resolve(jobAttemptDirectory, identifier) : undefined,
     };
   });
   const before = await Promise.all(inputs.map(requireFixtureWitnessInputs));
@@ -2379,23 +2423,25 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
         await cp(input.retainedRoot, reconstruction, { recursive: true, force: false, errorOnExist: true, dereference: false });
         const copied = await snapshotTree(reconstruction);
         if (fingerprint(JSON.stringify(copied)) !== retainedFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
-        const retainedFingerprints = new Map(copied.map(({ path, fingerprint }) => [path, fingerprint]));
-        for (const { path, fingerprint: expected } of before[index]) {
-          const content = await readFile(join(input.witnessRoot, path));
-          if (fingerprint(content) !== expected || !(await pathIdentityMatches(owner))) fail("FIXTURE_WITNESS_INVALID");
-          await writeFixtureWitness(reconstruction, path, content, retainedFingerprints.get(path));
+        const { publicBuild, jobAttempt } = before[index];
+        await applyFixtureWitness(reconstruction, owner, input.witnessRoot, publicBuild, copied);
+        if (jobAttempt !== undefined) {
+          const publicBuildSnapshot = await snapshotTree(reconstruction);
+          if (fingerprint(JSON.stringify(publicBuildSnapshot)) !== publicBuildFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+          await applyFixtureWitness(reconstruction, owner, input.jobAttemptRoot, jobAttempt, publicBuildSnapshot);
         }
       } catch {
         fail("FIXTURE_WITNESS_INVALID");
       }
       const source = await sourceForRoot(reconstruction, currentFixtureContract(identifier));
-      if (fingerprint(JSON.stringify(source.snapshot)) !== currentFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+      const expectedDigest = jobAttemptWitnesses[identifier]?.digest ?? publicBuildFixtureDigests[identifier];
+      if (fingerprint(JSON.stringify(source.snapshot)) !== expectedDigest) fail("FIXTURE_WITNESS_INVALID");
       sources.push(source);
     }
     return await operation(sources);
   } finally {
     try {
-      await requireFixtureWitnessDirectory(witnessDirectory);
+      await requireWitnessDirectories();
       const after = await Promise.all(inputs.map(requireFixtureWitnessInputs));
       if (!jsonMatches(before, after)) fail("FIXTURE_SOURCE_CHANGED");
     } catch {

@@ -186,14 +186,34 @@ export const publicBuildManagedFiles = [
 const deploymentVersionPairs = {
   ordinary: { retained: "0.9.0", current: "0.13.0" },
   persistence: { retained: "0.10.0", current: "0.14.0" },
-  jobs: { retained: "0.11.0", current: "0.15.0" },
-  persistenceAndJobs: { retained: "0.12.0", current: "0.16.0" },
+  jobs: { retained: "0.11.0", publicBuild: "0.15.0", current: "0.17.0" },
+  persistenceAndJobs: { retained: "0.12.0", publicBuild: "0.16.0", current: "0.18.0" },
 } as const;
 
 type DeploymentVersionPair = typeof deploymentVersionPairs[keyof typeof deploymentVersionPairs];
-export type DeploymentCapabilityVersion = DeploymentVersionPair[keyof DeploymentVersionPair];
+type PublicBuildJobsDeploymentVersion = typeof deploymentVersionPairs["jobs" | "persistenceAndJobs"]["publicBuild"];
+export type DeploymentCapabilityVersion = DeploymentVersionPair[keyof DeploymentVersionPair] | PublicBuildJobsDeploymentVersion;
+export type RetainedDeploymentView = boolean | "public-build";
+export const backgroundJobDeliveryVersions = { retained: "0.3.0", current: "0.4.0" } as const;
+export type BackgroundJobDeliveryVersion = typeof backgroundJobDeliveryVersions[keyof typeof backgroundJobDeliveryVersions];
 
-export function deploymentVersionsFor(persistence: boolean, jobs: boolean): DeploymentVersionPair {
+export function deploymentVersionsFor(persistence: boolean, jobs: boolean): Readonly<{
+  retained: DeploymentCapabilityVersion;
+  current: DeploymentCapabilityVersion;
+  publicBuild?: PublicBuildJobsDeploymentVersion;
+}> {
   if (jobs) return persistence ? deploymentVersionPairs.persistenceAndJobs : deploymentVersionPairs.jobs;
   return persistence ? deploymentVersionPairs.persistence : deploymentVersionPairs.ordinary;
+}
+
+export function deploymentViewForVersion(persistence: boolean, jobs: boolean, version: unknown): RetainedDeploymentView | undefined {
+  const versions = deploymentVersionsFor(persistence, jobs);
+  if (version === versions.current) return false;
+  if (version === versions.retained) return true;
+  if (versions.publicBuild !== undefined && version === versions.publicBuild) return "public-build";
+  return undefined;
+}
+
+export function supportedDeploymentViews(jobs: boolean): readonly RetainedDeploymentView[] {
+  return jobs ? [false, true, "public-build"] : [false, true];
 }

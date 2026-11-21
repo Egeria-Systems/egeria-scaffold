@@ -17,23 +17,24 @@ const request = (profile, extra = {}) => ({ profile, projectName: "jobs-example"
 
 const excludedOperatorFiles = ["apps/web/scripts/job-operator.mjs", "apps/web/src/infrastructure/cloudflare/job-operations.ts", "apps/web/tests/unit/job-operations.test.ts"];
 
-test("application environment catalog admits exactly the retained and fresh deployment compositions", () => {
-  for (const [persistence, jobs, standards, predecessor, successor] of [
+test("application environment catalog admits exactly the retained, public-build, and fresh deployment compositions", () => {
+  for (const [persistence, jobs, standards, predecessor, successor, publicBuild] of [
     [false, false, "0.9.0", "0.9.0", "0.13.0"],
     [true, false, "0.10.0", "0.10.0", "0.14.0"],
-    [false, true, "0.9.0", "0.11.0", "0.15.0"],
-    [true, true, "0.10.0", "0.12.0", "0.16.0"],
-  ]) for (const [retained, deployment] of [[true, predecessor], [false, successor]]) {
+    [false, true, "0.9.0", "0.11.0", "0.17.0", "0.15.0"],
+    [true, true, "0.10.0", "0.12.0", "0.18.0", "0.16.0"],
+  ]) for (const [retained, deployment] of [[true, predecessor], [false, successor], ...(publicBuild ? [["public-build", publicBuild]] : [])]) {
     const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs, undefined, undefined, retained);
+    const jobsVersion = jobs ? (retained === false ? "0.4.0" : "0.3.0") : undefined;
     assert.equal(isApplicationEnvironmentRenderingContext(context), true);
     assert.equal(context.catalogSnapshot.standards, standards);
     assert.equal(context.catalogSnapshot.deploymentCloudflare, deployment);
     assert.equal(context.catalogSnapshot.siteRouting, "0.5.0");
-    assert.equal(context.catalogSnapshot.backgroundJobDelivery, jobs ? "0.3.0" : undefined);
+    assert.equal(context.catalogSnapshot.backgroundJobDelivery, jobsVersion);
     const result = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, context.catalogSnapshot);
     assert.equal(result.ok, true, JSON.stringify(result));
     const descriptor = result.value.find(({ identifier }) => identifier === "background-job-delivery");
-    assert.equal(descriptor?.version, jobs ? "0.3.0" : undefined);
+    assert.equal(descriptor?.version, jobsVersion);
     if (jobs) {
       assert.deepEqual(descriptor.migrationPlanners, []);
       assert.deepEqual(descriptor.privilegedOperations, ["dispatch-background-job", "consume-background-job"]);
@@ -49,7 +50,7 @@ test("application environment catalog admits exactly the retained and fresh depl
       { standards: persistence ? "0.9.0" : "0.10.0" },
       { deploymentCloudflare: jobs ? "0.13.0" : "0.15.0" },
       { siteRouting: "0.4.0" },
-      { backgroundJobDelivery: jobs ? "0.2.0" : "0.3.0" },
+      { backgroundJobDelivery: jobsVersion === "0.3.0" ? "0.4.0" : "0.3.0" },
     ]) {
       const mixed = { ...context, catalogSnapshot: { ...context.catalogSnapshot, ...changed } };
       assert.equal(isApplicationEnvironmentRenderingContext(mixed), false, JSON.stringify(changed));
@@ -95,7 +96,7 @@ test("application environment jobs render matching manifests and independent ser
         assert.equal(project.schemaVersion, "2.0.0");
         assert.equal(project.selectedCapabilities.includes("application-persistence"), persistence);
         assert.equal(project.selectedCapabilities.includes("transactional-email-resend"), email);
-        assert.equal(resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.3.0");
+        assert.equal(resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.4.0");
         assert.equal(resolved.capabilities.find(({ identifier }) => identifier === "app-foundation").version, "0.3.0");
         const generated = new Map(files.map(({ path, content }) => [path, new TextDecoder().decode(content)]));
         const manifest = JSON.parse(generated.get("apps/web/package.json"));
@@ -195,7 +196,7 @@ test("default jobs generation omits credentialed operator tools", async () => {
   for (const profile of ["portfolio", "site", "app"]) {
     const result = await renderSkeleton(request(profile, { backgroundJobDelivery: true }));
     assert.equal(result.ok, true, JSON.stringify(result));
-    assert.equal(result.value.resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.3.0");
+    assert.equal(result.value.resolved.capabilities.find(({ identifier }) => identifier === "background-job-delivery").version, "0.4.0");
     for (const path of excludedOperatorFiles) {
       assert.equal(result.value.files.some(file => file.path === path), false, path);
     }

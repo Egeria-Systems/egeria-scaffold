@@ -1510,7 +1510,7 @@ test("current deployment families preserve supported installed combinations and 
   for (const foundation of ["default", "retained", "email"]) {
     scenarios.push({ profile: "app", foundation, persistence: true });
   }
-  for (const jobsVersion of ["0.3.0"]) {
+  for (const jobsVersion of ["0.4.0"]) {
     for (const profile of ["portfolio", "site", "app"]) {
       for (const foundation of ["retained", "email"]) {
         scenarios.push({ profile, foundation, persistence: false, jobsVersion });
@@ -1539,6 +1539,7 @@ test("current deployment families preserve supported installed combinations and 
       assert.equal(rendered.ok, true, JSON.stringify(rendered));
       const project = rendered.value.project;
       const installedCapabilities = contracts.createInstalledManifest(rendered.value.resolved);
+      assert.equal(installedCapabilities.find(({ identifier }) => identifier === "background-job-delivery")?.version, jobsVersion);
       const surfaces = contracts.materializeInstalledSurfaces({
         files: new Map(rendered.value.files.map(({ path, content }) => [path, content])),
         surfaces: rendered.value.surfaces,
@@ -1565,13 +1566,11 @@ test("current deployment families preserve supported installed combinations and 
         assert.equal(contracts.parseStateJson(JSON.stringify(candidate)).ok, true, label);
         assert.equal(snapshots.createVerifiedProjectSnapshot(project, candidate).ok, true, label);
       }
-      const retainedDeploymentVersion = jobsVersion === undefined
-        ? (persistence ? "0.10.0" : "0.9.0")
-        : (persistence ? "0.12.0" : "0.11.0");
+      const retainedDeploymentVersion = jobsVersion === undefined ? (persistence ? "0.10.0" : "0.9.0") : undefined;
 
       for (const version of [
         "0.3.1", "0.4.1", "0.5.1", "0.6.1",
-        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "9.9.9",
+        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "0.17.0", "0.18.0", "9.9.9",
       ].filter(version => version !== deploymentVersion)) {
         const changed = {
           ...state,
@@ -1592,6 +1591,7 @@ test("current deployment families preserve supported installed combinations and 
         ["app-foundation", "0.2.0"],
         ["application-persistence", "0.1.0"],
         ["background-job-delivery", "0.2.0"],
+        ["background-job-delivery", "0.3.0"],
       ]) {
         if (!installedCapabilities.some(capability => capability.identifier === identifier)) continue;
         const changed = {
