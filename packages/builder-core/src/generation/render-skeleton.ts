@@ -81,6 +81,7 @@ export type SkeletonRenderingContext = Readonly<{
   retainAppFoundation?: true;
   retainAnalyticsConsent?: true;
   retainSections?: true;
+  retainPublicContentRouting?: true;
   retainedNextVersion?: typeof retainedNextVersion;
 }>;
 
@@ -524,6 +525,7 @@ export async function renderProjectTemplates(
   retainDeployment = false,
   checkedJobAttempts = false,
   retainSections?: true,
+  retainPublicContentRouting?: true,
 ): Promise<ValidationResult<GeneratedFile[]>> {
   const selected = project.selectedCapabilities;
   const analytics = project.capabilitySettings.analytics;
@@ -546,6 +548,7 @@ export async function renderProjectTemplates(
     retainDeployment,
     checkedJobAttempts,
     retainSections,
+    retainPublicContentRouting,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -714,7 +717,7 @@ export async function renderSkeleton(
   const templates = await renderProjectTemplates(projectResult.value, undefined, renderingContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(renderingContext.catalogSnapshot),
     renderingContext.catalogSnapshot.backgroundJobDelivery === backgroundJobDeliveryVersions.current,
-    renderingContext.retainSections);
+    renderingContext.retainSections, renderingContext.retainPublicContentRouting);
   if (!templates.ok) return templates;
   const files = templates.value;
   {

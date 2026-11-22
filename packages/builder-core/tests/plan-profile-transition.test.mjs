@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
-import { readFile, readdir } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
+import { parse, stringify } from "yaml";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -180,6 +182,46 @@ test("site planning binds the current target without mutation or control-file ac
   assert.equal(result.value.target.recipeVersion, "0.3.0");
   assert.equal(result.value.actions.some(({ path }) => path.startsWith(".egeria/")), false);
   assert.deepEqual(result.value.requiredApprovals, ["transform", "verified-final-diff"]);
+});
+
+test("site transition validates French booking copy in a retained bilingual selection", async context => {
+  const scratch = await mkdtemp(join(tmpdir(), "egeria-retained-booking-"));
+  context.after(() => rm(scratch, { recursive: true, force: true }));
+  const destination = join(scratch, "project");
+  const generated = await core.generateProject({
+    request: { profile: "site", projectName: "retained-booking", displayName: "Retained Booking",
+      multilingual: true, bookingCalendly: { mode: "link" } },
+    destination,
+    renderingContext: { ...core.createApplicationEnvironmentRenderingContext(), retainPublicContentRouting: true },
+    verifier: {
+      async prepareLockfile(root) {
+        await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, "lockfiles/web-recipe-site-0.13.0-next-16.4.5/pnpm-lock.yaml")));
+        return { ok: true, value: undefined };
+      },
+      async verifyInIsolatedCopy() {
+        return { ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } };
+      },
+    },
+  });
+  assert.equal(generated.ok, true, JSON.stringify(generated));
+  const base = await loadEntries(destination);
+  const path = "apps/web/content/fr-CA/booking-calendly.yaml";
+  const copy = parse(text(base, path));
+  const pristine = await planFromEntries(base);
+  assert.equal(pristine.ok, true, JSON.stringify(pristine));
+  for (const source of [
+    stringify({ ...copy, heading: undefined }),
+    stringify({ ...copy, heading: ["Invalid heading"] }),
+    stringify({ ...copy, extra: "Unexpected key" }),
+    "heading: [unterminated",
+  ]) {
+    const changed = cloneEntries(base);
+    setText(changed, path, source);
+    assertFailure(await planFromEntries(changed), "PROFILE_TRANSITION_CONTENT_INVALID");
+  }
+  const missing = cloneEntries(base);
+  missing.delete(path);
+  assertFailure(await planFromEntries(missing), "PROJECT_STATE_INCOMPATIBLE");
 });
 
 test("current planning refuses collisions, managed drift, ejections and invalid controls without mutation", async () => {

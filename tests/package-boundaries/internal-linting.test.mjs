@@ -316,6 +316,26 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/multilingual/application-environments/public-content-and-routing/apps/web/app/[locale]/[[...segments]]/page.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/public-content-and-routing/apps/web/app/global-error.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/public-content-and-routing/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/public-content-and-routing/apps/web/src/integrations/booking/localized-booking.stub.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
         messages: [],
       },

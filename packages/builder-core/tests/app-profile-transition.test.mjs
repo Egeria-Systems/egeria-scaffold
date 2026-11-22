@@ -275,7 +275,10 @@ test("app content migration preserves every localized source value and appends o
   for (const locale of ["en-CA", "fr-CA"]) {
     const path = `apps/web/content/${locale}/localized-content.yaml`;
     const value = parseDocument(decoder.decode(f.files.get(path))).toJS();
-    value.booking.heading = `Booking ${locale}`;
+    assert.equal(Object.hasOwn(value, "booking"), false);
+    const bookingPath = `apps/web/content/${locale}/booking-calendly.yaml`;
+    const booking = parseDocument(decoder.decode(f.files.get(bookingPath))).toJS();
+    f.files.set(bookingPath, encoder.encode(stringify({ ...booking, heading: `Booking ${locale}` })));
     value.error.summary = `false ${locale}`;
     value.navigation[0].label = `Home ${locale}`;
     value.pages.home.sections[0].content.heading = `Title ${locale}`;
@@ -287,11 +290,30 @@ test("app content migration preserves every localized source value and appends o
   for (const [index, locale] of ["en-CA", "fr-CA"].entries()) {
     const content = prepared.value.files.find(({ path }) => path === `apps/web/content/${locale}/localized-content.yaml`).content;
     const after = parseDocument(decoder.decode(content)).toJS();
-    for (const key of ["metadata", "accessibility", "localeSwitch", "booking", "error", "notFound"])
+    for (const key of ["metadata", "accessibility", "localeSwitch", "error", "notFound"])
       assert.deepEqual(after[key], before[index][key]);
+    const bookingPath = `apps/web/content/${locale}/booking-calendly.yaml`;
+    assert.deepEqual(prepared.value.files.find(({ path }) => path === bookingPath).content, f.files.get(bookingPath));
     assert.deepEqual(after.pages.home, before[index].pages.home);
     assert.deepEqual(after.navigation.slice(0, before[index].navigation.length), before[index].navigation);
     assert.deepEqual(Object.keys(after.pages).sort(), ["about", "home", "workFeatured"]);
+  }
+});
+
+test("fresh site transition validates only the selected booking catalogs", async () => {
+  const withoutBooking = await fixture("site", 2);
+  const omittedPlan = await plan(withoutBooking);
+  assert.equal(omittedPlan.ok, true, JSON.stringify(omittedPlan));
+  assert.ok(omittedPlan.value.dispositions.every(({ path }) => !path.endsWith("/booking-calendly.yaml")));
+  const booked = await fixture("site", 3);
+  assert.equal((await plan(booked)).ok, true);
+  for (const locale of ["en-CA", "fr-CA"]) {
+    const path = `apps/web/content/${locale}/booking-calendly.yaml`;
+    const content = booked.files.get(path);
+    booked.files.set(path, encoder.encode("heading: incomplete\n"));
+    const invalidPlan = await plan(booked);
+    assert.equal(invalidPlan.issues?.[0]?.code, "PROFILE_TRANSITION_CONTENT_INVALID");
+    booked.files.set(path, content);
   }
 });
 
@@ -677,10 +699,10 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const policy = await import("../dist/lifecycle/app-profile-transition.js");
   const { loadAppTransitionContentValidators } = await import("../dist/lifecycle/app-transition-content-validation.js");
   const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
-  const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
-  const preSectionContext = createGenerationRenderingContext(false, false, false, undefined, undefined, false, true);
-  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true, true);
+  const sectionContext = { ...context, retainPublicContentRouting: true };
+  const preSectionContext = createGenerationRenderingContext(false, false, false, undefined, undefined, false, true, true);
+  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true, true, true);
   const retainedContext = { ...predecessorContext, retainAnalyticsConsent: true };
   const subsets = {};
   const consentFiles = [
@@ -699,6 +721,7 @@ test("current preparation fingerprints and canonical admission protect exact bas
     "apps/web/src/sections/section-registry.tsx",
   ];
   async function prepare(request, renderingContext) {
+    const validators = await loadAppTransitionContentValidators(renderingContext.retainPublicContentRouting);
     const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, renderingContext);
     const target = await core.renderSkeleton({ ...request, profile: "app" }, renderingContext);
     assert.equal(source.ok, true); assert.equal(target.ok, true);
@@ -720,11 +743,13 @@ test("current preparation fingerprints and canonical admission protect exact bas
     const retained = await prepare(request, retainedContext);
     const predecessor = await prepare(request, predecessorContext);
     const preSection = await prepare(request, preSectionContext);
+    const section = await prepare(request, sectionContext);
     const current = await prepare(request, context);
     const optionalCapabilities = current.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
     const priorFingerprints = retained.prepared.influencingFingerprints;
     const predecessorFingerprints = predecessor.prepared.influencingFingerprints;
     const preSectionFingerprints = preSection.prepared.influencingFingerprints;
+    const sectionFingerprints = section.prepared.influencingFingerprints;
     const currentFingerprints = current.prepared.influencingFingerprints;
     subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(priorFingerprints);
     const priorByPath = new Map(priorFingerprints.map(({ path, fingerprint }) => [path, fingerprint]));
@@ -734,12 +759,15 @@ test("current preparation fingerprints and canonical admission protect exact bas
     assert.deepEqual(predecessorFingerprints.filter(({ path, fingerprint }) => priorByPath.get(path) !== fingerprint).map(({ path }) => path),
       subset & 4 ? consentFiles : []);
     assert.deepEqual(preSectionFingerprints.filter(({ path, fingerprint }) => predecessorByPath.get(path) !== fingerprint).map(({ path }) => path), buildFiles);
-    assert.deepEqual(currentFingerprints.map(({ path }) => path), preSectionFingerprints.map(({ path }) => path));
-    assert.deepEqual(currentFingerprints.filter(({ path, fingerprint }) => preSectionByPath.get(path) !== fingerprint).map(({ path }) => path), sectionFiles);
+    assert.deepEqual(sectionFingerprints.map(({ path }) => path), preSectionFingerprints.map(({ path }) => path));
+    assert.deepEqual(sectionFingerprints.filter(({ path, fingerprint }) => preSectionByPath.get(path) !== fingerprint).map(({ path }) => path), sectionFiles);
+    assert.deepEqual(currentFingerprints.map(({ path }) => path), sectionFingerprints.map(({ path }) => path));
+    assert.notDeepEqual(currentFingerprints, sectionFingerprints);
     const identity = { optionalCapabilities, influencingFingerprints: currentFingerprints, targetLockfileFingerprint };
     const retainedIdentity = { ...identity, influencingFingerprints: priorFingerprints };
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current preparation remains unadmitted");
     assert.equal(policy.verifyAppTransitionVisualInputRecord(retainedIdentity).ok, false, "retained preparation remains unadmitted");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, influencingFingerprints: sectionFingerprints }).ok, false);
     assert.equal(policy.verifyAppTransitionVisualInputRecord({ ...identity, influencingFingerprints: predecessorFingerprints }).ok, false);
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok, true);
     const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({

@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { createRecipeLockfileUrl, currentNextVersion, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
-import { loadAppTransitionContentValidators } from "./app-transition-content-validation.js";
+import { loadAppTransitionContentValidators, type AppTransitionContentValidators } from "./app-transition-content-validation.js";
 import { appTransitionBaselinePaths, appTransitionVisualProject, appTransitionVisualBookingSettings, appTransitionVisualAnalyticsSettings, verifyAppTransitionVisualInputRecord, prepareAppProfileTransition, selectAppTransitionVisuals, type AppTransitionDisposition, type AppTransitionVisualEvidence, type AppTransitionPreparation, type AppTransitionFailureCode } from "./app-profile-transition.js";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
@@ -340,12 +340,12 @@ async function readReviewedAppTransitionVisualEvidence(input: Readonly<{
   source: RenderedSkeleton;
   target: RenderedSkeleton;
   prepared: AppTransitionPreparation;
-}>): Promise<AppTransitionVisualEvidence | undefined> {
+}>, validators: AppTransitionContentValidators): Promise<AppTransitionVisualEvidence | undefined> {
   if (input.source.project.originProfile !== "portfolio") {
     return undefined;
   }
   const canonical = prepareAppProfileTransition({
-    source: input.source, target: input.target, currentFiles: new Map(input.source.files.map(({ path, content }) => [path, content])), validators: await loadAppTransitionContentValidators()
+    source: input.source, target: input.target, currentFiles: new Map(input.source.files.map(({ path, content }) => [path, content])), validators
   });
   if (!canonical.ok || !sameJson(canonical.value.influencingFingerprints, input.prepared.influencingFingerprints)) {
     return undefined;
@@ -495,15 +495,15 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
       return planningFailure("PROJECT_DRIFT_DETECTED");
     }
   }
-  const prepared = prepareAppProfileTransition({
-    source, target, currentFiles, validators: await loadAppTransitionContentValidators()
-  });
+  const validators = await loadAppTransitionContentValidators(renderingContext.retainPublicContentRouting);
+  const prepared = prepareAppProfileTransition({ source, target, currentFiles, validators });
   if (!prepared.ok) {
     return prepared;
   }
-  const evidence = project.originProfile === "portfolio" ? await (input.readReviewedVisualEvidence ?? readReviewedAppTransitionVisualEvidence)({
-    source, target, prepared: prepared.value
-  }) : undefined;
+  const evidenceInput = { source, target, prepared: prepared.value };
+  const evidence = project.originProfile === "portfolio"
+    ? await (input.readReviewedVisualEvidence?.(evidenceInput) ?? readReviewedAppTransitionVisualEvidence(evidenceInput, validators))
+    : undefined;
   const selected = selectAppTransitionVisuals({
     prepared: prepared.value, source, evidence
   });

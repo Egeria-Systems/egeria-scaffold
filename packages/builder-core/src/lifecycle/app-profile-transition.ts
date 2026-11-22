@@ -265,18 +265,25 @@ function validateRoutedContent(
 }
 function validateAdditionalContent(
   files: ReadonlyMap<string, Uint8Array>,
+  project: RenderedSkeleton["project"],
   validators: AppTransitionContentValidators,
 ): void {
   const content = [
     ["apps/web/content/content.config.yaml", validators.parseConfiguration],
     ["apps/web/content/en-CA/observability.yaml", validators.parseErrorCopy],
-    ["apps/web/content/en-CA/booking-calendly.yaml", validators.parseBooking],
     ["apps/web/content/en-CA/analytics.yaml", validators.parseAnalytics],
     ["apps/web/content/fr-CA/analytics.yaml", validators.parseAnalytics],
   ] as const;
   for (const [path, validate] of content) {
     const bytes = files.get(path);
     if (bytes !== undefined) validate(validators.parseYaml(text(bytes)));
+  }
+  if (project.selectedCapabilities.includes("booking-calendly")) {
+    const locales = project.selectedCapabilities.includes("multilingual") ? ["en-CA", "fr-CA"] : ["en-CA"];
+    for (const locale of locales) {
+      const bytes = required(files, `apps/web/content/${locale}/booking-calendly.yaml`);
+      validators.parseBooking(validators.parseYaml(text(bytes)));
+    }
   }
 }
 function fileSurface(surfaces: readonly ManagedSurfaceDescriptor[], path: string): ManagedSurfaceDescriptor | undefined {
@@ -346,8 +353,8 @@ export function prepareAppProfileTransition(input: Readonly<{
     const target = new Map(input.target.files.map(({ path, content }) => [path, content]));
     validateRoutedContent(input.currentFiles, input.validators);
     validateRoutedContent(target, input.validators);
-    validateAdditionalContent(input.currentFiles, input.validators);
-    validateAdditionalContent(target, input.validators);
+    validateAdditionalContent(input.currentFiles, input.source.project, input.validators);
+    validateAdditionalContent(target, input.target.project, input.validators);
     const multilingual = input.source.project.selectedCapabilities.includes("multilingual");
     input.validators.parseSite(input.validators.parseYaml(text(required(input.currentFiles, "apps/web/content/en-CA/site.yaml"))));
     input.validators.parseMarkdown(text(required(input.currentFiles, "apps/web/content/en-CA/long-form/introduction.md")));

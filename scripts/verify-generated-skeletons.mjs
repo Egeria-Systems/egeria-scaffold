@@ -313,6 +313,69 @@ test("renders and retries ordinary failures in the active locale", async ({ page
 });
 `;
 
+const multilingualGlobalErrorProofSpecification = `import { expect, test } from "@playwright/test";
+
+const english = ["Something went wrong", "We could not complete this page. Please try again.", "Try again"] as const;
+const french = ["Une erreur s’est produite", "Nous n’avons pas pu terminer cette page. Veuillez réessayer.", "Réessayer"] as const;
+const cookie = "egeria-verifier-root-error";
+
+for (const { pathname, language, copy, frenchCopyFailure } of [
+  { pathname: "/fr-CA/about", language: "fr-CA", copy: french, frenchCopyFailure: null },
+  { pathname: "/en-CA/about", language: "en-CA", copy: english, frenchCopyFailure: null },
+  { pathname: "/de-DE/about", language: "en-CA", copy: english, frenchCopyFailure: null },
+  { pathname: "/fr-CA/about", language: "en-CA", copy: english, frenchCopyFailure: "malformed-yaml" },
+  { pathname: "/fr-CA/about", language: "en-CA", copy: english, frenchCopyFailure: "invalid-fields" },
+]) {
+  const scenario = frenchCopyFailure ? pathname + " with " + frenchCopyFailure : pathname;
+  test("recovers the global error at " + scenario, async ({ page, context, baseURL }) => {
+    const origin = baseURL ?? "";
+    test.skip(!origin || new URL(origin).port !== "3101", "Requires the production-mode local preview");
+    const reports: string[] = [];
+    await context.route("**/*", async route => {
+      const request = route.request();
+      const url = new URL(request.url());
+      if (url.origin !== origin) return route.abort();
+      if (url.pathname !== "/api/observability") return route.continue();
+      if (request.method() === "POST") {
+        const body = request.postData() ?? "";
+        if (body.includes("browser.react.boundary")) reports.push(body);
+      }
+      return route.fulfill({ status: 204 });
+    });
+    await context.addCookies([{ name: cookie, value: "fail", url: origin }]);
+    const target = new URL(pathname, origin);
+    target.searchParams.set("fixture-query", "unused");
+    if (frenchCopyFailure) target.searchParams.set("fixture-french-copy", frenchCopyFailure);
+    const response = await page.goto(target.href);
+    expect(response?.status()).toBe(500);
+    expect(new URL(page.url()).pathname).toBe(pathname);
+    expect(await page.evaluate(() => window.isSecureContext)).toBe(true);
+    await expect(page.getByTestId("verifier-global-error")).toBeVisible();
+    await expect(page.locator("html")).toHaveAttribute("lang", language);
+    const fallback = page.locator('main[aria-labelledby="error-fallback-heading"]');
+    await expect(fallback.getByRole("heading", { name: copy[0], exact: true })).toBeVisible();
+    await expect(fallback.getByText(copy[1], { exact: true })).toBeVisible();
+    const retry = fallback.getByRole("button", { name: copy[2], exact: true });
+    await expect(retry).toBeVisible();
+    await expect.poll(() => reports.length).toBe(1);
+    const [report] = reports;
+    if (report === undefined) throw new Error("Missing global boundary report");
+    expect(Buffer.byteLength(report)).toBeLessThan(16384);
+    expect(report).toContain("react-error-boundary");
+    expect(report).not.toMatch(/fixture-query|fixture-french-copy|fixture-only root failure/u);
+    expect(report).not.toContain("/about");
+
+    if (pathname === "/fr-CA/about") {
+      await context.clearCookies({ name: cookie });
+      await retry.click();
+      await expect(page.getByTestId("verifier-global-error")).toHaveCount(0);
+      await expect(page.locator("html")).toHaveAttribute("lang", "fr-CA");
+      expect(new URL(page.url()).pathname).toBe(pathname);
+    }
+  });
+}
+`;
+
 async function prepareVerifierOnlyBrowserProof(validationRoot, contract) {
   if (contract.expectedMultilingualVersion === null) return;
 
@@ -331,6 +394,30 @@ async function prepareVerifierOnlyBrowserProof(validationRoot, contract) {
       "apps/web/tests/e2e/multilingual-error-boundary.spec.ts",
     ),
     multilingualErrorProofSpecification,
+    { flag: "wx", mode: 0o600 },
+  );
+  if (!contract.verifyGlobalError) return;
+  const proofRoot = await realpath(validationRoot);
+  for (const [path, anchor, replacement] of [
+    ["apps/web/app/layout.tsx", "  const requestHeaders = await headers();",
+      '  const requestHeaders = await headers();\n  if (requestHeaders.get("cookie")?.split(";").some(value => value.trim() === "egeria-verifier-root-error=fail")) throw new Error("fixture-only root failure");'],
+    ["apps/web/app/global-error.tsx", "<body>", '<body data-testid="verifier-global-error">'],
+    ["apps/web/app/global-error.tsx",
+      "    const catalog = parseYamlContent(frenchCatalogSource);",
+      '    const scenario = new URLSearchParams(window.location.search).get("fixture-french-copy");\n' +
+      '    const source = scenario === "malformed-yaml" ? "error: [unterminated"\n' +
+      '      : scenario === "invalid-fields" ? "error: { heading: false, summary: Summary, retryLabel: Retry }"\n' +
+      '      : frenchCatalogSource;\n' +
+      '    const catalog = parseYamlContent(source);'],
+  ]) {
+    const original = await readFile(join(proofRoot, path));
+    const source = original.toString("utf8");
+    if (source.split(anchor).length !== 2) fail("VERIFICATION_SETUP_FAILED");
+    await writeFixtureWitness(proofRoot, path, Buffer.from(source.replace(anchor, replacement)), fingerprint(original));
+  }
+  await writeFile(
+    join(validationRoot, "apps/web/tests/e2e/multilingual-global-error.spec.ts"),
+    multilingualGlobalErrorProofSpecification,
     { flag: "wx", mode: 0o600 },
   );
 }
@@ -1444,6 +1531,21 @@ const publicBuildWitnessPaths = Object.freeze([
 ]);
 const jobAttemptWitnessDirectory = "tests/generated-fixtures/fixtures/job-attempts";
 const sectionWitnessDirectory = "tests/generated-fixtures/fixtures/section-contracts";
+const publicContentRoutingWitnessDirectory = "tests/generated-fixtures/fixtures/public-content-and-routing";
+const publicContentRoutingSharedPaths = Object.freeze({
+  routed: ["apps/web/src/routing/routing-content-schema.ts"],
+  "monolingual-routed": ["apps/web/app/sitemap.ts", "apps/web/tests/unit/routing-content.test.ts"],
+  "localized-routed": ["apps/web/src/i18n/localized-profile.ts"],
+  multilingual: [
+    "apps/web/app/[locale]/[[...segments]]/page.tsx",
+    "apps/web/app/global-error.tsx",
+    "apps/web/src/i18n/localized-content.ts",
+    "apps/web/tests/unit/localized-content.test.ts",
+    "docs/multilingual.md",
+  ],
+  "booking-selected": ["apps/web/content/fr-CA/booking-calendly.yaml", "apps/web/src/integrations/booking/localized-booking.tsx"],
+  "booking-omitted": ["apps/web/src/integrations/booking/localized-booking.tsx"],
+});
 const sharedSectionPaths = Object.freeze([
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/sections/section-registry.tsx",
@@ -1519,6 +1621,48 @@ const sectionFixtureDigests = Object.freeze({
   "app-jobs": "1b48ba416ab57efdd6425b896fea7e0c870562194270d6798854624245417f3a",
   "app-persistence-jobs-email": "63103a5fa7bc27824edb7d5901a9810917a7b1ecc9699605ade6b437fda832d5",
 });
+const publicContentRoutingFixtureDigests = Object.freeze({
+  "portfolio-calendly": "2d94b373082d905fe87421ed79909c08c3f85612a47dc9f5f2cf8a4859c07a34",
+  "site": "25140802abb24b700bbe36974b4f3f11ee73ae1ad58cc99eff78462f3b08058d",
+  "site-multilingual": "800163d76d4073b2ffd155245bef3c925abe26254b72f1a506bcdcdeec071f22",
+  "site-public-integrations": "5e18a44417ebd5a433998894e60bb4c0b6356ff8ba1630205864dc6e44b2d68e",
+  "app": "13a4ce634a4d6543521c86b8e9cf89e5b1c8e2c5e1f8e30aecb3f82f8e5a9e73",
+  "app-all-optional-integrations": "779c690fe48863485623e9bca14dab7f795d4cf1bdda857818443186db7602d6",
+  "app-persistence": "8b76f8ddd209508923fcebe9ecd69550f20a5acfb7117fd959f128ec6c0174d8",
+  "app-persistence-email": "f628782fc40150a95a4036d16e3710a5568bf3b2d1e863a5771a6324224b77b7",
+  "site-contact-form": "ff6dca7ba0797ae93a1ccb39c5e40fc12a5b96caed68808c2a52cbc93c8bb288",
+  "app-jobs": "1bb947e607d067cd4cf29bea115218b0061726568a3f9f46ddad9ad761af3d46",
+  "app-persistence-jobs-email": "e3267061fcf2e1bacefbd3f56f37dbd7e562ccf20227b0e5ee4646650e3a32e2",
+});
+
+function publicContentRoutingGroups(contract) {
+  if (!Object.hasOwn(publicContentRoutingFixtureDigests, contract.identifier)) return [];
+  const multilingual = Boolean(contract.expectedMultilingualVersion);
+  const booking = Boolean(contract.expectedBookingCalendlyVersion);
+  return [
+    ...(contract.profile === "portfolio" ? [] : ["routed", multilingual ? "localized-routed" : "monolingual-routed"]),
+    ...(multilingual ? ["multilingual", booking ? "booking-selected" : "booking-omitted"] : booking ? ["booking-selected"] : []),
+    contract.identifier,
+  ];
+}
+
+async function readPublicContentRoutingWitnesses(root) {
+  const projectPaths = Object.keys(publicContentRoutingFixtureDigests).map(identifier => [
+    identifier,
+    [
+      ".egeria/state.json",
+      ...(contractForIdentifier(identifier).expectedMultilingualVersion ? [
+        "apps/web/content/en-CA/localized-content.yaml",
+        "apps/web/content/fr-CA/localized-content.yaml",
+      ] : []),
+    ],
+  ]);
+  const groups = [...Object.entries(publicContentRoutingSharedPaths), ...projectPaths];
+  await requireFixtureWitnessDirectory(root, groups.map(([name]) => name));
+  return Object.fromEntries(await Promise.all(groups.map(async ([name, paths]) => [
+    name, await requireSectionWitness(join(root, name), paths),
+  ])));
+}
 const successorDeploymentVersions = Object.freeze({
   "0.9.0": "0.13.0", "0.10.0": "0.14.0", "0.11.0": "0.15.0", "0.12.0": "0.16.0",
 });
@@ -1531,6 +1675,7 @@ function currentFixtureContract(identifier) {
     expectedFiles: Object.freeze([...new Set([...retained.expectedFiles, ...publicBuildWitnessPaths])].sort(codePointCompare)),
     expectedSurfaces: retained.expectedSurfaces + 2,
     expectedDeploymentCloudflareVersion: jobAttempt?.deploymentVersion ?? successorDeploymentVersions[retained.expectedDeploymentCloudflareVersion],
+    verifyGlobalError: Boolean(retained.expectedMultilingualVersion),
     ...(jobAttempt === undefined ? {} : { expectedBackgroundJobVersion: "0.4.0" }),
   });
 }
@@ -2425,6 +2570,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
   let witnessDirectory;
   let jobAttemptDirectory;
   let sectionDirectory;
+  let publicContentRoutingDirectory;
   let root;
   const fixtureIdentifiers = generatedFixtureContracts.map(({ identifier }) => identifier);
   const requireWitnessDirectories = () => Promise.all([
@@ -2437,6 +2583,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
     witnessDirectory = resolve(root, publicBuildWitnessDirectory);
     jobAttemptDirectory = resolve(root, jobAttemptWitnessDirectory);
     sectionDirectory = resolve(root, sectionWitnessDirectory);
+    publicContentRoutingDirectory = resolve(root, publicContentRoutingWitnessDirectory);
     await requireWitnessDirectories();
   } catch {
     fail("FIXTURE_WITNESS_INVALID");
@@ -2455,8 +2602,9 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
   const readWitnesses = () => Promise.all([
     requireSectionWitness(sharedSectionRoot, sharedSectionPaths),
     Promise.all(inputs.map(requireFixtureWitnessInputs)),
+    readPublicContentRoutingWitnesses(publicContentRoutingDirectory),
   ]);
-  const [sharedSections, before] = await readWitnesses();
+  const [sharedSections, before, publicContentRouting] = await readWitnesses();
   const owner = await createGeneratedFixtureOwner();
   try {
     const ownedRoot = await realpath(owner.path);
@@ -2481,11 +2629,19 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
         if (fingerprint(JSON.stringify(predecessor)) !== predecessorDigest) fail("FIXTURE_WITNESS_INVALID");
         await applyFixtureWitness(reconstruction, owner, sharedSectionRoot, sharedSections, predecessor);
         await applyFixtureWitness(reconstruction, owner, input.sectionRoot, projectSections, predecessor);
+        const sectionSnapshot = await snapshotTree(reconstruction);
+        if (fingerprint(JSON.stringify(sectionSnapshot)) !== sectionFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+        for (const group of publicContentRoutingGroups(input.retained)) {
+          const members = group === "booking-selected" && !input.retained.expectedMultilingualVersion
+            ? publicContentRouting[group].filter(({ path }) => path === "apps/web/content/fr-CA/booking-calendly.yaml")
+            : publicContentRouting[group];
+          await applyFixtureWitness(reconstruction, owner, join(publicContentRoutingDirectory, group), members, sectionSnapshot);
+        }
       } catch {
         fail("FIXTURE_WITNESS_INVALID");
       }
       const source = await sourceForRoot(reconstruction, currentFixtureContract(identifier));
-      if (fingerprint(JSON.stringify(source.snapshot)) !== sectionFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+      if (fingerprint(JSON.stringify(source.snapshot)) !== (publicContentRoutingFixtureDigests[identifier] ?? sectionFixtureDigests[identifier])) fail("FIXTURE_WITNESS_INVALID");
       sources.push(source);
     }
     return await operation(sources);
@@ -2493,7 +2649,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
     try {
       await requireWitnessDirectories();
       const after = await readWitnesses();
-      if (!jsonMatches([sharedSections, before], after)) fail("FIXTURE_SOURCE_CHANGED");
+      if (!jsonMatches([sharedSections, before, publicContentRouting], after)) fail("FIXTURE_SOURCE_CHANGED");
     } catch {
       fail("FIXTURE_SOURCE_CHANGED");
     } finally {

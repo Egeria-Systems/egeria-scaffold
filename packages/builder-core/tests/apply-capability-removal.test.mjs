@@ -1167,11 +1167,11 @@ test("multilingual and Calendly removal preserve the other capability in both in
         true,
       );
       if (capability === "booking-calendly") {
-        assert.match(
+        assert.doesNotMatch(
           repository.files.get(
             "apps/web/src/integrations/booking/localized-booking.tsx",
           ),
-          /return null/u,
+          /booking-calendly/u,
         );
       } else {
         assert.equal(
@@ -2400,7 +2400,10 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
+      destination, renderingContext: {
+        ...core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
+        ...(options.retainPublicContentRouting ? { retainPublicContentRouting: true } : {}),
+      },
       verifier: {
         async prepareLockfile(root) {
           const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
@@ -2777,6 +2780,67 @@ test("current multilingual lifecycle preserves provider neighbors across removal
       assert.deepEqual(await core.doctorRepository({ reader: repository.reader, catalog: snapshot.value.catalog, profiles: snapshot.value.profiles }), { healthy: true, diagnostics: [] });
     }
   }
+});
+
+test("multilingual lifecycle replaces and restores the pristine observability global boundary", async () => {
+  const boundary = "apps/web/app/global-error.tsx";
+  const original = await environmentContactEntries("portfolio");
+  const localized = await environmentContactEntries("portfolio", { multilingual: true });
+  assert.notEqual(original.get(boundary), localized.get(boundary));
+  const repository = createRepository(original);
+  for (const operation of appOperations.filter(({ capability }) => capability === "multilingual")) {
+    const result = await planAppOperation(repository, operation);
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.deepEqual(result.value.actions.find(({ path }) => path === boundary), {
+      kind: "replace-file", path: boundary, owner: "observability", ownership: "application-owned",
+    });
+    const customized = createRepository(repository.files);
+    customized.files.set(boundary, customized.files.get(boundary) + "\n// Local customization.\n");
+    const before = snapshot(customized.files);
+    assert.equal((await planAppOperation(customized, operation)).issues?.[0]?.code, "PROJECT_DRIFT_DETECTED");
+    const verifierCalls = [];
+    const refusal = await applyAppOperation(customized, operation, result.value, { verifier: successfulVerifier(verifierCalls) });
+    assert.equal(refusal.code, "PROJECT_DRIFT_DETECTED");
+    assert.deepEqual(customized.writes, []);
+    assert.deepEqual(verifierCalls, []);
+    assert.equal(snapshot(customized.files), before);
+
+    const applied = await applyAppOperation(repository, operation, result.value, { verifier: successfulVerifier([]) });
+    assert.equal(applied.ok, true, JSON.stringify(applied));
+    const expected = operation.kind === "addition" ? localized : original;
+    assert.equal(repository.files.get(boundary), expected.get(boundary));
+    const state = core.parseStateJson(repository.files.get(".egeria/state.json"));
+    assert.equal(state.ok, true);
+    assert.equal(state.value.managedSurfaces.find(({ path }) => path === boundary).fingerprint,
+      core.fingerprintFileContent(encoder.encode(expected.get(boundary))));
+    assert.deepEqual(repository.writes.at(-1).map(({ path }) => path), [".egeria/state.json"]);
+  }
+});
+
+test("a retained multilingual-only portfolio keeps its source family through neighboring lifecycle", async () => {
+  const original = await environmentContactEntries("portfolio", { multilingual: true, retainPublicContentRouting: true });
+  const repository = createRepository(original);
+  const analytics = appOperations.find(({ kind, capability }) => kind === "addition" && capability === "analytics");
+  const plan = await planAppOperation(repository, analytics);
+  assert.equal(plan.ok, true, JSON.stringify(plan));
+  const added = await applyAppOperation(repository, analytics, plan.value, { verifier: successfulVerifier([]) });
+  assert.equal(added.ok, true, JSON.stringify(added));
+  for (const path of ["apps/web/app/global-error.tsx", "apps/web/src/i18n/localized-content.ts",
+    "apps/web/content/fr-CA/localized-content.yaml", "apps/web/src/integrations/booking/localized-booking.tsx"]) {
+    assert.equal(repository.files.get(path), original.get(path), path);
+  }
+  const installed = await core.readVerifiedProjectSnapshot(repository.reader);
+  assert.equal(installed.value.renderingContext.retainPublicContentRouting, true);
+  const removal = appOperations.find(({ kind, capability }) => kind === "removal" && capability === "multilingual");
+  const boundary = "apps/web/app/global-error.tsx";
+  const edited = original.get(boundary) + "\n// Local customization.\n";
+  repository.files.set(boundary, edited);
+  const removable = await planAppOperation(repository, removal);
+  assert.equal(removable.ok, true, JSON.stringify(removable));
+  assert.ok(removable.value.actions.every(({ path }) => path !== boundary));
+  const removed = await applyAppOperation(repository, removal, removable.value, { verifier: successfulVerifier([]) });
+  assert.equal(removed.ok, true, JSON.stringify(removed));
+  assert.equal(repository.files.get(boundary), edited);
 });
 
 test("current multilingual and analytics compose in both installation orders with conservative reference refusal", async () => {
