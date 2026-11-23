@@ -716,6 +716,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     environmentContext.retainedNextVersion,
     input.capability === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
+    environmentContext.retainSections,
   ));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

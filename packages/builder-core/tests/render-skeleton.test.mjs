@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
-import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, mkdtemp, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -4962,6 +4962,85 @@ test("generated section parsing is bounded, ordered, and link-safe", async () =>
   }
 });
 
+test("a text-only variant reaches the generated component and compiled content contracts", async (context) => {
+  const scratch = await mkdtemp(join(tmpdir(), "egeria-section-variant-"));
+  context.after(() => rm(scratch, { recursive: true, force: true }));
+  for (const path of ["dist", "templates", "package.json"]) {
+    await cp(new URL(`../${path}`, import.meta.url), join(scratch, path), { recursive: true });
+  }
+  await mkdir(join(scratch, "scripts"));
+  const compiler = "scripts/compile-content-validation.mjs";
+  await cp(new URL(`../${compiler}`, import.meta.url), join(scratch, compiler));
+  await symlink(fileURLToPath(new URL("../node_modules", import.meta.url)), join(scratch, "node_modules"), "dir");
+
+  const temporaryBuilder = path => import(pathToFileURL(join(scratch, "dist", path)).href);
+  const editTemplate = async (path, before, after) => {
+    const file = join(scratch, "templates", path);
+    const text = await readFile(file, "utf8");
+    const updated = text.replace(before, after);
+    assert.notEqual(updated, text, path);
+    await writeFile(file, updated);
+  };
+  const contentPath = "common/apps/web/src/content/content-schema.ts";
+  const registryPath = "common/apps/web/src/sections/section-registry.tsx";
+  const textDefinition = 'text: Object.freeze({\n    approvedVariants: Object.freeze(["default"] as const),';
+  await editTemplate(contentPath, textDefinition, textDefinition.replace('"default"', '"default", "test-accent"'));
+  await editTemplate(registryPath,
+    /(function TextSection\([\s\S]*?return \(\n    <section)/u,
+    '$1 data-test-section-variant={section.variant}');
+  const locales = ["en-CA", "fr-CA"];
+  for (const locale of locales) {
+    await editTemplate(`multilingual/site/apps/web/content/${locale}/localized-content.yaml.template`,
+      /(^ +type: text\n +variant: )default/mu, "$1test-accent");
+  }
+
+  const { renderSkeleton } = await temporaryBuilder("generation/render-skeleton.js");
+  const { files } = assertSuccess(await renderSkeleton({
+    profile: "app", projectName: "section-example", displayName: "Section Example",
+    multilingual: true, packageVersions,
+  }));
+  const generated = indexFiles(files);
+  const [english, french] = locales.map(locale =>
+    parseDocument(generated.get(`apps/web/content/${locale}/localized-content.yaml`)).toJS());
+  const page = english.pages.home;
+  const site = {
+    metadata: english.metadata,
+    accessibility: { skipToContent: english.accessibility.skipToContent },
+    home: { sections: page.sections },
+    navigation: [],
+  };
+  const content = await loadGeneratedContentModule(files);
+  const react = await loadGeneratedSectionModule(files);
+  assert.deepEqual(react.sectionRegistry.text.approvedVariants, ["default", "test-accent"]);
+  const parsed = content.parseSiteContent(site);
+  const textElement = react.SectionComposition({ sections: parsed.home.sections })
+    .find(({ props }) => props.section.type === "text");
+  assert.equal(textElement.type(textElement.props).props["data-test-section-variant"], "test-accent");
+  assertContentInvalid(() => content.parsePageContent({
+    sections: [{ ...page.sections[0], variant: "test-accent" }],
+  }));
+
+  const compiled = spawnSync(process.execPath, [join(scratch, compiler)], { encoding: "utf8" });
+  assert.equal(compiled.status, 0, compiled.stderr);
+  const validatorPath = "lifecycle/app-transition-content-validation.js";
+  const { loadAppTransitionContentValidators } = await temporaryBuilder(validatorPath);
+  const validators = await loadAppTransitionContentValidators();
+  assert.equal(validators.parseSite(site).home.sections[1].variant, "test-accent");
+  assert.equal(validators.parseRoutedPage(page).sections[1].variant, "test-accent");
+  const parsedEnglish = validators.parseLocalized(english, "en-CA", "site");
+  const parsedFrench = validators.parseLocalized(french, "fr-CA", "site");
+  assert.equal(parsedEnglish.pages.home.sections[1].variant, "test-accent");
+  assert.equal(parsedFrench.pages.home.sections[1].variant, "test-accent");
+  validators.assertParity(parsedEnglish, parsedFrench, "site");
+  french.pages.home.sections[1].variant = "default";
+  const differentFrench = validators.parseLocalized(french, "fr-CA", "site");
+  assertContentInvalid(() => validators.assertParity(parsedEnglish, differentFrench, "site"));
+
+  const installed = await import(`../dist/${validatorPath}`);
+  const installedValidators = await installed.loadAppTransitionContentValidators();
+  assertContentInvalid(() => installedValidators.parseSite(site));
+});
+
 test("the source-owned registry declares and renders every approved section", async () => {
   const renderSkeleton = await loadRenderSkeleton();
   const rendered = assertSuccess(
@@ -5007,7 +5086,7 @@ test("the source-owned registry declares and renders every approved section", as
         type: "hero",
         contentSchemaVersion: "1.0.0",
         approvedVariants: ["default"],
-        supportedProfiles: ["portfolio", "site"],
+        supportedProfiles: ["portfolio", "site", "app"],
         accessibilityRequirements: ["page-heading-level-one"],
         analyticsDeclarations: [],
         migrationHooks: [],
@@ -5016,7 +5095,7 @@ test("the source-owned registry declares and renders every approved section", as
         type: "text",
         contentSchemaVersion: "1.0.0",
         approvedVariants: ["default"],
-        supportedProfiles: ["portfolio", "site"],
+        supportedProfiles: ["portfolio", "site", "app"],
         accessibilityRequirements: ["section-heading-level-two"],
         analyticsDeclarations: [],
         migrationHooks: [],
@@ -5025,7 +5104,7 @@ test("the source-owned registry declares and renders every approved section", as
         type: "project-list",
         contentSchemaVersion: "1.0.0",
         approvedVariants: ["default"],
-        supportedProfiles: ["portfolio", "site"],
+        supportedProfiles: ["portfolio", "site", "app"],
         accessibilityRequirements: [
           "section-heading-level-two",
           "project-list-semantics",
@@ -5038,7 +5117,7 @@ test("the source-owned registry declares and renders every approved section", as
         type: "call-to-action",
         contentSchemaVersion: "1.0.0",
         approvedVariants: ["default"],
-        supportedProfiles: ["portfolio", "site"],
+        supportedProfiles: ["portfolio", "site", "app"],
         accessibilityRequirements: [
           "section-heading-level-two",
           "descriptive-link-labels",

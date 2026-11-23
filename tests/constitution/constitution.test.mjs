@@ -17,6 +17,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { listRepositoryPaths } from "../../scripts/check-semantic-naming.mjs";
+import { withCurrentGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
 
 import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
 import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
@@ -163,8 +164,8 @@ function listRepositoryMarkdownFiles(repositoryPaths) {
     .map((path) => resolve(repositoryRoot, path));
 }
 
-function isInsideRepository(path) {
-  const relativePath = relative(repositoryRoot, path);
+function isInsideRepository(path, root = repositoryRoot) {
+  const relativePath = relative(root, path);
 
   return (
     relativePath !== ".." &&
@@ -2888,12 +2889,9 @@ test("repository documentation has no broken local Markdown links", async () => 
   const markdownFiles = listRepositoryMarkdownFiles(repositoryPaths);
   const brokenLinks = [];
 
-  for (const markdownFile of markdownFiles) {
+  async function checkLinks(markdownFile, root, sourcePaths, repositoryMarkdownPath) {
     const document = await readFile(markdownFile, "utf8");
     const links = document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g);
-    const repositoryMarkdownPath = relative(repositoryRoot, markdownFile)
-      .split(sep)
-      .join("/");
     const isApplicationEnvironmentGuide =
       /^packages\/builder-core\/templates\/[^/]+\/application-environments\/docs\/[^/]+\.md$/u.test(
         repositoryMarkdownPath,
@@ -2920,22 +2918,22 @@ test("repository documentation has no broken local Markdown links", async () => 
             )
           : resolve(dirname(markdownFile), decodedPath);
 
-      if (!isInsideRepository(target)) {
+      if (!isInsideRepository(target, root)) {
         brokenLinks.push(
-          `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination} (outside repository)`,
+          `${repositoryMarkdownPath} -> ${destination} (outside repository)`,
         );
         continue;
       }
 
-      const relativeTarget = relative(repositoryRoot, target);
-      const targetIsTracked = repositoryPaths.some(
-        (repositoryPath) =>
-          repositoryPath === relativeTarget ||
-          repositoryPath.startsWith(`${relativeTarget}/`),
+      const relativeTarget = relative(root, target).split(sep).join("/");
+      const targetIsListed = sourcePaths.some(
+        (sourcePath) =>
+          sourcePath === relativeTarget ||
+          sourcePath.startsWith(`${relativeTarget}/`),
       );
-      if (!targetIsTracked) {
+      if (!targetIsListed) {
         brokenLinks.push(
-          `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination} (not tracked)`,
+          `${repositoryMarkdownPath} -> ${destination} (not tracked)`,
         );
         continue;
       }
@@ -2944,9 +2942,25 @@ test("repository documentation has no broken local Markdown links", async () => 
         await access(target);
       } catch {
         brokenLinks.push(
-          `${markdownFile.slice(repositoryRoot.length + 1)} -> ${destination}`,
+          `${repositoryMarkdownPath} -> ${destination}`,
         );
       }
+    }
+  }
+
+  for (const markdownFile of markdownFiles) {
+    const repositoryMarkdownPath = relative(repositoryRoot, markdownFile)
+      .split(sep)
+      .join("/");
+    const sparseGuide = /^tests\/generated-fixtures\/fixtures\/section-contracts\/([a-z0-9-]+)\/apps\/web\/AGENTS\.md$/u.exec(
+      repositoryMarkdownPath,
+    );
+    if (sparseGuide) {
+      await withCurrentGeneratedFixture(sparseGuide[1], (root, contract) =>
+        checkLinks(resolve(root, "apps/web/AGENTS.md"), root, contract.expectedFiles, repositoryMarkdownPath),
+      );
+    } else {
+      await checkLinks(markdownFile, repositoryRoot, repositoryPaths, repositoryMarkdownPath);
     }
   }
 
