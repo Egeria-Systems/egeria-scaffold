@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
-import {
+import filesystem, {
   access,
   chmod,
   cp,
@@ -17,6 +17,7 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -31,7 +32,8 @@ import {
   inspectGeneratedFixture,
   parseVerificationArguments,
   verifyApplicationEnvironmentProjectForTesting,
-  verifyGeneratedProjectForTesting,
+  verifyGeneratedProjectForTesting as verifyGeneratedProject,
+  withCurrentGeneratedFixture,
   verifyGeneratedSkeletonsForTesting as verifySkeletons,
 } from "../../scripts/verify-generated-skeletons.mjs";
 
@@ -41,6 +43,10 @@ const repositoryRoot = resolve(
 );
 const execFileAsync = promisify(execFile);
 const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
+
+function verifyGeneratedProjectForTesting(root, identifier, adapters, expectedProjectName, options) {
+  return verifyGeneratedProject(root, identifier, adapters, expectedProjectName, options, identifier !== "app-calendly");
+}
 const retainedFixtureIdentifier = identifier => ({
   "site-public-integrations": "site-multilingual-analytics",
   "app-jobs": "app",
@@ -70,6 +76,113 @@ test("every generated fixture selection uses the public create argument contract
   }
 });
 
+test("fixed verification refuses missing current fixture witnesses before any command", async (context) => {
+  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-current-fixtures-"));
+  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
+  for (const { relativeRoot } of generatedFixtureContracts) {
+    const destination = resolve(fixtureRepository, relativeRoot);
+    await mkdir(dirname(destination), { recursive: true });
+    await cp(resolve(repositoryRoot, relativeRoot), destination, { recursive: true, errorOnExist: true, force: false });
+  }
+  await expectFixtureError(() => verifySkeletons({
+    createOwner: () => createKnownOwner(fixtureRepository),
+    runCommand: () => assert.fail("missing current fixture bytes cannot reach the production command vector"),
+    runAudit: () => assert.fail("missing current fixture bytes cannot reach the dependency audit"),
+  }, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+});
+
+test("fixed verification refuses changed witness bytes and different fixture ancestors before commands", async (context) => {
+  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-current-fixture-witnesses-"));
+  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
+  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build"]) {
+    const destination = resolve(fixtureRepository, tree);
+    await mkdir(dirname(destination), { recursive: true });
+    await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
+  }
+  let commands = 0;
+  const adapters = {
+    createOwner: () => createKnownOwner(fixtureRepository),
+    runCommand: input => { commands++; return successfulCommand(input); },
+    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+  };
+  const witnessFile = resolve(fixtureRepository, "tests/generated-fixtures/fixtures/public-build/portfolio/apps/web/src/configuration/public-build.ts");
+  const retainedFile = resolve(fixtureRepository, fixtureRoot("portfolio"), "README.md");
+  for (const path of [witnessFile, retainedFile]) {
+    const original = await readFile(path);
+    await writeFile(path, Buffer.concat([original, Buffer.from("\nsynthetic-drift\n")]));
+    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+    await writeFile(path, original);
+  }
+  assert.equal(commands, 0);
+
+  const original = await readFile(witnessFile);
+  await expectFixtureError(() => verifySkeletons({
+    ...adapters,
+    async runCommand(input) {
+      if (commands === 0) await writeFile(witnessFile, Buffer.concat([original, Buffer.from("\nchanged-during-verification\n")]));
+      return adapters.runCommand(input);
+    },
+  }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
+  assert.ok(commands > 0);
+});
+
+test("current reconstruction refuses changed and nonregular copied files before overlay writes", async (context) => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-copy-race-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const path = "apps/web/next.config.ts";
+  const retainedRoot = resolve(repositoryRoot, fixtureRoot("portfolio"));
+  const protectedPath = join(parent, "separate-file");
+  const originalCopy = cp;
+  const unchanged = "separate file bytes\n";
+  await writeFile(protectedPath, unchanged);
+
+  for (const change of ["regular", "symlink"]) {
+    await context.test(change, async t => {
+      let reconstructed;
+      const copy = t.mock.method(filesystem, "cp", async (source, destination, options) => {
+        await originalCopy(source, destination, options);
+        if (source !== retainedRoot) return;
+        reconstructed = join(destination, path);
+        if (change === "regular") await writeFile(reconstructed, "changed while copying\n");
+        else {
+          await rm(reconstructed);
+          await symlink(protectedPath, reconstructed);
+        }
+      });
+      syncBuiltinESMExports();
+      try {
+        let reachedOperation = false;
+        const result = await withCurrentGeneratedFixture("portfolio", async () => { reachedOperation = true; }).catch(error => error);
+        assert.equal(await readFile(protectedPath, "utf8"), unchanged);
+        assert.equal(reachedOperation, false);
+        assert.ok(result instanceof GeneratedFixtureVerificationError);
+        assert.ok(reconstructed);
+      } finally {
+        copy.mock.restore();
+        syncBuiltinESMExports();
+      }
+    });
+  }
+});
+
+test("fixed verification detects a changed top-level witness inventory on exit", async t => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-witness-inventory-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const isolatedRoot = join(parent, "inputs");
+  const witnessTree = "tests/generated-fixtures/fixtures/public-build";
+  for (const tree of ["fixtures/generated", witnessTree]) {
+    await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
+  }
+  await expectFixtureError(() => verifySkeletons({
+    async createOwner() {
+      await mkdir(join(isolatedRoot, witnessTree, "unexpected-fixture"));
+      return createKnownOwner(parent);
+    },
+    runCommand: successfulCommand,
+    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+  }, { includeVisual: false, fromFixture: generatedFixtureContracts.at(-1).identifier }, isolatedRoot), "FIXTURE_SOURCE_CHANGED");
+});
+
 test("the admitted skeleton audit exception never reaches strict single-project certification verification", async t => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-audit-boundary-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
@@ -89,7 +202,7 @@ test("the admitted skeleton audit exception never reaches strict single-project 
   assert.equal(result.auditDispositions.every(receipt => receipt.thresholdExitCode === 1), true);
   assert.equal(result.status, "completed-with-security-exception");
   const commands = [];
-  await expectFixtureError(() => verifyGeneratedProjectForTesting(resolve(repositoryRoot, fixtureRoot("portfolio")), "portfolio", {
+  await withCurrentGeneratedFixture("portfolio", root => expectFixtureError(() => verifyGeneratedProject(root, "portfolio", {
     ...adapters,
     runAudit: async () => assert.fail("certification must not use the exception route"),
     runCommand: async input => {
@@ -97,7 +210,7 @@ test("the admitted skeleton audit exception never reaches strict single-project 
       if (input.arguments[0] === "audit") throw Object.assign(new Error("raw audit failure"), { code: 1 });
       return successfulCommand(input);
     },
-  }), "DEPENDENCY_AUDIT_FAILED");
+  }), "DEPENDENCY_AUDIT_FAILED"));
   assert.equal(commands.some(args => args.includes("lint")), false);
   assert.equal(commands.some(args => args.includes("signatures")), false);
 });
@@ -1180,7 +1293,9 @@ test("fixed verification detects a change to a skipped prefix fixture", async t 
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-prefix-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
   const isolatedRoot = join(parent, "inputs");
-  await cp(resolve(repositoryRoot, "fixtures/generated"), join(isolatedRoot, "fixtures/generated"), { recursive: true });
+  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build"]) {
+    await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
+  }
   const prefixReadme = join(isolatedRoot, fixtureRoot("portfolio"), "README.md");
   const last = generatedFixtureContracts.at(-1).identifier;
   const executed = new Set();

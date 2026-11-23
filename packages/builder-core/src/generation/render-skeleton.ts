@@ -7,6 +7,7 @@ import {
   applicationEnvironmentScripts,
   applicationEnvironmentVerificationScripts,
   persistenceDeploymentScripts,
+  retainsDeploymentConfiguration,
   type CapabilityCatalogSnapshot,
   type CapabilityPackageVersions,
 } from "../catalog/capability-catalog.js";
@@ -465,10 +466,61 @@ function createDesiredSurfaces(
   ].sort((left, right) => compareText(left.identifier, right.identifier));
 }
 
+const publicBuildProviderFragments = {
+  contact: {
+    imports: 'import { resolveContactSettings } from "../integrations/contact-form-web3forms/contact-settings.ts";\n',
+    inputFields: "  contactAccessKey?: unknown;\n",
+    reads: "    contactAccessKey: process.env.NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY,\n",
+    validation: [
+      "  const contact = resolveContactSettings(input.contactAccessKey, target);",
+      '  if (!contact.ok) return { ok: false, source: "contact", ...contact.issue } as const;',
+    ].join("\n") + "\n",
+    values: '    NEXT_PUBLIC_WEB3FORMS_ACCESS_KEY: contact.settings?.accessKey ?? "",\n',
+  },
+  booking: {
+    imports: 'import { resolveBookingDestination } from "../integrations/booking-calendly/booking-settings.ts";\n',
+    inputFields: "  bookingUrl?: unknown;\n",
+    reads: "    bookingUrl: process.env.NEXT_PUBLIC_CALENDLY_URL,\n",
+    validation: [
+      "  const booking = resolveBookingDestination(input.bookingUrl, target);",
+      '  if (!booking.ok) return { ok: false, source: "booking", ...booking.issue } as const;',
+    ].join("\n") + "\n",
+    values: '    NEXT_PUBLIC_CALENDLY_URL: booking.destination ?? "",\n',
+  },
+  analytics: {
+    imports: [
+      'import { resolveAnalyticsConfiguration, type AnalyticsConfigurationInput } from "../integrations/analytics/analytics-configuration.ts";',
+      'import { analyticsSettings } from "../integrations/analytics/analytics-settings.ts";',
+    ].join("\n") + "\n",
+    inputFields: '  analytics: Omit<AnalyticsConfigurationInput, "siteUrl" | "enabled"> & { enabled: string | undefined };\n',
+    reads: [
+      "    analytics: {",
+      "      enabled: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED,",
+      "      cloudflareToken: process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN,",
+      "      googleMeasurementId: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,",
+      "      clarityProjectId: process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID,",
+      "      googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,",
+      "    },",
+    ].join("\n") + "\n",
+    validation: [
+      "  const analytics = resolveAnalyticsConfiguration(analyticsSettings, { ...input.analytics, siteUrl: input.siteUrl }, target);",
+      '  if (!analytics.ok) return { ok: false, source: "analytics", ...analytics.issue } as const;',
+    ].join("\n") + "\n",
+    values: [
+      '    NEXT_PUBLIC_ANALYTICS_ENABLED: input.analytics.enabled ?? "",',
+      '    NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: analytics.configuration.cloudflareToken ?? "",',
+      '    NEXT_PUBLIC_GA4_MEASUREMENT_ID: analytics.configuration.googleMeasurementId ?? "",',
+      '    NEXT_PUBLIC_CLARITY_PROJECT_ID: analytics.configuration.clarityProjectId ?? "",',
+      '    NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: analytics.configuration.googleSiteVerification ?? "",',
+    ].join("\n") + "\n",
+  },
+} as const;
+
 export async function renderProjectTemplates(
   project: ProjectConfiguration,
   destinations?: ReadonlySet<string>,
   retainAnalyticsConsent?: true,
+  retainDeployment = false,
 ): Promise<ValidationResult<GeneratedFile[]>> {
   const selected = project.selectedCapabilities;
   const analytics = project.capabilitySettings.analytics;
@@ -488,16 +540,27 @@ export async function renderProjectTemplates(
     contactForm,
     jobsSelected,
     retainAnalyticsConsent,
+    retainDeployment,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
   }
 
+  const buildFragments = [
+    ...(contactForm ? [publicBuildProviderFragments.contact] : []),
+    ...(booking === undefined ? [] : [publicBuildProviderFragments.booking]),
+    ...(analytics === undefined ? [] : [publicBuildProviderFragments.analytics]),
+  ];
   const tokens: TemplateTokens = {
     projectName: project.project.name,
     displayNameJson: JSON.stringify(project.project.displayName),
     workerName: project.project.name,
     workerEntryJson: JSON.stringify(jobsSelected ? "worker.mjs" : ".open-next/worker.js"),
+    publicBuildProviderImports: buildFragments.map(fragment => fragment.imports).join(""),
+    publicBuildProviderInputFields: buildFragments.map(fragment => fragment.inputFields).join(""),
+    publicBuildProviderReads: buildFragments.map(fragment => fragment.reads).join(""),
+    publicBuildProviderValidation: buildFragments.map(fragment => fragment.validation).join(""),
+    publicBuildProviderValues: buildFragments.map(fragment => fragment.values).join(""),
     ...(analytics === undefined
       ? {}
       : {
@@ -637,7 +700,8 @@ export async function renderSkeleton(
     return projectResult;
   }
 
-  const templates = await renderProjectTemplates(projectResult.value, undefined, renderingContext.retainAnalyticsConsent);
+  const templates = await renderProjectTemplates(projectResult.value, undefined, renderingContext.retainAnalyticsConsent,
+    retainsDeploymentConfiguration(renderingContext.catalogSnapshot));
   if (!templates.ok) return templates;
   const files = templates.value;
   {

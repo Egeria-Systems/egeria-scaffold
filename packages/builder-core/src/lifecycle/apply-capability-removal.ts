@@ -1,4 +1,5 @@
 import { isAbsolute, resolve } from "node:path";
+import { retainsDeploymentConfiguration } from "../catalog/capability-catalog.js";
 
 import {
   createApplicationEnvironmentRenderingContext,
@@ -714,6 +715,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     false,
     environmentContext.retainedNextVersion,
     input.capability === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
+    retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
   ));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

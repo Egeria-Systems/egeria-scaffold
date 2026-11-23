@@ -1622,7 +1622,7 @@ test("portfolio and site generation writes exact state-last repositories", async
         generated.state.installedCapabilities.find(
           ({ identifier }) => identifier === "deployment-cloudflare",
         )?.version,
-        "0.9.0",
+        "0.13.0",
       );
       assert.equal(
         generated.state.installedCapabilities.find(

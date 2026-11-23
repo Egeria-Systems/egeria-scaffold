@@ -108,8 +108,8 @@
     },
     "deployment-cloudflare": {
       "subject": {
-        "descriptorVersion": "0.12.0",
-        "behaviorContractDigest": "sha256:a415ac2d81272c6fe57dde554465c9120282df75e209de8796725f2f52844fe6"
+        "descriptorVersion": "0.16.0",
+        "behaviorContractDigest": "sha256:30432169a7786d0efa4e64d8e3871e19a25b81fdeb8b940ff47a5ce42ea97478"
       },
       "requiredEvidence": [
         "cleanup-recovery",
@@ -117,7 +117,7 @@
         "fresh-scaffold"
       ],
       "status": "pending",
-      "taskPlan": "docs/superpowers/plans/2026-11-04-environment-generation-certification-handoff.md",
+      "taskPlan": "docs/superpowers/plans/2026-11-19-deployment-public-build-certification-handoff.md",
       "evidence": []
     },
     "multilingual": {

@@ -121,6 +121,16 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/analytics/application-environments/public-build/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/analytics/application-environments/public-build/multilingual/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/analytics/apps/web/app/layout.tsx",
         messages: [],
       },
@@ -152,6 +162,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/common/application-environments/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/common/application-environments/public-build/apps/web/app/layout.tsx",
         messages: [],
       },
       {
@@ -216,6 +231,26 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       },
       {
         filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/public-build/apps/web/app/layout.analytics.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/public-build/apps/web/app/layout.multilingual-analytics.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/public-build/apps/web/app/layout.multilingual.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/contact-form-web3forms/application-environments/public-build/apps/web/app/layout.tsx",
+        messages: [],
+      },
+      {
+        filePath:
           "packages/builder-core/templates/contact-form-web3forms/apps/web/app/layout.analytics.tsx",
         messages: [],
       },
@@ -267,6 +302,11 @@ test("copy externalization covers canonical builder TSX templates", async () => 
       {
         filePath:
           "packages/builder-core/templates/multilingual/application-environments/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
+        messages: [],
+      },
+      {
+        filePath:
+          "packages/builder-core/templates/multilingual/application-environments/public-build/apps/web/app/layout.tsx",
         messages: [],
       },
       {

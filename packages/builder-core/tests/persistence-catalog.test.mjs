@@ -23,7 +23,7 @@ test("explicit application persistence resolves the complete optional tuple with
   const versions = Object.fromEntries(resolved.value.capabilities.map(({ identifier, version }) => [identifier, version]));
   assert.equal(versions["application-persistence"], "0.2.0");
   assert.equal(versions.standards, "0.10.0");
-  assert.equal(versions["deployment-cloudflare"], "0.10.0");
+  assert.equal(versions["deployment-cloudflare"], "0.14.0");
   assert.equal(versions["app-foundation"], "0.3.0");
   assert.equal(versions["site-routing"], "0.5.0");
   const persistence = result.value.find(({ identifier }) => identifier === "application-persistence");
@@ -39,7 +39,7 @@ test("default generation retains exact default shared subjects while persistence
   assert.equal(result.ok, true, JSON.stringify(result));
   const versions = Object.fromEntries(result.value.resolved.capabilities.map(({ identifier, version }) => [identifier, version]));
   assert.equal(versions.standards, "0.9.0");
-  assert.equal(versions["deployment-cloudflare"], "0.9.0");
+  assert.equal(versions["deployment-cloudflare"], "0.13.0");
   assert.equal(versions["application-persistence"], undefined);
   assert.equal(result.value.files.some(({ path }) => path.includes("persistence") || path.endsWith("vitest.bindings.config.ts")), false);
 });
@@ -161,7 +161,7 @@ test("environment persistence resolves the complete app tuple without changing o
   const versions = Object.fromEntries(resolved.value.capabilities.map(({ identifier, version }) => [identifier, version]));
   assert.equal(versions["application-persistence"], "0.2.0");
   assert.equal(versions.standards, "0.10.0");
-  assert.equal(versions["deployment-cloudflare"], "0.10.0");
+  assert.equal(versions["deployment-cloudflare"], "0.14.0");
   assert.equal(versions["app-foundation"], "0.3.0");
   const persistence = result.value.find(({ identifier }) => identifier === "application-persistence");
   assert.equal(persistence.removalPolicy, "export-and-remove");
@@ -184,7 +184,7 @@ test("environment persistence resolves the complete app tuple without changing o
 
 test("environment persistence rejects partial and mixed snapshots at the catalog and rendering-context boundaries", () => {
   const context = createApplicationEnvironmentRenderingContext(true);
-  const exact = { standards: "0.10.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.10.0", applicationPersistence: "0.2.0", transactionalEmailResend: "0.2.0" };
+  const exact = { standards: "0.10.0", siteRouting: "0.5.0", appFoundation: "0.3.0", deploymentCloudflare: "0.14.0", applicationPersistence: "0.2.0", transactionalEmailResend: "0.2.0" };
   assert.deepEqual(context.catalogSnapshot, exact);
   assert.equal(isApplicationEnvironmentRenderingContext(context), true);
   for (const snapshot of [

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import * as core from "../dist/index.js";
 
 const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
@@ -46,12 +47,25 @@ test("contact generation rejects retired contexts and redacts invalid selections
   assert.doesNotMatch(JSON.stringify(result.issues), /private-value/);
 });
 
-test("absent contact selection preserves the existing portfolio source", async () => {
-  const result = await core.renderSkeleton({ ...request("portfolio"), projectName: "acme-portfolio", displayName: "Acme Portfolio" });
-  assert.equal(result.ok, true);
-  assert.equal(result.value.files.some(f => f.path.includes("web3forms")), false);
-  for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"])
-    assert.deepEqual(Buffer.from(result.value.files.find(f => f.path === path).content), await readFile(new URL(`../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/${path}`, import.meta.url)));
+test("absent contact selection preserves the retained portfolio and excludes contact from fresh generation", async () => {
+  const fixtureRoot = new URL("../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/", import.meta.url);
+  const installed = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fileURLToPath(fixtureRoot)));
+  assert.equal(installed.ok, true);
+  const portfolio = { ...request("portfolio"), projectName: "acme-portfolio", displayName: "Acme Portfolio" };
+  const retained = await core.renderSkeleton(portfolio, installed.value.renderingContext);
+  const fresh = await core.renderSkeleton(portfolio);
+  assert.equal(retained.ok, true);
+  assert.equal(fresh.ok, true);
+  for (const { files } of [retained.value, fresh.value]) {
+    assert.equal(files.some(({ path }) => path.includes("web3forms")), false);
+  }
+  for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"]) {
+    assert.deepEqual(Buffer.from(retained.value.files.find(file => file.path === path).content), await readFile(new URL(path, fixtureRoot)));
+  }
+  for (const path of ["apps/web/app/layout.tsx", "apps/web/src/configuration/public-build.ts"]) {
+    const source = fresh.value.files.find(file => file.path === path).content;
+    assert.doesNotMatch(new TextDecoder().decode(source), /web3forms|ContactFormPlacement|resolveContactSettings/u);
+  }
 });
 
 test("environment contact selection renders every profile and locale without literal settings", async () => {

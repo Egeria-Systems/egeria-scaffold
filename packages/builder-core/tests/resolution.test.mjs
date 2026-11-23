@@ -496,7 +496,7 @@ test("the current catalog exposes exact capability contracts and keeps observabi
     "frame-src https://calendly.com https://www.calendly.com",
   ]);
 
-  assert.deepEqual(catalog.slice(1, 7), [
+  const expectedRetainedContracts = [
     {
       "identifier": "content-files",
       "version": "0.4.0",
@@ -2128,7 +2128,25 @@ test("the current catalog exposes exact capability contracts and keeps observabi
         "exclude-calendly-account-and-provider-data"
       ]
     }
-  ]);
+  ];
+  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const retainedCatalog = assertOk(core.createCapabilityCatalogSnapshot(packageVersions, retainedContext.catalogSnapshot));
+  assert.deepEqual(retainedCatalog.slice(1, 7), expectedRetainedContracts);
+  const publicBuildFiles = [
+    ["deployment-public-build-configuration", "apps/web/src/configuration/public-build.ts"],
+    ["deployment-document-metadata", "apps/web/src/configuration/document-metadata.ts"],
+  ];
+  assert.deepEqual(catalog.slice(1, 7), expectedRetainedContracts.map(descriptor =>
+    descriptor.identifier === "deployment-cloudflare" ? {
+      ...descriptor,
+      version: "0.13.0",
+      managedSurfaces: [...descriptor.managedSurfaces, ...publicBuildFiles.map(([identifier, path]) => ({
+        identifier, path, owner: { kind: "capability", identifier: "deployment-cloudflare" }, ownership: "managed",
+        fingerprintTarget: { kind: "file" }, mergeStrategy: "replace-file",
+      }))],
+      inferenceProbes: [...descriptor.inferenceProbes, ...publicBuildFiles.map(([, path]) => ({ kind: "file", path }))],
+    } : descriptor,
+  ));
 
   const observability = catalog.find(
     ({ identifier }) => identifier === "observability",
@@ -2708,7 +2726,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
     });
   }
 
-  assert.deepEqual(core.createInstalledManifest(site), [
+  const expectedRetainedManifest = [
     {
       identifier: "standards",
       version: "0.9.0",
@@ -2751,7 +2769,14 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
       stateClassifications: ["repository-stateful"],
       removalPolicy: "reviewed",
     },
-  ]);
+  ];
+  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const retainedCatalog = assertOk(core.createCapabilityCatalogSnapshot(packageVersions, retainedContext.catalogSnapshot));
+  const retainedSite = assertOk(resolveRequest({ profile: "site" }, retainedCatalog));
+  assert.deepEqual(core.createInstalledManifest(retainedSite), expectedRetainedManifest);
+  assert.deepEqual(core.createInstalledManifest(site), expectedRetainedManifest.map(capability =>
+    capability.identifier === "deployment-cloudflare" ? { ...capability, version: "0.13.0" } : capability,
+  ));
 });
 
 test("current recipes have one default tuple and refuse retired catalog views", () => {

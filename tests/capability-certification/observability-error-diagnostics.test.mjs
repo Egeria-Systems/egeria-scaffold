@@ -14,7 +14,7 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
-import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
+import { generatedFixtureContracts, withCurrentGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
 const generatedFixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
@@ -47,7 +47,7 @@ const currentSubject = Object.freeze({
   behaviorContractDigest: "sha256:1da86ce88e9257fc0d33dfb0a9f379919c32b58f1337c4b4ae9699ded0770a16",
 });
 const appProjectSource = await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/project.yaml"), "utf8");
-const appState = JSON.parse(await readFile(resolve(repositoryRoot, generatedFixtureRoot("app"), ".egeria/state.json"), "utf8"));
+const appState = await withCurrentGeneratedFixture("app", async root => JSON.parse(await readFile(resolve(root, ".egeria/state.json"), "utf8")));
 const installedCapabilities = appState.installedCapabilities;
 const appBuildEvidence = [{
   fixture: "app",

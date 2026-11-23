@@ -1565,17 +1565,20 @@ test("current deployment families preserve supported installed combinations and 
         assert.equal(contracts.parseStateJson(JSON.stringify(candidate)).ok, true, label);
         assert.equal(snapshots.createVerifiedProjectSnapshot(project, candidate).ok, true, label);
       }
+      const retainedDeploymentVersion = jobsVersion === undefined
+        ? (persistence ? "0.10.0" : "0.9.0")
+        : (persistence ? "0.12.0" : "0.11.0");
 
       for (const version of [
         "0.3.1", "0.4.1", "0.5.1", "0.6.1",
-        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "9.9.9",
+        "0.3.0", "0.4.0", "0.5.0", "0.6.0", "0.7.1", "0.9.0", "0.10.0", "0.11.0", "0.12.0", "0.13.0", "0.14.0", "0.15.0", "0.16.0", "9.9.9",
       ].filter(version => version !== deploymentVersion)) {
         const changed = {
           ...state,
           installedCapabilities: installedCapabilities.map(capability =>
             capability.identifier === "deployment-cloudflare" ? { ...capability, version } : capability),
         };
-        assert.equal(contracts.parseStateJson(JSON.stringify(changed)).ok, false, `${label}: deployment ${version}`);
+        assert.equal(contracts.parseStateJson(JSON.stringify(changed)).ok, version === retainedDeploymentVersion, `${label}: deployment ${version}`);
         assert.equal(snapshots.createVerifiedProjectSnapshot(project, changed).ok, false, label);
       }
 

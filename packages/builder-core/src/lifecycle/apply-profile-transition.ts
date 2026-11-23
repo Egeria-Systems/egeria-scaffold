@@ -2,11 +2,7 @@ import { constants } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
-import {
-  createCapabilityCatalogSnapshot,
-  applicationEnvironmentCatalogSnapshot,
-} from "../catalog/capability-catalog.js";
-import { verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { createVerifiedProjectSnapshot } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   appGenerationVerificationChecks,
@@ -686,6 +682,11 @@ export async function applyProfileTransition(input: Readonly<{
   if (controls === undefined) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
   }
+  const snapshot = createVerifiedProjectSnapshot(controls.project.value, controls.state.value);
+  if (!snapshot.ok) {
+    return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
+  }
+  const targetCatalog = snapshot.value.catalog;
   if (
     controls.state.value.appliedMigrations.includes(migrationIdentifier) ||
     controls.migrations.value.some(
@@ -816,25 +817,13 @@ export async function applyProfileTransition(input: Readonly<{
     );
   }
 
-  const targetCatalog = createCapabilityCatalogSnapshot(
-    verifiedCapabilityPackageVersions,
-    applicationEnvironmentCatalogSnapshot,
-  );
-  if (!targetCatalog.ok) {
-    return failure(
-      "PROFILE_TRANSITION_REINFERENCE_FAILED",
-      "re-infer",
-      "inspect-worktree",
-    );
-  }
-
   let pendingControls: ControlSnapshot | undefined;
   let pendingInference: Awaited<ReturnType<typeof inferRepository>>;
   try {
     pendingControls = await readControlSnapshot(reader);
     pendingInference = await inferRepository({
       reader,
-      catalog: targetCatalog.value,
+      catalog: targetCatalog,
     });
   } catch {
     return failure(
@@ -1025,7 +1014,7 @@ export async function applyProfileTransition(input: Readonly<{
     finalControls = await readControlSnapshot(reader);
     finalInference = await inferRepository({
       reader,
-      catalog: targetCatalog.value,
+      catalog: targetCatalog,
     });
   } catch {
     return failure(
