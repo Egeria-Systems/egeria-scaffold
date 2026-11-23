@@ -583,6 +583,7 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,
     environmentContext.retainPublicContentRouting,
+    environmentContext.retainPersistenceTarget,
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return planningFailure("PROJECT_INSPECTION_INVALID");

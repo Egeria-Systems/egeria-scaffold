@@ -1532,6 +1532,19 @@ const publicBuildWitnessPaths = Object.freeze([
 const jobAttemptWitnessDirectory = "tests/generated-fixtures/fixtures/job-attempts";
 const sectionWitnessDirectory = "tests/generated-fixtures/fixtures/section-contracts";
 const publicContentRoutingWitnessDirectory = "tests/generated-fixtures/fixtures/public-content-and-routing";
+const persistenceTargetWitnessDirectory = "tests/generated-fixtures/fixtures/persistence-target-validation";
+const persistenceTargetWitnessPaths = Object.freeze([
+  "apps/web/src/configuration/application-database.ts",
+  "apps/web/tests/bindings/application-persistence.test.ts",
+  "apps/web/tests/bindings/fixtures/worker.ts",
+  "apps/web/tests/unit/application-database-environment.test.ts",
+  "docs/application-persistence.md",
+]);
+const persistenceTargetFixtureDigests = Object.freeze({
+  "app-persistence": "10ee6e4f5257dd5ba3f1a3e1d0bc9e5cf3b94c61416afcdf6a5e1b192870f86e",
+  "app-persistence-email": "4e2b9767e24f693f66b32c46d8c68d6bf161a80025338f89b6f9e50a40f5720b",
+  "app-persistence-jobs-email": "8306f4c02c24bcc30feff07792976e20d0e4039d754a029da277008e389b13a6",
+});
 const publicContentRoutingSharedPaths = Object.freeze({
   routed: ["apps/web/src/routing/routing-content-schema.ts"],
   "monolingual-routed": ["apps/web/app/sitemap.ts", "apps/web/tests/unit/routing-content.test.ts"],
@@ -2571,12 +2584,14 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
   let jobAttemptDirectory;
   let sectionDirectory;
   let publicContentRoutingDirectory;
+  let persistenceTargetDirectory;
   let root;
   const fixtureIdentifiers = generatedFixtureContracts.map(({ identifier }) => identifier);
   const requireWitnessDirectories = () => Promise.all([
     requireFixtureWitnessDirectory(witnessDirectory, fixtureIdentifiers),
     requireFixtureWitnessDirectory(jobAttemptDirectory, Object.keys(jobAttemptWitnesses)),
     requireFixtureWitnessDirectory(sectionDirectory, [...fixtureIdentifiers, "shared"]),
+    requireFixtureWitnessDirectory(persistenceTargetDirectory, ["shared", ...Object.keys(persistenceTargetFixtureDigests)]),
   ]);
   try {
     root = await realpath(fixtureRepositoryRoot);
@@ -2584,6 +2599,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
     jobAttemptDirectory = resolve(root, jobAttemptWitnessDirectory);
     sectionDirectory = resolve(root, sectionWitnessDirectory);
     publicContentRoutingDirectory = resolve(root, publicContentRoutingWitnessDirectory);
+    persistenceTargetDirectory = resolve(root, persistenceTargetWitnessDirectory);
     await requireWitnessDirectories();
   } catch {
     fail("FIXTURE_WITNESS_INVALID");
@@ -2599,12 +2615,21 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
     };
   });
   const sharedSectionRoot = resolve(sectionDirectory, "shared");
+  const persistenceTargetGroups = [
+    ["shared", persistenceTargetWitnessPaths],
+    ...Object.keys(persistenceTargetFixtureDigests).map(identifier => [identifier, [".egeria/state.json"]]),
+  ];
   const readWitnesses = () => Promise.all([
     requireSectionWitness(sharedSectionRoot, sharedSectionPaths),
     Promise.all(inputs.map(requireFixtureWitnessInputs)),
     readPublicContentRoutingWitnesses(publicContentRoutingDirectory),
+    Promise.all(persistenceTargetGroups.map(async ([name, paths]) => [
+      name, await requireSectionWitness(join(persistenceTargetDirectory, name), paths),
+    ])),
   ]);
-  const [sharedSections, before, publicContentRouting] = await readWitnesses();
+  const originalWitnesses = await readWitnesses();
+  const [sharedSections, before, publicContentRouting, persistenceTargetWitnessEntries] = originalWitnesses;
+  const persistenceTargetWitnesses = Object.fromEntries(persistenceTargetWitnessEntries);
   const owner = await createGeneratedFixtureOwner();
   try {
     const ownedRoot = await realpath(owner.path);
@@ -2637,11 +2662,19 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
             : publicContentRouting[group];
           await applyFixtureWitness(reconstruction, owner, join(publicContentRoutingDirectory, group), members, sectionSnapshot);
         }
+        if (Object.hasOwn(persistenceTargetFixtureDigests, identifier)) {
+          const routingSnapshot = await snapshotTree(reconstruction);
+          if (fingerprint(JSON.stringify(routingSnapshot)) !== publicContentRoutingFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
+          for (const group of ["shared", identifier]) {
+            await applyFixtureWitness(reconstruction, owner, join(persistenceTargetDirectory, group), persistenceTargetWitnesses[group], routingSnapshot);
+          }
+        }
       } catch {
         fail("FIXTURE_WITNESS_INVALID");
       }
       const source = await sourceForRoot(reconstruction, currentFixtureContract(identifier));
-      if (fingerprint(JSON.stringify(source.snapshot)) !== (publicContentRoutingFixtureDigests[identifier] ?? sectionFixtureDigests[identifier])) fail("FIXTURE_WITNESS_INVALID");
+      const expectedDigest = persistenceTargetFixtureDigests[identifier] ?? publicContentRoutingFixtureDigests[identifier] ?? sectionFixtureDigests[identifier];
+      if (fingerprint(JSON.stringify(source.snapshot)) !== expectedDigest) fail("FIXTURE_WITNESS_INVALID");
       sources.push(source);
     }
     return await operation(sources);
@@ -2649,7 +2682,7 @@ async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, ope
     try {
       await requireWitnessDirectories();
       const after = await readWitnesses();
-      if (!jsonMatches([sharedSections, before, publicContentRouting], after)) fail("FIXTURE_SOURCE_CHANGED");
+      if (!jsonMatches(originalWitnesses, after)) fail("FIXTURE_SOURCE_CHANGED");
     } catch {
       fail("FIXTURE_SOURCE_CHANGED");
     } finally {

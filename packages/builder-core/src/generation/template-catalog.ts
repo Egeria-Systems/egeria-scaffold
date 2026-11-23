@@ -376,6 +376,15 @@ const persistenceSharedTemplateSources: readonly TemplateSource[] = [
   { source: "standards/application-persistence/.github/workflows/quality.yml.template", destinationSource: "common/.github/workflows/quality.yml.template", contentKind: "text" },
 ];
 
+const persistenceEnvironmentSource = "application-persistence/application-environments/";
+const persistenceTargetSources = new Set([
+  "apps/web/src/configuration/application-database.ts",
+  "apps/web/tests/unit/application-database-environment.test.ts",
+  "apps/web/tests/bindings/fixtures/worker.ts",
+  "apps/web/tests/bindings/application-persistence.test.ts",
+  "docs/application-persistence.md",
+].map(path => persistenceEnvironmentSource + path));
+
 function compareText(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
 }
@@ -406,6 +415,7 @@ export function createTemplateCatalog(
   checkedJobAttempts = false,
   retainSections?: true,
   retainPublicContentRouting?: true,
+  retainPersistenceTarget?: true,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -738,7 +748,9 @@ export function createTemplateCatalog(
       };
     }
 
-    const templateSource = retainSections && retainedSectionSources.has(destinationSource ?? source)
+    const templateSource = !retainPersistenceTarget && persistenceTargetSources.has(source)
+      ? source.replace(persistenceEnvironmentSource, persistenceEnvironmentSource + "target-validation/")
+      : retainSections && retainedSectionSources.has(destinationSource ?? source)
       ? (destinationSource ?? source).replace("common/", "common/application-environments/retained-sections/")
       : retainPublicContentRouting ? source : publicContentRoutingSource(source, includeMultilingual);
     destinations.add(destinationResult.value);

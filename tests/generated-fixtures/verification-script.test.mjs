@@ -45,6 +45,7 @@ const execFileAsync = promisify(execFile);
 const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
 const sectionWitnessTree = "tests/generated-fixtures/fixtures/section-contracts";
 const publicContentRoutingWitnessTree = "tests/generated-fixtures/fixtures/public-content-and-routing";
+const persistenceTargetWitnessTree = "tests/generated-fixtures/fixtures/persistence-target-validation";
 const predecessorFixtureTrees = [
   "fixtures/generated",
   "tests/generated-fixtures/fixtures/public-build",
@@ -93,6 +94,25 @@ test("current public content witnesses retain the booked French catalog and loca
   });
 });
 
+test("current persistence fixtures reconstruct the target contract and omit it from jobs-only", async () => {
+  const path = "apps/web/src/configuration/application-database.ts";
+  for (const identifier of ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"]) {
+    await withCurrentGeneratedFixture(identifier, async root => {
+      const mapping = await readFile(join(root, path));
+      assert.notDeepEqual(mapping, await readFile(resolve(repositoryRoot, fixtureRoot(identifier), path)));
+      assert.deepEqual(mapping, await readFile(resolve(repositoryRoot, persistenceTargetWitnessTree, "shared", path)));
+      const state = JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8"));
+      const surface = state.managedSurfaces.find(entry => entry.path === path);
+      assert.equal(surface.fingerprint, "sha256:" + createHash("sha256").update(mapping).digest("hex"));
+    });
+  }
+  await withCurrentGeneratedFixture("app-jobs", async root => {
+    await assert.rejects(access(join(root, path)), { code: "ENOENT" });
+    const state = JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8"));
+    assert.equal(state.managedSurfaces.some(entry => entry.path === path), false);
+  });
+});
+
 test("fixed verification refuses missing current fixture witnesses before any command", async (context) => {
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-current-fixtures-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
@@ -101,7 +121,7 @@ test("fixed verification refuses missing current fixture witnesses before any co
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, relativeRoot), destination, { recursive: true, errorOnExist: true, force: false });
   }
-  for (const tree of ["tests/generated-fixtures/fixtures/job-attempts", sectionWitnessTree, publicContentRoutingWitnessTree]) {
+  for (const tree of ["tests/generated-fixtures/fixtures/job-attempts", sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
   }
   await expectFixtureError(() => verifySkeletons({
@@ -114,7 +134,7 @@ test("fixed verification refuses missing current fixture witnesses before any co
 test("fixed verification refuses missing checked job attempt witnesses before any command", async (context) => {
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-job-attempt-witnesses-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", sectionWitnessTree, publicContentRoutingWitnessTree]) {
+  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     const destination = resolve(fixtureRepository, tree);
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
@@ -129,7 +149,7 @@ test("fixed verification refuses missing checked job attempt witnesses before an
 test("fixed verification refuses missing section witnesses before any command", async (context) => {
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-section-witnesses-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const tree of [...predecessorFixtureTrees, publicContentRoutingWitnessTree]) {
+  for (const tree of [...predecessorFixtureTrees, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
   }
   let commands = 0;
@@ -150,7 +170,7 @@ test("fixed verification refuses changed witness bytes and different fixture anc
   const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-current-fixture-witnesses-"));
   context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
   const jobAttemptTree = "tests/generated-fixtures/fixtures/job-attempts";
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     const destination = resolve(fixtureRepository, tree);
     await mkdir(dirname(destination), { recursive: true });
     await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
@@ -168,7 +188,8 @@ test("fixed verification refuses changed witness bytes and different fixture anc
   const sharedSectionFile = resolve(fixtureRepository, sectionWitnessTree, "shared/apps/web/src/content/content-schema.ts");
   const sectionState = resolve(fixtureRepository, sectionWitnessTree, "portfolio/.egeria/state.json");
   const frenchBooking = resolve(fixtureRepository, publicContentRoutingWitnessTree, "booking-selected/apps/web/content/fr-CA/booking-calendly.yaml");
-  for (const path of [witnessFile, retainedFile, priorJobsWrapper, jobAttemptFile, sharedSectionFile, sectionState, frenchBooking]) {
+  const persistenceMapping = resolve(fixtureRepository, persistenceTargetWitnessTree, "shared/apps/web/src/configuration/application-database.ts");
+  for (const path of [witnessFile, retainedFile, priorJobsWrapper, jobAttemptFile, sharedSectionFile, sectionState, frenchBooking, persistenceMapping]) {
     const original = await readFile(path);
     await writeFile(path, Buffer.concat([original, Buffer.from("\nsynthetic-drift\n")]));
     await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
@@ -182,39 +203,38 @@ test("fixed verification refuses changed witness bytes and different fixture anc
   await writeFile(extraSectionFile, "Unexpected section witness.\n");
   await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
   await rm(extraSectionFile);
-  const publicContentExtra = resolve(fixtureRepository, publicContentRoutingWitnessTree, "routed/extra.txt");
-  await writeFile(publicContentExtra, "Unexpected public content witness.\n");
-  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  await rm(publicContentExtra);
-  const frenchBookingSource = await readFile(frenchBooking);
-  await rm(frenchBooking);
-  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  await symlink(retainedFile, frenchBooking);
-  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  await rm(frenchBooking);
-  await writeFile(frenchBooking, frenchBookingSource);
+  for (const path of [
+    resolve(fixtureRepository, publicContentRoutingWitnessTree, "routed/extra.txt"),
+    resolve(fixtureRepository, persistenceTargetWitnessTree, "shared/extra.txt"),
+  ]) {
+    await writeFile(path, "Unexpected witness member.\n");
+    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+    await rm(path);
+  }
+  for (const path of [frenchBooking, persistenceMapping]) {
+    const original = await readFile(path);
+    await rm(path);
+    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+    await symlink(retainedFile, path);
+    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
+    await rm(path);
+    await writeFile(path, original);
+  }
   assert.equal(commands, 0);
 
-  const original = await readFile(jobAttemptFile);
-  await expectFixtureError(() => verifySkeletons({
-    ...adapters,
-    async runCommand(input) {
-      if (commands === 0) await writeFile(jobAttemptFile, Buffer.concat([original, Buffer.from("\nchanged-during-verification\n")]));
-      return adapters.runCommand(input);
-    },
-  }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
-  assert.ok(commands > 0);
-  await writeFile(jobAttemptFile, original);
-  commands = 0;
-  const originalSection = await readFile(sharedSectionFile);
-  await expectFixtureError(() => verifySkeletons({
-    ...adapters,
-    async runCommand(input) {
-      if (commands === 0) await writeFile(sharedSectionFile, Buffer.concat([originalSection, Buffer.from("\nchanged-during-verification\n")]));
-      return adapters.runCommand(input);
-    },
-  }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
-  assert.ok(commands > 0);
+  for (const path of [jobAttemptFile, sharedSectionFile, persistenceMapping]) {
+    commands = 0;
+    const original = await readFile(path);
+    await expectFixtureError(() => verifySkeletons({
+      ...adapters,
+      async runCommand(input) {
+        if (commands === 0) await writeFile(path, Buffer.concat([original, Buffer.from("\nchanged-during-verification\n")]));
+        return adapters.runCommand(input);
+      },
+    }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
+    assert.ok(commands > 0);
+    await writeFile(path, original);
+  }
 });
 
 test("current reconstruction refuses changed and nonregular copied files before overlay writes", async (context) => {
@@ -261,7 +281,7 @@ test("fixed verification detects a changed top-level witness inventory on exit",
   t.after(() => rm(parent, { recursive: true, force: true }));
   const isolatedRoot = join(parent, "inputs");
   const witnessTree = "tests/generated-fixtures/fixtures/public-build";
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
   }
   await expectFixtureError(() => verifySkeletons({
@@ -1413,7 +1433,7 @@ test("fixed verification detects a change to a skipped prefix fixture", async t 
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-prefix-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
   const isolatedRoot = join(parent, "inputs");
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree]) {
+  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
     await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
   }
   const prefixReadme = join(isolatedRoot, fixtureRoot("portfolio"), "README.md");

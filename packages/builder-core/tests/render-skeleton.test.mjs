@@ -106,6 +106,87 @@ function renderingState(core, rendered) {
   };
 }
 
+test("persistence target views preserve installed bytes independently of public routing", async () => {
+  const core = await import("../dist/index.js");
+  const fixture = new URL("../../../fixtures/generated/app-persistence-0.3.0-next-16.4.5/", import.meta.url);
+  const [project, state] = await Promise.all([
+    readFile(new URL(".egeria/project.yaml", fixture), "utf8"),
+    readFile(new URL("../../../tests/generated-fixtures/fixtures/public-content-and-routing/app-persistence/.egeria/state.json", import.meta.url), "utf8"),
+  ]);
+  const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
+    ".egeria/project.yaml": project,
+    ".egeria/state.json": state,
+  })));
+  const request = {
+    profile: "app", projectName: "acme-app-persistence", displayName: "Acme App Persistence",
+    packageVersions: core.verifiedCapabilityPackageVersions, applicationPersistence: true,
+  };
+  const installed = assertSuccess(await core.renderSkeleton(request, snapshot.renderingContext));
+  const fresh = assertSuccess(await core.renderSkeleton(request));
+  const persistencePaths = new Set([
+    "apps/web/src/configuration/application-database.ts",
+    "apps/web/tests/unit/application-database-environment.test.ts",
+    "apps/web/tests/bindings/fixtures/worker.ts",
+    "apps/web/tests/bindings/application-persistence.test.ts",
+    "docs/application-persistence.md",
+  ]);
+  for (const path of persistencePaths) {
+    const previous = await readFile(new URL(path, fixture));
+    assert.deepEqual(Buffer.from(installed.files.find(file => file.path === path).content), previous, path);
+    assert.notDeepEqual(Buffer.from(fresh.files.find(file => file.path === path).content), previous, path);
+  }
+  const sharedFiles = ({ files }) => snapshotBytes(files.filter(file => !persistencePaths.has(file.path)));
+  assert.deepEqual(sharedFiles(fresh), sharedFiles(installed));
+
+  const mappingPath = "apps/web/src/configuration/application-database.ts";
+  const mapping = fresh.files.find(({ path }) => path === mappingPath).content;
+  for (const [persist, options] of [
+    [true, { transactionalEmailResend: true }],
+    [true, { backgroundJobDelivery: true }],
+    [true, { backgroundJobDelivery: true, transactionalEmailResend: true }],
+    [false, { backgroundJobDelivery: true }],
+  ]) {
+    const generated = assertSuccess(await core.renderSkeleton({ ...request, ...options, applicationPersistence: persist }));
+    const state = renderingState(core, generated);
+    assert.deepEqual(generated.files.find(({ path }) => path === mappingPath)?.content, persist ? mapping : undefined);
+    for (const path of persistencePaths) {
+      assert.equal(generated.files.some(file => file.path === path), persist);
+      assert.equal(state.managedSurfaces.some(surface => surface.path === path), persist);
+    }
+  }
+});
+
+test("installed persistence requires one eligible canonical mapping declaration", async (context) => {
+  const core = await import("../dist/index.js");
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const rendered = assertSuccess(await core.renderSkeleton({
+    profile: "app", projectName: "persistence-example", displayName: "Persistence Example",
+    packageVersions: core.verifiedCapabilityPackageVersions, applicationPersistence: true,
+  }));
+  const { project } = rendered;
+  const state = renderingState(core, rendered);
+  assertSuccess(createVerifiedProjectSnapshot(project, state));
+  const mapping = state.managedSurfaces.find(surface => surface.identifier === "persistence-environment-mapping");
+  assert.ok(mapping);
+  const others = state.managedSurfaces.filter(surface => surface !== mapping);
+  for (const [label, candidateProject, candidateState] of [
+    ["missing", project, { ...state, managedSurfaces: others }],
+    ["duplicate path", project, { ...state, managedSurfaces: [...others, mapping, { ...mapping, identifier: "duplicate-mapping" }] }],
+    ["wrong path", project, { ...state, managedSurfaces: [...others, { ...mapping, path: "apps/web/src/configuration/other.ts" }] }],
+    ["wrong owner", project, { ...state, managedSurfaces: [...others, { ...mapping, owner: { kind: "builder-kernel" } }] }],
+    ["wrong ownership", project, { ...state, managedSurfaces: [...others, { ...mapping, ownership: "application-owned" }] }],
+    ["wrong target", project, { ...state, managedSurfaces: [...others, { ...mapping, fingerprintTarget: { kind: "json-value", pointer: "/mapping" } }] }],
+    ["wrong merge strategy", project, { ...state, managedSurfaces: [...others, { ...mapping, mergeStrategy: "json-property" }] }],
+    ["unknown fingerprint", project, { ...state, managedSurfaces: [...others, { ...mapping, fingerprint: core.fingerprintFileContent(Buffer.from("unrecognized mapping")) }] }],
+    ["state ejection", project, { ...state, ejections: [mapping.path] }],
+    ["project ejection", { ...project, ejectedAreas: [mapping.path] }, state],
+  ]) {
+    await context.test(label, () => {
+      assert.equal(createVerifiedProjectSnapshot(candidateProject, candidateState).ok, false);
+    });
+  }
+});
+
 test("installed rendering requires a supported Next fingerprint", async (t) => {
   const core = await import("../dist/index.js");
   const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
