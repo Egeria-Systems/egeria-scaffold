@@ -2888,11 +2888,15 @@ test("repository documentation has no broken local Markdown links", async () => 
   const repositoryPaths = await listRepositoryPaths({ root: repositoryRoot });
   const markdownFiles = listRepositoryMarkdownFiles(repositoryPaths);
   const brokenLinks = [];
+  const persistenceGuide = "docs/application-persistence.md";
+  const persistenceGuideTemplate = `packages/builder-core/templates/application-persistence/application-environments/target-validation/${persistenceGuide}`;
+  const persistenceGuideWitness = `tests/generated-fixtures/fixtures/persistence-target-validation/shared/${persistenceGuide}`;
 
   async function checkLinks(markdownFile, root, sourcePaths, repositoryMarkdownPath) {
     const document = await readFile(markdownFile, "utf8");
     const links = document.matchAll(/\[[^\]]+\]\(([^)]+)\)/g);
     const isApplicationEnvironmentGuide =
+      repositoryMarkdownPath === persistenceGuideTemplate ||
       /^packages\/builder-core\/templates\/[^/]+\/application-environments\/docs\/[^/]+\.md$/u.test(
         repositoryMarkdownPath,
       );
@@ -2955,7 +2959,13 @@ test("repository documentation has no broken local Markdown links", async () => 
     const sparseGuide = /^tests\/generated-fixtures\/fixtures\/section-contracts\/([a-z0-9-]+)\/apps\/web\/AGENTS\.md$/u.exec(
       repositoryMarkdownPath,
     );
-    if (sparseGuide) {
+    if (repositoryMarkdownPath === persistenceGuideWitness) {
+      for (const identifier of ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"]) {
+        await withCurrentGeneratedFixture(identifier, (root, contract) =>
+          checkLinks(resolve(root, persistenceGuide), root, contract.expectedFiles, repositoryMarkdownPath),
+        );
+      }
+    } else if (sparseGuide) {
       await withCurrentGeneratedFixture(sparseGuide[1], (root, contract) =>
         checkLinks(resolve(root, "apps/web/AGENTS.md"), root, contract.expectedFiles, repositoryMarkdownPath),
       );

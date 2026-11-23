@@ -133,16 +133,20 @@ const persistenceAdapterSource = `import type { D1Database } from "@cloudflare/w
 import { Effect, Layer } from "effect";
 import { JobHandlerFailure } from "@/src/application/job-delivery";
 import { CompositionPersistence } from "@/src/application/synthetic-composition-persistence";
-import { resolveApplicationDatabaseEnvironment } from "@/src/configuration/application-database";
-import { validateRuntimeApplicationEnvironment, type ApplicationEnvironment } from "@/src/configuration/application-environment";
+import { matchesApplicationDatabaseTarget } from "@/src/configuration/application-database";
+import type { ApplicationEnvironment } from "@/src/configuration/application-environment";
 type Inputs = Readonly<{ environment: unknown; compiledTarget: ApplicationEnvironment;
   record: (value: Readonly<Record<string, unknown>>) => Promise<void> }>;
 function database(input: Inputs): D1Database {
-  const runtime = validateRuntimeApplicationEnvironment(Reflect.get(Object(input.environment), "APPLICATION_ENVIRONMENT"), input.compiledTarget);
-  if (!runtime.ok || Reflect.get(Object(input.environment), "APPLICATION_DATABASE_ENVIRONMENT") !== resolveApplicationDatabaseEnvironment(runtime.value)) {
+  const environment = Object(input.environment);
+  if (!matchesApplicationDatabaseTarget(
+    input.compiledTarget,
+    Reflect.get(environment, "APPLICATION_ENVIRONMENT"),
+    Reflect.get(environment, "APPLICATION_DATABASE_ENVIRONMENT"),
+  )) {
     throw new Error("SYNTHETIC_DATABASE_TARGET_REFUSED");
   }
-  const binding: unknown = Reflect.get(Object(input.environment), "APP_DB");
+  const binding: unknown = Reflect.get(environment, "APP_DB");
   if (typeof binding !== "object" || binding === null || !("prepare" in binding) || typeof binding.prepare !== "function") {
     throw new Error("SYNTHETIC_DATABASE_BINDING_REFUSED");
   }
