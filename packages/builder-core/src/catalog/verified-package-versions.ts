@@ -38,8 +38,9 @@ export function createGenerationRenderingContext(
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
   retainPublicContentRouting?: true,
+  retainPersistenceTarget?: true,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -94,6 +95,23 @@ function installedPublicContentRouting(
   return view ?? "current";
 }
 
+function installedPersistenceTarget(
+  project: ProjectConfiguration,
+  state: InstalledState,
+): "retained" | "current" | undefined {
+  const identifier = "persistence-environment-mapping";
+  const path = "apps/web/src/configuration/application-database.ts";
+  const declarations = state.managedSurfaces.filter(surface => surface.identifier === identifier || surface.path === path);
+  const [surface] = declarations;
+  if (declarations.length !== 1 || surface?.identifier !== identifier || surface.path !== path ||
+    surface.owner.kind !== "capability" || surface.owner.identifier !== "application-persistence" ||
+    surface.ownership !== "managed" || surface.fingerprintTarget.kind !== "file" ||
+    surface.mergeStrategy !== "replace-file" || state.ejections.includes(path) || project.ejectedAreas.includes(path)) return undefined;
+  if (surface.fingerprint === "sha256:82a6756752cf3c88b999cd64333d46732670f0fe349062d2cf32a3cfbc857ad9") return "retained";
+  if (surface.fingerprint === "sha256:7f5326cf54ef5c2fc1182253860460edd6a9f2a5ca31d307c72d4b8ddacb7374") return "current";
+  return undefined;
+}
+
 export function createVerifiedProjectSnapshot(
   project: ProjectConfiguration | undefined,
   state: InstalledState | undefined,
@@ -143,6 +161,8 @@ export function createVerifiedProjectSnapshot(
   );
   const publicContentRouting = installedPublicContentRouting(projectValue, stateValue);
   if (publicContentRouting === undefined) return invalidProjectSnapshot();
+  const persistenceTarget = persistence ? installedPersistenceTarget(projectValue, stateValue) : "current";
+  if (persistenceTarget === undefined) return invalidProjectSnapshot();
   const renderingContext = createGenerationRenderingContext(
     persistence,
     projectValue.selectedCapabilities.includes("app-foundation"),
@@ -152,6 +172,7 @@ export function createVerifiedProjectSnapshot(
     deploymentView,
     retainsSectionTemplates ? true : undefined,
     publicContentRouting === "retained" ? true : undefined,
+    persistenceTarget === "retained" ? true : undefined,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -190,6 +211,7 @@ export function createApplicationEnvironmentRenderingContext(
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
   retainPublicContentRouting?: true,
+  retainPersistenceTarget?: true,
 ): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
@@ -198,6 +220,7 @@ export function createApplicationEnvironmentRenderingContext(
     ...(retainAnalyticsConsent ? { retainAnalyticsConsent: true } : {}),
     ...(retainSections ? { retainSections: true } : {}),
     ...(retainPublicContentRouting ? { retainPublicContentRouting: true } : {}),
+    ...(applicationPersistence && retainPersistenceTarget ? { retainPersistenceTarget: true } : {}),
     catalogSnapshot: applicationEnvironmentSnapshotFor(applicationPersistence, backgroundJobs, retainDeployment),
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
@@ -213,11 +236,13 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
       "retainSections" in value && value.retainSections === true ? true : undefined;
     const retainPublicContentRouting = typeof value === "object" && value !== null &&
       "retainPublicContentRouting" in value && value.retainPublicContentRouting === true ? true : undefined;
+    const retainPersistenceTarget = typeof value === "object" && value !== null &&
+      "retainPersistenceTarget" in value && value.retainPersistenceTarget === true ? true : undefined;
     const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
         [false, true].some((jobs) => supportedDeploymentViews(jobs).some(retainDeployment =>
-          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting))))),
+          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget))))),
     );
   } catch {
     return false;

@@ -996,6 +996,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
       environmentContext.retainSections,
       environmentContext.retainPublicContentRouting,
+      environmentContext.retainPersistenceTarget,
     )),
   ]);
 

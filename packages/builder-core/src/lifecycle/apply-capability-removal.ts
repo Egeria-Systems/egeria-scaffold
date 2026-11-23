@@ -718,6 +718,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,
     environmentContext.retainPublicContentRouting,
+    environmentContext.retainPersistenceTarget,
   ));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
