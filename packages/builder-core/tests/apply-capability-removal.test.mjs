@@ -2400,11 +2400,12 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent),
       verifier: {
         async prepareLockfile(root) {
+          const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}-next-16.4.5/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}${nextSuffix}/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
@@ -2604,6 +2605,46 @@ test("environment analytics lifecycle preserves all provider installation orders
       const expected = await environmentContactEntries(profile, { multilingual, contact, ...(analytics ? { analytics: environmentAnalyticsSelection } : {}), ...(booking ? { booking: mode } : {}) });
       for (const [path, content] of expected) if (!path.startsWith(".egeria/")) assert.deepEqual(repository.files.get(path), content, path);
       assert.deepEqual([...repository.files.keys()].sort(), [...expected.keys()].sort());
+    }
+  }
+});
+
+const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
+
+test("removing a neighbor preserves installed consent and re-add chooses the successor", async () => {
+  const retainedFile = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath), "utf8");
+  for (const retainedNext of [undefined, "16.4.1"]) {
+    for (const retainConsent of [undefined, true]) {
+      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", retainedNext, retainConsent });
+      const repository = createRepository(entries);
+      const priorSource = repository.files.get(consentRuntimePath);
+      assert.equal(priorSource === retainedFile, retainConsent === true);
+      for (const capability of ["booking-calendly", "analytics", "analytics"]) {
+        const add = !repository.files.has(consentRuntimePath);
+        const common = { reader: repository.reader, git, capability,
+          inspectRepositoryInventory: inventoryInspectorForFiles(repository.files),
+          ...(add ? { settings: environmentAnalyticsSelection } : {}) };
+        const plan = await (add ? core.planCapabilityAddition(common) : core.planCapabilityRemoval(common));
+        assert.equal(plan.ok, true, JSON.stringify(plan));
+        const beforeState = repository.files.get(".egeria/state.json");
+        const operation = { ...common, root, writer: repository.writer, approvedPlanFingerprint: plan.value.planFingerprint,
+          inspectWorktree: async () => git, inspectCreateTargets: async () => ({ ok: true }), inspectExpectedChanges: async () => ({ ok: true }),
+          verifier: { async verifyInIsolatedCopy() {
+            assert.equal(repository.files.get(".egeria/state.json"), beforeState);
+            return { ok: true, value: { checks: core.ordinaryGenerationVerificationChecks } };
+          } },
+        };
+        const result = await (add ? core.applyCapabilityAddition(operation) : core.applyCapabilityRemoval(operation));
+        assert.equal(result.ok, true, JSON.stringify(result));
+        assert.equal(repository.files.get("pnpm-lock.yaml"), entries.get("pnpm-lock.yaml"));
+        const state = JSON.parse(repository.files.get(".egeria/state.json"));
+        const runtime = repository.files.get(consentRuntimePath);
+        if (capability === "booking-calendly") assert.equal(runtime, priorSource);
+        else if (add) assert.notEqual(runtime, retainedFile);
+        else assert.equal(runtime, undefined);
+        const surface = state.managedSurfaces.find(({ path }) => path === consentRuntimePath);
+        assert.equal(surface?.fingerprint, runtime === undefined ? undefined : core.fingerprintFileContent(new TextEncoder().encode(runtime)));
+      }
     }
   }
 });

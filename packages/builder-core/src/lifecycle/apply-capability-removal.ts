@@ -713,6 +713,7 @@ export async function applyCapabilityRemoval(input: Readonly<{
     controls.project.value.selectedCapabilities.includes("app-foundation"),
     false,
     environmentContext.retainedNextVersion,
+    input.capability === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
   ));
   if (!desiredRender.ok) {
     return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");

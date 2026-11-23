@@ -679,7 +679,23 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const validators = await loadAppTransitionContentValidators();
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
+  const retainedContext = { ...context, retainAnalyticsConsent: true };
   const subsets = {};
+  const consentFiles = [
+    "apps/web/src/integrations/analytics/analytics-consent.tsx",
+    "apps/web/src/integrations/analytics/analytics-runtime.ts",
+  ];
+  async function prepare(request, renderingContext) {
+    const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, renderingContext);
+    const target = await core.renderSkeleton({ ...request, profile: "app" }, renderingContext);
+    assert.equal(source.ok, true); assert.equal(target.ok, true);
+    const currentFiles = new Map(source.value.files.map(({ path, content }) => [path, content]));
+    const before = [...currentFiles].map(([path, content]) => [path, Buffer.from(content)]);
+    const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value, currentFiles, validators });
+    assert.equal(prepared.ok, true, JSON.stringify(prepared));
+    assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
+    return { source: source.value, prepared: prepared.value };
+  }
   const targetLockfileFingerprint = core.fingerprintFileContent(new Uint8Array(await readFile(new URL("../lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml", import.meta.url))));
   for (let subset = 0; subset < 8; subset++) {
     const request = {
@@ -688,17 +704,19 @@ test("current preparation fingerprints and canonical admission protect exact bas
       ...(subset & 2 ? { multilingual: true } : {}),
       ...(subset & 4 ? { analytics: policy.appTransitionVisualAnalyticsSettings } : {}),
     };
-    const source = await core.renderSkeleton({ ...request, profile: "portfolio" }, context);
-    const target = await core.renderSkeleton({ ...request, profile: "app" }, context);
-    assert.equal(source.ok, true); assert.equal(target.ok, true);
-    const currentFiles = new Map(source.value.files.map(({ path, content }) => [path, content]));
-    const before = [...currentFiles].map(([path, content]) => [path, Buffer.from(content)]);
-    const prepared = policy.prepareAppProfileTransition({ source: source.value, target: target.value, currentFiles, validators });
-    assert.equal(prepared.ok, true, JSON.stringify(prepared));
-    const optionalCapabilities = source.value.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
-    subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(prepared.value.influencingFingerprints);
-    const identity = { optionalCapabilities, influencingFingerprints: prepared.value.influencingFingerprints, targetLockfileFingerprint };
+    const retained = await prepare(request, retainedContext);
+    const current = await prepare(request, context);
+    const optionalCapabilities = current.source.project.selectedCapabilities.filter(identifier => ["analytics", "booking-calendly", "multilingual"].includes(identifier));
+    const priorFingerprints = retained.prepared.influencingFingerprints;
+    const currentFingerprints = current.prepared.influencingFingerprints;
+    subsets[[...optionalCapabilities].sort().join("+") || "none"] = core.fingerprintJsonValue(priorFingerprints);
+    assert.deepEqual(currentFingerprints.map(({ path }) => path), priorFingerprints.map(({ path }) => path));
+    const changedInputs = currentFingerprints.filter(({ fingerprint }, index) => fingerprint !== priorFingerprints[index].fingerprint);
+    assert.deepEqual(changedInputs.map(({ path }) => path), subset & 4 ? consentFiles : []);
+    const identity = { optionalCapabilities, influencingFingerprints: currentFingerprints, targetLockfileFingerprint };
+    const retainedIdentity = { ...identity, influencingFingerprints: priorFingerprints };
     assert.equal(policy.verifyAppTransitionVisualInputRecord(identity).ok, false, "current preparation remains unadmitted");
+    assert.equal(policy.verifyAppTransitionVisualInputRecord(retainedIdentity).ok, false, "retained preparation remains unadmitted");
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord(identity).ok, true);
     const baselines = await Promise.all(policy.appTransitionBaselinePaths.map(async (path, index) => ({
       path, content: await readFile(new URL(`../templates/portfolio/apps/web/tests/visual/home-visual.spec.ts-snapshots/app-transition-${subset & 2 ? "multilingual-" : ""}home-${index === 0 ? "desktop" : "mobile"}-chromium-linux.png`, import.meta.url)),
@@ -706,7 +724,16 @@ test("current preparation fingerprints and canonical admission protect exact bas
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines }).ok, true);
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [baselines[0], baselines[0]] }).ok, false);
     assert.equal(syntheticPolicy.verifyAppTransitionVisualInputRecord({ ...identity, baselines: [{ ...baselines[0], path: "foreign.png" }, baselines[1]] }).ok, false);
-    assert.deepEqual([...currentFiles].map(([path, content]) => [path, Buffer.from(content)]), before);
+    const retainedEvidence = {
+      ...retainedIdentity,
+      sourceProfile: "portfolio",
+      manifestFingerprint: `sha256:${"a".repeat(64)}`,
+      baselines,
+    };
+    assert.equal(policy.selectAppTransitionVisuals({ ...retained, evidence: retainedEvidence }).ok, true);
+    const usingRetainedEvidence = policy.selectAppTransitionVisuals({ ...current, evidence: retainedEvidence });
+    if (subset & 4) assert.equal(usingRetainedEvidence.issues?.[0]?.code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
+    else assert.equal(usingRetainedEvidence.ok, true);
   }
   assert.deepEqual(subsets, {
   "none": "sha256:b95793876632bc0532d66fbcd110368ae2c47e03b44b16adb849679064473366",
