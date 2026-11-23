@@ -203,6 +203,42 @@ const retainedSectionSources = new Set([
   ...retainedSectionTemplates.map(([, , path]) => `common/${path}`),
 ]);
 
+const publicContentRoutingSources = new Map([
+  ...[
+    "site/apps/web/app/sitemap.ts",
+    "multilingual/apps/web/app/[locale]/[[...segments]]/page.tsx",
+    "multilingual/apps/web/src/integrations/booking/localized-booking.stub.tsx",
+    "multilingual/docs/multilingual.md",
+  ].map(source => [source, source.replace("/", "/application-environments/public-content-and-routing/")] as const),
+  ...[
+    "site/application-environments/apps/web/src/routing/routing-content-schema.ts",
+    "site/application-environments/apps/web/tests/unit/routing-content.test.ts",
+    "multilingual/application-environments/apps/web/app/[locale]/[[...segments]]/page.tsx",
+    "multilingual/application-environments/apps/web/src/integrations/booking/localized-booking.calendly.tsx",
+    "multilingual/application-environments/apps/web/src/i18n/localized-content.ts",
+    "multilingual/application-environments/apps/web/tests/unit/localized-content.test.ts",
+    "booking-calendly/application-environments/apps/web/content/fr-CA/booking-calendly.yaml",
+  ].map(source => [source, source.replace("/application-environments/", "/application-environments/public-content-and-routing/")] as const),
+  ...["portfolio", "site"].flatMap(profile => ["en-CA", "fr-CA"].map(locale => {
+    const path = `apps/web/content/${locale}/localized-content.yaml.template`;
+    return [`multilingual/${profile}/${path}`, `multilingual/${profile}/application-environments/public-content-and-routing/${path}`] as const;
+  })),
+  [
+    "multilingual/site/apps/web/src/i18n/localized-profile.ts",
+    "multilingual/site/application-environments/public-content-and-routing/apps/web/src/i18n/localized-profile.ts",
+  ],
+]);
+
+function publicContentRoutingSource(source: string, multilingual: boolean): string {
+  if (multilingual && source === "common/apps/web/app/global-error.tsx") {
+    return "multilingual/application-environments/public-content-and-routing/apps/web/app/global-error.tsx";
+  }
+  if (multilingual && source === "site/application-environments/apps/web/tests/unit/routing-content.test.ts") {
+    return source;
+  }
+  return publicContentRoutingSources.get(source) ?? source;
+}
+
 const successorAnalyticsConsentSources = new Set<string>(
   retainedAnalyticsConsentTemplates.map(([, path]) => `analytics/${path}`),
 );
@@ -369,6 +405,7 @@ export function createTemplateCatalog(
   retainDeployment = true,
   checkedJobAttempts = false,
   retainSections?: true,
+  retainPublicContentRouting?: true,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -703,7 +740,7 @@ export function createTemplateCatalog(
 
     const templateSource = retainSections && retainedSectionSources.has(destinationSource ?? source)
       ? (destinationSource ?? source).replace("common/", "common/application-environments/retained-sections/")
-      : source;
+      : retainPublicContentRouting ? source : publicContentRoutingSource(source, includeMultilingual);
     destinations.add(destinationResult.value);
     entries.push({ source: templateSource, destination: destinationResult.value, contentKind });
   }

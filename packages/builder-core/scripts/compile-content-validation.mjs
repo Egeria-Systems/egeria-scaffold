@@ -3,12 +3,24 @@ import ts from "typescript";
 // Compile only this fixed set of builder-owned templates. Generated clients
 // keep their existing source bytes; no repository-supplied module is executed.
 const root = new URL("../", import.meta.url);
+const localizedContentImports = [
+  ['"../content/content-schema"', '"../content-schema.js"'],
+  ['"./locale"', '"../locale.js"'],
+];
 const modules = [
   ["common/apps/web/src/content/content-schema.ts", "content-schema.js", []],
   ["multilingual/apps/web/src/i18n/locale.ts", "locale.js", []],
   ["site/apps/web/src/routing/routing-content-schema.ts", "routing-content-schema.js", [
     ['"../content/content-schema"', '"./content-schema.js"'],
   ]],
+  ["site/application-environments/public-content-and-routing/apps/web/src/routing/routing-content-schema.ts", "site-routing-model.js", [
+    ['"../content/content-schema"', '"./content-schema.js"'],
+  ]],
+  ["multilingual/site/application-environments/public-content-and-routing/apps/web/src/i18n/localized-profile.ts", "site/localized-profile.js", [
+    ['"../routing/routing-content-schema"', '"../site-routing-model.js"'],
+  ]],
+  ["multilingual/portfolio/apps/web/src/i18n/localized-profile.ts", "portfolio/localized-profile.js", []],
+  ["multilingual/site/apps/web/src/i18n/localized-profile.ts", "site/retained-localized-profile.js", []],
   ["booking-calendly/application-environments/apps/web/src/integrations/booking-calendly/booking-content.ts", "booking-content.js", [
     ['"../../content/content-schema"', '"./content-schema.js"'],
   ], ["frenchBookingContentSource", "bookingContentSource", "readBookingContent"]],
@@ -19,12 +31,14 @@ const modules = [
     ['"../../content/content-schema"', '"./content-schema.js"'],
   ], ["observabilityCopySource", "readErrorFallbackCopy"]],
   ...["portfolio", "site"].flatMap((profile) => [
-    [`multilingual/${profile}/apps/web/src/i18n/localized-profile.ts`, `${profile}/localized-profile.js`, []],
-    ["multilingual/application-environments/apps/web/src/i18n/localized-content.ts", `${profile}/localized-content.js`, [
-        ['"../content/content-schema"', '"../content-schema.js"'],
-        ['"./localized-profile"', '"./localized-profile.js"'],
-        ['"./locale"', '"../locale.js"'],
-      ]],
+    ["multilingual/application-environments/apps/web/src/i18n/localized-content.ts", `${profile}/retained-localized-content.js`, [
+      ...localizedContentImports,
+      ['"./localized-profile"', profile === "site" ? '"./retained-localized-profile.js"' : '"./localized-profile.js"'],
+    ]],
+    ["multilingual/application-environments/public-content-and-routing/apps/web/src/i18n/localized-content.ts", `${profile}/localized-content.js`, [
+      ...localizedContentImports,
+      ['"./localized-profile"', '"./localized-profile.js"'],
+    ]],
   ]),
 ];
 for (const [source, destination, imports, omittedNames = []] of modules) {

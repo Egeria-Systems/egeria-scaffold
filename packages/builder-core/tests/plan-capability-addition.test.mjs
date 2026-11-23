@@ -263,6 +263,7 @@ test("multilingual addition plans the exact locale overlay with or without Calen
       [
         ...(fixture.includes("calendly") ? [".github/workflows/deploy.yml", ".github/workflows/quality.yml"] : []),
         "apps/web/app/error.tsx",
+        "apps/web/app/global-error.tsx",
         "apps/web/app/layout.tsx",
         "apps/web/tests/visual/home-visual.spec.ts",
       ],

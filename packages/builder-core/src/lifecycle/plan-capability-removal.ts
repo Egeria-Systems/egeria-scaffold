@@ -995,6 +995,7 @@ export async function planCapabilityRemoval(input: Readonly<{
       capabilityValue === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
       retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
       environmentContext.retainSections,
+      environmentContext.retainPublicContentRouting,
     )),
   ]);
 

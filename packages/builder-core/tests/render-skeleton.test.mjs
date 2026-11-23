@@ -133,6 +133,57 @@ test("installed rendering requires a supported Next fingerprint", async (t) => {
   }
 });
 
+test("a multilingual-only portfolio preserves its installed catalog and boundary families", async () => {
+  const core = await import("../dist/index.js");
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const request = { profile: "portfolio", projectName: "localized-portfolio", displayName: "Localized portfolio",
+    packageVersions: core.verifiedCapabilityPackageVersions, multilingual: true };
+  const current = assertSuccess(await core.renderSkeleton(request));
+  const currentState = renderingState(core, current);
+  const currentBytes = path => Buffer.from(current.files.find(file => file.path === path).content);
+  const globalBoundary = "apps/web/app/global-error.tsx";
+  const parser = "apps/web/src/i18n/localized-content.ts";
+  const catalog = "apps/web/content/fr-CA/localized-content.yaml";
+  const originalBoundary = await readFile(new URL(`../templates/common/${globalBoundary}`, import.meta.url));
+  assert.notDeepEqual(currentBytes(globalBoundary), originalBoundary);
+  assert.equal(parseDocument(currentBytes(catalog).toString()).has("booking"), false);
+  const legacyContext = { ...core.createApplicationEnvironmentRenderingContext(), retainPublicContentRouting: true };
+  const retained = assertSuccess(await core.renderSkeleton(request, legacyContext));
+  const retainedState = renderingState(core, retained);
+  const anchor = retainedState.managedSurfaces.find(({ path }) => path === parser);
+  assert.ok(anchor);
+  assert.equal(anchor.ownership, "managed");
+  assert.deepEqual(anchor.owner, { kind: "capability", identifier: "multilingual" });
+  assert.equal(anchor.fingerprint, "sha256:af156157ef4e6c8f7802b6625d2b49efdb8b0ffc862d5536b9994d7e7dbf3287");
+  assert.ok(!retainedState.managedSurfaces.some(({ owner }) => ["booking-calendly", "site-routing"].includes(owner.identifier)));
+  assert.deepEqual(retainedState.installedCapabilities, currentState.installedCapabilities);
+  const installed = assertSuccess(createVerifiedProjectSnapshot(retained.project, retainedState));
+  assert.equal(installed.renderingContext.retainPublicContentRouting, true);
+  assert.equal(assertSuccess(createVerifiedProjectSnapshot(current.project, currentState)).renderingContext.retainPublicContentRouting, undefined);
+  assert.deepEqual(assertSuccess(await core.renderSkeleton(request, installed.renderingContext)).files, retained.files);
+  assert.deepEqual(Buffer.from(retained.files.find(({ path }) => path === globalBoundary).content), originalBoundary);
+  assert.equal(parseDocument(Buffer.from(retained.files.find(({ path }) => path === catalog).content).toString()).has("booking"), true);
+  for (const managedSurfaces of [
+    retainedState.managedSurfaces.filter(surface => surface !== anchor),
+    retainedState.managedSurfaces.map(surface => surface === anchor ? { ...surface, ownership: "application-owned" } : surface),
+    retainedState.managedSurfaces.map(surface => surface === anchor ? { ...surface, fingerprint: `sha256:${"0".repeat(64)}` } : surface),
+  ]) assert.equal(createVerifiedProjectSnapshot(retained.project, { ...retainedState, managedSurfaces }).ok, false);
+});
+
+test("installed public content selection refuses mixed anchor fingerprints", async () => {
+  const core = await import("../dist/index.js");
+  const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
+  const request = { profile: "site", projectName: "localized-site", displayName: "Localized site",
+    packageVersions: core.verifiedCapabilityPackageVersions, multilingual: true, bookingCalendly: { mode: "link" } };
+  const current = assertSuccess(await core.renderSkeleton(request));
+  const state = renderingState(core, current);
+  assertSuccess(createVerifiedProjectSnapshot(current.project, state));
+  const managedSurfaces = state.managedSurfaces.map(surface => surface.identifier === "multilingual-content-contract"
+    ? { ...surface, fingerprint: "sha256:af156157ef4e6c8f7802b6625d2b49efdb8b0ffc862d5536b9994d7e7dbf3287" }
+    : surface);
+  assert.equal(createVerifiedProjectSnapshot(current.project, { ...state, managedSurfaces }).ok, false);
+});
+
 test("frozen retired rendering controls remain inert and refuse executable selection", async () => {
   const core = await import("../dist/index.js");
   const frozen = JSON.parse(await readFile(new URL("./fixtures/retired-recipes/supported-rendering.json", import.meta.url), "utf8"));
@@ -1778,11 +1829,10 @@ test("multilingual and Calendly compose without changing either capability setti
     rendered.files,
     "apps/web/content/fr-CA/localized-content.yaml",
   );
-  assert.match(frenchCatalog.booking.linkLabel, /\S/u);
-  assert.notEqual(
-    frenchCatalog.booking.linkLabel,
-    englishCatalog.booking.linkLabel,
-  );
+  assert.equal(Object.hasOwn(englishCatalog, "booking"), false);
+  assert.equal(Object.hasOwn(frenchCatalog, "booking"), false);
+  assert.equal(parseGeneratedYaml(rendered.files, "apps/web/content/en-CA/booking-calendly.yaml").linkLabel, "Schedule with Calendly");
+  assert.equal(parseGeneratedYaml(rendered.files, "apps/web/content/fr-CA/booking-calendly.yaml").linkLabel, "Planifier avec Calendly");
 });
 
 test("analytics renders deterministic provider-neutral contracts and composes with multilingual", async () => {
@@ -4990,7 +5040,7 @@ test("a text-only variant reaches the generated component and compiled content c
     '$1 data-test-section-variant={section.variant}');
   const locales = ["en-CA", "fr-CA"];
   for (const locale of locales) {
-    await editTemplate(`multilingual/site/apps/web/content/${locale}/localized-content.yaml.template`,
+    await editTemplate(`multilingual/site/application-environments/public-content-and-routing/apps/web/content/${locale}/localized-content.yaml.template`,
       /(^ +type: text\n +variant: )default/mu, "$1test-accent");
   }
 

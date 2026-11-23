@@ -25,10 +25,11 @@ type LocalizedModule = Readonly<{
   parseLocalizedCatalog(value: unknown, locale: "en-CA" | "fr-CA"): unknown;
   assertTranslationParity(reference: unknown, candidate: unknown): void;
 }>;
-export async function loadAppTransitionContentValidators(): Promise<AppTransitionContentValidators> {
+export async function loadAppTransitionContentValidators(retainPublicContentRouting?: true): Promise<AppTransitionContentValidators> {
   const content = await import(new URL("../content-validation/content-schema.js", import.meta.url).href) as ContentModule;
-  const portfolio = await import(new URL("../content-validation/portfolio/localized-content.js", import.meta.url).href) as LocalizedModule;
-  const site = await import(new URL("../content-validation/site/localized-content.js", import.meta.url).href) as LocalizedModule;
+  const localizedModule = retainPublicContentRouting ? "retained-localized-content.js" : "localized-content.js";
+  const portfolio = await import(new URL(`../content-validation/portfolio/${localizedModule}`, import.meta.url).href) as LocalizedModule;
+  const site = await import(new URL(`../content-validation/site/${localizedModule}`, import.meta.url).href) as LocalizedModule;
   const routing = await import(new URL("../content-validation/routing-content-schema.js", import.meta.url).href) as RoutingModule;
   const booking = await import(new URL("../content-validation/booking-content.js", import.meta.url).href) as Readonly<{parseBookingContent: AppTransitionContentValidators["parseBooking"]}>;
   const analytics = await import(new URL("../content-validation/analytics-content.js", import.meta.url).href) as Readonly<{parseAnalyticsContent: AppTransitionContentValidators["parseAnalytics"]}>;

@@ -5528,7 +5528,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
       const { createGenerationRenderingContext } = await import(pathToFileURL(resolve(
         repositoryRoot, "packages/builder-core/dist/catalog/verified-package-versions.js",
       )));
-      const renderingContext = createGenerationRenderingContext(false, true, false, undefined, undefined, true, true);
+      const renderingContext = createGenerationRenderingContext(false, true, false, undefined, undefined, true, true, true);
       const capability = "transactional-email-resend";
       const migrations = [];
       for (const operation of ["add", "remove", "add"]) {

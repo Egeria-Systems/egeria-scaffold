@@ -37,8 +37,9 @@ export function createGenerationRenderingContext(
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
+  retainPublicContentRouting?: true,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -59,6 +60,38 @@ function canonicalInstalledManifest(capabilities: InstalledState["installedCapab
     ...capability,
     stateClassifications: [...capability.stateClassifications].sort(),
   })).sort((left, right) => left.identifier < right.identifier ? -1 : left.identifier > right.identifier ? 1 : 0));
+}
+
+const publicContentRoutingAnchors = [
+  ["site-routing", "site-routing-content-schema", "apps/web/src/routing/routing-content-schema.ts", "application-owned",
+    "sha256:787c8e043fccd76b79f2d616af2fba35c878007da4be6f1950e03d17f6900724",
+    "sha256:98c3284568587549c7a08e17c84f86769d44852dba1468f65fe7ea82200e1222"],
+  ["multilingual", "multilingual-content-contract", "apps/web/src/i18n/localized-content.ts", "managed",
+    "sha256:af156157ef4e6c8f7802b6625d2b49efdb8b0ffc862d5536b9994d7e7dbf3287",
+    "sha256:a5e8906af5f2ea05543329c986cf76b072c882e6801d94dce1cc8cef016becb5"],
+  ["booking-calendly", "booking-calendly-french-content", "apps/web/content/fr-CA/booking-calendly.yaml", "application-owned",
+    "sha256:8ce430913d009dda290dbcd0cbc194478c93e53a4869304d8fb58215d7b8260c",
+    "sha256:2f9ac95d13c0cf6b5ec1c3a41438f160c32bc0735f8c47dffb2afe2fff15a6dd"],
+] as const;
+
+function installedPublicContentRouting(
+  project: ProjectConfiguration,
+  state: InstalledState,
+): "retained" | "current" | undefined {
+  let view: "retained" | "current" | undefined;
+  for (const [owner, identifier, path, ownership, retained, current] of publicContentRoutingAnchors) {
+    if (!project.selectedCapabilities.includes(owner)) continue;
+    const declarations = state.managedSurfaces.filter(surface => surface.identifier === identifier || surface.path === path);
+    const [surface] = declarations;
+    if (declarations.length !== 1 || surface?.identifier !== identifier ||
+      surface.path !== path || surface.ownership !== ownership ||
+      surface.owner.kind !== "capability" || surface.owner.identifier !== owner ||
+      surface.fingerprintTarget.kind !== "file" || surface.mergeStrategy !== "replace-file") return undefined;
+    const anchorView = surface.fingerprint === retained ? "retained" : surface.fingerprint === current ? "current" : undefined;
+    if (anchorView === undefined || (view !== undefined && view !== anchorView)) return undefined;
+    view = anchorView;
+  }
+  return view ?? "current";
 }
 
 export function createVerifiedProjectSnapshot(
@@ -108,6 +141,8 @@ export function createVerifiedProjectSnapshot(
       surface.ownership === "application-owned" && surface.fingerprintTarget.kind === "file" &&
       surface.fingerprint === fingerprint),
   );
+  const publicContentRouting = installedPublicContentRouting(projectValue, stateValue);
+  if (publicContentRouting === undefined) return invalidProjectSnapshot();
   const renderingContext = createGenerationRenderingContext(
     persistence,
     projectValue.selectedCapabilities.includes("app-foundation"),
@@ -116,6 +151,7 @@ export function createVerifiedProjectSnapshot(
     retainedConsentCount === retainedAnalyticsConsentTemplates.length ? true : undefined,
     deploymentView,
     retainsSectionTemplates ? true : undefined,
+    publicContentRouting === "retained" ? true : undefined,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -153,6 +189,7 @@ export function createApplicationEnvironmentRenderingContext(
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
+  retainPublicContentRouting?: true,
 ): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
@@ -160,6 +197,7 @@ export function createApplicationEnvironmentRenderingContext(
     ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     ...(retainAnalyticsConsent ? { retainAnalyticsConsent: true } : {}),
     ...(retainSections ? { retainSections: true } : {}),
+    ...(retainPublicContentRouting ? { retainPublicContentRouting: true } : {}),
     catalogSnapshot: applicationEnvironmentSnapshotFor(applicationPersistence, backgroundJobs, retainDeployment),
     profiles: createApplicationEnvironmentProfileRecipes(),
   };
@@ -173,11 +211,13 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
       "retainAnalyticsConsent" in value && value.retainAnalyticsConsent === true ? true : undefined;
     const retainSections = typeof value === "object" && value !== null &&
       "retainSections" in value && value.retainSections === true ? true : undefined;
+    const retainPublicContentRouting = typeof value === "object" && value !== null &&
+      "retainPublicContentRouting" in value && value.retainPublicContentRouting === true ? true : undefined;
     const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
         [false, true].some((jobs) => supportedDeploymentViews(jobs).some(retainDeployment =>
-          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections))))),
+          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting))))),
     );
   } catch {
     return false;

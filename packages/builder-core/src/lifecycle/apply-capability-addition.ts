@@ -515,6 +515,7 @@ export async function applyCapabilityAddition(input: Readonly<{
     environmentContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,
+    environmentContext.retainPublicContentRouting,
   );
   const targetCatalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, environmentTargetContext.catalogSnapshot);
   if (!targetCatalog.ok) return failure("PROJECT_INSPECTION_INVALID", "precondition", "not-required");
