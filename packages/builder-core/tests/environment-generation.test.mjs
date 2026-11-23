@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { readFile } from "node:fs/promises";
 import * as core from "../dist/index.js";
 import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
 import { ordinaryGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
@@ -17,19 +18,29 @@ function success(result) {
 }
 
 test("fresh generation and installed inspection select exact deployment versions independently", async () => {
-  for (const [fixture, persistence, jobs, retained, fresh] of [
+  for (const [fixture, persistence, jobs, retained, fresh, publicBuild] of [
     ["portfolio-0.12.0-next-16.4.5", false, false, "0.9.0", "0.13.0"],
     ["app-persistence-0.3.0-next-16.4.5", true, false, "0.10.0", "0.14.0"],
-    ["app-jobs-recovery-composition-0.3.0-next-16.4.5", false, true, "0.11.0", "0.15.0"],
-    ["app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.16.0"],
+    ["app-jobs-recovery-composition-0.3.0-next-16.4.5", false, true, "0.11.0", "0.17.0", ["app-jobs", "0.15.0"]],
+    ["app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.18.0", ["app-persistence-jobs-email", "0.16.0"]],
   ]) {
     const reader = core.createFileSystemRepositoryReader(fileURLToPath(new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url)));
     const installed = success(await core.readVerifiedProjectSnapshot(reader));
     assert.equal(installed.catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, retained);
+    if (publicBuild !== undefined) {
+      const [identifier, deploymentVersion] = publicBuild;
+      const project = await readFile(new URL(`../../../fixtures/generated/${fixture}/.egeria/project.yaml`, import.meta.url), "utf8");
+      const state = await readFile(new URL(`../../../tests/generated-fixtures/fixtures/public-build/${identifier}/.egeria/state.json`, import.meta.url), "utf8");
+      const neighbor = success(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
+        ".egeria/project.yaml": project, ".egeria/state.json": state,
+      })));
+      assert.equal(neighbor.catalog.find(entry => entry.identifier === "deployment-cloudflare").version, deploymentVersion);
+      assert.equal(neighbor.catalog.find(entry => entry.identifier === "background-job-delivery").version, "0.3.0");
+    }
     const context = createGenerationRenderingContext(persistence, false, jobs);
     const catalog = success(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, context.catalogSnapshot));
     assert.equal(catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, fresh);
-    for (const version of ["0.8.0", "0.17.0", persistence ? "0.13.0" : "0.14.0"]) {
+    for (const version of ["0.8.0", persistence ? "0.17.0" : "0.18.0", persistence ? "0.13.0" : "0.14.0"]) {
       assert.equal(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
         ...context.catalogSnapshot, deploymentCloudflare: version,
       }).ok, false);

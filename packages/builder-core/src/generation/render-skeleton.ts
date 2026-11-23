@@ -13,7 +13,7 @@ import {
 } from "../catalog/capability-catalog.js";
 import { createGenerationRenderingContext, isApplicationEnvironmentRenderingContext } from "../catalog/verified-package-versions.js";
 import { currentNextVersion, retainedNextVersion } from "./recipe-lockfiles.js";
-import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
+import { backgroundJobDeliveryVersions, type ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import {
   type ProjectConfiguration,
   type AnalyticsSettings,
@@ -521,6 +521,7 @@ export async function renderProjectTemplates(
   destinations?: ReadonlySet<string>,
   retainAnalyticsConsent?: true,
   retainDeployment = false,
+  checkedJobAttempts = false,
 ): Promise<ValidationResult<GeneratedFile[]>> {
   const selected = project.selectedCapabilities;
   const analytics = project.capabilitySettings.analytics;
@@ -541,6 +542,7 @@ export async function renderProjectTemplates(
     jobsSelected,
     retainAnalyticsConsent,
     retainDeployment,
+    checkedJobAttempts,
   );
   if (!templateCatalogResult.ok) {
     return templateCatalogResult;
@@ -556,6 +558,12 @@ export async function renderProjectTemplates(
     displayNameJson: JSON.stringify(project.project.displayName),
     workerName: project.project.name,
     workerEntryJson: JSON.stringify(jobsSelected ? "worker.mjs" : ".open-next/worker.js"),
+    publicNextBuildIdConfiguration: checkedJobAttempts ? [
+      "  generateBuildId: async () => {",
+      '    if (buildId === undefined) throw new Error("APPLICATION_BUILD_INVALID:BUILD_SOURCE_REVISION:missing");',
+      "    return buildId;",
+      "  },",
+    ].join("\n") : "  ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),",
     publicBuildProviderImports: buildFragments.map(fragment => fragment.imports).join(""),
     publicBuildProviderInputFields: buildFragments.map(fragment => fragment.inputFields).join(""),
     publicBuildProviderReads: buildFragments.map(fragment => fragment.reads).join(""),
@@ -646,7 +654,7 @@ export async function renderSkeleton(
   if (Object.hasOwn(request, "contactFormWeb3Forms") && request.contactFormWeb3Forms !== true) {
     return generatedIssue("PROJECT_GENERATION_REQUEST_INVALID", ["request", "contactFormWeb3Forms"], "invalid-selection");
   }
-  if ((request.backgroundJobDelivery === true) !== (context.catalogSnapshot.backgroundJobDelivery === "0.3.0")) {
+  if ((request.backgroundJobDelivery === true) !== (context.catalogSnapshot.backgroundJobDelivery !== undefined)) {
     return generatedIssue("APPLICATION_ENVIRONMENT_CONTEXT_INVALID", ["context"], "selection-mismatch");
   }
   if ((request.applicationPersistence === true) !== (context.catalogSnapshot.applicationPersistence === "0.2.0")) {
@@ -701,7 +709,8 @@ export async function renderSkeleton(
   }
 
   const templates = await renderProjectTemplates(projectResult.value, undefined, renderingContext.retainAnalyticsConsent,
-    retainsDeploymentConfiguration(renderingContext.catalogSnapshot));
+    retainsDeploymentConfiguration(renderingContext.catalogSnapshot),
+    renderingContext.catalogSnapshot.backgroundJobDelivery === backgroundJobDeliveryVersions.current);
   if (!templates.ok) return templates;
   const files = templates.value;
   {

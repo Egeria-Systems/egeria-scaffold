@@ -135,6 +135,8 @@ Fresh generation selects the deployment descriptor successors in the [current ge
 
 The same boundary defines the immutable fixture ancestors and current generated witnesses. Verification reconstructs the full current tree in isolated scratch and continues to check exact generation, runtime and audit evidence. Historical fixture bytes, visual admission and certification records keep their exact identities.
 
+The fresh jobs deployment views require a source revision at the Next production build phase, after Next loads the normal environment files. This binds the prepared OpenNext asset identity before the Queue entry consumes it. The existing [installed tuple boundary](../architecture/capability-model.md#current-environment-generation) selects both retained jobs deployment families exactly. The [jobs guide](../../packages/builder-core/templates/background-job-delivery/application-environments/checked-attempt/docs/background-job-delivery.md#common-target-and-prepared-queue-identity) owns the local preparation steps.
+
 ## Consequences
 
 - Local work can omit optional public destinations without accidental provider calls; deployments require deliberate target configuration.

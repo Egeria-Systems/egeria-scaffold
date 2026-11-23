@@ -1,4 +1,4 @@
-import { deploymentVersionsFor, publicBuildManagedFiles, type CapabilityDescriptor } from "../contracts/capability.js";
+import { deploymentViewForVersion, publicBuildManagedFiles, supportedDeploymentViews, type CapabilityDescriptor, type RetainedDeploymentView } from "../contracts/capability.js";
 import type { ProfileRecipe } from "../contracts/profile.js";
 import { projectConfigurationSchema, type ProjectConfiguration } from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
@@ -35,7 +35,7 @@ export function createGenerationRenderingContext(
   backgroundJobs = false,
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
-  retainDeployment = false,
+  retainDeployment: RetainedDeploymentView = false,
 ): ApplicationEnvironmentRenderingContext {
   return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment);
 }
@@ -89,12 +89,11 @@ export function createVerifiedProjectSnapshot(
   const persistence = projectValue.selectedCapabilities.includes("application-persistence");
   const jobs = projectValue.selectedCapabilities.includes("background-job-delivery");
   const deploymentVersion = stateValue.installedCapabilities.find(({ identifier }) => identifier === "deployment-cloudflare")?.version;
-  const { retained, current } = deploymentVersionsFor(persistence, jobs);
-  if (deploymentVersion !== retained && deploymentVersion !== current) return invalidProjectSnapshot();
-  const retainsDeployment = deploymentVersion === retained;
+  const deploymentView = deploymentViewForVersion(persistence, jobs, deploymentVersion);
+  if (deploymentView === undefined) return invalidProjectSnapshot();
   const matchesDeploymentInventory = publicBuildManagedFiles.every(([identifier, path]) => {
     const declarations = stateValue.managedSurfaces.filter(surface => surface.identifier === identifier || surface.path === path);
-    if (retainsDeployment) return declarations.length === 0;
+    if (deploymentView === true) return declarations.length === 0;
     const [surface] = declarations;
     return declarations.length === 1 && surface?.identifier === identifier && surface.path === path &&
       surface.owner.kind === "capability" && surface.owner.identifier === "deployment-cloudflare" &&
@@ -108,7 +107,7 @@ export function createVerifiedProjectSnapshot(
     jobs,
     retainsNext ? retainedNextVersion : undefined,
     retainedConsentCount === retainedAnalyticsConsentTemplates.length ? true : undefined,
-    retainsDeployment,
+    deploymentView,
   );
   const catalog = createCapabilityCatalogSnapshot(verifiedCapabilityPackageVersions, renderingContext.catalogSnapshot);
   if (!catalog.ok) return catalog;
@@ -144,7 +143,7 @@ export function createApplicationEnvironmentRenderingContext(
   backgroundJobs = false,
   retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
-  retainDeployment = false,
+  retainDeployment: RetainedDeploymentView = false,
 ): ApplicationEnvironmentRenderingContext {
   return {
     projectSchemaVersion: "2.0.0",
@@ -165,7 +164,7 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
     const serialized = stringifyCanonicalJson(value);
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
-        [false, true].some((jobs) => [false, true].some(retainDeployment =>
+        [false, true].some((jobs) => supportedDeploymentViews(jobs).some(retainDeployment =>
           serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment))))),
     );
   } catch {

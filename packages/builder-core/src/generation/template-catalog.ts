@@ -357,6 +357,7 @@ export function createTemplateCatalog(
   includeBackgroundJobs = false,
   retainAnalyticsConsent?: true,
   retainDeployment = true,
+  checkedJobAttempts = false,
 ): ValidationResult<readonly TemplateCatalogEntry[]> {
   if (recipeVersion !== applicationEnvironmentRecipeVersions[profile]) {
     return { ok: false, issues: [{ code: "TEMPLATE_CATALOG_INVALID", path: ["recipeVersion"], context: { reason: "unsupported-recipe" } }] };
@@ -535,7 +536,13 @@ export function createTemplateCatalog(
         "background-job-delivery/apps/web/tests/integration/fixtures/job-worker.mjs",
         "background-job-delivery/docs/background-job-delivery.md",
       ].includes(jobSource)) {
-        return { ...entry, source: jobSource.replace("background-job-delivery/", "background-job-delivery/application-environments/"), destinationSource: entry.destinationSource ?? jobSource };
+        const sharedComposition = [
+          "background-job-delivery/apps/web/src/application/job-handlers.ts",
+          "background-job-delivery/apps/web/src/composition/job-handler-composition.ts",
+          "background-job-delivery/apps/web/src/composition/server-jobs.ts",
+        ].includes(jobSource);
+        const directory = checkedJobAttempts && !sharedComposition ? "application-environments/checked-attempt/" : "application-environments/";
+        return { ...entry, source: jobSource.replace("background-job-delivery/", `background-job-delivery/${directory}`), destinationSource: entry.destinationSource ?? jobSource };
       }
     }
     if (includeTransactionalEmail && [
@@ -639,7 +646,8 @@ export function createTemplateCatalog(
   const buildSources = retainDeployment ? selectedSources : selectedSources.map(entry => {
     const destinationSource = entry.destinationSource ?? entry.source;
     if (destinationSource === "common/apps/web/next.config.ts" || destinationSource === "common/apps/web/scripts/check-application-environment.mjs") {
-      return { ...entry, source: destinationSource.replace("common/", "common/application-environments/public-build/"), destinationSource };
+      const suffix = destinationSource === "common/apps/web/next.config.ts" ? ".template" : "";
+      return { ...entry, source: destinationSource.replace("common/", "common/application-environments/public-build/") + suffix, destinationSource };
     }
     if (destinationSource.endsWith("/apps/web/app/layout.tsx")) {
       return { ...entry, source: entry.source.replace("/application-environments/", "/application-environments/public-build/"), destinationSource };

@@ -80,7 +80,7 @@ test("installed current jobs remain inspectable while every optional lifecycle r
     assert.equal(inspection.project.kind, "valid");
     assert.equal(inspection.inference.state.kind, "valid");
     assert.equal(inspection.resolution.ok, true);
-    assert.equal(core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value.installedCapabilities.find(value => value.identifier === capability).version, "0.3.0");
+    assert.equal(core.parseStateJson(decoder.decode(repo.files.get(".egeria/state.json"))).value.installedCapabilities.find(value => value.identifier === capability).version, "0.4.0");
     for (const [selectedCapability, settings] of [
       ["contact-form-web3forms", undefined], ["multilingual", undefined],
       ["booking-calendly", { mode: "link" }],
