@@ -571,10 +571,21 @@ test(`${applicationEnvironments ? "environment " : ""}changed user migration byt
 
 test("environment persistence neighbors preserve database ownership and enforce the binding lane", async () => {
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
+  const retainedPersistence = createGenerationRenderingContext(true, false, false, undefined, undefined, false, undefined, undefined, true);
   const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
-  for (const [capability, settings] of [["contact-form-web3forms", undefined], ["booking-calendly", { mode: "link" }], ["analytics", analytics]]) {
-    const repo = await repository({ applicationEnvironments: true, multilingual: true });
-    const retainedPaths = ["apps/web/src/configuration/application-database.ts", "apps/web/wrangler.jsonc", "apps/web/tests/bindings/application-persistence.test.ts", "apps/web/src/infrastructure/persistence/schema.ts"];
+  for (const [capability, settings, context] of [
+    ["contact-form-web3forms", undefined],
+    ["booking-calendly", { mode: "link" }],
+    ["analytics", analytics],
+    ["contact-form-web3forms", undefined, retainedPersistence],
+  ]) {
+    const repo = await repository({ applicationEnvironments: true, multilingual: true, context });
+    const mapping = "apps/web/src/configuration/application-database.ts";
+    const retainedPaths = [
+      mapping, "apps/web/wrangler.jsonc", "apps/web/tests/bindings/application-persistence.test.ts",
+      "apps/web/tests/bindings/fixtures/worker.ts", "apps/web/tests/unit/application-database-environment.test.ts",
+      "docs/application-persistence.md", "apps/web/src/infrastructure/persistence/schema.ts",
+    ];
     const retained = new Map(retainedPaths.map(path => [path, repo.files.get(path)]));
     const addedPlan = await core.planCapabilityAddition({ reader: repo.reader, git, capability, settings, renderingContext });
     assert.equal(addedPlan.ok, true, JSON.stringify(addedPlan));
@@ -594,6 +605,17 @@ test("environment persistence neighbors preserve database ownership and enforce 
     assert.equal(state.installedCapabilities.find(({ identifier }) => identifier === "application-persistence").version, "0.2.0");
     assert.ok(state.installedCapabilities.some(({ identifier }) => identifier === "multilingual"));
     for (const [path, bytes] of retained) assert.deepEqual(repo.files.get(path), bytes, path);
+    const inspected = await core.readVerifiedProjectSnapshot(repo.reader);
+    assert.equal(inspected.ok, true, JSON.stringify(inspected));
+    assert.equal(inspected.value.renderingContext.retainPersistenceTarget, context?.retainPersistenceTarget);
+    if (context === retainedPersistence) {
+      const writes = repo.writes.length;
+      repo.files.set(mapping, encoder.encode("// changed managed mapping\n"));
+      const drift = await core.planCapabilityAddition({ reader: repo.reader, git, capability, settings, renderingContext });
+      assert.equal(drift.ok, false);
+      assert.equal(drift.issues[0].code, "PROJECT_DRIFT_DETECTED");
+      assert.equal(repo.writes.length, writes);
+    }
   }
   const repo = await repository({ applicationEnvironments: true, contact: true });
   const planned = await plan(repo, undefined, "contact-form-web3forms");
