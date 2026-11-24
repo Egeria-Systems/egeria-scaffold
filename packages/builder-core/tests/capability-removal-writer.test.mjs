@@ -1,14 +1,20 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import { chmod, link, lstat, mkdir, mkdtemp, readFile, readdir, rename, rm, symlink, unlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { createFileSystemCapabilityRemovalWriter } from "../dist/lifecycle/capability-removal-writer.js";
 
 const encoder = new TextEncoder();
+const execFileAsync = promisify(execFile);
+const writerModuleUrl = new URL(
+  "../dist/lifecycle/capability-removal-writer.js",
+  import.meta.url,
+).href;
 const fileOperationPath = fileURLToPath(
   new URL(
     "../dist/lifecycle/capability-removal-file-operation.js",
@@ -22,24 +28,14 @@ async function createTemporaryRoot(context, prefix) {
   return root;
 }
 
-async function runCreateWithZeroFileSizeLimit(root, request) {
+function runFileOperation(root, request, executable, arguments_) {
   return new Promise((resolveResult, rejectResult) => {
     const output = [];
-    const child = spawn(
-      "/bin/sh",
-      [
-        "-c",
-        'ulimit -f 0; exec "$1" "$2"',
-        "egeria-removal-test",
-        process.execPath,
-        fileOperationPath,
-      ],
-      {
-        cwd: root,
-        env: {},
-        stdio: ["pipe", "pipe", "ignore"],
-      },
-    );
+    const child = spawn(executable, arguments_, {
+      cwd: root,
+      env: {},
+      stdio: ["pipe", "pipe", "ignore"],
+    });
     child.stdout.on("data", (chunk) => output.push(chunk));
     child.once("error", rejectResult);
     child.once("close", (code) => {
@@ -52,6 +48,132 @@ async function runCreateWithZeroFileSizeLimit(root, request) {
     child.stdin.end(JSON.stringify(request));
   });
 }
+
+function runCreateWithZeroFileSizeLimit(root, request) {
+  return runFileOperation(root, request, "/bin/sh", [
+    "-c",
+    'ulimit -f 0; exec "$1" "$2"',
+    "egeria-removal-test",
+    process.execPath,
+    fileOperationPath,
+  ]);
+}
+
+async function writeWithSubstitutedHelper(root, kind, helperCall, helperScript) {
+  const script = `
+    import childProcess from "node:child_process";
+    import { syncBuiltinESMExports } from "node:module";
+    import { join } from "node:path";
+    import { promisify } from "node:util";
+
+    const root = ${JSON.stringify(root)};
+    const helperScript = ${JSON.stringify(helperScript)};
+    let calls = 0;
+    function substitute(invoke) {
+      return (executable, arguments_, ...options) => {
+        if (arguments_[0] !== ${JSON.stringify(fileOperationPath)} || ++calls !== ${helperCall}) {
+          return invoke(executable, arguments_, ...options);
+        }
+        if (helperScript === null) {
+          return invoke(join(root, "missing-node"), arguments_, ...options);
+        }
+        return invoke(executable, ["--eval", helperScript], ...options);
+      };
+    }
+    const execFileAsync = promisify(childProcess.execFile);
+    childProcess.spawn = substitute(childProcess.spawn);
+    childProcess.execFile = substitute(childProcess.execFile);
+    childProcess.execFile[promisify.custom] = substitute(execFileAsync);
+    syncBuiltinESMExports();
+
+    const { createFileSystemCapabilityRemovalWriter } = await import(
+      ${JSON.stringify(writerModuleUrl)}
+    );
+    const writer = createFileSystemCapabilityRemovalWriter(root);
+    const result = await writer.write([{
+      kind: ${JSON.stringify(kind)},
+      path: "target.txt",
+      expected: new TextEncoder().encode("before\\n"),
+      content: new TextEncoder().encode("after\\n"),
+    }]);
+    if (calls < ${helperCall}) {
+      throw new Error("the selected helper call was not reached");
+    }
+    process.stdout.write(JSON.stringify(result));
+  `;
+  const { stdout } = await execFileAsync(
+    process.execPath,
+    ["--input-type=module", "--eval", script],
+    { encoding: "utf8", env: {}, timeout: 20_000, maxBuffer: 16 * 1024 },
+  );
+  return JSON.parse(stdout);
+}
+
+test("removal helper strictly validates requests before touching files", async (context) => {
+  const operation = {
+    kind: "create",
+    name: ".egeria-removal-unexpected.tmp",
+    mode: 0o600,
+    content: "Zg==",
+  };
+
+  for (const [name, withInvalidField] of [
+    ["extra envelope field", (parent) => ({ parent, operation, extra: true })],
+    ["extra parent field", (parent) => ({ parent: { ...parent, extra: true }, operation })],
+    ["extra operation field", (parent) => ({ parent, operation: { ...operation, extra: true } })],
+    ["noncanonical identity", (parent) => ({ parent: { ...parent, inode: `0${parent.inode}` }, operation })],
+    ["noncanonical base64", (parent) => ({ parent, operation: { ...operation, content: "Zh==" } })],
+    ["path with a separator", (parent) => ({ parent, operation: { ...operation, name: `./${operation.name}` } })],
+    ["out-of-range mode", (parent) => ({ parent, operation: { ...operation, mode: 0o1000 } })],
+  ]) {
+    await context.test(name, async (testContext) => {
+      const root = await createTemporaryRoot(testContext, "egeria-removal-wire-");
+      const stats = await lstat(root, { bigint: true });
+      const request = withInvalidField({ device: stats.dev.toString(), inode: stats.ino.toString() });
+      assert.deepEqual(
+        await runFileOperation(root, request, process.execPath, [fileOperationPath]),
+        { ok: false, sourceChanged: false },
+      );
+      assert.deepEqual(await readdir(root), []);
+    });
+  }
+});
+
+test("filesystem removal writer classifies helper transport failures", async (context) => {
+  const identity = {
+    device: "1", inode: "2", mode: 0o600, size: "3",
+    changeTime: "4", modificationTime: "5",
+  };
+  for (const [operation, kind, helperCall, invalidResult] of [
+    ["staging", "replace-file", 1, { ok: false, sourceChanged: false, extra: true }],
+    ["replacement", "replace-file", 2, { ok: true, identity }],
+    ["deletion", "delete-file", 1, { ok: true, identity }],
+  ]) {
+    for (const [scenario, script, sourceChanged] of [
+      ["fails to launch", null, false],
+      ["exits without a reply", "process.exitCode = 1", true],
+      ["sends malformed JSON", 'process.stdout.write("{")', true],
+      ["sends an invalid result", `process.stdout.write(${JSON.stringify(JSON.stringify(invalidResult))})`, true],
+      ["reports a clean refusal", 'process.stdout.write(\'{"ok":false,"sourceChanged":false}\')', false],
+    ]) {
+      await context.test(`${operation} helper ${scenario}`, async (testContext) => {
+        const root = await createTemporaryRoot(testContext, "egeria-removal-transport-");
+        const target = join(root, "target.txt");
+        await writeFile(target, "before\n", "utf8");
+        const helperScript = script === null
+          ? null
+          : `process.stdin.on("end", () => { ${script}; }); process.stdin.resume();`;
+
+        assert.deepEqual(
+          await writeWithSubstitutedHelper(root, kind, helperCall, helperScript),
+          { ok: false, sourceChanged },
+        );
+        assert.equal(await readFile(target, "utf8"), "before\n");
+        assert.deepEqual(await readdir(root), ["target.txt"]);
+      });
+    }
+  }
+});
 
 test(
   "filesystem removal writer retains failed staging paths for fail-closed recovery",
