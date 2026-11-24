@@ -724,25 +724,21 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     assert.equal(selectors.some((selector) => selector.test(name)), false, name);
     assert.equal(skipSelector.test(name), false, name);
   }
-  for (const command of [
+  assert.deepEqual(workflow.jobs["builder-and-packages"].steps.filter(({ run }) => run).map(({ run }) => run), [
+    "pnpm install --frozen-lockfile",
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
     "pnpm run test:package-boundaries",
-    "pnpm run test:builder-core",
+    "pnpm run build:builder",
+    "node --test packages/builder-core/tests/*.test.mjs",
     nonJobsCommand,
     "pnpm run test:packages",
-    "pnpm run test:capability-certification",
-    "pnpm run check:capability-certification",
-  ]) {
-    assert.match(
-      commandsByJob["builder-and-packages"],
-      new RegExp(escapeRegularExpression(command), "u"),
-    );
-  }
-  assert.doesNotMatch(
-    commandsByJob["builder-and-packages"],
-    /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
-  );
+    "node --test tests/capability-certification/*.test.mjs",
+    "node scripts/check-capability-certification.mjs",
+    "pnpm run lint:builder",
+    "pnpm run typecheck:builder",
+    "pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main",
+  ]);
   const generatedJobsCommand = withVerificationGit('node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs');
   const generatedJobs = workflow.jobs["generated-jobs-profiles"];
   assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.group }})");
