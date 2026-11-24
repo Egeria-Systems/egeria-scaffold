@@ -26,7 +26,7 @@ import {
   pathIdentityMatches,
   readPathIdentity,
 } from "./lib/isolated-process.mjs";
-import { runDependencyAudit } from "./lib/dependency-audit.mjs";
+import { isPassingDependencyAudit, runDependencyAudit } from "./lib/dependency-audit.mjs";
 import { inspectAppEffectBuild, inspectEffectSourceBoundary } from "./verify-app-transition-visuals.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -2373,10 +2373,7 @@ async function verifySourcesWithAdapters(
           if (command.failureCode === "DEPENDENCY_AUDIT_FAILED" && admittedAudit) {
             const audit = await runExpectedCommand(admittedAudit,
               commandInput(command.arguments), command.failureCode);
-            const auditAccepted = audit?.status === "passed"
-              ? audit.thresholdExitCode === 0 && [0, 1].includes(audit.rawExitCode)
-              : audit?.status === "accepted-with-security-exception" && audit.thresholdExitCode === 1 && audit.rawExitCode === 1;
-            if (!auditAccepted) fail(command.failureCode);
+            if (!isPassingDependencyAudit(audit)) fail(command.failureCode);
             auditDispositions.push({ fixture: source.contract.identifier, ...audit });
           } else {
             const output = await runExpectedCommand(adapters.runCommand, commandInput(command.arguments), command.failureCode);
@@ -2468,8 +2465,7 @@ async function verifySourcesWithAdapters(
   return {
     ok: true,
     fixtures: selectedSources.map(({ contract }) => contract.identifier),
-    ...(admittedAudit ? { auditDispositions, status: auditDispositions.some(audit => audit.status === "accepted-with-security-exception")
-      ? "completed-with-security-exception" : "completed" } : {}),
+    ...(admittedAudit ? { auditDispositions, status: "completed" } : {}),
     workerIntegration,
     bindingIntegration,
     appBuildEvidence,

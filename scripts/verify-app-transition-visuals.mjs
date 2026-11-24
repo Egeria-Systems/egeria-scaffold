@@ -8,7 +8,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 
-import { runDependencyAudit } from "./lib/dependency-audit.mjs";
+import { isPassingDependencyAudit, runDependencyAudit } from "./lib/dependency-audit.mjs";
 import { cleanupOwnedDirectory, createIsolatedProcessEnvironment, isolatedProcessOptions, pathIdentityMatches, readPathIdentity } from "./lib/isolated-process.mjs";
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -128,7 +128,7 @@ async function sourcePaths(root) {
     ["package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", ".npmrc"].includes(path) ||
     /^packages\/builder-core\/(src\/|templates\/|lockfiles\/|scripts\/|package.json$|tsconfig)/.test(path) ||
     ["scripts/verify-app-transition-visuals.mjs", "scripts/lib/isolated-process.mjs",
-      "scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json"].includes(path)
+      "scripts/lib/dependency-audit.mjs"].includes(path)
   )).sort();
 }
 
@@ -580,10 +580,7 @@ export async function executeAppTransitionVisualCase(input, injected = {}) {
         const disposition = await audit({ executable: "pnpm", cwd: project, environment, timeout: 15 * 60 * 1000 });
         if (!(await pathIdentityMatches(identity))) fail("VISUAL_ROOT_CHANGED");
         checks.push({ name, exitCode: disposition.rawExitCode, disposition });
-        const auditAccepted = disposition.status === "passed"
-          ? disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode)
-          : disposition.status === "accepted-with-security-exception" && disposition.thresholdExitCode === 1 && disposition.rawExitCode === 1;
-        if (!auditAccepted) fail("VISUAL_PROJECT_CHECK_FAILED");
+        if (!isPassingDependencyAudit(disposition)) fail("VISUAL_PROJECT_CHECK_FAILED");
       } catch (error) {
         if (error.auditDisposition) checks.push({ name, exitCode: error.auditDisposition.rawExitCode, disposition: error.auditDisposition });
         fail("VISUAL_PROJECT_CHECK_FAILED");

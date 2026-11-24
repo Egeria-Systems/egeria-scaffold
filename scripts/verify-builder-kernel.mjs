@@ -80,7 +80,7 @@ function skeletonEvidence(text, withVisuals) {
     workerIntegration: integration(result.workerIntegration),
     bindingIntegration: integration(result.bindingIntegration),
     auditDispositions: audits.filter(audit => fixtureNames.has(audit?.fixture) &&
-      ["passed", "accepted-with-security-exception"].includes(audit.status) &&
+      audit.status === "passed" &&
       typeof audit.artifactDirectory === "string" && /^audit-[a-z0-9]{6}$/iu.test(audit.artifactDirectory))
       .map(({ fixture, status, artifactDirectory }) => ({ fixture, status, artifactDirectory })),
     appBuildEvidence: builds.filter(build => fixtureNames.has(build?.fixture) &&

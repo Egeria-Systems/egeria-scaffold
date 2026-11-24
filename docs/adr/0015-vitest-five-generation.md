@@ -40,7 +40,7 @@ A supported installed schema-2 project whose managed Next.js fingerprint records
 
 ### Temporary picomatch CI exception
 
-The user authorized a temporary CI exception during PR #177 development for the high-severity [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf). The current [exception record](../../scripts/dependency-audit-exception.json) owns the expiry and the five exact generated dependency graphs. Visual verification keeps the failing raw audit and the separate exception disposition. GitHub dependency review applies the allowance to PR #177 in this repository while its reviewed dependency inputs match. The exception closes at expiry or when npm publishes a newer stable picomatch version.
+During PR #177, the user authorized a temporary CI exception for the [picomatch advisory](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) on five exact generated dependency graphs. It expired on November 21, 2026. The earlier braces allowance expired on October 10, 2026. The [original policy](https://github.com/Egeria-Systems/egeria-scaffold/blob/117ab777030c4d0fd1b92f2ec774b53b51ca12fe/scripts/dependency-audit-exception.json) records the exact scope and limits. Current fixed-fixture and transition-visual checks retain native audit evidence and reject findings at moderate severity or higher. GitHub dependency review keeps the same threshold and dependency scopes.
 
 ### Proof ESLint alignment
 

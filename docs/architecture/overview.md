@@ -18,12 +18,7 @@ Profiles are versioned materialized recipes. A selected profile resolves to expl
 
 - `portfolio` is a static-first, principally one-page public presence. It excludes persistence, queues, forms, identity, CMS, payments, business CRUD, and real-time behavior by default.
 - `site` is a conventional multi-page public website. It adds routes, navigation, page metadata, content composition, and migration support without becoming stateful merely because it has multiple pages.
-- `app` is a backend-ready public profile without customer identity. It retains the complete production-site experience and adds the application foundation. Its recipe is exactly:
-
-```text
-app@0.2.7 = app-foundation@0.1.0 + site-routing@0.4.0
-```
-
+- `app` is a backend-ready public profile without customer identity. It retains the complete production-site experience and adds the application foundation. The [current recipe](capability-model.md#current-environment-generation) is `app@0.3.0` with `app-foundation@0.3.0` and `site-routing@0.5.0`.
   Calendly, multilingual, and analytics remain independent optional selections. Persistence, email, jobs, durable contact submissions, booking webhooks, and payments also remain independent selections.
 - `authenticated-app` is an individual-account application recipe. It materializes `app-foundation`, application persistence, Resend transactional email, Better Auth verified email/password, Google sign-in, protected routes, account-profile behavior, and a narrow support console. TOTP, passkeys, payments, durable contact submissions, jobs, and CMS remain independent.
 

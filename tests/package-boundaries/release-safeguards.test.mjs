@@ -246,7 +246,7 @@ test("root release commands use the supported Changesets boundary", async () => 
       typecheck:
         "pnpm --filter @egeria-systems/cli --filter @egeria-systems/builder-core --filter @egeria-systems/observability run typecheck",
       verify:
-        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:cli && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
+        "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm --filter @egeria-systems/cli run test && pnpm run test:packages && pnpm run typecheck:builder && pnpm run changeset:status",
       verifyQuality:
         "pnpm run test:constitution && pnpm run test:package-boundaries && pnpm run build:builder && pnpm run lint:builder && pnpm run test:packages && pnpm run typecheck:builder",
       verifyRelease:
