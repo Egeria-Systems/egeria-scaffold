@@ -46,8 +46,9 @@ export async function createSyntheticAppTransitionAdmission(context) {
     preparedProjects.set(subsetKey(subset), prepared);
   }
   const sourcePaths = historicalPolicy.record.originalSourceFiles
+    .filter(({ path }) => path !== "scripts/dependency-audit-exception.json")
     .map(({ path }) => currentLockPaths.get(path) ?? path).sort();
-  assert.equal(sourcePaths.length, 299);
+  assert.equal(sourcePaths.length, 298);
   assert.equal(new Set(sourcePaths).size, sourcePaths.length);
   const pngPaths = [];
   const images = { monolingual: {}, multilingual: {} };

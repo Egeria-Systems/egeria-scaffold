@@ -83,7 +83,6 @@ jobs:
             "scripts/verify-app-transition-visuals.mjs"
             "scripts/lib/isolated-process.mjs"
             "scripts/lib/dependency-audit.mjs"
-            "scripts/dependency-audit-exception.json"
             "tests/generated-fixtures/**"
           )
           compatibility_paths=(
@@ -674,45 +673,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
-      - name: Check out reviewed dependency inputs
-        if: >-
-          github.repository == 'Egeria-Systems/egeria-scaffold'
-          && github.event.pull_request.head.repo.full_name == github.repository
-          && github.event.pull_request.number == 177
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Resolve temporary picomatch exception
-        id: picomatch_exception
-        if: >-
-          github.repository == 'Egeria-Systems/egeria-scaffold'
-          && github.event.pull_request.head.repo.full_name == github.repository
-          && github.event.pull_request.number == 177
-        shell: bash
-        run: |
-          set -euo pipefail
-          reviewed=89952c3e6571ee8f70c14f65d50320bbbe01b73e
-          if ! git diff --quiet "$reviewed" HEAD -- \
-              ':(glob)**/pnpm-lock.yaml' ':(glob)**/pnpm-workspace.yaml' \
-              ':(glob)**/package.json' ':(glob)**/.npmrc' ':(glob)**/*.patch'; then
-            exit 0
-          fi
-          node --input-type=module <<'JS'
-          import { appendFileSync } from "node:fs";
-          import { picomatchDependencyReviewAllowance } from "./scripts/lib/dependency-audit.mjs";
-
-          const advisory = await picomatchDependencyReviewAllowance();
-          if (advisory) {
-            appendFileSync(process.env.GITHUB_OUTPUT, `advisory=${advisory}\n`);
-            appendFileSync(process.env.GITHUB_STEP_SUMMARY, `Temporary exception for ${advisory} on the reviewed dependency inputs. See scripts/dependency-audit-exception.json for the risk and expiry.\n`);
-          }
-          JS
-
       - name: Review dependency changes
         uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294
         with:
           fail-on-severity: moderate
           fail-on-scopes: runtime, development
-          allow-ghsas: ${{ steps.picomatch_exception.outputs.advisory }}
