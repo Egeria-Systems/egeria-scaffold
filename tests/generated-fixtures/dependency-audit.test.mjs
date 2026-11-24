@@ -1,412 +1,195 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import test from "node:test";
 
-const moduleUrl = new URL("../../scripts/lib/dependency-audit.mjs", import.meta.url);
-const policyUrl = new URL("../../scripts/dependency-audit-exception.json", import.meta.url);
-const instant = Date.parse("2026-10-04T18:30:00Z");
-const digest = value => createHash("sha256").update(value).digest("hex");
-const raw = (exitCode, report, overrides = {}) => ({ exitCode, stdout: Buffer.from(JSON.stringify(report)), stderr: Buffer.alloc(0), signal: null, killed: false, operationalError: false, ...overrides });
+import { inspectDependencyAuditInputs, runDependencyAudit } from "../../scripts/lib/dependency-audit.mjs";
 
-function reportFor(graph) {
+const instant = Date.parse("2026-11-18T16:00:00Z");
+const digest = bytes => createHash("sha256").update(bytes).digest("hex");
+const dependencyCounts = { dependencies: 3, devDependencies: 2, optionalDependencies: 1, totalDependencies: 5 };
+
+function reportFor(severity, advisoryId = "GHSA-fc5q-39xc-vjpf", packageName = "picomatch") {
   return {
-    advisories: { "1240992": { id: 1240992, github_advisory_id: "GHSA-vfj7-8cjw-p6xm", module_name: "braces", severity: "high", vulnerable_versions: "<=3.0.3", patched_versions: ">=3.0.4", findings: structuredClone(graph.advisoryFindings) } },
-    metadata: { ...graph.dependencyCounts, vulnerabilities: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 } },
+    advisories: severity === undefined ? {} : {
+      "1240992": {
+        id: 1240992,
+        github_advisory_id: advisoryId,
+        module_name: packageName,
+        severity,
+        vulnerable_versions: "<=4.0.7",
+        findings: [{ version: "4.0.7", dev: true, optional: false, bundled: false, paths: ["apps__web>vitest>picomatch"] }],
+      },
+    },
+    metadata: {
+      ...dependencyCounts,
+      vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, ...(severity && { [severity]: 1 }) },
+    },
   };
 }
 
-async function fixture(t) {
-  const module = await import(moduleUrl);
-  const policyBytes = await readFile(policyUrl);
-  const policy = JSON.parse(policyBytes);
+function raw(exitCode, report, overrides = {}) {
+  return {
+    exitCode, stdout: Buffer.from(JSON.stringify(report)), stderr: Buffer.alloc(0),
+    signal: null, killed: false, operationalError: false, ...overrides,
+  };
+}
+
+async function fixture(t, result, graph = null) {
   const directory = await mkdtemp(join(tmpdir(), "egeria-audit-contract-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   const calls = [];
-  const metadata = new Map(policy.fixObservation.packages.map(entry => [entry.url, {
-    name: entry.name, "dist-tags": { latest: entry.latest },
-    versions: Object.fromEntries(entry.knownVersions.map(version => [version.version, { name: entry.name, version: version.version, dependencies: version.dependencies }])),
-    time: Object.fromEntries(entry.knownVersions.map(version => [version.version, version.publishedAt])),
-  }]));
-  const graph = policy.graphs[0];
-  const result = raw(1, reportFor(graph));
+  const input = {
+    executable: "pnpm", cwd: directory, environment: { LANG: "C", AUDIT_TEST_DIRECTORY: directory },
+    timeout: 1234, artifactRoot: join(directory, "receipts"),
+  };
   const adapters = {
     now: () => instant,
-    readPolicy: async () => policyBytes,
-    isHosted: () => false,
-    inspectInputs: async () => ({ graph, fingerprint: "same-reviewed-inputs" }),
-    fetchBytes: async url => {
-      assert.ok(metadata.has(url), `unexpected network request: ${url}`);
-      return Buffer.from(JSON.stringify(metadata.get(url)));
+    inspectInputs: async () => ({ graph, fingerprint: "unchanged" }),
+    runProcess: async arguments_ => {
+      calls.push(arguments_);
+      return result;
     },
-    runProcess: async input => { calls.push(input); return result; },
   };
-  const input = { executable: "pnpm", cwd: directory, environment: { HOME: directory, NPM_CONFIG_REGISTRY: "https://registry.npmjs.org/" }, timeout: 1234, artifactRoot: join(directory, "receipts") };
-  return { module, policy, policyBytes, directory, calls, metadata, graph, result, adapters, input };
+  return { directory, input, adapters, calls };
 }
 
-test("all six admitted graphs preserve the actual failing audit and a separate exception disposition", async t => {
-  const h = await fixture(t);
-  for (const graph of h.policy.graphs) {
-    const result = raw(1, reportFor(graph));
-    const receipt = await h.module.runDependencyAudit(h.input, { ...h.adapters, inspectInputs: async () => ({ graph, fingerprint: graph.lockSha256 }), runProcess: async input => { h.calls.push(input); return result; } });
-    assert.equal(receipt.status, "accepted-with-security-exception");
-    assert.equal(receipt.rawExitCode, 1);
-    assert.equal(receipt.thresholdExitCode, 1);
-    assert.equal(receipt.graph, graph.id);
-    assert.deepEqual(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "stdout")), result.stdout);
-    assert.deepEqual(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "stderr")), result.stderr);
-    const process = JSON.parse(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "process.json")));
-    assert.equal(process.exitCode, 1);
-    assert.equal(process.stdoutSha256, digest(result.stdout));
-    assert.equal(JSON.parse(await readFile(join(h.input.artifactRoot, receipt.artifactDirectory, "disposition.json"))).status, receipt.status);
-  }
-  for (const call of h.calls) {
-    assert.deepEqual(call.arguments, ["audit", "--audit-level", "info", "--json"]);
-    assert.equal(call.cwd, h.input.cwd);
-    assert.deepEqual(call.environment, h.input.environment);
-    assert.equal(call.timeout, 1234);
-  }
+async function assertReceipt(input, disposition, result) {
+  assert.equal(isAbsolute(disposition.artifactDirectory), false);
+  const directory = resolve(input.artifactRoot, disposition.artifactDirectory);
+  assert.equal(relative(input.artifactRoot, directory), disposition.artifactDirectory);
+  assert.equal(dirname(directory), input.artifactRoot);
+  assert.equal(JSON.stringify(disposition).includes(input.cwd), false);
+  assert.deepEqual(await readFile(join(directory, "stdout")), result.stdout);
+  assert.deepEqual(await readFile(join(directory, "stderr")), result.stderr);
+  const process = JSON.parse(await readFile(join(directory, "process.json")));
+  assert.equal(process.exitCode, result.exitCode);
+  assert.equal(process.stdoutSha256, digest(result.stdout));
+  assert.equal(process.stderrSha256, digest(result.stderr));
+  const receiptName = disposition.status === "refused" ? "failure.json" : "disposition.json";
+  const receipt = JSON.parse(await readFile(join(directory, receiptName)));
+  assert.equal(receipt.status, disposition.status);
+  assert.equal(receipt.rawExitCode, result.exitCode);
+}
+
+test("a valid audit runs without an exception policy or registry metadata adapter", async t => {
+  const result = raw(0, reportFor());
+  const { input, adapters, calls } = await fixture(t, result);
+  const disposition = await runDependencyAudit(input, adapters);
+  assert.equal(disposition.status, "passed");
+  assert.equal(disposition.rawExitCode, 0);
+  assert.equal(disposition.thresholdExitCode, 0);
+  assert.deepEqual(calls, [{
+    executable: "pnpm", arguments: ["audit", "--audit-level", "info", "--json"],
+    cwd: input.cwd, environment: input.environment, timeout: input.timeout,
+  }]);
+  await assertReceipt(input, disposition, result);
 });
 
-test("ordinary audit success needs no security exception or network fix check", async t => {
-  const h = await fixture(t);
-  const report = reportFor(h.graph);
-  report.advisories = {};
-  report.metadata.vulnerabilities.high = 0;
-  for (const graph of [h.graph, null]) {
-    const result = await h.module.runDependencyAudit(h.input, {
-      ...h.adapters,
-      now: () => Date.parse("2030-01-01"),
-      readPolicy: async () => Buffer.from(JSON.stringify({ ...h.policy, status: "revoked" })),
-      isHosted: () => true,
-      inspectInputs: async () => ({ graph, fingerprint: "unchanged-inputs" }),
-      runProcess: async () => raw(0, report),
-      fetchBytes: async () => assert.fail("ordinary success must not request exception metadata"),
-    });
-    assert.equal(result.status, "passed");
-    assert.equal(result.rawExitCode, 0);
-    assert.equal(result.thresholdExitCode, 0);
-    assert.equal(result.graph, graph?.id ?? null);
-  }
-});
-
-for (const severity of ["low", "info"])
-test(`complete ${severity}-only audits preserve findings and raw exit without requiring an exception`, async t => {
-  const h = await fixture(t);
-  const report = reportFor(h.graph);
-  Object.assign(report.advisories["1240992"], { severity, module_name: "other-package", github_advisory_id: "GHSA-aaaa-bbbb-cccc" });
-  report.metadata.vulnerabilities.high = 0;
-  report.metadata.vulnerabilities[severity] = 1;
-  for (const graph of [h.graph, null]) {
-    const result = raw(1, report);
-    const receipt = await h.module.runDependencyAudit(h.input, {
-      ...h.adapters,
-      now: () => Date.parse("2030-01-01"),
-      readPolicy: async () => Buffer.from(JSON.stringify({ ...h.policy, status: "revoked" })),
-      isHosted: () => true,
-      inspectInputs: async () => ({ graph, fingerprint: "unchanged-inputs" }),
-      runProcess: async input => { h.calls.push(input); return result; },
-      fetchBytes: async () => assert.fail("below-threshold findings must not request exception metadata"),
-    });
-    assert.equal(receipt.status, "passed");
-    assert.equal(receipt.rawExitCode, 1);
-    assert.equal(receipt.thresholdExitCode, 0);
-    assert.equal(receipt.graph, graph?.id ?? null);
-    const directory = join(h.input.artifactRoot, receipt.artifactDirectory);
-    assert.deepEqual(await readFile(join(directory, "stdout")), result.stdout);
-    assert.deepEqual(await readFile(join(directory, "stderr")), result.stderr);
-    const process = JSON.parse(await readFile(join(directory, "process.json")));
-    assert.equal(process.exitCode, 1);
-    assert.deepEqual(process.arguments, ["audit", "--audit-level", "info", "--json"]);
-    const disposition = JSON.parse(await readFile(join(directory, "disposition.json")));
+for (const severity of ["info", "low"]) {
+  test("a complete " + severity + " audit preserves the native exit and passes the threshold", async t => {
+    const result = raw(1, reportFor(severity));
+    const { input, adapters } = await fixture(t, result);
+    const disposition = await runDependencyAudit(input, adapters);
+    assert.equal(disposition.rawExitCode, 1);
     assert.equal(disposition.thresholdExitCode, 0);
-    assert.equal(Object.hasOwn(disposition, "advisory"), false);
-  }
-});
-
-test("braces plus any below-threshold advisory and filtered advisory counts remain refused", async t => {
-  const h = await fixture(t);
-  for (const severity of ["low", "info"])
-  for (const includeAdvisory of [false, true]) {
-    const report = reportFor(h.graph);
-    report.metadata.vulnerabilities[severity] = 1;
-    if (includeAdvisory) report.advisories["2"] = { ...report.advisories["1240992"], id: 2,
-      github_advisory_id: "GHSA-aaaa-bbbb-cccc", module_name: "other-package", severity };
-    const result = raw(1, report);
-    await assert.rejects(h.module.runDependencyAudit(h.input, {
-      ...h.adapters,
-      runProcess: async () => result,
-      fetchBytes: async () => assert.fail("extra or omitted findings must refuse before exception metadata"),
-    }), asyncError => asyncError.message === "DEPENDENCY_AUDIT_FAILED");
-  }
-});
-
-test("collection exit must agree with all findings even below the moderate threshold", async t => {
-  const h = await fixture(t);
-  for (const hasAdvisory of [false, true]) {
-    const report = reportFor(h.graph);
-    report.metadata.vulnerabilities.high = 0;
-    if (hasAdvisory) {
-      report.advisories["1240992"].severity = "low";
-      report.metadata.vulnerabilities.low = 1;
-    } else report.advisories = {};
-    await assert.rejects(h.module.runDependencyAudit(h.input, {
-      ...h.adapters,
-      runProcess: async () => raw(hasAdvisory ? 0 : 1, report),
-      fetchBytes: async () => assert.fail("inconsistent collection exits must refuse before metadata"),
-    }), /DEPENDENCY_AUDIT_FAILED/);
-  }
-});
-
-test("ordinary audit success rejects inconsistent dependency totals for every known graph", async t => {
-  const h = await fixture(t);
-  for (const graph of h.policy.graphs) {
-    for (const key of Object.keys(graph.dependencyCounts)) {
-      const report = reportFor(graph);
-      report.advisories = {};
-      report.metadata.vulnerabilities.high = 0;
-      report.metadata[key]++;
-      const result = raw(0, report);
-      let refusal;
-      await assert.rejects(h.module.runDependencyAudit(h.input, {
-        ...h.adapters,
-        inspectInputs: async () => ({ graph, fingerprint: graph.lockSha256 }),
-        runProcess: async () => result,
-        fetchBytes: async () => assert.fail("inconsistent totals must refuse before exception metadata"),
-      }), error => {
-        refusal = error.auditDisposition;
-        return error.message === "DEPENDENCY_AUDIT_FAILED";
-      });
-      assert.equal(refusal.rawExitCode, 0);
-      assert.deepEqual(await readFile(join(h.input.artifactRoot, refusal.artifactDirectory, "stdout")), result.stdout);
-      assert.equal(JSON.parse(await readFile(join(h.input.artifactRoot, refusal.artifactDirectory, "process.json"))).exitCode, 0);
-    }
-  }
-});
-
-for (const status of ["passed", "accepted-with-security-exception", "refused"]) {
-  test(`public ${status} audit disposition contains only a relative receipt identifier`, async t => {
-    const h = await fixture(t);
-    const report = reportFor(h.graph);
-    if (status === "passed") {
-      report.advisories = {};
-      report.metadata.vulnerabilities.high = 0;
-    }
-    const result = raw(status === "passed" ? 0 : 1, report, status === "refused" ? { stderr: Buffer.from("registry unavailable") } : {});
-    const audit = h.module.runDependencyAudit(h.input, { ...h.adapters, runProcess: async () => result });
-    let disposition;
-    let publicValue;
-    if (status === "refused") {
-      await assert.rejects(audit, error => {
-        disposition = error.auditDisposition;
-        publicValue = error;
-        return error.message === "DEPENDENCY_AUDIT_FAILED";
-      });
-    } else {
-      disposition = await audit;
-      publicValue = disposition;
-    }
-    assert.equal(disposition.status, status);
-    const serialized = JSON.stringify(publicValue);
-    assert.equal(serialized.includes(h.input.artifactRoot), false);
-    assert.equal(serialized.includes(h.input.environment.HOME), false);
-    assert.equal(isAbsolute(disposition.artifactDirectory), false);
-    const directory = resolve(h.input.artifactRoot, disposition.artifactDirectory);
-    assert.equal(relative(h.input.artifactRoot, directory), disposition.artifactDirectory);
-    assert.equal(dirname(directory), h.input.artifactRoot);
-    assert.deepEqual(await readFile(join(directory, "stdout")), result.stdout);
-    assert.deepEqual(await readFile(join(directory, "stderr")), result.stderr);
-    const process = JSON.parse(await readFile(join(directory, "process.json")));
-    assert.equal(process.exitCode, result.exitCode);
-    assert.equal(process.stdoutSha256, digest(result.stdout));
-    assert.equal(process.stderrSha256, digest(result.stderr));
-    assert.equal(JSON.parse(await readFile(join(directory, status === "refused" ? "failure.json" : "disposition.json"))).status, status);
+    assert.equal(disposition.status, "passed");
+    await assertReceipt(input, disposition, result);
   });
 }
 
-test("unknown advisories, inconsistent reports and operational audit failures never receive an exception", async t => {
-  const h = await fixture(t);
-  const cases = [
-    value => { value.advisories["1240992"].github_advisory_id = "GHSA-aaaa-bbbb-cccc"; },
-    value => { value.advisories["1240992"].severity = "critical"; },
-    value => { value.advisories["1240992"].findings[0].version = "3.0.2"; },
-    value => { value.advisories["1240992"].findings[0].paths.push("untrusted>braces"); },
-    value => { value.advisories["1240992"].findings = []; },
-    value => { value.advisories["1240992"].severity = "unknown"; },
-    value => { value.advisories["2"] = { ...value.advisories["1240992"], id: 2 }; },
-    value => { value.metadata.vulnerabilities.high = 0; },
-    value => { value.metadata.totalDependencies++; },
-    value => { delete value.metadata.devDependencies; },
-    value => { value.error = "registry unavailable"; },
+test("blocking findings retain failed evidence, including the formerly reviewed advisories", async t => {
+  const reports = [
+    reportFor("moderate", "GHSA-abcd-1234-efgh", "synthetic"),
+    reportFor("high", "GHSA-vfj7-8cjw-p6xm", "braces"),
+    reportFor("high"),
+    reportFor("critical", "GHSA-abcd-1234-efgh", "synthetic"),
   ];
-  const results = cases.map(change => { const report = reportFor(h.graph); change(report); return raw(1, report); });
-  for (const override of [{ exitCode: 0 }, { exitCode: 2 }, { exitCode: null, operationalError: true }, { signal: "SIGTERM" }, { killed: true }, { operationalError: true }, { stderr: Buffer.from("registry error") }, { stdout: Buffer.from("{truncated") }, { stdout: Buffer.from([255]) }]) results.push({ ...h.result, ...override });
-  for (const result of results) {
-    let refusal;
-    await assert.rejects(h.module.runDependencyAudit(h.input, { ...h.adapters, runProcess: async () => result }), error => {
-      refusal = error.auditDisposition;
-      return error.message === "DEPENDENCY_AUDIT_FAILED";
+  for (const report of reports) {
+    const result = raw(1, report);
+    const { input, adapters } = await fixture(t, result);
+    let disposition;
+    await assert.rejects(runDependencyAudit(input, adapters), error => {
+      assert.equal(error.message, "DEPENDENCY_AUDIT_FAILED");
+      disposition = error.auditDisposition;
+      assert.equal(disposition.status, "refused");
+      return true;
     });
-    assert.deepEqual(await readFile(join(h.input.artifactRoot, refusal.artifactDirectory, "stdout")), result.stdout);
-    assert.deepEqual(await readFile(join(h.input.artifactRoot, refusal.artifactDirectory, "stderr")), result.stderr);
-    assert.equal(JSON.parse(await readFile(join(h.input.artifactRoot, refusal.artifactDirectory, "process.json"))).exitCode, result.exitCode);
+    await assertReceipt(input, disposition, result);
   }
 });
 
-test("expiry, revocation, input drift and newly published fixes or parents refuse continuation", async t => {
-  const h = await fixture(t);
-  const cases = [
-    { now: () => Date.parse(h.policy.expiresAt) },
-    { readPolicy: async () => Buffer.from(JSON.stringify({ ...h.policy, status: "revoked" })) },
-    { inspectInputs: async () => ({ graph: null, fingerprint: "unknown-pair" }) },
-    { fetchBytes: async () => { throw new Error("offline"); } },
-    { fetchBytes: async () => Buffer.from("{}") },
-    { fetchBytes: async url => {
-      const value = structuredClone(h.metadata.get(url));
-      value["dist-tags"].latest = "99.0.0";
-      return Buffer.from(JSON.stringify(value));
-    } },
-    { fetchBytes: async url => {
-      const value = structuredClone(h.metadata.get(url));
-      value.versions["3.0.4"] = { name: value.name, version: "3.0.4" };
-      value.time["3.0.4"] = "2026-10-04T18:29:00Z";
-      return Buffer.from(JSON.stringify(value));
-    } },
-  ];
-  let inspections = 0;
-  cases.push({ inspectInputs: async () => ({ graph: h.graph, fingerprint: String(inspections++) }) });
-  let ticks = 0;
-  cases.push({ now: () => ticks++ === 0 ? instant : Date.parse(h.policy.expiresAt) });
-  for (const change of cases) await assert.rejects(h.module.runDependencyAudit(h.input, { ...h.adapters, ...change }), /DEPENDENCY_AUDIT_FAILED/);
-});
-
-test("hosted acceptance requires the current identical active public policy", async t => {
-  const h = await fixture(t);
-  const hostedUrl = "https://raw.githubusercontent.com/Egeria-Systems/egeria-scaffold/application-environment-configuration/scripts/dependency-audit-exception.json";
-  const adapters = { ...h.adapters, isHosted: () => true, fetchBytes: async url => url === hostedUrl ? h.policyBytes : h.adapters.fetchBytes(url) };
-  assert.equal((await h.module.runDependencyAudit(h.input, adapters)).rawExitCode, 1);
-  await assert.rejects(h.module.runDependencyAudit(h.input, { ...adapters, fetchBytes: async url => url === hostedUrl ? Buffer.from("revoked") : h.adapters.fetchBytes(url) }), /DEPENDENCY_AUDIT_FAILED/);
-});
-
-test("incomplete test adapters and unwritable evidence fail before they can silently use live services", async t => {
-  const h = await fixture(t);
-  await assert.rejects(h.module.runDependencyAudit(h.input, { runProcess: h.adapters.runProcess }), /DEPENDENCY_AUDIT_ADAPTER_INVALID/);
-  const collision = join(h.directory, "collision");
-  await writeFile(collision, "preserve");
-  await assert.rejects(h.module.runDependencyAudit({ ...h.input, artifactRoot: collision }, h.adapters));
-  assert.equal(await readFile(collision, "utf8"), "preserve");
-  assert.equal(h.calls.length, 0);
-});
-
-test("input inspection binds lock-policy pairs, caller bytes and reviewed configuration", async t => {
-  const h = await fixture(t);
-  const cwd = join(h.directory, "project");
-  await mkdir(cwd);
-  const policy = structuredClone(h.policy);
-  const graph = policy.graphs[0];
-  await writeFile(join(cwd, "pnpm-lock.yaml"), "lock");
-  await writeFile(join(cwd, "pnpm-workspace.yaml"), "policy");
-  graph.lockSha256 = digest("lock");
-  graph.workspacePolicySha256 = digest("policy");
-  const config = join(cwd, graph.eslintConfigPath);
-  await mkdir(join(cwd, "apps/web"), { recursive: true });
-  await writeFile(config, "reviewed configuration");
-  graph.eslintConfigSha256 = digest("reviewed configuration");
-  const modules = join(cwd, "apps/web/node_modules");
-  for (const row of graph.callerFiles) {
-    const file = join(modules, row.package, row.member);
-    await mkdir(dirname(file), { recursive: true });
-    const content = row.member === "package.json" ? JSON.stringify({ name: row.package, version: row.version }) : `reviewed ${row.package}/${row.member}`;
-    row.sha256 = digest(content);
-    row.bytes = Buffer.byteLength(content);
-    await writeFile(file, content);
-  }
-  const before = await h.module.inspectDependencyAuditInputs(cwd, policy);
-  assert.equal(before.graph.id, graph.id);
-  await writeFile(config, "settings.next.rootDir from an untrusted source");
-  await assert.rejects(h.module.inspectDependencyAuditInputs(cwd, policy), /DEPENDENCY_AUDIT_INPUT_CHANGED/);
-  await writeFile(config, "reviewed configuration");
-  const caller = join(modules, "braces/lib/parse.js");
-  const callerBefore = await readFile(caller);
-  await writeFile(caller, "changed caller");
-  await assert.rejects(h.module.inspectDependencyAuditInputs(cwd, policy), /DEPENDENCY_AUDIT_INPUT_CHANGED/);
-  await writeFile(caller, callerBefore);
-  await writeFile(join(cwd, "pnpm-workspace.yaml"), "different policy");
-  assert.equal((await h.module.inspectDependencyAuditInputs(cwd, policy)).graph, null);
-});
-
-test("the temporary picomatch exception accepts only the reviewed development finding", async t => {
-  const h = await fixture(t);
-  const reviewedAt = Date.parse("2026-11-18T15:00:00Z");
-  const findings = [{ bundled: false, dev: true, optional: false, paths: [
-    "apps__web>typescript-eslint>tinyglobby>picomatch",
-    "apps__web>vitest>picomatch",
-  ], version: "4.0.7" }];
-  const graph = {
-    id: "app",
-    lockSha256: digest("app lock"),
-    workspacePolicySha256: digest("app workspace"),
-    dependencyCounts: h.graph.dependencyCounts,
-  };
-  const exception = {
-    status: "active",
-    advisory: "GHSA-fc5q-39xc-vjpf",
-    package: "picomatch",
-    version: "4.0.7",
-    approvedAt: new Date(reviewedAt).toISOString(),
-    expiresAt: "2026-11-21T15:00:00Z",
-    findingsSha256: digest(JSON.stringify(findings)),
-    graphs: [graph],
-  };
-  const report = {
-    advisories: { "1": { id: 1, github_advisory_id: exception.advisory, module_name: "picomatch",
-      severity: "high", vulnerable_versions: "<=4.0.7", findings: [{ ...findings[0], paths: [...findings[0].paths].reverse() }] } },
-    metadata: { ...graph.dependencyCounts, vulnerabilities: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 } },
-  };
-  const policyBytes = Buffer.from(JSON.stringify({ ...h.policy, picomatch: exception }));
-  const result = raw(1, report);
-  const adapters = {
-    ...h.adapters,
-    now: () => reviewedAt,
-    readPolicy: async () => policyBytes,
-    inspectInputs: async () => ({ graph, fingerprint: "reviewed" }),
-    fetchBytes: async url => {
-      assert.equal(url, "https://registry.npmjs.org/picomatch");
-      return Buffer.from(JSON.stringify({ name: "picomatch", "dist-tags": { latest: "4.0.7" }, versions: { "4.0.7": {} } }));
-    },
-    runProcess: async () => result,
-  };
-  const disposition = await h.module.runDependencyAudit(h.input, adapters);
-  assert.equal(disposition.status, "accepted-with-security-exception");
-  assert.equal(disposition.advisory, exception.advisory);
-  assert.equal(disposition.rawExitCode, 1);
-  assert.equal(disposition.expiresAt, exception.expiresAt);
-  assert.deepEqual(await readFile(join(h.input.artifactRoot, disposition.artifactDirectory, "stdout")), result.stdout);
-
-  const refusalCases = [
-    { now: () => Date.parse(exception.expiresAt) },
-    { inspectInputs: async () => ({ graph: { ...graph, lockSha256: digest("other lock") }, fingerprint: "other" }) },
-    { fetchBytes: async () => Buffer.from(JSON.stringify({ name: "picomatch", "dist-tags": { latest: "4.0.7" }, versions: { "4.0.7": {}, "4.0.8": {} } })) },
-    { fetchBytes: async () => { throw new Error("registry unavailable"); } },
-  ];
-  for (const change of [
-    advisory => { advisory.findings[0].dev = false; },
-    advisory => { advisory.findings[0].paths.push("apps__web>changed-parent>picomatch"); },
-    advisory => { advisory.github_advisory_id = "GHSA-aaaa-bbbb-cccc"; },
-    advisory => { advisory.patched_versions = ">=4.0.8"; },
+test("malformed reports, inconsistent counts and native failures refuse approval", async t => {
+  const mismatchedCounts = reportFor("low");
+  mismatchedCounts.metadata.vulnerabilities.low = 0;
+  const duplicatedFindingPath = reportFor("low");
+  const [finding] = duplicatedFindingPath.advisories["1240992"].findings;
+  finding.paths.push(finding.paths[0]);
+  for (const result of [
+    raw(0, reportFor("low")),
+    raw(1, reportFor()),
+    raw(1, mismatchedCounts),
+    raw(1, duplicatedFindingPath),
+    raw(0, reportFor(), { stdout: Buffer.from("{") }),
+    raw(0, reportFor(), { stderr: Buffer.from("unexpected native diagnostic") }),
+    raw(2, reportFor()), raw(0, reportFor(), { operationalError: true }),
+    raw(0, reportFor(), { signal: "SIGTERM" }), raw(0, reportFor(), { killed: true }),
   ]) {
-    const changed = structuredClone(report);
-    change(changed.advisories["1"]);
-    refusalCases.push({ runProcess: async () => raw(1, changed) });
+    const { input, adapters } = await fixture(t, result);
+    await assert.rejects(runDependencyAudit(input, adapters), /DEPENDENCY_AUDIT_FAILED/);
   }
-  const additional = structuredClone(report);
-  additional.advisories["2"] = { ...additional.advisories["1"], id: 2, github_advisory_id: "GHSA-aaaa-bbbb-cccc", severity: "moderate" };
-  additional.metadata.vulnerabilities.moderate = 1;
-  refusalCases.push({ runProcess: async () => raw(1, additional) });
-  for (const change of refusalCases) {
-    await assert.rejects(h.module.runDependencyAudit(h.input, { ...adapters, ...change }), /DEPENDENCY_AUDIT_FAILED/);
+});
+
+test("known graph counts still reject an otherwise valid audit", async t => {
+  const report = reportFor();
+  const graph = { id: "portfolio", dependencyCounts: { ...dependencyCounts, devDependencies: 1 } };
+  const { input, adapters } = await fixture(t, raw(0, report), graph);
+  await assert.rejects(runDependencyAudit(input, adapters), /DEPENDENCY_AUDIT_FAILED/);
+});
+
+test("real generated inputs identify a known graph and bind both audit files", async t => {
+  const committed = new URL("../../fixtures/generated/portfolio-0.12.0-next-16.4.5/", import.meta.url);
+  const directory = await mkdtemp(join(tmpdir(), "egeria-audit-inputs-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const names = ["pnpm-lock.yaml", "pnpm-workspace.yaml"];
+  for (const name of names) await writeFile(join(directory, name), await readFile(new URL(name, committed)));
+  const recognized = await inspectDependencyAuditInputs(directory);
+  assert.equal(recognized.graph.id, "portfolio");
+  for (const name of names) {
+    const path = join(directory, name);
+    const original = await readFile(path);
+    await writeFile(path, "changed input");
+    const changed = await inspectDependencyAuditInputs(directory);
+    assert.equal(changed.graph, null);
+    assert.notEqual(changed.fingerprint, recognized.fingerprint);
+    await writeFile(path, original);
   }
+  const result = raw(0, reportFor());
+  const { input, adapters } = await fixture(t, result);
+  const lock = join(directory, "pnpm-lock.yaml");
+  await writeFile(lock, "unrecognized dependency lock");
+  await assert.rejects(runDependencyAudit({ ...input, cwd: directory }, {
+    ...adapters,
+    inspectInputs: inspectDependencyAuditInputs,
+    runProcess: async () => {
+      await writeFile(lock, "changed during audit");
+      return result;
+    },
+  }), /DEPENDENCY_AUDIT_FAILED/);
+  await rm(lock);
+  await symlink(new URL("pnpm-lock.yaml", committed), lock);
+  await assert.rejects(inspectDependencyAuditInputs(directory), /DEPENDENCY_AUDIT_INPUT_CHANGED/);
+});
+
+test("incomplete adapters and unwritable evidence refuse before executing the audit", async t => {
+  const { directory, input, adapters, calls } = await fixture(t, raw(0, reportFor()));
+  await assert.rejects(runDependencyAudit(input, { runProcess: adapters.runProcess }), /DEPENDENCY_AUDIT_ADAPTER_INVALID/);
+  const collision = join(directory, "collision");
+  await writeFile(collision, "preserve");
+  await assert.rejects(runDependencyAudit({ ...input, artifactRoot: collision }, adapters));
+  assert.equal(await readFile(collision, "utf8"), "preserve");
+  assert.deepEqual(await readdir(directory), ["collision"]);
+  assert.equal(calls.length, 0);
 });

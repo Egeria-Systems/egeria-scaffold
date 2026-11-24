@@ -487,7 +487,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scripts/verify-app-transition-visuals.mjs",
     "scripts/lib/isolated-process.mjs",
     "scripts/lib/dependency-audit.mjs",
-    "scripts/dependency-audit-exception.json",
     "tests/generated-fixtures/**",
   ];
   const compatibilityPaths = [
@@ -725,25 +724,21 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     assert.equal(selectors.some((selector) => selector.test(name)), false, name);
     assert.equal(skipSelector.test(name), false, name);
   }
-  for (const command of [
+  assert.deepEqual(workflow.jobs["builder-and-packages"].steps.filter(({ run }) => run).map(({ run }) => run), [
+    "pnpm install --frozen-lockfile",
     "pnpm run test:constitution",
     "pnpm run check:semantic-naming",
     "pnpm run test:package-boundaries",
-    "pnpm run test:builder-core",
+    "pnpm run build:builder",
+    "node --test packages/builder-core/tests/*.test.mjs",
     nonJobsCommand,
     "pnpm run test:packages",
-    "pnpm run test:capability-certification",
-    "pnpm run check:capability-certification",
-  ]) {
-    assert.match(
-      commandsByJob["builder-and-packages"],
-      new RegExp(escapeRegularExpression(command), "u"),
-    );
-  }
-  assert.doesNotMatch(
-    commandsByJob["builder-and-packages"],
-    /test:generated-fixtures|verify:generated-skeletons|nextjs-cloudflare-proof/u,
-  );
+    "node --test tests/capability-certification/*.test.mjs",
+    "node scripts/check-capability-certification.mjs",
+    "pnpm run lint:builder",
+    "pnpm run typecheck:builder",
+    "pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main",
+  ]);
   const generatedJobsCommand = withVerificationGit('node --test --test-name-pattern="$GENERATED_JOBS_TEST_PATTERN" packages/builder-core/tests/background-job-generation.integration.mjs');
   const generatedJobs = workflow.jobs["generated-jobs-profiles"];
   assert.equal(generatedJobs.name, "Generated jobs (${{ matrix.group }})");
@@ -1011,16 +1006,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   }
 
   const dependencySteps = workflow.jobs["dependency-review"].steps;
-  assert.equal(dependencySteps.length, 3);
-  const [dependencyCheckout, exceptionStep, dependencyReview] = dependencySteps;
-  const exceptionScope = "github.repository == 'Egeria-Systems/egeria-scaffold' && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.number == 177";
-  assert.equal(dependencyCheckout.if, exceptionScope);
-  assert.equal(isPinnedGitHubActionReference(dependencyCheckout.uses, "actions/checkout"), true);
-  assert.deepEqual(dependencyCheckout.with, { "fetch-depth": 0, "persist-credentials": false });
-  assert.equal(exceptionStep.id, "picomatch_exception");
-  assert.equal(exceptionStep.if, exceptionScope);
-  assert.match(exceptionStep.run, /git diff --quiet "\$reviewed" HEAD --/u);
-  assert.match(exceptionStep.run, /await picomatchDependencyReviewAllowance\(\)/u);
+  assert.equal(dependencySteps.length, 1);
+  const [dependencyReview] = dependencySteps;
   assert.equal(
     isPinnedGitHubActionReference(
       dependencyReview.uses,
@@ -1033,7 +1020,6 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.deepEqual(dependencyReview.with, {
     "fail-on-severity": "moderate",
     "fail-on-scopes": "runtime, development",
-    "allow-ghsas": "${{ steps.picomatch_exception.outputs.advisory }}",
   });
 }
 
@@ -5395,7 +5381,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     contributing,
-    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*recurring Calendly browser proof.*separate private exact-revision provider receipt certifies.*protected-staging.*confirmation.*cancellation.*cleanup/isu,
+    /\]\(docs\/architecture\/capability-model\.md#current-environment-generation\)/u,
+  );
+  assert.match(
+    contributing,
+    /\[historical Calendly record\]\(docs\/architecture\/capability-model\.md#executable-calendly-boundary\)[^\n]*protected-staging[^\n]*confirmation[^\n]*cancellation[^\n]*cleanup[^\n]*`booking-calendly@0\.1\.0`/iu,
   );
   assert.match(
     packageOwnership,

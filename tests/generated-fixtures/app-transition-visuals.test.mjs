@@ -16,11 +16,11 @@ import { createSyntheticAppTransitionAdmission } from "../helpers/synthetic-app-
 
 const producer = new URL("../../scripts/verify-app-transition-visuals.mjs", import.meta.url);
 
-for (const auditPath of ["scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"])
+for (const auditPath of ["scripts/lib/dependency-audit.mjs", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"])
 test(`changing ${auditPath} invalidates visual candidates and promotion`, async t => {
   const h = await harness(t);
   const execute = promisify(execFile);
-  for (const path of ["scripts/lib/dependency-audit.mjs", "scripts/dependency-audit-exception.json", "packages/builder-core/dist/index.js", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"]) {
+  for (const path of ["scripts/lib/dependency-audit.mjs", "packages/builder-core/dist/index.js", "packages/builder-core/src/lifecycle/app-transition-visual-admission.cjs"]) {
     await mkdir(dirname(join(h.root, path)), { recursive: true });
     await writeFile(join(h.root, path), "original reviewed content");
   }
@@ -450,7 +450,7 @@ test("visual prerequisites retain raw and threshold audit results and reject inc
   const cases = [
     { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 0 }, accepted: true },
     { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 0 }, accepted: true },
-    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1 }, accepted: true },
+    { disposition: { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false },
     { disposition: { status: "passed", rawExitCode: 0 }, accepted: false },
     { disposition: { status: "passed", rawExitCode: 0, thresholdExitCode: 1 }, accepted: false },
     { disposition: { status: "passed", rawExitCode: 1, thresholdExitCode: 1 }, accepted: false },

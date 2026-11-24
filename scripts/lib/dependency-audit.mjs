@@ -2,15 +2,71 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { lstat, mkdir, mkdtemp, open, readFile, realpath, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
 import { isolatedProcessOptions, pathIdentityMatches, readPathIdentity } from "./isolated-process.mjs";
 
 const execute = promisify(execFile);
-const policyUrl = new URL("../dependency-audit-exception.json", import.meta.url);
 const artifactRoot = fileURLToPath(new URL("../../generated-visual-artifacts/dependency-audit/", import.meta.url));
+const knownGraphs = [
+  {
+    "id": "portfolio",
+    "lockSha256": "e46a83d2b2fcd45b1368965cc02694cd60d1d9000283341e884287a9df4f3597",
+    "workspacePolicySha256": "a91e1b66e04605fff44dc168eddd60cab2027adf6218ef89e29fbde892b022da",
+    "dependencyCounts": {
+      "dependencies": 321,
+      "devDependencies": 453,
+      "optionalDependencies": 180,
+      "totalDependencies": 876
+    }
+  },
+  {
+    "id": "site",
+    "lockSha256": "041c4684a58db5b9e12753ce9f132fd02623cd0d8c87fc6d9a27b9d18a35a6ae",
+    "workspacePolicySha256": "25f93c3fceeaa13d129748db36f171706ee5ceef5c55a1e529ffcff762057c6b",
+    "dependencyCounts": {
+      "dependencies": 321,
+      "devDependencies": 453,
+      "optionalDependencies": 180,
+      "totalDependencies": 876
+    }
+  },
+  {
+    "id": "app",
+    "lockSha256": "17988722d44ecb809a7d73d7eb553b33f422596f7089ab9ee04900242260c10f",
+    "workspacePolicySha256": "559a5acf71f6950c2ca20e759c54b04f93afb80c3f5a03a6448ad0f73c3dff1d",
+    "dependencyCounts": {
+      "dependencies": 325,
+      "devDependencies": 453,
+      "optionalDependencies": 188,
+      "totalDependencies": 888
+    }
+  },
+  {
+    "id": "portfolio-email",
+    "lockSha256": "526c473aa0bac20c39435216ceac88b6daca911367ac16a9a13dd1ad53fc3070",
+    "workspacePolicySha256": "5e0c092b271e3322a583c6a9ce037e8f6943c9719e0658ce8bb8e7bae10d4984",
+    "dependencyCounts": {
+      "dependencies": 325,
+      "devDependencies": 453,
+      "optionalDependencies": 188,
+      "totalDependencies": 888
+    }
+  },
+  {
+    "id": "app-persistence",
+    "lockSha256": "e70b7ad107c93d245c32f9f2c7f8424fd1c4a35a2c146679c55f30cc0c977830",
+    "workspacePolicySha256": "bce2f25a339e28fdc6ec7d248318ff2b1273a338e23134d760bc67852f23180d",
+    "dependencyCounts": {
+      "dependencies": 326,
+      "devDependencies": 485,
+      "optionalDependencies": 213,
+      "totalDependencies": 921
+    }
+  }
+];
 const severities = ["info", "low", "moderate", "high", "critical"];
 const dependencyCounts = ["dependencies", "devDependencies", "optionalDependencies", "totalDependencies"];
 const auditArguments = Object.freeze(["audit", "--audit-level", "info", "--json"]);
@@ -23,7 +79,7 @@ const same = (left, right) => JSON.stringify(canonical(left)) === JSON.stringify
 const parse = bytes => JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
 function refuse(code = "DEPENDENCY_AUDIT_FAILED") { throw new Error(code); }
 
-function inspectReport(result, graph, policy) {
+function inspectReport(result, graph) {
   if (result.operationalError || result.signal || result.killed || ![0, 1].includes(result.exitCode) || result.stderr.length) refuse();
   const report = parse(result.stdout);
   if (!object(report) || !same(Object.keys(report).sort(), ["advisories", "metadata"]) || !object(report.advisories) || !object(report.metadata)) refuse();
@@ -48,26 +104,14 @@ function inspectReport(result, graph, policy) {
     }
   }
   if (!same(counts, metadata.vulnerabilities)) refuse();
-  const thresholdFailure = counts.moderate + counts.high + counts.critical > 0;
   if (result.exitCode !== (advisories.length ? 1 : 0)) refuse();
   if (graph && !same(Object.fromEntries(dependencyCounts.map(key => [key, metadata[key]])), graph.dependencyCounts)) refuse();
-  if (!thresholdFailure) return { status: "passed", thresholdExitCode: 0 };
-  if (!graph || advisories.length !== 1) refuse();
-  const advisory = advisories[0][1];
-  if (advisory.github_advisory_id === "GHSA-fc5q-39xc-vjpf") {
-    const reviewed = policy.picomatch;
-    const findings = advisory.findings.map(finding => ({ ...finding, paths: [...finding.paths].sort() }));
-    if (advisory.module_name !== "picomatch" || advisory.severity !== "high" ||
-        advisory.vulnerable_versions !== "<=4.0.7" || advisory.patched_versions != null ||
-        !reviewed?.graphs.some(entry => same(entry, graph)) ||
-        findings.some(finding => finding.version !== "4.0.7" || !finding.dev || finding.optional || finding.bundled) ||
-        hash(JSON.stringify(canonical(findings))) !== reviewed.findingsSha256) refuse();
-    return { status: "exception-required", thresholdExitCode: 1, picomatch: true };
-  }
-  if (advisory.github_advisory_id !== "GHSA-vfj7-8cjw-p6xm" || advisory.module_name !== "braces" || advisory.severity !== "high" ||
-      advisory.vulnerable_versions !== "<=3.0.3" || !same(advisory.findings, graph.advisoryFindings) ||
-      advisory.findings.some(finding => finding.version !== "3.0.3")) refuse();
-  return { status: "exception-required", thresholdExitCode: 1 };
+  if (counts.moderate + counts.high + counts.critical > 0) refuse();
+}
+
+export function isPassingDependencyAudit(disposition) {
+  return disposition?.status === "passed" &&
+    disposition.thresholdExitCode === 0 && [0, 1].includes(disposition.rawExitCode);
 }
 
 function inside(root, path) {
@@ -90,36 +134,13 @@ async function readBounded(root, path) {
   } finally { await handle.close(); }
 }
 
-export async function inspectDependencyAuditInputs(cwd, policy) {
+export async function inspectDependencyAuditInputs(cwd) {
   const root = await realpath(cwd);
   const lock = hash(await readBounded(root, join(root, "pnpm-lock.yaml")));
   const workspace = hash(await readBounded(root, join(root, "pnpm-workspace.yaml")));
-  const matches = entry => entry.lockSha256 === lock && entry.workspacePolicySha256 === workspace;
-  const legacyGraph = policy.graphs.find(matches);
-  const graph = legacyGraph ?? policy.picomatch?.graphs.find(matches) ?? null;
-  const files = { lock, workspace };
-  if (legacyGraph) {
-    files.configuration = hash(await readBounded(root, join(root, graph.eslintConfigPath)));
-    if (files.configuration !== graph.eslintConfigSha256) refuse("DEPENDENCY_AUDIT_INPUT_CHANGED");
-    const consumer = dirname(join(root, graph.eslintConfigPath));
-    const configuration = await realpath(join(consumer, "node_modules/eslint-config-next"));
-    const plugin = await realpath(join(dirname(configuration), "@next/eslint-plugin-next"));
-    const glob = await realpath(join(dirname(dirname(plugin)), "fast-glob"));
-    const micromatch = await realpath(join(dirname(glob), "micromatch"));
-    const braces = await realpath(join(dirname(micromatch), "braces"));
-    const packages = { "eslint-config-next": configuration, "@next/eslint-plugin-next": plugin, "fast-glob": glob, micromatch, braces };
-    for (const expected of graph.callerFiles) {
-      const bytes = await readBounded(root, join(packages[expected.package], expected.member));
-      const digest = hash(bytes);
-      if (digest !== expected.sha256 || bytes.length !== expected.bytes) refuse("DEPENDENCY_AUDIT_INPUT_CHANGED");
-      if (expected.member === "package.json") {
-        const manifest = parse(bytes);
-        if (manifest.name !== expected.package || manifest.version !== expected.version) refuse("DEPENDENCY_AUDIT_INPUT_CHANGED");
-      }
-      files[`${expected.package}/${expected.member}`] = digest;
-    }
-  }
-  return { graph, fingerprint: hash(JSON.stringify(canonical(files))) };
+  const graph = knownGraphs.find(entry =>
+    entry.lockSha256 === lock && entry.workspacePolicySha256 === workspace) ?? null;
+  return { graph, fingerprint: hash(JSON.stringify(canonical({ lock, workspace }))) };
 }
 
 async function runProcess(input) {
@@ -134,126 +155,9 @@ async function runProcess(input) {
   }
 }
 
-async function fetchBytes(url) {
-  const address = new URL(url);
-  if (address.protocol !== "https:" || address.username || address.password || !["registry.npmjs.org", "raw.githubusercontent.com"].includes(address.hostname)) refuse();
-  const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(30_000), headers: { Accept: "application/json" } });
-  if (!response.ok || !response.body) refuse();
-  const chunks = [];
-  let size = 0;
-  for await (const chunk of response.body) {
-    size += chunk.length;
-    if (size > 16 * 1024 * 1024) refuse();
-    chunks.push(chunk);
-  }
-  return Buffer.concat(chunks);
-}
-
-function requireActivePolicy(policy, now) {
-  if (policy.status !== "active" || policy.advisory !== "GHSA-vfj7-8cjw-p6xm" || policy.package !== "braces" || policy.version !== "3.0.3" ||
-      policy.pnpmVersion !== "11.20.0" || !Number.isFinite(now) || !Number.isFinite(Date.parse(policy.expiresAt)) || now >= Date.parse(policy.expiresAt)) refuse();
-}
-
-function requireActivePicomatchException(exception, now) {
-  const approved = Date.parse(exception?.approvedAt);
-  const expires = Date.parse(exception?.expiresAt);
-  if (exception?.status !== "active" || exception.advisory !== "GHSA-fc5q-39xc-vjpf" ||
-      exception.package !== "picomatch" || exception.version !== "4.0.7" ||
-      !Number.isFinite(now) || !Number.isFinite(approved) || !Number.isFinite(expires) ||
-      now < approved || now >= expires || expires - approved > 72 * 60 * 60 * 1000) refuse();
-}
-
-async function checkPicomatchFixAvailability(fetchRegistry, observations) {
-  const url = "https://registry.npmjs.org/picomatch";
-  const bytes = await fetchRegistry(url);
-  const metadata = parse(bytes);
-  observations.push({ url, sha256: hash(bytes), bytes: bytes.length, latest: metadata["dist-tags"]?.latest });
-  if (metadata.name !== "picomatch" || metadata["dist-tags"]?.latest !== "4.0.7" ||
-      !object(metadata.versions) || !Object.hasOwn(metadata.versions, "4.0.7")) refuse();
-  for (const version of Object.keys(metadata.versions)) {
-    if (!/^\d+\.\d+\.\d+$/.test(version)) continue;
-    const [major, minor, patch] = version.split(".").map(Number);
-    if (major > 4 || (major === 4 && (minor > 0 || patch > 7))) refuse();
-  }
-}
-
-// The GitHub dependency review input accepts only advisory IDs. CI binds this
-// value to the reviewed pull request and unchanged dependency inputs.
-export async function picomatchDependencyReviewAllowance() {
-  try {
-    const bytes = await readFile(policyUrl);
-    const exception = parse(bytes).picomatch;
-    const host = { isHosted: () => process.env.GITHUB_ACTIONS === "true", fetchBytes };
-    requireActivePicomatchException(exception, Date.now());
-    const observations = [];
-    await checkCurrentPicomatchPolicy(bytes, host, observations);
-    await checkPicomatchFixAvailability(fetchBytes, observations);
-    requireActivePicomatchException(exception, Date.now());
-    if (!(await readFile(policyUrl)).equals(bytes)) return "";
-    return exception.advisory;
-  } catch {
-    return "";
-  }
-}
-
-async function checkCurrentPolicy(policy, bytes, adapters, observations) {
-  if (!adapters.isHosted()) return;
-  const active = policy.hostedActivePolicy;
-  if (active.repository !== "Egeria-Systems/egeria-scaffold" || active.ref !== "application-environment-configuration" || active.path !== "scripts/dependency-audit-exception.json") refuse();
-  const url = `https://raw.githubusercontent.com/${active.repository}/${active.ref}/${active.path}`;
-  const current = await adapters.fetchBytes(url);
-  observations.push({ url, sha256: hash(current), bytes: current.length });
-  if (!Buffer.from(current).equals(bytes)) refuse();
-}
-
-async function checkCurrentPicomatchPolicy(bytes, adapters, observations) {
-  if (!adapters.isHosted()) return;
-  if (process.env.GITHUB_REPOSITORY !== "Egeria-Systems/egeria-scaffold") refuse();
-  const ref = process.env.GITHUB_REF === "refs/pull/177/merge"
-    ? "repair/capability-reliability-latest-main"
-    : "main";
-  const url = `https://raw.githubusercontent.com/Egeria-Systems/egeria-scaffold/${ref}/scripts/dependency-audit-exception.json`;
-  const current = await adapters.fetchBytes(url);
-  observations.push({ url, sha256: hash(current), bytes: current.length });
-  if (!Buffer.from(current).equals(bytes)) refuse();
-}
-
-async function checkFixAvailability(policy, adapters, observations) {
-  const baseline = Date.parse(policy.fixObservation.observedAt);
-  if (!Number.isFinite(baseline) || policy.fixObservation.packages.length !== 5) refuse();
-  const names = ["eslint-config-next", "@next/eslint-plugin-next", "fast-glob", "micromatch", "braces"];
-  if (!same(policy.fixObservation.packages.map(entry => entry.name).sort(), names.sort())) refuse();
-  for (const expected of policy.fixObservation.packages) {
-    const address = new URL(expected.url);
-    if (address.origin !== "https://registry.npmjs.org" || decodeURIComponent(address.pathname.slice(1)) !== expected.name || address.search || address.hash) refuse();
-    const bytes = await adapters.fetchBytes(expected.url);
-    const observation = { url: expected.url, sha256: hash(bytes), bytes: bytes.length };
-    observations.push(observation);
-    const metadata = parse(bytes);
-    if (metadata.name !== expected.name || !object(metadata.versions) || !object(metadata.time) || !object(metadata["dist-tags"]) || metadata["dist-tags"].latest !== expected.latest) refuse();
-    for (const version of expected.knownVersions) {
-      const current = metadata.versions[version.version];
-      if (!object(current) || current.name !== expected.name || current.version !== version.version || !same(current.dependencies, version.dependencies) || metadata.time[version.version] !== version.publishedAt) refuse();
-    }
-    const stable = Object.keys(metadata.versions).filter(version => /^\d+\.\d+\.\d+$/.test(version));
-    if (!stable.length || !stable.includes(expected.latest)) refuse();
-    observation.latest = metadata["dist-tags"].latest;
-    observation.stablePublications = Object.fromEntries(stable.sort().map(version => [version, metadata.time[version]]));
-    observation.selectedDependencies = Object.fromEntries(expected.knownVersions.map(version => [version.version, metadata.versions[version.version].dependencies]));
-    for (const version of stable) {
-      const published = Date.parse(metadata.time[version]);
-      if (typeof metadata.time[version] !== "string" || !/^\d{4}-\d{2}-\d{2}T/.test(metadata.time[version]) || !Number.isFinite(published) || published > baseline) refuse();
-      if (expected.name === "braces") {
-        const [major, minor, patch] = version.split(".").map(Number);
-        if (major > 3 || (major === 3 && (minor > 0 || patch > 3))) refuse();
-      }
-    }
-  }
-}
-
 // This helper is internal verification machinery. Certification entry points do not call it.
 export async function runDependencyAudit(input, injected = {}) {
-  const defaults = { now: Date.now, readPolicy: () => readFile(policyUrl), isHosted: () => process.env.GITHUB_ACTIONS === "true", inspectInputs: inspectDependencyAuditInputs, fetchBytes, runProcess };
+  const defaults = { now: Date.now, inspectInputs: inspectDependencyAuditInputs, runProcess };
   if (Object.keys(injected).length && Object.keys(defaults).some(key => typeof injected[key] !== "function")) refuse("DEPENDENCY_AUDIT_ADAPTER_INVALID");
   const adapters = Object.keys(injected).length ? injected : defaults;
   const destination = resolve(input.artifactRoot ?? artifactRoot);
@@ -267,16 +171,11 @@ export async function runDependencyAudit(input, injected = {}) {
     await writeFile(join(directory, name), content, { flag: "wx", mode: 0o600 });
     if (!(await pathIdentityMatches(identity))) refuse();
   };
-  const observations = [];
   const startedAt = adapters.now();
   let result;
   let graph;
-  let policySha256;
   try {
-    const policyBytes = Buffer.from(await adapters.readPolicy());
-    policySha256 = hash(policyBytes);
-    const policy = parse(policyBytes);
-    const before = await adapters.inspectInputs(input.cwd, policy);
+    const before = await adapters.inspectInputs(input.cwd);
     graph = before.graph;
     result = await adapters.runProcess({ executable: input.executable, arguments: [...auditArguments], cwd: input.cwd, environment: input.environment, timeout: input.timeout });
     if (!result || !(result.stdout instanceof Uint8Array) || !(result.stderr instanceof Uint8Array)) refuse();
@@ -285,35 +184,14 @@ export async function runDependencyAudit(input, injected = {}) {
     await save("process.json", JSON.stringify({ executable: input.executable, arguments: auditArguments, graph: graph?.id ?? null, startedAt,
       completedAt: adapters.now(), exitCode: result.exitCode, signal: result.signal ?? null, killed: result.killed === true, operationalError: result.operationalError === true,
       stdoutSha256: hash(result.stdout), stderrSha256: hash(result.stderr) }, null, 2));
-    const assessment = inspectReport(result, graph, policy);
-    const exception = assessment.picomatch ? policy.picomatch : policy;
-    const requireActive = assessment.picomatch ? requireActivePicomatchException : requireActivePolicy;
-    let status = assessment.status;
-    if (status === "exception-required") {
-      requireActive(exception, startedAt);
-      if (assessment.picomatch) {
-        await checkCurrentPicomatchPolicy(policyBytes, adapters, observations);
-        await checkPicomatchFixAvailability(adapters.fetchBytes, observations);
-      } else {
-        await checkCurrentPolicy(policy, policyBytes, adapters, observations);
-        await checkFixAvailability(policy, adapters, observations);
-      }
-      if (!Buffer.from(await adapters.readPolicy()).equals(policyBytes)) refuse();
-      if (assessment.picomatch) await checkCurrentPicomatchPolicy(policyBytes, adapters, observations);
-      else await checkCurrentPolicy(policy, policyBytes, adapters, observations);
-      requireActive(exception, adapters.now());
-      status = "accepted-with-security-exception";
-    }
-    const after = await adapters.inspectInputs(input.cwd, policy);
+    inspectReport(result, graph);
+    const after = await adapters.inspectInputs(input.cwd);
     if (after.fingerprint !== before.fingerprint) refuse();
-    if (status === "accepted-with-security-exception") requireActive(exception, adapters.now());
-    const disposition = { status, rawExitCode: result.exitCode, thresholdExitCode: assessment.thresholdExitCode, graph: graph?.id ?? null, policySha256,
-      ...(status === "accepted-with-security-exception" ? { advisory: exception.advisory, expiresAt: exception.expiresAt } : {}) };
-    await save("metadata-observations.json", JSON.stringify(observations, null, 2));
+    const disposition = { status: "passed", rawExitCode: result.exitCode, thresholdExitCode: 0, graph: graph?.id ?? null };
     await save("disposition.json", JSON.stringify(disposition, null, 2));
     return { ...disposition, artifactDirectory: artifactIdentifier };
   } catch {
-    await save("failure.json", JSON.stringify({ status: "refused", rawExitCode: result?.exitCode ?? null, graph: graph?.id ?? null, policySha256, observations }, null, 2));
+    await save("failure.json", JSON.stringify({ status: "refused", rawExitCode: result?.exitCode ?? null, graph: graph?.id ?? null }, null, 2));
     const error = new Error("DEPENDENCY_AUDIT_FAILED");
     error.auditDisposition = { status: "refused", rawExitCode: result?.exitCode ?? null, artifactDirectory: artifactIdentifier };
     throw error;

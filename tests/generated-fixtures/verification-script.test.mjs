@@ -294,7 +294,7 @@ test("fixed verification detects a changed top-level witness inventory on exit",
   }, { includeVisual: false, fromFixture: generatedFixtureContracts.at(-1).identifier }, isolatedRoot), "FIXTURE_SOURCE_CHANGED");
 });
 
-test("the admitted skeleton audit exception never reaches strict single-project certification verification", async t => {
+test("fixed and single-project verification reject a blocking dependency audit", async t => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-audit-boundary-"));
   t.after(() => rm(parent, { recursive: true, force: true }));
   let admittedAudits = 0;
@@ -306,12 +306,10 @@ test("the admitted skeleton audit exception never reaches strict single-project 
       return { status: "accepted-with-security-exception", rawExitCode: 1, thresholdExitCode: 1, advisory: "GHSA-vfj7-8cjw-p6xm" };
     },
   };
-  const result = await verifyGeneratedSkeletonsForTesting(adapters);
-  assert.equal(admittedAudits, generatedFixtureContracts.length);
-  assert.equal(result.auditDispositions.length, generatedFixtureContracts.length);
-  assert.equal(result.auditDispositions.every(receipt => receipt.rawExitCode === 1), true);
-  assert.equal(result.auditDispositions.every(receipt => receipt.thresholdExitCode === 1), true);
-  assert.equal(result.status, "completed-with-security-exception");
+  await expectFixtureError(() => verifyGeneratedSkeletonsForTesting(adapters,
+    { includeVisual: false, fromFixture: generatedFixtureContracts.at(-1).identifier }),
+  "DEPENDENCY_AUDIT_FAILED");
+  assert.equal(admittedAudits, 1);
   const commands = [];
   await withCurrentGeneratedFixture("portfolio", root => expectFixtureError(() => verifyGeneratedProject(root, "portfolio", {
     ...adapters,
