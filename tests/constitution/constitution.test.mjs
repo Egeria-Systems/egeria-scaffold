@@ -5385,7 +5385,11 @@ test("generated fixture enforcement is wired through its canonical owners", asyn
   );
   assert.match(
     contributing,
-    /The executable builder currently has seven capability descriptors.*retains exact `portfolio`, `portfolio-calendly`, and `site` fixtures.*all three fixtures are certified locally.*recurring Calendly browser proof.*separate private exact-revision provider receipt certifies.*protected-staging.*confirmation.*cancellation.*cleanup/isu,
+    /\]\(docs\/architecture\/capability-model\.md#current-environment-generation\)/u,
+  );
+  assert.match(
+    contributing,
+    /\[historical Calendly record\]\(docs\/architecture\/capability-model\.md#executable-calendly-boundary\)[^\n]*protected-staging[^\n]*confirmation[^\n]*cancellation[^\n]*cleanup[^\n]*`booking-calendly@0\.1\.0`/iu,
   );
   assert.match(
     packageOwnership,
