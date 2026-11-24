@@ -1,171 +1,18 @@
 import { constants, type BigIntStats } from "node:fs";
 import { lstat, open, rename, unlink } from "node:fs/promises";
 
+import {
+  fileOperationRequestSchema,
+  parseFileOperationResult,
+  serializeFileIdentity,
+  type FileOperationRequest,
+  type FileOperationResult,
+  type SerializedFileIdentity,
+} from "./capability-removal-file-operation-protocol.js";
+
 const maximumRequestBytes = 2 * 1024 * 1024;
 
-type SerializedIdentity = Readonly<{
-  device: string;
-  inode: string;
-  mode: number;
-  size: string;
-  changeTime: string;
-  modificationTime: string;
-}>;
-
-type OperationRequest = Readonly<{
-  parent: Readonly<{ device: string; inode: string }>;
-  operation:
-    | Readonly<{
-        kind: "create";
-        name: string;
-        mode: number;
-        content: string;
-      }>
-    | Readonly<{
-        kind: "remove";
-        name: string;
-        identity: SerializedIdentity;
-      }>
-    | Readonly<{
-        kind: "replace";
-        targetName: string;
-        targetIdentity: SerializedIdentity;
-        expected: string;
-        temporaryName: string;
-        temporaryIdentity: SerializedIdentity;
-      }>
-    | Readonly<{
-        kind: "delete";
-        targetName: string;
-        targetIdentity: SerializedIdentity;
-        expected: string;
-      }>;
-}>;
-
-type OperationResult =
-  | Readonly<{ ok: true; identity?: SerializedIdentity }>
-  | Readonly<{ ok: false; sourceChanged: boolean }>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function parseDecimal(value: unknown): string {
-  if (typeof value !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(value)) {
-    throw new TypeError("invalid-decimal");
-  }
-  return value;
-}
-
-function parseMode(value: unknown): number {
-  if (
-    typeof value !== "number" ||
-    !Number.isInteger(value) ||
-    value < 0 ||
-    value > 0o777
-  ) {
-    throw new TypeError("invalid-mode");
-  }
-  return value;
-}
-
-function parseName(value: unknown): string {
-  if (
-    typeof value !== "string" ||
-    value.length === 0 ||
-    value === "." ||
-    value === ".." ||
-    value.includes("/") ||
-    value.includes("\\") ||
-    value.includes("\0")
-  ) {
-    throw new TypeError("invalid-name");
-  }
-  return value;
-}
-
-function parseBytes(value: unknown): string {
-  if (typeof value !== "string") {
-    throw new TypeError("invalid-bytes");
-  }
-  const bytes = Buffer.from(value, "base64");
-  if (bytes.toString("base64") !== value) {
-    throw new TypeError("invalid-bytes");
-  }
-  return value;
-}
-
-function parseIdentity(value: unknown): SerializedIdentity {
-  if (!isRecord(value)) {
-    throw new TypeError("invalid-identity");
-  }
-  return {
-    device: parseDecimal(value.device),
-    inode: parseDecimal(value.inode),
-    mode: parseMode(value.mode),
-    size: parseDecimal(value.size),
-    changeTime: parseDecimal(value.changeTime),
-    modificationTime: parseDecimal(value.modificationTime),
-  };
-}
-
-function parseRequest(value: unknown): OperationRequest {
-  if (!isRecord(value) || !isRecord(value.parent) || !isRecord(value.operation)) {
-    throw new TypeError("invalid-request");
-  }
-  const parent = {
-    device: parseDecimal(value.parent.device),
-    inode: parseDecimal(value.parent.inode),
-  };
-  const operation = value.operation;
-  switch (operation.kind) {
-    case "create":
-      return {
-        parent,
-        operation: {
-          kind: "create",
-          name: parseName(operation.name),
-          mode: parseMode(operation.mode),
-          content: parseBytes(operation.content),
-        },
-      };
-    case "remove":
-      return {
-        parent,
-        operation: {
-          kind: "remove",
-          name: parseName(operation.name),
-          identity: parseIdentity(operation.identity),
-        },
-      };
-    case "replace":
-      return {
-        parent,
-        operation: {
-          kind: "replace",
-          targetName: parseName(operation.targetName),
-          targetIdentity: parseIdentity(operation.targetIdentity),
-          expected: parseBytes(operation.expected),
-          temporaryName: parseName(operation.temporaryName),
-          temporaryIdentity: parseIdentity(operation.temporaryIdentity),
-        },
-      };
-    case "delete":
-      return {
-        parent,
-        operation: {
-          kind: "delete",
-          targetName: parseName(operation.targetName),
-          targetIdentity: parseIdentity(operation.targetIdentity),
-          expected: parseBytes(operation.expected),
-        },
-      };
-    default:
-      throw new TypeError("invalid-operation");
-  }
-}
-
-async function readRequest(): Promise<OperationRequest> {
+async function readRequest(): Promise<FileOperationRequest> {
   const chunks: Uint8Array[] = [];
   let totalBytes = 0;
   for await (const chunk of process.stdin as AsyncIterable<Uint8Array>) {
@@ -176,23 +23,25 @@ async function readRequest(): Promise<OperationRequest> {
     }
     chunks.push(bytes);
   }
-  return parseRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+  return fileOperationRequestSchema.parse(
+    JSON.parse(Buffer.concat(chunks).toString("utf8")),
+  );
 }
 
-function serializeIdentity(stats: BigIntStats): SerializedIdentity {
-  return {
-    device: stats.dev.toString(),
-    inode: stats.ino.toString(),
+function serializeIdentity(stats: BigIntStats): SerializedFileIdentity {
+  return serializeFileIdentity({
+    device: stats.dev,
+    inode: stats.ino,
     mode: Number(stats.mode & 0o777n),
-    size: stats.size.toString(),
-    changeTime: stats.ctimeNs.toString(),
-    modificationTime: stats.mtimeNs.toString(),
-  };
+    size: stats.size,
+    changeTime: stats.ctimeNs,
+    modificationTime: stats.mtimeNs,
+  });
 }
 
 function identityMatches(
   stats: BigIntStats,
-  identity: SerializedIdentity,
+  identity: SerializedFileIdentity,
 ): boolean {
   return (
     !stats.isSymbolicLink() &&
@@ -207,7 +56,7 @@ function identityMatches(
 }
 
 async function parentMatches(
-  parent: OperationRequest["parent"],
+  parent: FileOperationRequest["parent"],
 ): Promise<boolean> {
   try {
     const stats = await lstat(".", { bigint: true });
@@ -224,7 +73,7 @@ async function parentMatches(
 
 async function fileMatches(
   name: string,
-  identity: SerializedIdentity,
+  identity: SerializedFileIdentity,
   expected?: string,
 ): Promise<boolean> {
   let handle;
@@ -245,8 +94,8 @@ async function fileMatches(
 }
 
 async function createFile(
-  operation: Extract<OperationRequest["operation"], { kind: "create" }>,
-): Promise<OperationResult> {
+  operation: Extract<FileOperationRequest["operation"], { kind: "create" }>,
+): Promise<FileOperationResult> {
   let handle;
   let created = false;
   try {
@@ -272,7 +121,9 @@ async function createFile(
   }
 }
 
-async function runOperation(request: OperationRequest): Promise<OperationResult> {
+async function runOperation(
+  request: FileOperationRequest,
+): Promise<FileOperationResult> {
   if (!(await parentMatches(request.parent))) {
     return { ok: false, sourceChanged: false };
   }
@@ -338,7 +189,11 @@ async function runOperation(request: OperationRequest): Promise<OperationResult>
   }
 }
 
-const result = await readRequest()
-  .then(runOperation)
-  .catch((): OperationResult => ({ ok: false, sourceChanged: false }));
+const request = await readRequest().catch(() => undefined);
+const result: FileOperationResult = request === undefined
+  ? { ok: false, sourceChanged: false }
+  : parseFileOperationResult(
+      request.operation.kind,
+      await runOperation(request).catch(() => undefined),
+    ) ?? { ok: false, sourceChanged: true };
 process.stdout.write(JSON.stringify(result));

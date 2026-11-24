@@ -1,11 +1,20 @@
 import { randomUUID } from "node:crypto";
-import { spawn } from "node:child_process";
+import { execFile } from "node:child_process";
 import { constants, lstatSync } from "node:fs";
 import { lstat, open } from "node:fs/promises";
 import { basename, dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import { safeRelativePathSchema } from "../contracts/identifiers.js";
+import {
+  fileOperationRequestSchema,
+  parseFileOperationResult,
+  serializeFileIdentity,
+  type FileOperation,
+  type FileOperationResult,
+  type SerializedFileIdentity,
+} from "./capability-removal-file-operation-protocol.js";
 
 export type CapabilityRemovalFileChange =
   | Readonly<{
@@ -56,50 +65,11 @@ type CapabilityRemovalWriterHooks = Readonly<{
   beforeMutation?: (path: string) => Promise<unknown>;
 }>;
 
-type SerializedFileIdentity = Readonly<{
-  device: string;
-  inode: string;
-  mode: number;
-  size: string;
-  changeTime: string;
-  modificationTime: string;
-}>;
-
-type FileOperation =
-  | Readonly<{
-      kind: "create";
-      name: string;
-      mode: number;
-      content: string;
-    }>
-  | Readonly<{
-      kind: "remove";
-      name: string;
-      identity: SerializedFileIdentity;
-    }>
-  | Readonly<{
-      kind: "replace";
-      targetName: string;
-      targetIdentity: SerializedFileIdentity;
-      expected: string;
-      temporaryName: string;
-      temporaryIdentity: SerializedFileIdentity;
-    }>
-  | Readonly<{
-      kind: "delete";
-      targetName: string;
-      targetIdentity: SerializedFileIdentity;
-      expected: string;
-    }>;
-
-type FileOperationResult =
-  | Readonly<{ ok: true; identity?: SerializedFileIdentity }>
-  | Readonly<{ ok: false; sourceChanged: boolean }>;
-
 const fileOperationPath = fileURLToPath(
   new URL("./capability-removal-file-operation.js", import.meta.url),
 );
 const maximumOperationOutputBytes = 4 * 1024;
+const execFileAsync = promisify(execFile);
 
 function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
   return (
@@ -221,54 +191,18 @@ function samePathIdentity(left: PathIdentity, right: PathIdentity): boolean {
   return left.device === right.device && left.inode === right.inode;
 }
 
-function serializeFileIdentity(
-  identity: FileIdentity,
-): SerializedFileIdentity {
-  return {
-    device: identity.device.toString(),
-    inode: identity.inode.toString(),
-    mode: identity.mode,
-    size: identity.size.toString(),
-    changeTime: identity.changeTime.toString(),
-    modificationTime: identity.modificationTime.toString(),
-  };
-}
-
 function parseSerializedIdentity(
-  value: unknown,
+  value: SerializedFileIdentity,
   path: string,
-): FileIdentity | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return undefined;
-  }
-  const identity = value as Record<string, unknown>;
-  const decimals = [
-    identity.device,
-    identity.inode,
-    identity.size,
-    identity.changeTime,
-    identity.modificationTime,
-  ];
-  if (
-    decimals.some(
-      (part) =>
-        typeof part !== "string" || !/^(?:0|[1-9][0-9]*)$/u.test(part),
-    ) ||
-    typeof identity.mode !== "number" ||
-    !Number.isInteger(identity.mode) ||
-    identity.mode < 0 ||
-    identity.mode > 0o777
-  ) {
-    return undefined;
-  }
+): FileIdentity {
   return {
     path,
-    device: BigInt(identity.device as string),
-    inode: BigInt(identity.inode as string),
-    mode: identity.mode,
-    size: BigInt(identity.size as string),
-    changeTime: BigInt(identity.changeTime as string),
-    modificationTime: BigInt(identity.modificationTime as string),
+    device: BigInt(value.device),
+    inode: BigInt(value.inode),
+    mode: value.mode,
+    size: BigInt(value.size),
+    changeTime: BigInt(value.changeTime),
+    modificationTime: BigInt(value.modificationTime),
   };
 }
 
@@ -276,96 +210,41 @@ async function runFileOperation(
   parent: PathIdentity,
   operation: FileOperation,
 ): Promise<FileOperationResult> {
-  return new Promise((resolveOperation) => {
-    let settled = false;
-    let outputBytes = 0;
-    let outputExceeded = false;
-    const output: Buffer[] = [];
-    const child = spawn(process.execPath, [fileOperationPath], {
+  let childSpawned = false;
+  let result: FileOperationResult | undefined;
+  try {
+    const request = fileOperationRequestSchema.parse({
+      parent: {
+        device: parent.device.toString(),
+        inode: parent.inode.toString(),
+      },
+      operation,
+    });
+    const message = JSON.stringify(request);
+    const execution = execFileAsync(process.execPath, [fileOperationPath], {
       cwd: parent.path,
       env: {},
-      stdio: ["pipe", "pipe", "ignore"],
+      encoding: "buffer",
+      maxBuffer: maximumOperationOutputBytes,
+      shell: false,
+      timeout: 5_000,
       windowsHide: true,
     });
-    const finish = (result: FileOperationResult): void => {
-      if (!settled) {
-        settled = true;
-        clearTimeout(timeout);
-        resolveOperation(result);
-      }
-    };
-    const timeout = setTimeout(() => {
-      child.kill();
-      finish({ ok: false, sourceChanged: false });
-    }, 5_000);
-    timeout.unref();
+    execution.child.once("spawn", () => {
+      childSpawned = true;
+    });
+    execution.child.stdin?.on("error", () => undefined);
+    execution.child.stdin?.end(message);
 
-    child.stdout.on("data", (chunk: Buffer) => {
-      outputBytes += chunk.length;
-      if (outputBytes > maximumOperationOutputBytes) {
-        outputExceeded = true;
-        child.kill();
-        return;
-      }
-      output.push(chunk);
-    });
-    child.once("error", () => {
-      finish({ ok: false, sourceChanged: false });
-    });
-    child.once("close", (code) => {
-      if (settled) {
-        return;
-      }
-      if (code !== 0 || outputExceeded) {
-        finish({ ok: false, sourceChanged: false });
-        return;
-      }
-      try {
-        const parsed = JSON.parse(
-          Buffer.concat(output).toString("utf8"),
-        ) as unknown;
-        if (
-          typeof parsed !== "object" ||
-          parsed === null ||
-          Array.isArray(parsed)
-        ) {
-          finish({ ok: false, sourceChanged: false });
-          return;
-        }
-        const result = parsed as Record<string, unknown>;
-        if (result.ok === true) {
-          finish(
-            result.identity === undefined
-              ? { ok: true }
-              : {
-                  ok: true,
-                  identity: result.identity as SerializedFileIdentity,
-                },
-          );
-          return;
-        }
-        finish({
-          ok: false,
-          sourceChanged:
-            result.ok === false && typeof result.sourceChanged === "boolean"
-              ? result.sourceChanged
-              : false,
-        });
-      } catch {
-        finish({ ok: false, sourceChanged: false });
-      }
-    });
-    child.stdin.on("error", () => undefined);
-    child.stdin.end(
-      JSON.stringify({
-        parent: {
-          device: parent.device.toString(),
-          inode: parent.inode.toString(),
-        },
-        operation,
-      }),
+    const { stdout } = await execution;
+    result = parseFileOperationResult(
+      operation.kind,
+      JSON.parse(stdout.toString("utf8")) as unknown,
     );
-  });
+  } catch {
+    // A helper that started may have changed files before its reply was lost.
+  }
+  return result ?? { ok: false, sourceChanged: childSpawned };
 }
 
 async function removeOwnedTemporary(
@@ -399,10 +278,11 @@ async function createTemporaryFile(
   if (!result.ok) {
     return result;
   }
+  if (!("identity" in result)) {
+    return { ok: false, sourceChanged: true };
+  }
   const identity = parseSerializedIdentity(result.identity, path);
-  return identity === undefined
-    ? { ok: false, sourceChanged: true }
-    : { ok: true, identity };
+  return { ok: true, identity };
 }
 
 async function targetStillMatches(
