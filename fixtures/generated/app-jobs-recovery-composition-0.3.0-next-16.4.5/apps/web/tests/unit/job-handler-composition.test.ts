@@ -1,6 +1,6 @@
 import { Context, Effect, Layer } from "effect";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { JobDispatcher, executeJob, validateJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
+import { JobDispatcher, runJobAttempt, validateJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
 
 const state = vi.hoisted(() => ({
   definitions: [] as JobDefinition[],
@@ -133,6 +133,7 @@ it("keeps service requirements until a layer closes the executable handle", asyn
   const layer = Layer.succeed(SelectedService, { run: Effect.sync(run) });
   const closed: JobDefinition = { ...requiring, handle: (job, context) => requiring.handle(job, context).pipe(Effect.provide(layer)) };
   expect(run).not.toHaveBeenCalled();
-  expect(await executeJob(job, [closed], 1)).toEqual({ outcome: "completed" });
+  expect(await runJobAttempt(job, job.environment, [closed], 1))
+    .toMatchObject({ kind: "executed", decision: { outcome: "completed" } });
   expect(run).toHaveBeenCalledOnce();
 });

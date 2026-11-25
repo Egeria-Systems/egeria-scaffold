@@ -72,6 +72,33 @@ async function completed(value = 1) {
   await expect.poll(async () => (await state()).values[operationId], { timeout: 80_000, interval: 50 }).toBe(value);
 }
 
+async function directDelivery(messages: readonly unknown[], uncertainTerminal = false) {
+  const response = await harness.getWorker("jobs-matching").fetch("/__synthetic-jobs/batch", {
+    method: "POST", body: JSON.stringify({ messages, uncertainTerminal }),
+  });
+  expect(response.status).toBe(200);
+  return await response.json();
+}
+
+it("refuses a late recognized foreign target before any built Queue entry effects", async () => {
+  const foreign = target === "production" ? "staging" : "production";
+  expect(await directDelivery([job(), job("complete", 2, foreign)])).toEqual({
+    refusal: "job-configuration", dispositions: [],
+  });
+  expect(await state()).toEqual({ observations: [], terminals: [], values: {} });
+});
+
+it("retries uncertain terminal admission and only acknowledges a confirmed terminal copy", async () => {
+  const terminal = job("terminal");
+  expect(await directDelivery([terminal], true)).toEqual({ dispositions: [{ retry: { delaySeconds: 5 } }] });
+  expect(await directDelivery([terminal])).toEqual({ dispositions: [{ ack: true }] });
+  const retained = { terminalVersion: 1, environment: queueEnvironment, code: "job-handler-terminal", operationId, job: terminal };
+  await expect.poll(async () => (await state()).terminals).toEqual([retained, retained]);
+  expect((await state()).values).toEqual({});
+  const recovery = await harness.getWorker("jobs-matching").fetch("/__synthetic-jobs/recovery");
+  expect(await recovery.json()).toEqual(terminal);
+});
+
 it("keeps actual built HTTP and health behavior while dispatch acceptance precedes completion", async () => {
   await enqueue();
   expect((await state()).values).toEqual({});

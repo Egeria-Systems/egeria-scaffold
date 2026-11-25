@@ -1,8 +1,4 @@
-import type { LocalizedBookingContent } from "../../i18n/localized-content";
+import type { Locale } from "../../i18n/locale";
 
-export function LocalizedBooking(
-  properties: Readonly<{ copy: LocalizedBookingContent }>,
-) {
-  void properties;
-  return null;
-}
+export const LocalizedBooking: (properties: Readonly<{ locale: Locale }>) => null =
+  () => null;

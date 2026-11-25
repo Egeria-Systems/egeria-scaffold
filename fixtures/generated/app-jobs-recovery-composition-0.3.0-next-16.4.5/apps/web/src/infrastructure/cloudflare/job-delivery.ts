@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { Effect, Layer } from "effect";
 import { parseApplicationEnvironment, validateRuntimeApplicationEnvironment, type ApplicationEnvironment, type ApplicationEnvironmentResult } from "@/src/configuration/application-environment";
-import { executeJob, isJobEnvironment, JobDeliveryFailure, JobDispatcher, parseJobEnvelope, terminalJob, validateJob,
+import { isJobEnvironment, JobDeliveryFailure, JobDispatcher, runJobAttempt, terminalJob, validateJob,
   type JobDeclaration, type JobDefinition, type JobEnvironment, type JobEnvelope, type JobFailureCode } from "@/src/application/job-delivery";
 
 export const cloudflareJobConfiguration = Effect.tryPromise({
@@ -99,24 +99,20 @@ export async function consumeCloudflareJobs(batch: JobMessageBatch, environment:
     if (!Number.isSafeInteger(message.attempts) || message.attempts < 1) throw new JobDeliveryFailure("job-configuration");
     const delaySeconds = Math.min(300, 5 * 2 ** Math.min(6, message.attempts - 1));
     try {
-      let job: JobEnvelope;
-      try { job = parseJobEnvelope(message.body, settings.environment); }
-      catch (error) {
-        const code = error instanceof JobDeliveryFailure ? error.code : "job-validation";
-        await send(settings.deadLetters, terminalJob(message.body, settings.environment, code), signal ?? new AbortController().signal);
-        message.ack(); report("terminal", code); continue;
+      const attempt = await runJobAttempt(message.body, settings.environment, handlers, message.attempts, signal);
+      if (attempt.kind === "malformed-envelope") {
+        await send(settings.deadLetters, terminalJob(settings.environment, attempt.code, attempt.operationId), signal ?? new AbortController().signal);
+        message.ack(); report("terminal", attempt.code); continue;
       }
-      try { job = validateJob(job, settings.environment, handlers); }
-      catch (error) {
-        const code = error instanceof JobDeliveryFailure ? error.code : "job-configuration";
+      if (attempt.kind === "declaration-rejection") {
         // Current business rejection cannot distinguish a changed consumer from
         // invalid injected work. Native exhaustion retains the original body.
-        message.retry({ delaySeconds }); report("retry", code); continue;
+        message.retry({ delaySeconds }); report("retry", attempt.code); continue;
       }
-      const decision = await executeJob(job, handlers, message.attempts, signal);
+      const { decision, job } = attempt;
       if (decision.outcome === "completed") { message.ack(); report("completed"); }
       else if (decision.outcome === "terminal") {
-        await send(settings.deadLetters, terminalJob(job, settings.environment, decision.code), signal ?? new AbortController().signal);
+        await send(settings.deadLetters, terminalJob(settings.environment, decision.code, job), signal ?? new AbortController().signal);
         message.ack(); report("terminal", decision.code);
       } else {
         // Native max_retries owns exhaustion and transfers the original envelope

@@ -6,6 +6,12 @@ import {
   type PageSection,
 } from "../content/content-schema";
 
+export const siteRoutes = [
+  { identifier: "home", segments: [] },
+  { identifier: "about", segments: ["about"] },
+  { identifier: "workFeatured", segments: ["work", "featured"] },
+] as const;
+
 export type RoutingContent = Readonly<{
   baseUrl: string;
 }>;

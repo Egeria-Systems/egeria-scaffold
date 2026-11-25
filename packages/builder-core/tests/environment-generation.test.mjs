@@ -18,28 +18,37 @@ function success(result) {
 }
 
 test("fresh generation and installed inspection select exact deployment versions independently", async () => {
-  for (const [fixture, persistence, jobs, retained, fresh, publicBuild] of [
-    ["portfolio-0.12.0-next-16.4.5", false, false, "0.9.0", "0.13.0"],
-    ["app-persistence-0.3.0-next-16.4.5", true, false, "0.10.0", "0.14.0"],
-    ["app-jobs-recovery-composition-0.3.0-next-16.4.5", false, true, "0.11.0", "0.17.0", ["app-jobs", "0.15.0"]],
-    ["app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.18.0", ["app-persistence-jobs-email", "0.16.0"]],
+  for (const [identifier, fixture, persistence, jobs, retained, fresh, intermediate] of [
+    ["portfolio", "portfolio-0.12.0-next-16.4.5", false, false, "0.9.0", "0.13.0"],
+    ["app-persistence", "app-persistence-0.3.0-next-16.4.5", true, false, "0.10.0", "0.14.0"],
+    ["app-jobs", "app-jobs-recovery-composition-0.3.0-next-16.4.5", false, true, "0.11.0", "0.17.0", "0.15.0"],
+    ["app-persistence-jobs-email", "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.18.0", "0.16.0"],
   ]) {
-    const reader = core.createFileSystemRepositoryReader(fileURLToPath(new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url)));
-    const installed = success(await core.readVerifiedProjectSnapshot(reader));
-    assert.equal(installed.catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, retained);
-    if (publicBuild !== undefined) {
-      const [identifier, deploymentVersion] = publicBuild;
-      const project = await readFile(new URL(`../../../fixtures/generated/${fixture}/.egeria/project.yaml`, import.meta.url), "utf8");
-      const state = await readFile(new URL(`../../../tests/generated-fixtures/fixtures/public-build/${identifier}/.egeria/state.json`, import.meta.url), "utf8");
-      const neighbor = success(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
+    const root = new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url);
+    const project = await readFile(new URL(".egeria/project.yaml", root), "utf8");
+    const archivedStateRoot = new URL("../../../tests/generated-fixtures/fixtures/installed-ancestor-controls/", import.meta.url);
+    const readArchivedCatalog = async name => {
+      const state = await readFile(new URL(name + "-state.json", archivedStateRoot), "utf8");
+      const snapshot = success(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
         ".egeria/project.yaml": project, ".egeria/state.json": state,
       })));
-      assert.equal(neighbor.catalog.find(entry => entry.identifier === "deployment-cloudflare").version, deploymentVersion);
-      assert.equal(neighbor.catalog.find(entry => entry.identifier === "background-job-delivery").version, "0.3.0");
+      return snapshot.catalog;
+    };
+    const archived = await readArchivedCatalog(identifier);
+    assert.equal(archived.find(entry => entry.identifier === "deployment-cloudflare").version, retained);
+    const installed = success(await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fileURLToPath(root))));
+    assert.equal(installed.catalog.find(entry => entry.identifier === "deployment-cloudflare").version, fresh);
+    if (intermediate !== undefined) {
+      const neighbor = await readArchivedCatalog(identifier + "-public-build");
+      assert.equal(neighbor.find(entry => entry.identifier === "deployment-cloudflare").version, intermediate);
+      assert.equal(neighbor.find(entry => entry.identifier === "background-job-delivery").version, "0.3.0");
+      assert.equal(archived.find(entry => entry.identifier === "background-job-delivery").version, "0.3.0");
+      assert.equal(installed.catalog.find(entry => entry.identifier === "background-job-delivery").version, "0.4.0");
     }
     const context = createGenerationRenderingContext(persistence, false, jobs);
     const catalog = success(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, context.catalogSnapshot));
     assert.equal(catalog.find(({ identifier }) => identifier === "deployment-cloudflare").version, fresh);
+    if (jobs) assert.equal(catalog.find(entry => entry.identifier === "background-job-delivery").version, "0.4.0");
     for (const version of ["0.8.0", persistence ? "0.17.0" : "0.18.0", persistence ? "0.13.0" : "0.14.0"]) {
       assert.equal(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, {
         ...context.catalogSnapshot, deploymentCloudflare: version,

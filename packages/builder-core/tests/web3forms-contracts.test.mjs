@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import * as core from "../dist/index.js";
 
 const settings = { accessKey: "00000000-0000-4000-8000-000000000001" };
@@ -48,8 +47,11 @@ test("contact generation rejects retired contexts and redacts invalid selections
 });
 
 test("absent contact selection preserves the retained portfolio and excludes contact from fresh generation", async () => {
-  const fixtureRoot = new URL("../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/", import.meta.url);
-  const installed = await core.readVerifiedProjectSnapshot(core.createFileSystemRepositoryReader(fileURLToPath(fixtureRoot)));
+  const archive = await readArchivedGeneratedFixture("portfolio");
+  const installed = await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
+    ".egeria/project.yaml": Buffer.from(archive.get(".egeria/project.yaml")).toString("utf8"),
+    ".egeria/state.json": Buffer.from(archive.get(".egeria/state.json")).toString("utf8"),
+  }));
   assert.equal(installed.ok, true);
   const portfolio = { ...request("portfolio"), projectName: "acme-portfolio", displayName: "Acme Portfolio" };
   const retained = await core.renderSkeleton(portfolio, installed.value.renderingContext);
@@ -60,7 +62,7 @@ test("absent contact selection preserves the retained portfolio and excludes con
     assert.equal(files.some(({ path }) => path.includes("web3forms")), false);
   }
   for (const path of ["apps/web/app/layout.tsx", "apps/web/app/page.tsx"]) {
-    assert.deepEqual(Buffer.from(retained.value.files.find(file => file.path === path).content), await readFile(new URL(path, fixtureRoot)));
+    assert.deepEqual(retained.value.files.find(file => file.path === path).content, archive.get(path));
   }
   for (const path of ["apps/web/app/layout.tsx", "apps/web/src/configuration/public-build.ts"]) {
     const source = fresh.value.files.find(file => file.path === path).content;

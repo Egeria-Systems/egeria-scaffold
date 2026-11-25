@@ -108,10 +108,12 @@ function renderingState(core, rendered) {
 
 test("persistence target views preserve installed bytes independently of public routing", async () => {
   const core = await import("../dist/index.js");
+  const { readArchivedGeneratedFixture } = await import("../../../tests/helpers/installed-fixture-ancestor.mjs");
   const fixture = new URL("../../../fixtures/generated/app-persistence-0.3.0-next-16.4.5/", import.meta.url);
-  const [project, state] = await Promise.all([
+  const [project, state, archivedFiles] = await Promise.all([
     readFile(new URL(".egeria/project.yaml", fixture), "utf8"),
-    readFile(new URL("../../../tests/generated-fixtures/fixtures/public-content-and-routing/app-persistence/.egeria/state.json", import.meta.url), "utf8"),
+    readFile(new URL("../../../tests/generated-fixtures/fixtures/installed-ancestor-controls/app-persistence-prior-target-state.json", import.meta.url), "utf8"),
+    readArchivedGeneratedFixture("app-persistence"),
   ]);
   const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
     ".egeria/project.yaml": project,
@@ -131,9 +133,11 @@ test("persistence target views preserve installed bytes independently of public 
     "docs/application-persistence.md",
   ]);
   for (const path of persistencePaths) {
-    const previous = await readFile(new URL(path, fixture));
+    const previous = Buffer.from(archivedFiles.get(path));
+    const current = await readFile(new URL(path, fixture));
     assert.deepEqual(Buffer.from(installed.files.find(file => file.path === path).content), previous, path);
-    assert.notDeepEqual(Buffer.from(fresh.files.find(file => file.path === path).content), previous, path);
+    assert.deepEqual(Buffer.from(fresh.files.find(file => file.path === path).content), current, path);
+    assert.notDeepEqual(current, previous, path);
   }
   const sharedFiles = ({ files }) => snapshotBytes(files.filter(file => !persistencePaths.has(file.path)));
   assert.deepEqual(sharedFiles(fresh), sharedFiles(installed));

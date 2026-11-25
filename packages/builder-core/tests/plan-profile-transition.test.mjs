@@ -5,6 +5,7 @@ import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { parse, stringify } from "yaml";
+import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repositoryRoot = resolve(packageRoot, "../..");
@@ -58,10 +59,6 @@ async function loadEntries(root) {
 
   await visit(root);
   return entries;
-}
-
-async function portfolioEntries() {
-  return loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5"));
 }
 
 function cloneEntries(entries) {
@@ -263,7 +260,7 @@ test("retired transition targets refuse before repository access", async () => {
 });
 
 test("app transition planning reaches content and visual eligibility after exact source admission", async () => {
-  const result = await planFromEntries(await portfolioEntries(), {toProfile: "app"});
+  const result = await planFromEntries(await readArchivedGeneratedFixture("portfolio"), {toProfile: "app"});
   assert.equal(result.ok, false);
   assert.equal(result.issues[0].code, "PROFILE_TRANSITION_VISUAL_EVIDENCE_REQUIRED");
 });

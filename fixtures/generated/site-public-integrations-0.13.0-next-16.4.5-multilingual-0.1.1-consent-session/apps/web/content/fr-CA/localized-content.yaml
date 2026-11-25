@@ -95,13 +95,6 @@ notFound:
       content:
         heading: Page introuvable
         summary: Vérifiez l’adresse ou utilisez la navigation pour continuer.
-booking:
-  heading: Réserver une conversation
-  summary: Choisissez un moment qui vous convient.
-  linkLabel: Planifier avec Calendly
-  frameTitle: Page de planification Calendly
-  popupHeading: Choisir un moment
-  closeLabel: Fermer la planification
 error:
   heading: Une erreur s’est produite
   summary: Nous n’avons pas pu terminer cette page. Veuillez réessayer.

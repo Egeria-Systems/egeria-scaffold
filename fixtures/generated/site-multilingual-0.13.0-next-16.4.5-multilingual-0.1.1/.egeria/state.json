@@ -43,7 +43,7 @@
         "repository-stateful",
         "external-stateful"
       ],
-      "version": "0.9.0"
+      "version": "0.13.0"
     },
     {
       "deliveryMode": "hybrid",
@@ -235,7 +235,7 @@
       "path": "AGENTS.md"
     },
     {
-      "fingerprint": "sha256:11780a1e2cde2e2ce661269d9e9010b783f95afbd4e9eeeb7400ac03c45b13a7",
+      "fingerprint": "sha256:1fa3be7476ee95055d80ac8600ad389ada9a43d2f06492343aa438d369eb6e27",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -330,7 +330,7 @@
       "path": "apps/web/package.json"
     },
     {
-      "fingerprint": "sha256:9c5883b1ab4a91597ef0e61049b27dc6cc3884dc25dd5a2db6af55f380b15c32",
+      "fingerprint": "sha256:8ba4efcdd7f298f18ced3fd3509343822120f4ed6a8784c20d84e6ac5b0f908b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -651,7 +651,7 @@
       "path": "apps/web/src/content/read-content.ts"
     },
     {
-      "fingerprint": "sha256:8c8c4fd3412112fa50773ce02756ccf2f97b265c8b609c35b397bcbac8203085",
+      "fingerprint": "sha256:02b7ad73e94b5895b3864e0810b665514d6e9abe2dde3382cc41ee26179118aa",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -722,7 +722,7 @@
       "path": "apps/web/src/configuration/application-environment.ts"
     },
     {
-      "fingerprint": "sha256:d0e7d34d7eca0b7d6a7b309d4248c370b8f0fc52a0c3d320495188a4c25a6bcd",
+      "fingerprint": "sha256:ad8148b315e689c79b595e9c1f74edd417eb1d302196cdb386a5640ce88dbed3",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -794,7 +794,7 @@
       "path": "apps/web/scripts/prepare-ci-git.sh"
     },
     {
-      "fingerprint": "sha256:a116faa9a0d17609f146663d4d7df1a02ccab6409f0a397de81c765be8e46cc6",
+      "fingerprint": "sha256:d5ce43751c6b88ff9c5e42c4061be0560977817fad16d3362d3d62c048fc331d",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -880,6 +880,34 @@
       "path": "apps/web/package.json"
     },
     {
+      "fingerprint": "sha256:007f75aa8682d571b14231345b6dca9ebc16eb798dd7df4bd0123becb013a821",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "deployment-document-metadata",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "deployment-cloudflare",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/src/configuration/document-metadata.ts"
+    },
+    {
+      "fingerprint": "sha256:a7a02ea6e7d3b0f40ae2a743f0f78670ae7b8ec052140980dc36e712447ab12a",
+      "fingerprintTarget": {
+        "kind": "file"
+      },
+      "identifier": "deployment-public-build-configuration",
+      "mergeStrategy": "replace-file",
+      "owner": {
+        "identifier": "deployment-cloudflare",
+        "kind": "capability"
+      },
+      "ownership": "managed",
+      "path": "apps/web/src/configuration/public-build.ts"
+    },
+    {
       "fingerprint": "sha256:3e7813e56568d3757c2ab8c358fda0e4a3cb6a9b78be223b7610742a68c8df12",
       "fingerprintTarget": {
         "kind": "file"
@@ -894,7 +922,7 @@
       "path": "apps/web/src/configuration/site-origin.ts"
     },
     {
-      "fingerprint": "sha256:a194bc812d61c47a72fd1a01edccbbaee037ffa8179b8a1c9807e6320cbb84d3",
+      "fingerprint": "sha256:9650acce0db956bb2c89d17f9409cbf0b059e19ffaf00c3509436920903b63f7",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -908,7 +936,7 @@
       "path": "docs/multilingual.md"
     },
     {
-      "fingerprint": "sha256:33b8b3824d75da91562ba3c0ee163b1f52c8f0ce45cc94acb370160e976f1153",
+      "fingerprint": "sha256:678bb32238af1161b76b9cbd449d838c7b55fb6fb1b2a0f59dbb1d2aa2c13789",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -950,7 +978,7 @@
       "path": "apps/web/tests/component/multilingual-page.test.tsx"
     },
     {
-      "fingerprint": "sha256:af156157ef4e6c8f7802b6625d2b49efdb8b0ffc862d5536b9994d7e7dbf3287",
+      "fingerprint": "sha256:a5e8906af5f2ea05543329c986cf76b072c882e6801d94dce1cc8cef016becb5",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -978,7 +1006,7 @@
       "path": "apps/web/src/i18n/read-localized-content.ts"
     },
     {
-      "fingerprint": "sha256:15ff9818bf4cc4a1b9977451585ee1c8fa52bfa56121c06ed3a66cbf200996ff",
+      "fingerprint": "sha256:0cd477bbc71c2e04d2dfc8ca1d44742881d69c2cd87d6956b56966fc2ff6d203",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -992,7 +1020,7 @@
       "path": "apps/web/tests/unit/localized-content.test.ts"
     },
     {
-      "fingerprint": "sha256:420fd6b8420a2802deb06196a2cbc9efdb923a95137d043ada8d8c0d804e9add",
+      "fingerprint": "sha256:6794069d8968eba0b7a46c0d8f5caf5f8c37821779f7cb0c6ff7797a400da062",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1006,7 +1034,7 @@
       "path": "apps/web/content/en-CA/localized-content.yaml"
     },
     {
-      "fingerprint": "sha256:b201ab071f463c6d439320adad6790fbc69ef34461b9a779f0293f1aaee5e017",
+      "fingerprint": "sha256:565e5fd0e3b4fa8a2e716cc9772c780d2481bc9b3b4e9c458d0b27616348345b",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1090,7 +1118,7 @@
       "path": "apps/web/app/[locale]/not-found.tsx"
     },
     {
-      "fingerprint": "sha256:1c61c9532dec151912086eb40d37d39b3a17044e06ece7557c332b6670668933",
+      "fingerprint": "sha256:768fca47fcefce1025c43cf202a4b472f9e8cb859f4aea1f809d6ab9a85cc54a",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1118,7 +1146,7 @@
       "path": "apps/web/src/presentation/localized-page.tsx"
     },
     {
-      "fingerprint": "sha256:94a68f0f10ff72f72b4412a919ebb14641bb4a63a8557dfaa4ac52ab042c6e68",
+      "fingerprint": "sha256:71c4e81e73b548a046d8a96e2c1e1890d0eba038542dc22666181014766f9419",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1244,7 +1272,7 @@
       "path": "apps/web/src/presentation/error-fallback.tsx"
     },
     {
-      "fingerprint": "sha256:e4cb19f30f11d647a41ef45c9c5911706769ebc9842797802ab1e100c7b2bd9d",
+      "fingerprint": "sha256:36f3422d0542fc47169ce297fabd02c2d37091474b1079d6e4a1795ba5d966e6",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1414,7 +1442,7 @@
       "path": "apps/web/src/presentation/content-page.tsx"
     },
     {
-      "fingerprint": "sha256:f69d5ae9ce4eb7da4b6b76a209c699f8586d886ccdac196dc1299ea6f29720d6",
+      "fingerprint": "sha256:e3b21c9220eae991c4d61d51bf6b074cec1c4fbdbb08bf52b29c0ddbef706ddc",
       "fingerprintTarget": {
         "kind": "file"
       },
@@ -1528,7 +1556,7 @@
       "path": "apps/web/src/routing/read-routing-content.ts"
     },
     {
-      "fingerprint": "sha256:787c8e043fccd76b79f2d616af2fba35c878007da4be6f1950e03d17f6900724",
+      "fingerprint": "sha256:98c3284568587549c7a08e17c84f86769d44852dba1468f65fe7ea82200e1222",
       "fingerprintTarget": {
         "kind": "file"
       },

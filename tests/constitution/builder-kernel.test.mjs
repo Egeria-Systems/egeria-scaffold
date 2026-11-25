@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 import { readPathIdentity } from "../../scripts/lib/isolated-process.mjs";
 import {
   formatGeneratedFixtureFailure,
+  generatedFixtureContracts,
   withCurrentGeneratedFixture,
   verifyGeneratedProjectForTesting,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -125,7 +126,7 @@ if (command === "run verify:generated-skeletons" && fixture.skeletonFailures) {
   }
   if (command === "run verify:generated-skeletons" || command === "run verify:generated-visuals") {
     console.log(JSON.stringify({
-      ok: true, fixtures: ["portfolio", "fixtureSecretValueNeverRetain"],
+      ok: true, fixtures: fixture.receiptFixtureIds ?? ["portfolio", "fixtureSecretValueNeverRetain"],
       workerIntegration: { executed: [], skipped: ["portfolio"] },
       bindingIntegration: { executed: [], skipped: ["portfolio"] },
       auditDispositions: [{ fixture: "portfolio", status: "passed", artifactDirectory: "audit-abc123" }],
@@ -250,7 +251,7 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   if (!sharedReports) await mkdir(reports);
   await mkdir(join(directory, "tests/client-journey"), { recursive: true });
   await mkdir(join(directory, "packages/builder-core/dist"), { recursive: true });
-  await mkdir(join(directory, "fixtures/generated/portfolio-0.12.0"), { recursive: true });
+  await mkdir(join(directory, "fixtures/generated", options.receiptFixtureIds ? "former-fixture-9.9.9" : "portfolio-0.12.0"), { recursive: true });
   await writeFile(join(directory, "packages/builder-core/dist/index.js"), "stale build");
   await writeFile(join(directory, packetFile), [
     'import { appendFileSync } from "node:fs";',
@@ -296,6 +297,8 @@ async function fixtureInvocation(context, options = {}, sharedReports) {
   }
   if (manifest.scripts[command].includes(runner)) {
     await mkdir(join(directory, "scripts"));
+    const fixedVerifier = "scripts/verify-generated-skeletons.mjs";
+    await symlink(fileURLToPath(new URL(fixedVerifier, root)), join(directory, fixedVerifier));
     const destination = join(directory, runner);
     if (options.unexpectedSignal) {
       const source = await readFile(new URL(runner, root), "utf8");
@@ -539,6 +542,23 @@ test("the public kernel command runs each required group in reader-before-writer
   const secondReport = await readReport(second, directory);
   assert.notEqual(secondReport.directory, directory);
   assert.deepEqual(await snapshotReport(directory), firstReport);
+});
+
+test("fixed verifier receipts recognize canonical IDs without historical fixture directories", { timeout: 60000 }, async context => {
+  const canonical = generatedFixtureContracts.map(({ identifier }) => identifier);
+  const invocation = await fixtureInvocation(context, {
+    receiptFixtureIds: [...canonical, "app-calendly", "former-fixture", "fixtureSecretValueNeverRetain"],
+  });
+  const result = await invocation.finish();
+  assert.equal(result.code, 0, result.stdout + result.stderr);
+  const { rows } = await readReport(invocation);
+  const log = await readFile(rows["verify:generated-skeletons"].steps[0].log, "utf8");
+  const evidence = JSON.parse(log.split("\n").find(line => line.startsWith('stdout {"fixtures":')).slice(7));
+  assert.deepEqual(evidence.fixtures, canonical);
+  assert.deepEqual(evidence.workerIntegration, { executed: [], skipped: ["portfolio"] });
+  assert.deepEqual(evidence.bindingIntegration, { executed: [], skipped: ["portfolio"] });
+  assert.deepEqual(evidence.auditDispositions, [{ fixture: "portfolio", status: "passed", artifactDirectory: "audit-abc123" }]);
+  assert.doesNotMatch(log, /app-calendly|former-fixture|fixtureSecretValueNeverRetain/u);
 });
 
 test("the public kernel replaces only fixed-root verification when fixed visuals are requested", { timeout: 60000 }, async context => {

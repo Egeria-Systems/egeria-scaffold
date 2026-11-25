@@ -2,7 +2,7 @@
 
 - Follow the canonical [workspace guidance](../../AGENTS.md); this file adds only the web application boundary.
 - Load validated locale content in routes and pass typed values into pure presentation components.
-- Add page sections through the typed source registry and preserve exact content validation, stable instance identifiers, and one enabled hero first among enabled sections per page.
+- Add approved section variants in `src/content/content-schema.ts` and map each kind to its presentation component in `src/sections/section-registry.tsx`. Preserve exact content validation, stable instance identifiers, and one enabled hero first among enabled sections per page.
 - Keep long-form Markdown as validated data and use only an explicitly reviewed renderer.
 - Keep visible copy out of TypeScript and TSX source.
 - Preserve externalized skip-navigation copy, the `main-content` focus target, visible focus treatment, responsive wrapping, minimum primary-link target sizing, and reduced-motion protection.

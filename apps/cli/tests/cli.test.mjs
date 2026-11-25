@@ -18,6 +18,7 @@ import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
+import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 const lifecycleCohorts = [
@@ -3706,9 +3707,15 @@ async function withGitFixture(name, run, options = {}) {
       if (cohort && contract) assert.equal(typeof cohort[contract.profile], "string", "test cohort must support the requested fixture");
       const fixtureRoot = contract?.relativeRoot;
       assert.notEqual(fixtureRoot, undefined);
-      await cp(resolve(repositoryRoot, fixtureRoot), primary, {
-        recursive: true,
-      });
+      if (options.archivedFixture === true) {
+        for (const [path, content] of await readArchivedGeneratedFixture(name)) {
+          const destination = join(primary, path);
+          await mkdir(dirname(destination), { recursive: true });
+          await writeFile(destination, content, { flag: "wx" });
+        }
+      } else {
+        await cp(resolve(repositoryRoot, fixtureRoot), primary, { recursive: true });
+      }
     } else {
       assertSuccess(
         await core.generateProject({
@@ -4064,6 +4071,8 @@ test("the compiled plan-add command emits exact portfolio and site plans without
           profile,
           revision,
           emitted.result.planFingerprint,
+          "popup",
+          true,
         ),
       });
       assert.deepEqual(after, before);
@@ -4836,7 +4845,7 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
       assert.equal(execution.stderr, "");
       const envelope = JSON.parse(execution.stdout);
       const expectedPaths = [
-        ...expectedPlanActions().map(({ path }) => path),
+        ...expectedPlanActions(false).map(({ path }) => path),
         ".egeria/migrations.jsonl",
         ".egeria/state.json",
       ].sort();
@@ -5129,7 +5138,7 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
           operations: primaryBefore.operations,
         },
       );
-    });
+    }, { archivedFixture: true });
   }
 });
 
@@ -5525,10 +5534,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
-      const { createGenerationRenderingContext } = await import(pathToFileURL(resolve(
-        repositoryRoot, "packages/builder-core/dist/catalog/verified-package-versions.js",
-      )));
-      const renderingContext = createGenerationRenderingContext(false, true, false, undefined, undefined, true, true, true);
+      const renderingContext = createGenerationRenderingContext(false, true);
       const capability = "transactional-email-resend";
       const migrations = [];
       for (const operation of ["add", "remove", "add"]) {
@@ -5565,7 +5571,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
         migrations.push(`${operation}-${capability}-0-2-0`);
         assert.deepEqual(state.appliedMigrations, migrations);
         assert.deepEqual(assertSuccess(core.parseMigrationLog(await readFile(join(linked, ".egeria/migrations.jsonl"), "utf8"))).map(({ identifier }) => identifier), migrations);
-        await assertExactInstalledAgreement(linked, { catalogSnapshot: renderingContext.catalogSnapshot });
+        await assertExactInstalledAgreement(linked);
         const rendered = assertSuccess(await core.renderSkeleton({
           profile, projectName: initialProject.project.name, displayName: initialProject.project.displayName,
           packageVersions: core.verifiedCapabilityPackageVersions,

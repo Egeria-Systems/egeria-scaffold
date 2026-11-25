@@ -1,5 +1,5 @@
 import { Effect, Layer } from "effect";
-import { executeJob, JobDeliveryFailure, JobDispatcher, terminalJob, validateJob,
+import { JobDeliveryFailure, JobDispatcher, runJobAttempt, terminalJob, validateJob,
   type JobDecision, type JobDefinition, type JobEnvironment, type JobEnvelope, type TerminalJob } from "@/src/application/job-delivery";
 
 // Explicit local/test adapter. Not a production fallback, durable queue or
@@ -29,15 +29,21 @@ export function createMemoryJobDelivery(environment: JobEnvironment, handlers: r
       try {
         item.attempts++;
         let decision: JobDecision;
+        let retainedEnvelope = item.job;
         try {
-          const job = validateJob(item.job, environment, handlers);
-          decision = await executeJob(job, handlers, item.attempts, signal);
+          const attempt = await runJobAttempt(item.job, environment, handlers, item.attempts, signal);
+          if (attempt.kind === "executed") {
+            retainedEnvelope = attempt.job;
+            decision = attempt.decision;
+          } else {
+            decision = { outcome: "retry", code: attempt.code };
+          }
         } catch (error) {
           decision = { outcome: "retry", code: error instanceof JobDeliveryFailure ? error.code : "job-execution-unknown" };
         }
         if (decision.outcome === "retry" && item.attempts >= 4) decision = { outcome: "terminal", code: "job-retries-exhausted" };
         if (decision.outcome !== "retry") pending.shift();
-        if (decision.outcome === "terminal") failed.push(terminalJob(item.job, environment, decision.code));
+        if (decision.outcome === "terminal") failed.push(terminalJob(environment, decision.code, retainedEnvelope));
         return decision;
       } finally { consuming = false; }
     },
