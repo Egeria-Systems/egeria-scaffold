@@ -1,4 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import sitemap from "../../app/sitemap";
+
+vi.mock("../../src/content/read-content", () => ({
+  readSiteContent: () => ({
+    navigation: [
+      { href: "/", label: "Home" },
+      { href: "/work", label: "Work index" },
+      { href: "/work/featured", label: "Featured work" },
+    ],
+  }),
+}));
+
+vi.mock("../../src/routing/read-routing-content", () => ({
+  readRoutingContent: () => ({ baseUrl: "https://example.test/" }),
+}));
+
+it("lists canonical site pages independently of the editor's navigation", () => {
+  expect(sitemap()).toEqual([
+    { url: "https://example.test/", changeFrequency: "monthly", priority: 1 },
+    { url: "https://example.test/about", changeFrequency: "monthly", priority: 0.8 },
+    { url: "https://example.test/work/featured", changeFrequency: "monthly", priority: 0.8 },
+  ]);
+});
 
 import {
   parseRoutedPageContent,

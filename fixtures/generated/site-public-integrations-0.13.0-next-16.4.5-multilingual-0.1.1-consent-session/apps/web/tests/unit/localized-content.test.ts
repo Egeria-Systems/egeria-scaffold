@@ -33,14 +33,6 @@ const validCatalog = {
     localizedRoutes.map(({ identifier }) => [identifier, page]),
   ),
   notFound: page,
-  booking: {
-    heading: "Book a conversation",
-    summary: "Choose a time.",
-    linkLabel: "Schedule",
-    frameTitle: "Scheduling page",
-    popupHeading: "Choose a time",
-    closeLabel: "Close scheduling",
-  },
   error: {
     heading: "Something went wrong",
     summary: "Please try again.",
@@ -63,7 +55,7 @@ describe("localized content", () => {
       "CONTENT_INVALID",
     );
     expect(() =>
-      parseLocalizedCatalog({ ...validCatalog, booking: undefined }, "en-CA"),
+      parseLocalizedCatalog({ ...validCatalog, booking: { heading: "Stale booking copy" } }, "en-CA"),
     ).toThrowError("CONTENT_INVALID");
   });
 

@@ -1,14 +1,17 @@
 import { execFileSync, spawn } from "node:child_process";
-import { closeSync, fsyncSync, mkdtempSync, openSync, readdirSync, realpathSync, statSync, writeFileSync } from "node:fs";
+import { closeSync, fsyncSync, mkdtempSync, openSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative, resolve } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import { stripVTControlCharacters } from "node:util";
 
+import { generatedFixtureContracts } from "./verify-generated-skeletons.mjs";
+
 const fixedRootGroup = "verify:generated-skeletons";
 const fixedVisualScript = "verify:generated-visuals";
 const fixedVisualFixtures = ["app", "portfolio-calendly", "portfolio", "site"];
+const fixtureNames = new Set(generatedFixtureContracts.map(({ identifier }) => identifier));
 
 const requiredGroups = [
   "test:constitution", "test:package-boundaries", "build:builder",
@@ -49,6 +52,11 @@ const skeletonFailureCodes = new Set([
   "CLOUDFLARE_TYPE_GENERATION_FAILED", "PEER_DEPENDENCY_CHECK_FAILED",
   "DEPLOYMENT_CONTRACTS_FAILED", "BROWSER_INSTALL_FAILED", "TRANSPORT_CONTRACTS_FAILED",
   "CLEAN_TYPECHECK_FAILED", "JOB_CONFIGURATION_FAILED", "VISUAL_REGRESSION_FAILED",
+  "FIXTURE_PATH_INVALID", "FIXTURE_INVENTORY_INVALID", "FIXTURE_CONTENT_INVALID",
+  "GENERATED_FIXTURE_FORBIDDEN_ARTIFACT", "GENERATED_FIXTURE_LOCAL_DEPENDENCY",
+  "FIXTURE_MANIFEST_INVALID", "FIXTURE_WORKSPACE_POLICY_INVALID", "FIXTURE_LOCKFILE_INVALID",
+  "FIXTURE_EFFECT_BOUNDARY_INVALID", "FIXTURE_SOURCE_CHANGED", "VERIFICATION_SETUP_FAILED",
+  "VERIFICATION_CLEANUP_FAILED",
 ]);
 
 // Persist only bounded, recognized observations. Test names, messages, paths and
@@ -60,8 +68,6 @@ function skeletonEvidence(text, withVisuals) {
   try { result = JSON.parse(text); } catch { return undefined; }
   if (result?.ok !== true || !Array.isArray(result.fixtures)) return undefined;
 
-  const fixtureNames = new Set(readdirSync("fixtures/generated", { withFileTypes: true })
-    .filter(entry => entry.isDirectory()).map(entry => entry.name.replace(/-\d+\.\d+\.\d+$/u, "")));
   const fixtures = list => Array.isArray(list) ? list.filter(name => fixtureNames.has(name)) : [];
   const integration = value => ({ executed: fixtures(value?.executed), skipped: fixtures(value?.skipped) });
   const audits = Array.isArray(result.auditDispositions) ? result.auditDispositions : [];

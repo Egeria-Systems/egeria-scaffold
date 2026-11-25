@@ -3,7 +3,7 @@ import buildIdentity from "../../../.open-next/assets/BUILD_ID";
 import { parseApplicationBuildId } from "../../../src/configuration/application-build.ts";
 import { Effect } from "effect";
 import { jobHandlers } from "../../../src/application/job-handlers.ts";
-import { JobDispatcher, JobHandlerFailure, prepareJobRecovery } from "../../../src/application/job-delivery.ts";
+import { JobDeliveryFailure, JobDispatcher, JobHandlerFailure, prepareJobRecovery } from "../../../src/application/job-delivery.ts";
 import { createCloudflareJobDispatcherLayer } from "../../../src/infrastructure/cloudflare/job-delivery.ts";
 
 // Synthetic test-only state, endpoints and handler. No fixture endpoint is
@@ -48,6 +48,33 @@ const syntheticWorker = {
     if (pathname === "/__synthetic-jobs/raw") {
       await environment.JOB_QUEUE.send(await request.json());
       return new Response(null, { status: 202 });
+    }
+    if (pathname === "/__synthetic-jobs/batch") {
+      const { messages, uncertainTerminal } = await request.json();
+      const dispositions = [];
+      const context = uncertainTerminal ? {
+        ...environment,
+        JOB_DEAD_LETTER_QUEUE: {
+          async send(body, options) {
+            await environment.JOB_DEAD_LETTER_QUEUE.send(body, options);
+            throw new Error("SYNTHETIC_TERMINAL_ACCEPTANCE_UNKNOWN");
+          },
+        },
+      } : environment;
+      const batch = {
+        queue: environment.JOB_QUEUE_NAME,
+        messages: messages.map(body => ({
+          body, attempts: 1,
+          ack() { dispositions.push({ ack: true }); },
+          retry(options) { dispositions.push({ retry: options }); },
+        })),
+      };
+      try {
+        await worker.queue(batch, context);
+        return Response.json({ dispositions });
+      } catch (error) {
+        return Response.json({ refusal: error instanceof JobDeliveryFailure ? error.code : "unknown", dispositions });
+      }
     }
     if (pathname === "/__synthetic-jobs/recovery") {
       try { return Response.json(prepareJobRecovery(terminals[0], environment.JOB_ENVIRONMENT, jobHandlers)); }

@@ -1,8 +1,4 @@
-export const localizedRoutes = [
-  { identifier: "home", segments: [] },
-  { identifier: "about", segments: ["about"] },
-  { identifier: "workFeatured", segments: ["work", "featured"] },
-] as const;
+export { siteRoutes as localizedRoutes } from "../routing/routing-content-schema";
 
 export const localizedRedirects = [
   { segments: ["work"], destinationSegments: ["work", "featured"] },

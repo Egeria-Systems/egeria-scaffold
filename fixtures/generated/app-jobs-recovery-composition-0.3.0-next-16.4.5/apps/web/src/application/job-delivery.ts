@@ -46,9 +46,15 @@ export type TerminalJob = Readonly<{
   operationId?: string;
   job?: JobEnvelope;
 }>;
+export type JobAttempt =
+  | Readonly<{ kind: "malformed-envelope"; code: JobFailureCode; operationId?: string }>
+  | Readonly<{ kind: "declaration-rejection"; code: JobFailureCode }>
+  | Readonly<{ kind: "executed"; job: JobEnvelope; decision: JobDecision }>;
 const operationPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 const typePattern = /^[a-z][a-z0-9-]{0,63}$/u;
+const maximumEnvelopeBytes = 16_384;
 const encoder = new TextEncoder();
+type SnapshotBudget = { remaining: number };
 
 export function isJobEnvironment(value: unknown): value is JobEnvironment {
   return value === "local" || value === "staging" || value === "production";
@@ -57,14 +63,50 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value) &&
     (Object.getPrototypeOf(value) === Object.prototype || Object.getPrototypeOf(value) === null);
 }
-function jsonValue(value: unknown, depth: number): value is JobValue {
-  if (depth > 5) return false;
-  if (value === null || typeof value === "boolean") return true;
-  if (typeof value === "number") return Number.isFinite(value);
-  if (typeof value === "string") return value.length <= 2_048;
-  if (Array.isArray(value)) return value.length <= 64 && value.every((item) => jsonValue(item, depth + 1));
-  return record(value) && Object.keys(value).length <= 64 && Object.entries(value).every(([key, item]) =>
-    /^[a-zA-Z][a-zA-Z0-9_]{0,63}$/u.test(key) && jsonValue(item, depth + 1));
+// Charge a lower bound on the JSON bytes before building more of the snapshot.
+// The exact UTF-8 check still accounts for escaping and the envelope fields.
+function reserveSnapshotBytes(budget: SnapshotBudget, minimumBytes: number): boolean {
+  budget.remaining -= minimumBytes;
+  return budget.remaining >= 0;
+}
+
+function snapshotJsonValue(value: unknown, depth: number, budget: SnapshotBudget): JobValue | undefined {
+  if (depth > 5) return undefined;
+  if (value === null || typeof value === "boolean") {
+    return reserveSnapshotBytes(budget, value === false ? 5 : 4) ? value : undefined;
+  }
+  if (typeof value === "number") {
+    return Number.isFinite(value) && reserveSnapshotBytes(budget, 1) ? (value === 0 ? 0 : value) : undefined;
+  }
+  if (typeof value === "string") {
+    return value.length <= 2_048 && reserveSnapshotBytes(budget, value.length + 2) ? value : undefined;
+  }
+  if (Array.isArray(value)) {
+    const length = value.length;
+    if (length > 64 || !reserveSnapshotBytes(budget, 2 + Math.max(0, length - 1))) return undefined;
+    const elements: JobValue[] = [];
+    for (let index = 0; index < length; index++) {
+      const element = snapshotJsonValue(index in value ? value[index] : null, depth + 1, budget);
+      if (element === undefined) return undefined;
+      elements.push(element);
+    }
+    return Object.freeze(elements);
+  }
+  return record(value) ? snapshotJsonRecord(value, depth, budget) : undefined;
+}
+
+function snapshotJsonRecord(value: Record<string, unknown>, depth: number, budget: SnapshotBudget): Readonly<Record<string, JobValue>> | undefined {
+  if (!reserveSnapshotBytes(budget, 2)) return undefined;
+  const keys = Object.keys(value);
+  if (keys.length > 64 || !reserveSnapshotBytes(budget, Math.max(0, keys.length - 1))) return undefined;
+  const snapshot: Record<string, JobValue> = {};
+  for (const key of keys) {
+    if (!/^[a-zA-Z][a-zA-Z0-9_]{0,63}$/u.test(key) || !reserveSnapshotBytes(budget, key.length + 3)) return undefined;
+    const item = snapshotJsonValue(value[key], depth + 1, budget);
+    if (item === undefined) return undefined;
+    snapshot[key] = item;
+  }
+  return Object.freeze(snapshot);
 }
 function validDeclarations(handlers: readonly JobDeclaration[]): boolean {
   const identities = new Set<string>();
@@ -78,51 +120,71 @@ function validDeclarations(handlers: readonly JobDeclaration[]): boolean {
   });
 }
 
-function freezePayload(value: JobValue): void {
-  if (typeof value !== "object" || value === null) return;
-  for (const child of Object.values(value)) freezePayload(child);
-  Object.freeze(value);
-}
-
 // Structural validity bounds retained data; it is not evidence of producer
 // admission. Keep parsing independent of the current business declaration.
 export function parseJobEnvelope(value: unknown, environment: JobEnvironment): JobEnvelope {
   try {
-    if (!record(value) || Object.keys(value).sort().join(",") !== "environment,jobType,jobVersion,operationId,payload,version" ||
-      value.version !== 1 || !isJobEnvironment(value.environment) || typeof value.operationId !== "string" || !operationPattern.test(value.operationId) ||
-      typeof value.jobType !== "string" || !typePattern.test(value.jobType) || !Number.isSafeInteger(value.jobVersion) ||
-      !record(value.payload) || !jsonValue(value.payload, 0) || encoder.encode(JSON.stringify(value)).byteLength > 16_384) {
+    if (!record(value) || Object.keys(value).sort().join(",") !== "environment,jobType,jobVersion,operationId,payload,version") {
       throw new JobDeliveryFailure("job-validation");
     }
-    if (value.environment !== environment) throw new JobDeliveryFailure("job-environment");
-    const job: JobEnvelope = JSON.parse(JSON.stringify(value));
-    freezePayload(job.payload);
+    const { version, environment: target, operationId, jobType, jobVersion, payload: input } = value;
+    if (version !== 1 || !isJobEnvironment(target) || typeof operationId !== "string" || !operationPattern.test(operationId) ||
+      typeof jobType !== "string" || !typePattern.test(jobType) || typeof jobVersion !== "number" || !Number.isSafeInteger(jobVersion) ||
+      !record(input)) throw new JobDeliveryFailure("job-validation");
+    const payload = snapshotJsonRecord(input, 0, { remaining: maximumEnvelopeBytes });
+    if (payload === undefined) throw new JobDeliveryFailure("job-validation");
+    const job: JobEnvelope = { version, environment: target, operationId, jobType, jobVersion, payload };
+    if (encoder.encode(JSON.stringify(job)).byteLength > maximumEnvelopeBytes) throw new JobDeliveryFailure("job-validation");
+    if (target !== environment) throw new JobDeliveryFailure("job-environment");
     return Object.freeze(job);
   } catch (error) {
     throw error instanceof JobDeliveryFailure ? error : new JobDeliveryFailure("job-validation");
   }
 }
 
+function checkedDeclaration<Declaration extends JobDeclaration>(job: JobEnvelope, handlers: readonly Declaration[]): Declaration {
+  const handler = handlers.find((candidate) => candidate.type === job.jobType && candidate.version === job.jobVersion);
+  if (handler === undefined) throw new JobDeliveryFailure("job-unsupported");
+  let accepted: boolean;
+  try { accepted = handler.validate(job.payload); }
+  catch { throw new JobDeliveryFailure("job-configuration"); }
+  if (accepted !== true) throw new JobDeliveryFailure("job-validation");
+  return handler;
+}
+
 export function validateJob(value: unknown, environment: JobEnvironment, handlers: readonly JobDeclaration[]): JobEnvelope {
   try {
     if (!validDeclarations(handlers)) throw new JobDeliveryFailure("job-configuration");
     const job = parseJobEnvelope(value, environment);
-    const handler = handlers.find((candidate) => candidate.type === job.jobType && candidate.version === job.jobVersion);
-    if (handler === undefined) throw new JobDeliveryFailure("job-unsupported");
-    let accepted: boolean;
-    try { accepted = handler.validate(job.payload); }
-    catch { throw new JobDeliveryFailure("job-configuration"); }
-    if (accepted !== true) throw new JobDeliveryFailure("job-validation");
+    checkedDeclaration(job, handlers);
     return job;
   } catch (error) {
     throw error instanceof JobDeliveryFailure ? error : new JobDeliveryFailure("job-validation");
   }
 }
 
-export async function executeJob(job: JobEnvelope, handlers: readonly JobDefinition[], attempt: number, signal?: AbortSignal): Promise<JobDecision> {
+export async function runJobAttempt(value: unknown, environment: JobEnvironment, handlers: readonly JobDefinition[], attempt: number, signal?: AbortSignal): Promise<JobAttempt> {
+  let job: JobEnvelope;
+  try {
+    job = parseJobEnvelope(value, environment);
+  } catch (error) {
+    const code = error instanceof JobDeliveryFailure ? error.code : "job-validation";
+    const operationId = readOperationId(value);
+    return { kind: "malformed-envelope", code, ...(operationId === undefined ? {} : { operationId }) };
+  }
+
+  let handler: JobDefinition;
+  try {
+    if (!validDeclarations(handlers)) throw new JobDeliveryFailure("job-configuration");
+    handler = checkedDeclaration(job, handlers);
+  } catch (error) {
+    return { kind: "declaration-rejection", code: error instanceof JobDeliveryFailure ? error.code : "job-validation" };
+  }
+  return { kind: "executed", job, decision: await executeJob(job, handler, attempt, signal) };
+}
+
+async function executeJob(job: JobEnvelope, handler: JobDefinition, attempt: number, signal?: AbortSignal): Promise<JobDecision> {
   if (signal?.aborted) return { outcome: "retry", code: "job-handler-cancelled" };
-  const handler = handlers.find((candidate) => candidate.type === job.jobType && candidate.version === job.jobVersion);
-  if (!handler) return { outcome: "terminal", code: "job-unsupported" };
   // A deadline or interruption cannot undo an already started side effect.
   const timeout = AbortSignal.timeout(10_000);
   const exit = await Effect.runPromiseExit(Effect.suspend(() => handler.handle(job, { attempt })), {
@@ -140,13 +202,19 @@ export async function executeJob(job: JobEnvelope, handlers: readonly JobDefinit
   return { outcome: disposition === "retry" ? "retry" : "terminal", code: `job-handler-${disposition}` };
 }
 
-export function terminalJob(value: unknown, environment: JobEnvironment, code: JobFailureCode): TerminalJob {
-  let job: JobEnvelope | undefined;
-  try { job = parseJobEnvelope(value, environment); } catch { /* Malformed bodies are not copied into diagnostic terminal records. */ }
-  let operationId: string | undefined;
+function readOperationId(value: unknown): string | undefined {
   try {
-    if (record(value) && typeof value.operationId === "string" && operationPattern.test(value.operationId)) operationId = value.operationId;
+    if (record(value)) {
+      const { operationId } = value;
+      if (typeof operationId === "string" && operationPattern.test(operationId)) return operationId;
+    }
   } catch { /* Malformed identity is not recoverable. */ }
+  return undefined;
+}
+
+export function terminalJob(environment: JobEnvironment, code: JobFailureCode, attachment?: JobEnvelope | string): TerminalJob {
+  const job = typeof attachment === "string" ? undefined : attachment;
+  const operationId = typeof attachment === "string" ? attachment : job?.operationId;
   return { terminalVersion: 1, environment, code, ...(operationId === undefined ? {} : { operationId }), ...(job === undefined ? {} : { job }) };
 }
 

@@ -1,3 +1,4 @@
+import { createDocumentMetadata } from "../src/configuration/document-metadata";
 import { readCompiledSiteOrigin } from "../src/configuration/site-origin";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -17,8 +18,7 @@ const searchVerification = analyticsConfiguration.ok
   : undefined;
 
 export const metadata: Metadata = {
-  metadataBase: new URL(readCompiledSiteOrigin()),
-  ...(process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT === "production" ? {} : { robots: { index: false, follow: false } }),
+  ...createDocumentMetadata(readCompiledSiteOrigin(), process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT),
   ...(searchVerification === undefined ? {} : { verification: { google: searchVerification } }),
 };
 

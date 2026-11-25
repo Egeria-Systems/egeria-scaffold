@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdtemp, readFile, readdir, realpath, rm } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { promisify } from "node:util";
@@ -14,6 +14,7 @@ import {
   inspectGeneratedFixture,
   withCurrentGeneratedFixture,
 } from "../../scripts/verify-generated-skeletons.mjs";
+import { readArchivedGeneratedFixture, requestForFixture } from "../helpers/installed-fixture-ancestor.mjs";
 
 const execFileAsync = promisify(execFile);
 const repositoryRoot = resolve(
@@ -66,6 +67,7 @@ async function snapshotTree(root) {
         snapshot.push({
           path: relativePath,
           content: await readFile(absolutePath, "base64"),
+          executable: ((await lstat(absolutePath)).mode & 0o111) !== 0,
         });
       }
     }
@@ -154,7 +156,7 @@ function assertPortablePublicLockfile(lockfile) {
   assert.match(lockfile, /tailwindcss@4\.3\.3/u);
 }
 
-test("retained security fixtures declare corrected Next with matching installed fingerprints", async () => {
+test("current security fixtures declare corrected Next with matching installed fingerprints", async () => {
   for (const fixture of generatedFixtureContracts) {
     const root = resolve(repositoryRoot, fixture.relativeRoot);
     const manifest = JSON.parse(await readFile(join(root, "apps/web/package.json"), "utf8"));
@@ -165,43 +167,28 @@ test("retained security fixtures declare corrected Next with matching installed 
   }
 });
 
-function requestForFixture(fixture) {
-  return {
-    profile: fixture.profile, projectName: fixture.projectName, displayName: fixture.displayName,
-    packageVersions: { standards: "0.1.0", observability: "0.3.0" },
-    ...(fixture.expectedBookingCalendlyVersion ? { bookingCalendly: fixture.expectedCapabilitySettings["booking-calendly"] } : {}),
-    ...(fixture.expectedAnalyticsVersion ? { analytics: fixture.expectedCapabilitySettings.analytics } : {}),
-    ...(fixture.expectedMultilingualVersion ? { multilingual: true } : {}),
-    ...(fixture.expectedApplicationPersistenceVersion ? { applicationPersistence: true } : {}),
-    ...(fixture.expectedTransactionalEmailVersion ? { transactionalEmailResend: true } : {}),
-    ...(fixture.expectedBackgroundJobVersion ? { backgroundJobDelivery: true } : {}),
-    ...(fixture.expectedContactFormVersion ? { contactFormWeb3Forms: true } : {}),
-  };
-}
-
-test("retained fixtures still render every original application byte using installed controls", async () => {
-  for (const fixture of generatedFixtureContracts) {
-    const root = resolve(repositoryRoot, fixture.relativeRoot);
-    const reader = core.createFileSystemRepositoryReader(root);
-    const installed = await core.readVerifiedProjectSnapshot(reader);
-    assert.equal(installed.ok, true, JSON.stringify(installed.issues));
-    const rendered = await core.renderSkeleton(requestForFixture(fixture), installed.value.renderingContext);
-    assert.equal(rendered.ok, true, JSON.stringify(rendered.issues));
-    for (const { path, content } of rendered.value.files) {
-      assert.deepEqual(await readFile(join(root, path)), Buffer.from(content), fixture.identifier + ":" + path);
+test("retained fixtures still render every original application byte using installed controls", async context => {
+  const owner = await realpath(await mkdtemp(join(tmpdir(), "egeria-archived-fixtures-")));
+  context.after(() => rm(owner, { recursive: true, force: true }));
+  for (const { identifier } of generatedFixtureContracts) {
+    const root = join(owner, identifier);
+    const files = await readArchivedGeneratedFixture(identifier);
+    for (const [path, content] of files) {
+      const destination = join(root, path);
+      await mkdir(dirname(destination), { recursive: true });
+      await writeFile(destination, content, { flag: "wx" });
     }
-    assert.deepEqual(
-      [...rendered.value.files.map(({ path }) => path), ".egeria/project.yaml", ".egeria/state.json", ".egeria/migrations.jsonl", "pnpm-lock.yaml"].sort(codePointCompare),
-      fixture.expectedFiles,
-    );
-    const lockIdentity = core.fingerprintFileContent(await readFile(join(root, "pnpm-lock.yaml")));
-    const state = core.installedStateSchema.parse(JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8")));
-    assert.equal(state.managedSurfaces.find(({ path }) => path === "pnpm-lock.yaml").fingerprint, lockIdentity);
-    await assertReadOnlyAgreement(root, await snapshotTree(root));
+    const expected = [...files].map(([path, content]) => ({
+      path,
+      content: Buffer.from(content).toString("base64"),
+      executable: false,
+    }));
+    assert.deepEqual(await snapshotTree(root), expected, identifier);
+    await assertReadOnlyAgreement(root, expected);
   }
 });
 
-test("representative current app witnesses retain exact descriptor ownership, production-site output and workflow ordering", async () => {
+test("representative current app fixtures retain exact descriptor ownership, production-site output and workflow ordering", async () => {
   for (const { identifier } of generatedFixtureContracts.filter(({ profile }) => profile === "app")) {
     await withCurrentGeneratedFixture(identifier, async (root, fixture) => {
       const rendered = await core.renderSkeleton(requestForFixture(fixture));
@@ -429,7 +416,7 @@ test("compiled project generation matches every committed fixture identifier", a
           }
 
           assert.deepEqual(generatedSnapshots[1], generatedSnapshots[0]);
-          const committedSnapshot = await withCurrentGeneratedFixture(fixtureCase.identifier, snapshotTree);
+          const committedSnapshot = await snapshotTree(resolve(repositoryRoot, fixtureCase.relativeRoot));
           assert.deepEqual(committedSnapshot, generatedSnapshots[0]);
           context.diagnostic(
             `${fixtureCase.identifier}: ${committedSnapshot.length} byte-stable files`,

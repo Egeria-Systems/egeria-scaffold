@@ -1,17 +1,14 @@
 import type { MetadataRoute } from "next";
 
-import { readSiteContent } from "../src/content/read-content";
 import { readRoutingContent } from "../src/routing/read-routing-content";
+import { siteRoutes } from "../src/routing/routing-content-schema";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const { navigation } = readSiteContent();
   const { baseUrl } = readRoutingContent();
 
-  return navigation
-    .filter(({ href }) => href.startsWith("/") && !href.startsWith("//"))
-    .map(({ href }) => ({
-      url: new URL(href, baseUrl).toString(),
-      changeFrequency: "monthly",
-      priority: href === "/" ? 1 : 0.8,
-    }));
+  return siteRoutes.map(({ segments }) => ({
+    url: new URL(segments.length === 0 ? "/" : `/${segments.join("/")}`, baseUrl).toString(),
+    changeFrequency: "monthly",
+    priority: segments.length === 0 ? 1 : 0.8,
+  }));
 }

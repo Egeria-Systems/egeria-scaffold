@@ -93,7 +93,7 @@ export default async function LocalizedRoute({ params }: LocalizedRoutePropertie
       navigationLabel={catalog.accessibility.navigationLabel}
     >
       {route.identifier === "home" ? (
-        <LocalizedBooking locale={locale} copy={catalog.booking} />
+        <LocalizedBooking locale={locale} />
       ) : null}
     </LocalizedPage>
   );

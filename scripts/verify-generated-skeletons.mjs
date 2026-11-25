@@ -96,6 +96,8 @@ const portfolioFiles = Object.freeze([
   "apps/web/scripts/prepare-ci-git.sh",
   "apps/web/src/configuration/application-build.ts",
   "apps/web/src/configuration/application-environment.ts",
+  "apps/web/src/configuration/document-metadata.ts",
+  "apps/web/src/configuration/public-build.ts",
   "apps/web/src/configuration/site-origin.ts",
   "apps/web/src/content/content-schema.ts",
   "apps/web/src/content/content-source.d.ts",
@@ -413,7 +415,7 @@ async function prepareVerifierOnlyBrowserProof(validationRoot, contract) {
     const original = await readFile(join(proofRoot, path));
     const source = original.toString("utf8");
     if (source.split(anchor).length !== 2) fail("VERIFICATION_SETUP_FAILED");
-    await writeFixtureWitness(proofRoot, path, Buffer.from(source.replace(anchor, replacement)), fingerprint(original));
+    await replaceCheckedFixtureFile(proofRoot, path, Buffer.from(source.replace(anchor, replacement)), fingerprint(original));
   }
   await writeFile(
     join(validationRoot, "apps/web/tests/e2e/multilingual-global-error.spec.ts"),
@@ -534,12 +536,13 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 134,
+    verifyGlobalError: false,
+    expectedSurfaces: 136,
     visualRegression: true,
   }),
   Object.freeze({
@@ -574,12 +577,13 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: null,
     expectedBookingCalendlyVersion: "0.2.0",
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 143,
+    verifyGlobalError: false,
+    expectedSurfaces: 145,
     visualRegression: true,
   }),
   Object.freeze({
@@ -611,12 +615,13 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 150,
+    verifyGlobalError: false,
+    expectedSurfaces: 152,
     visualRegression: true,
   }),
   Object.freeze({
@@ -651,12 +656,13 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: "0.1.1",
-    expectedSurfaces: 167,
+    verifyGlobalError: true,
+    expectedSurfaces: 169,
     visualRegression: false,
   }),
   Object.freeze({
@@ -700,13 +706,14 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: "0.2.0",
     expectedContactFormVersion: "0.2.0",
     expectedAnalyticsVersion: "0.2.0",
     expectedMultilingualVersion: "0.1.1",
-    expectedSurfaces: 209,
+    verifyGlobalError: true,
+    expectedSurfaces: 211,
     visualRegression: false,
   }),
   Object.freeze({
@@ -731,13 +738,14 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedAppFoundationVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 170,
+    verifyGlobalError: false,
+    expectedSurfaces: 172,
     visualRegression: true,
   }),
   Object.freeze({
@@ -772,13 +780,14 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedAppFoundationVersion: "0.3.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: "0.2.0",
     expectedAnalyticsVersion: "0.2.0",
     expectedMultilingualVersion: "0.1.1",
-    expectedSurfaces: 213,
+    verifyGlobalError: true,
+    expectedSurfaces: 215,
     visualRegression: false,
   }),
   Object.freeze({
@@ -799,14 +808,15 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.10.0",
+    expectedDeploymentCloudflareVersion: "0.14.0",
     expectedAppFoundationVersion: "0.3.0",
     expectedApplicationPersistenceVersion: "0.2.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
-    expectedSurfaces: 191,
+    verifyGlobalError: false,
+    expectedSurfaces: 193,
     visualRegression: false,
   }),
   Object.freeze({
@@ -818,10 +828,10 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilities: Object.freeze(["standards", "content-files", "section-composition", "deployment-cloudflare", "observability", "app-foundation", "transactional-email-resend"]),
     expectedRecipeVersion: "0.12.0", expectedStandardsVersion: "0.9.0",
     expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0", expectedAppFoundationVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.13.0", expectedAppFoundationVersion: "0.3.0",
     expectedTransactionalEmailVersion: "0.2.0", expectedApplicationPersistenceVersion: null,
     expectedSiteRoutingVersion: null, expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 163, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, verifyGlobalError: false, expectedSurfaces: 165, visualRegression: false,
   }),
   Object.freeze({
     identifier: "app-persistence-email", profile: "app", projectName: "acme-app-persistence-email", displayName: "Acme App Persistence Email",
@@ -832,10 +842,10 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend"]),
     expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.10.0",
     expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.10.0", expectedAppFoundationVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.14.0", expectedAppFoundationVersion: "0.3.0",
     expectedTransactionalEmailVersion: "0.2.0", expectedApplicationPersistenceVersion: "0.2.0",
     expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 200, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, verifyGlobalError: false, expectedSurfaces: 202, visualRegression: false,
   }),
   Object.freeze({
     identifier: "site-contact-form",
@@ -852,13 +862,14 @@ export const generatedFixtureContracts = Object.freeze([
     expectedObservabilityVersion: "0.4.0",
     expectedContentFilesVersion: "0.4.0",
     expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.9.0",
+    expectedDeploymentCloudflareVersion: "0.13.0",
     expectedSiteRoutingVersion: "0.5.0",
     expectedBookingCalendlyVersion: null,
     expectedAnalyticsVersion: null,
     expectedMultilingualVersion: null,
+    verifyGlobalError: false,
     expectedContactFormVersion: "0.2.0",
-    expectedSurfaces: 166,
+    expectedSurfaces: 168,
     visualRegression: false,
   }),
   Object.freeze({
@@ -870,10 +881,10 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "background-job-delivery"]),
     expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.9.0",
     expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.11.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.17.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.4.0",
     expectedApplicationPersistenceVersion: null, expectedTransactionalEmailVersion: null,
     expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 183, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, verifyGlobalError: false, expectedSurfaces: 185, visualRegression: false,
   }),
   Object.freeze({
     identifier: "app-persistence-jobs-email", profile: "app", projectName: "acme-app-persistence-jobs-email", displayName: "Acme App Persistence Jobs Email",
@@ -884,10 +895,10 @@ export const generatedFixtureContracts = Object.freeze([
     expectedCapabilities: Object.freeze(["standards", "deployment-cloudflare", "content-files", "section-composition", "observability", "app-foundation", "site-routing", "application-persistence", "transactional-email-resend", "background-job-delivery"]),
     expectedRecipeVersion: "0.3.0", expectedStandardsVersion: "0.10.0",
     expectedObservabilityVersion: "0.4.0", expectedContentFilesVersion: "0.4.0", expectedSectionCompositionVersion: "0.3.0",
-    expectedDeploymentCloudflareVersion: "0.12.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.3.0",
+    expectedDeploymentCloudflareVersion: "0.18.0", expectedAppFoundationVersion: "0.3.0", expectedBackgroundJobVersion: "0.4.0",
     expectedApplicationPersistenceVersion: "0.2.0", expectedTransactionalEmailVersion: "0.2.0",
     expectedSiteRoutingVersion: "0.5.0", expectedBookingCalendlyVersion: null,
-    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, expectedSurfaces: 213, visualRegression: false,
+    expectedAnalyticsVersion: null, expectedMultilingualVersion: null, verifyGlobalError: false, expectedSurfaces: 215, visualRegression: false,
   }),
 ]);
 
@@ -1284,7 +1295,7 @@ async function createSupportPaths(root) {
   return { browsers, cache, home, temporary, store, userConfiguration };
 }
 
-async function snapshotTree(root) {
+async function snapshotTree(root, expectedFiles) {
   let rootStats;
   try {
     rootStats = await lstat(root);
@@ -1295,6 +1306,12 @@ async function snapshotTree(root) {
     fail("FIXTURE_PATH_INVALID");
   }
 
+  const expectedDirectories = new Set();
+  for (const path of expectedFiles ?? []) {
+    for (let directory = dirname(path); directory !== "."; directory = dirname(directory)) {
+      expectedDirectories.add(directory);
+    }
+  }
   const snapshot = [];
 
   async function visit(directory, relativeDirectory) {
@@ -1313,8 +1330,16 @@ async function snapshotTree(root) {
       const absolutePath = join(directory, entry.name);
 
       if (entry.isDirectory()) {
+        if (expectedFiles !== undefined && !expectedDirectories.has(relativePath)) {
+          fail("GENERATED_FIXTURE_FORBIDDEN_ARTIFACT");
+        }
         await visit(absolutePath, relativePath);
       } else if (entry.isFile()) {
+        if (expectedFiles !== undefined) {
+          const stats = await lstat(absolutePath).catch(() => fail("FIXTURE_PATH_INVALID"));
+          if (!stats.isFile()) fail("FIXTURE_PATH_INVALID");
+          if ((stats.mode & 0o111) !== 0) fail("FIXTURE_CONTENT_INVALID");
+        }
         let content;
         try {
           content = await readFile(absolutePath);
@@ -1375,8 +1400,8 @@ async function readJson(path, failureCode) {
   }
 }
 
-async function inspectFixture(root, contract) {
-  const snapshot = await snapshotTree(root);
+async function inspectFixture(root, contract, fixed = false) {
+  const snapshot = await snapshotTree(root, fixed ? contract.expectedFiles : undefined);
   const actualPaths = snapshot.map(({ path }) => path);
   const expectedPathSet = new Set(contract.expectedFiles);
   if (actualPaths.some((path) => !expectedPathSet.has(path))) {
@@ -1520,182 +1545,25 @@ function contractForIdentifier(identifier) {
   return contract;
 }
 
-const publicBuildWitnessDirectory = "tests/generated-fixtures/fixtures/public-build";
-const publicBuildWitnessPaths = Object.freeze([
-  ".egeria/state.json",
-  "apps/web/app/layout.tsx",
-  "apps/web/next.config.ts",
-  "apps/web/scripts/check-application-environment.mjs",
-  "apps/web/src/configuration/document-metadata.ts",
-  "apps/web/src/configuration/public-build.ts",
-]);
-const jobAttemptWitnessDirectory = "tests/generated-fixtures/fixtures/job-attempts";
-const sectionWitnessDirectory = "tests/generated-fixtures/fixtures/section-contracts";
-const publicContentRoutingWitnessDirectory = "tests/generated-fixtures/fixtures/public-content-and-routing";
-const persistenceTargetWitnessDirectory = "tests/generated-fixtures/fixtures/persistence-target-validation";
-const persistenceTargetWitnessPaths = Object.freeze([
-  "apps/web/src/configuration/application-database.ts",
-  "apps/web/tests/bindings/application-persistence.test.ts",
-  "apps/web/tests/bindings/fixtures/worker.ts",
-  "apps/web/tests/unit/application-database-environment.test.ts",
-  "docs/application-persistence.md",
-]);
-const persistenceTargetFixtureDigests = Object.freeze({
-  "app-persistence": "10ee6e4f5257dd5ba3f1a3e1d0bc9e5cf3b94c61416afcdf6a5e1b192870f86e",
-  "app-persistence-email": "4e2b9767e24f693f66b32c46d8c68d6bf161a80025338f89b6f9e50a40f5720b",
-  "app-persistence-jobs-email": "8306f4c02c24bcc30feff07792976e20d0e4039d754a029da277008e389b13a6",
-});
-const publicContentRoutingSharedPaths = Object.freeze({
-  routed: ["apps/web/src/routing/routing-content-schema.ts"],
-  "monolingual-routed": ["apps/web/app/sitemap.ts", "apps/web/tests/unit/routing-content.test.ts"],
-  "localized-routed": ["apps/web/src/i18n/localized-profile.ts"],
-  multilingual: [
-    "apps/web/app/[locale]/[[...segments]]/page.tsx",
-    "apps/web/app/global-error.tsx",
-    "apps/web/src/i18n/localized-content.ts",
-    "apps/web/tests/unit/localized-content.test.ts",
-    "docs/multilingual.md",
-  ],
-  "booking-selected": ["apps/web/content/fr-CA/booking-calendly.yaml", "apps/web/src/integrations/booking/localized-booking.tsx"],
-  "booking-omitted": ["apps/web/src/integrations/booking/localized-booking.tsx"],
-});
-const sharedSectionPaths = Object.freeze([
-  "apps/web/src/content/content-schema.ts",
-  "apps/web/src/sections/section-registry.tsx",
-]);
-const projectSectionPaths = Object.freeze([
-  ".egeria/state.json",
-  "apps/web/AGENTS.md",
-]);
-const jobAttemptWitnessPaths = Object.freeze([
-  ".egeria/state.json",
-  "apps/web/next.config.ts",
-  "apps/web/src/application/job-delivery.ts",
-  "apps/web/src/infrastructure/cloudflare/job-delivery.ts",
-  "apps/web/src/infrastructure/memory/job-delivery.ts",
-  "apps/web/tests/integration/fixtures/job-worker.mjs",
-  "apps/web/tests/integration/job-worker.test.ts",
-  "apps/web/tests/unit/job-delivery.test.ts",
-  "apps/web/tests/unit/job-handler-composition.test.ts",
-  "docs/background-job-delivery.md",
-]);
-const jobAttemptWitnesses = Object.freeze({
-  "app-jobs": {
-    deploymentVersion: "0.17.0",
-    digest: "5d1cf472814f6da7b67d82a370ffd312f3ddd935164b23a37b7b373b052b86ac",
-  },
-  "app-persistence-jobs-email": {
-    deploymentVersion: "0.18.0",
-    digest: "b1efbb84e637954dc43ea9412b74a84d57cbfa1ab6e4847cce3ead751af39ef0",
-  },
-});
-const retainedFixtureDigests = Object.freeze({
-  "portfolio": "8eb404916e43d7d3cfb6d2fc2c42c9a62cc2874f4f6690a976775bdf96b75cf4",
-  "portfolio-calendly": "38887cc49a9782ed75327f9e1c95d05cc6c6ff99f986069a58249513c3302770",
-  "site": "85aca4d30591100a04e16aef620655d4089d359fe0da146ae23cde138758ccb3",
-  "site-multilingual": "28ddc8ea570a20fbed0f9679eb702248cc26db40305825057d61f59d62bd4e8e",
-  "site-public-integrations": "c4272d9ad68eb7e53773edb6ae56084db05c6992e652a2d4f5c5775a863affa6",
-  "app": "d2e36928bb5142c31a241d10c1239ccc182965fba2377d6edfb2daed429d5d5c",
-  "app-all-optional-integrations": "b83cf9976c7ce24586719f26522dfc7a1b0577c2c6417c441b2d8313d85b70e5",
-  "app-persistence": "174302b580953fd41ececd9e440b318c5b33c106af8e58d6b0f618fc618a0b85",
-  "portfolio-email": "80a1fa553ee53436e721f9fadcc30aac790a5c0fb61aac38dba1534a7232264d",
-  "app-persistence-email": "f27bad80efca9c2b1847b1121468ea374f4a2d07985ebad0411b6d7d9e1a0524",
-  "site-contact-form": "fd8c3ee291bcacf958619b380bfa3c926049462fa39505b7a3f3f19dd3dc8ffb",
-  "app-jobs": "bae3ec20b6597e06a3d63429e3fbc20db46b0a3cfaee5f32ac4f9f2bfe5c892e",
-  "app-persistence-jobs-email": "4fcc2a241639c20849fb697906b4371b820024d56770fcb0274095c61053f3e8",
-});
-const publicBuildFixtureDigests = Object.freeze({
-  "portfolio": "b99697c5e430a1ffa493f06adb84f6c77bb123dcad1980027304fd83ef028908",
-  "portfolio-calendly": "e5f9cd0516c11a5e4469cc9fbbbfb6d7edc693b8de35a440afddb748692faa21",
-  "site": "acd5434db2c2dd70e5515fd6a9e976056ebc9d1f0a089fa3866f493e623a5cb0",
-  "site-multilingual": "55afd4ac0766c710a9d757f1dead9eef23ab7cf2714ed7bbb102f819b218220e",
-  "site-public-integrations": "871588a3d3219e755c9d926565aa1a92158a5550e2cb52668665b83c2462f4c3",
-  "app": "eef57916a8e67e1a53279eb541fa53fb8a595f10465894972b5a929339199d84",
-  "app-all-optional-integrations": "71977c46898f8d7273390a3c5bbeb3241d1ca8848dcc5bc9cc59b448729c1621",
-  "app-persistence": "334fd73d363554a678c4ef15fe70c4fd0911e90b18a6cef681290ddb58721ec3",
-  "portfolio-email": "289bb0c323bfbd78960e72f8ba34028442494dea4c3edfbda2a0cca26598d430",
-  "app-persistence-email": "9b391237237a80b67287ba3c51c321cd8f9d729390a9b657edfe175cc10ca667",
-  "site-contact-form": "bfd91b292b6770d52938fd9c86943af38ada7a2e109bd267e82872f0f7c1a10c",
-  "app-jobs": "f73f8313fa30dd09cc9822b311992d072bfc1f00e9bdb1397707fc81f2f91181",
-  "app-persistence-jobs-email": "3ba4a3116ecfa8094ec12b09281c1c4965130079807e7142949183abc86700e7",
-});
-const sectionFixtureDigests = Object.freeze({
+const currentFixtureDigests = Object.freeze({
   "portfolio": "684a48b27d8d9dca077e6ab4c6ce4cc20b83d98871019ab4659e019ff46d8d9a",
-  "portfolio-calendly": "6113a90b50137b1334f92dd1fd20864949ddaf8fc529ba8c6730e9779eb88140",
-  "site": "ef5e33decc6b1127bda0fbe37550d7449c355eb4de32f957e751ab9a729fee3f",
-  "site-multilingual": "afcc3d950336423407dd85b205ca654c5fdc727d43f695f8c2497eefb9d010eb",
-  "site-public-integrations": "c8f2a6ec2e45f872319a6d77b32ba6f03adc617dc5d05052e304d8ec48f16f52",
-  "app": "5ff291ca1417007d41d81837712097b97ce3de3ae8d3e1c5a85a139878995f20",
-  "app-all-optional-integrations": "ec90fecf9d72c6cecb6f767785f485111c2485c53b5ddd5698c5ac33f61b201c",
-  "app-persistence": "c5a757b37096b42e30fb4242f17413500b172b4575b491a68901c3efa9fb1f23",
-  "portfolio-email": "8e96559ee693c809b82767d9f6384a3d25a596c5d9321d1bb708177466080ed6",
-  "app-persistence-email": "261ab76e0855f94f1d9f706b53cee67372e42a07a5894375763559612a451fc5",
-  "site-contact-form": "537edf152cfc546e0070888ec30aa4dbb08def033feae00ae9a34a127a2e8ff0",
-  "app-jobs": "1b48ba416ab57efdd6425b896fea7e0c870562194270d6798854624245417f3a",
-  "app-persistence-jobs-email": "63103a5fa7bc27824edb7d5901a9810917a7b1ecc9699605ade6b437fda832d5",
-});
-const publicContentRoutingFixtureDigests = Object.freeze({
   "portfolio-calendly": "2d94b373082d905fe87421ed79909c08c3f85612a47dc9f5f2cf8a4859c07a34",
   "site": "25140802abb24b700bbe36974b4f3f11ee73ae1ad58cc99eff78462f3b08058d",
   "site-multilingual": "800163d76d4073b2ffd155245bef3c925abe26254b72f1a506bcdcdeec071f22",
   "site-public-integrations": "5e18a44417ebd5a433998894e60bb4c0b6356ff8ba1630205864dc6e44b2d68e",
   "app": "13a4ce634a4d6543521c86b8e9cf89e5b1c8e2c5e1f8e30aecb3f82f8e5a9e73",
   "app-all-optional-integrations": "779c690fe48863485623e9bca14dab7f795d4cf1bdda857818443186db7602d6",
-  "app-persistence": "8b76f8ddd209508923fcebe9ecd69550f20a5acfb7117fd959f128ec6c0174d8",
-  "app-persistence-email": "f628782fc40150a95a4036d16e3710a5568bf3b2d1e863a5771a6324224b77b7",
+  "app-persistence": "10ee6e4f5257dd5ba3f1a3e1d0bc9e5cf3b94c61416afcdf6a5e1b192870f86e",
+  "portfolio-email": "8e96559ee693c809b82767d9f6384a3d25a596c5d9321d1bb708177466080ed6",
+  "app-persistence-email": "4e2b9767e24f693f66b32c46d8c68d6bf161a80025338f89b6f9e50a40f5720b",
   "site-contact-form": "ff6dca7ba0797ae93a1ccb39c5e40fc12a5b96caed68808c2a52cbc93c8bb288",
   "app-jobs": "1bb947e607d067cd4cf29bea115218b0061726568a3f9f46ddad9ad761af3d46",
-  "app-persistence-jobs-email": "e3267061fcf2e1bacefbd3f56f37dbd7e562ccf20227b0e5ee4646650e3a32e2",
+  "app-persistence-jobs-email": "8306f4c02c24bcc30feff07792976e20d0e4039d754a029da277008e389b13a6",
 });
-
-function publicContentRoutingGroups(contract) {
-  if (!Object.hasOwn(publicContentRoutingFixtureDigests, contract.identifier)) return [];
-  const multilingual = Boolean(contract.expectedMultilingualVersion);
-  const booking = Boolean(contract.expectedBookingCalendlyVersion);
-  return [
-    ...(contract.profile === "portfolio" ? [] : ["routed", multilingual ? "localized-routed" : "monolingual-routed"]),
-    ...(multilingual ? ["multilingual", booking ? "booking-selected" : "booking-omitted"] : booking ? ["booking-selected"] : []),
-    contract.identifier,
-  ];
-}
-
-async function readPublicContentRoutingWitnesses(root) {
-  const projectPaths = Object.keys(publicContentRoutingFixtureDigests).map(identifier => [
-    identifier,
-    [
-      ".egeria/state.json",
-      ...(contractForIdentifier(identifier).expectedMultilingualVersion ? [
-        "apps/web/content/en-CA/localized-content.yaml",
-        "apps/web/content/fr-CA/localized-content.yaml",
-      ] : []),
-    ],
-  ]);
-  const groups = [...Object.entries(publicContentRoutingSharedPaths), ...projectPaths];
-  await requireFixtureWitnessDirectory(root, groups.map(([name]) => name));
-  return Object.fromEntries(await Promise.all(groups.map(async ([name, paths]) => [
-    name, await requireSectionWitness(join(root, name), paths),
-  ])));
-}
-const successorDeploymentVersions = Object.freeze({
-  "0.9.0": "0.13.0", "0.10.0": "0.14.0", "0.11.0": "0.15.0", "0.12.0": "0.16.0",
-});
-
-function currentFixtureContract(identifier) {
-  const retained = contractForIdentifier(identifier);
-  const jobAttempt = jobAttemptWitnesses[identifier];
-  return Object.freeze({
-    ...retained,
-    expectedFiles: Object.freeze([...new Set([...retained.expectedFiles, ...publicBuildWitnessPaths])].sort(codePointCompare)),
-    expectedSurfaces: retained.expectedSurfaces + 2,
-    expectedDeploymentCloudflareVersion: jobAttempt?.deploymentVersion ?? successorDeploymentVersions[retained.expectedDeploymentCloudflareVersion],
-    verifyGlobalError: Boolean(retained.expectedMultilingualVersion),
-    ...(jobAttempt === undefined ? {} : { expectedBackgroundJobVersion: "0.4.0" }),
-  });
-}
 
 export function contractForGeneratedProject(identifier, expectedProjectName) {
-  const app = identifier === "app-calendly" ? currentFixtureContract("app") : undefined;
-  const contract = app === undefined ? currentFixtureContract(identifier) : Object.freeze({
+  const app = identifier === "app-calendly" ? contractForIdentifier("app") : undefined;
+  const contract = app === undefined ? contractForIdentifier(identifier) : Object.freeze({
     ...app,
     identifier,
     projectName: "acme-app-calendly",
@@ -2213,15 +2081,6 @@ async function verifySourcesWithAdapters(
 ) {
   const selectedSources = sourcesBefore.slice(firstFixture);
   let owner;
-  try {
-    owner = await adapters.createOwner();
-  } catch {
-    fail("VERIFICATION_SETUP_FAILED");
-  }
-  if (!(await pathIdentityMatches(owner))) {
-    fail("VERIFICATION_SETUP_FAILED");
-  }
-
   let pendingError;
   const workerIntegration = { executed: [], skipped: [] };
   const bindingIntegration = { executed: [], skipped: [] };
@@ -2229,22 +2088,13 @@ async function verifySourcesWithAdapters(
   const auditDispositions = [];
   const visualComparisons = [];
   try {
+    owner = await requireVerificationOwner(() => adapters.createOwner());
     for (const source of selectedSources) {
-      const validationRoot = join(
-        owner.path,
-        `${source.contract.identifier}-project`,
-      );
+      const { root: validationRoot } = await copyCheckedFixture(source, owner, `${source.contract.identifier}-project`);
       const supportRoot = join(
-        owner.path,
+        dirname(validationRoot),
         `${source.contract.identifier}-support`,
       );
-
-      await cp(source.root, validationRoot, {
-        recursive: true,
-        force: false,
-        errorOnExist: true,
-        dereference: false,
-      });
       await mkdir(supportRoot, { mode: 0o700 });
       const support = await createSupportPaths(supportRoot);
       try {
@@ -2425,29 +2275,12 @@ async function verifySourcesWithAdapters(
         : new GeneratedFixtureVerificationError("VERIFICATION_FAILED");
   } finally {
     try {
-      const sourcesAfter = await Promise.all(
-        sourcesBefore.map(({ contract, root }) =>
-          inspectFixture(root, contract),
-        ),
-      );
-      if (
-        sourcesAfter.some(
-          (snapshot, index) =>
-            JSON.stringify(snapshot) !==
-            JSON.stringify(sourcesBefore[index].snapshot),
-        )
-      ) {
-        pendingError = new GeneratedFixtureVerificationError(
-          "FIXTURE_SOURCE_CHANGED",
-        );
-      }
-    } catch {
-      pendingError = new GeneratedFixtureVerificationError(
-        "FIXTURE_SOURCE_CHANGED",
-      );
+      await requireUnchangedSources(sourcesBefore);
+    } catch (error) {
+      pendingError = error;
     }
 
-    if (!(await cleanupOwnedDirectory(owner))) {
+    if (owner !== undefined && !(await cleanupOwnedDirectory(owner))) {
       pendingError = new GeneratedFixtureVerificationError(
         "VERIFICATION_CLEANUP_FAILED",
       );
@@ -2504,204 +2337,123 @@ function requireAdapters(adapters) {
   }
 }
 
-async function requireFixtureWitnessInputs(input) {
-  try {
-    if (await realpath(input.retainedRoot) !== input.retainedRoot ||
-        await realpath(input.witnessRoot) !== input.witnessRoot ||
-        (input.jobAttemptRoot !== undefined && await realpath(input.jobAttemptRoot) !== input.jobAttemptRoot)) fail("FIXTURE_WITNESS_INVALID");
-    const [retained, publicBuild, jobAttempt, projectSections] = await Promise.all([
-      inspectFixture(input.retainedRoot, input.retained),
-      snapshotTree(input.witnessRoot),
-      input.jobAttemptRoot === undefined ? undefined : snapshotTree(input.jobAttemptRoot),
-      requireSectionWitness(input.sectionRoot, projectSectionPaths),
-    ]);
-    if (fingerprint(JSON.stringify(retained)) !== retainedFixtureDigests[input.retained.identifier] ||
-        !jsonMatches(publicBuild.map(({ path }) => path), publicBuildWitnessPaths) ||
-        (jobAttempt !== undefined && !jsonMatches(jobAttempt.map(({ path }) => path), jobAttemptWitnessPaths))) fail("FIXTURE_WITNESS_INVALID");
-    return { publicBuild, jobAttempt, projectSections };
-  } catch {
-    fail("FIXTURE_WITNESS_INVALID");
-  }
-}
-
-async function requireSectionWitness(root, paths) {
-  try {
-    if (await realpath(root) !== root) fail("FIXTURE_WITNESS_INVALID");
-    const snapshot = await snapshotTree(root);
-    if (!jsonMatches(snapshot.map(({ path }) => path), paths)) fail("FIXTURE_WITNESS_INVALID");
-    return snapshot;
-  } catch {
-    fail("FIXTURE_WITNESS_INVALID");
-  }
-}
-
-async function requireFixtureWitnessDirectory(witnessDirectory, identifiers) {
-  if (await realpath(witnessDirectory) !== witnessDirectory) fail("FIXTURE_WITNESS_INVALID");
-  const entries = await readdir(witnessDirectory, { withFileTypes: true });
-  if (entries.some(entry => !entry.isDirectory()) || !jsonMatches(
-    entries.map(entry => entry.name).sort(codePointCompare),
-    [...identifiers].sort(codePointCompare),
-  )) fail("FIXTURE_WITNESS_INVALID");
-}
-
-async function writeFixtureWitness(reconstruction, path, content, retainedFingerprint) {
-  const destination = join(reconstruction, path);
+async function replaceCheckedFixtureFile(root, path, content, expectedFingerprint) {
+  const destination = join(root, path);
   const parent = dirname(destination);
-  if (await realpath(parent) !== parent) fail("FIXTURE_WITNESS_INVALID");
-  const existing = retainedFingerprint !== undefined;
-  const flags = fileConstants.O_RDWR | fileConstants.O_NOFOLLOW | fileConstants.O_NONBLOCK |
-    (existing ? 0 : fileConstants.O_CREAT | fileConstants.O_EXCL);
-  const file = await open(destination, flags, 0o644);
+  if (await realpath(parent) !== parent) fail("VERIFICATION_SETUP_FAILED");
+
+  const file = await open(destination, fileConstants.O_RDWR | fileConstants.O_NOFOLLOW | fileConstants.O_NONBLOCK);
   try {
     const stats = await file.stat();
-    if (!stats.isFile() || stats.nlink !== 1) fail("FIXTURE_WITNESS_INVALID");
-    if (existing) {
-      if (fingerprint(await file.readFile()) !== retainedFingerprint) fail("FIXTURE_WITNESS_INVALID");
-      await file.truncate(0);
+    if (!stats.isFile() || stats.nlink !== 1 || fingerprint(await file.readFile()) !== expectedFingerprint) {
+      fail("VERIFICATION_SETUP_FAILED");
     }
+    await file.truncate(0);
     const { bytesWritten } = await file.write(content, 0, content.length, 0);
-    if (bytesWritten !== content.length) fail("FIXTURE_WITNESS_INVALID");
+    if (bytesWritten !== content.length) fail("VERIFICATION_SETUP_FAILED");
   } finally {
     await file.close();
   }
 }
 
-async function applyFixtureWitness(reconstruction, owner, witnessRoot, witness, existingSnapshot) {
-  const existingFingerprints = new Map(existingSnapshot.map(({ path, fingerprint }) => [path, fingerprint]));
-  for (const { path, fingerprint: expected } of witness) {
-    const content = await readFile(join(witnessRoot, path));
-    if (fingerprint(content) !== expected || !(await pathIdentityMatches(owner))) fail("FIXTURE_WITNESS_INVALID");
-    await writeFixtureWitness(reconstruction, path, content, existingFingerprints.get(path));
-  }
+async function matchesFixtureRoot(identity) {
+  return await pathIdentityMatches(identity) && await realpath(identity.path) === identity.path;
 }
 
-async function withCurrentFixtureSources(fixtureRepositoryRoot, identifiers, operation) {
-  let witnessDirectory;
-  let jobAttemptDirectory;
-  let sectionDirectory;
-  let publicContentRoutingDirectory;
-  let persistenceTargetDirectory;
+async function sourceForRoot(root, contract, expectedDigest) {
+  const fixedRoot = resolve(root);
+  let identity;
+  if (expectedDigest !== undefined) {
+    try {
+      identity = await readPathIdentity(fixedRoot);
+      if (!await matchesFixtureRoot(identity)) fail("FIXTURE_PATH_INVALID");
+    } catch {
+      fail("FIXTURE_PATH_INVALID");
+    }
+  }
+  const snapshot = await inspectFixture(fixedRoot, contract, identity !== undefined);
+  if (identity !== undefined && !await matchesFixtureRoot(identity).catch(() => false)) fail("FIXTURE_PATH_INVALID");
+  if (expectedDigest !== undefined && fingerprint(JSON.stringify(snapshot)) !== expectedDigest) {
+    fail("FIXTURE_CONTENT_INVALID");
+  }
+  return { contract, root: fixedRoot, snapshot, identity };
+}
+
+async function fixedFixtureSources(fixtureRepositoryRoot, contracts) {
   let root;
-  const fixtureIdentifiers = generatedFixtureContracts.map(({ identifier }) => identifier);
-  const requireWitnessDirectories = () => Promise.all([
-    requireFixtureWitnessDirectory(witnessDirectory, fixtureIdentifiers),
-    requireFixtureWitnessDirectory(jobAttemptDirectory, Object.keys(jobAttemptWitnesses)),
-    requireFixtureWitnessDirectory(sectionDirectory, [...fixtureIdentifiers, "shared"]),
-    requireFixtureWitnessDirectory(persistenceTargetDirectory, ["shared", ...Object.keys(persistenceTargetFixtureDigests)]),
-  ]);
   try {
     root = await realpath(fixtureRepositoryRoot);
-    witnessDirectory = resolve(root, publicBuildWitnessDirectory);
-    jobAttemptDirectory = resolve(root, jobAttemptWitnessDirectory);
-    sectionDirectory = resolve(root, sectionWitnessDirectory);
-    publicContentRoutingDirectory = resolve(root, publicContentRoutingWitnessDirectory);
-    persistenceTargetDirectory = resolve(root, persistenceTargetWitnessDirectory);
-    await requireWitnessDirectories();
   } catch {
-    fail("FIXTURE_WITNESS_INVALID");
+    fail("FIXTURE_PATH_INVALID");
   }
-  const inputs = identifiers.map(identifier => {
-    const retained = contractForIdentifier(identifier);
-    return {
-      retained,
-      retainedRoot: resolve(root, retained.relativeRoot),
-      witnessRoot: resolve(witnessDirectory, identifier),
-      jobAttemptRoot: Object.hasOwn(jobAttemptWitnesses, identifier) ? resolve(jobAttemptDirectory, identifier) : undefined,
-      sectionRoot: resolve(sectionDirectory, identifier),
-    };
-  });
-  const sharedSectionRoot = resolve(sectionDirectory, "shared");
-  const persistenceTargetGroups = [
-    ["shared", persistenceTargetWitnessPaths],
-    ...Object.keys(persistenceTargetFixtureDigests).map(identifier => [identifier, [".egeria/state.json"]]),
-  ];
-  const readWitnesses = () => Promise.all([
-    requireSectionWitness(sharedSectionRoot, sharedSectionPaths),
-    Promise.all(inputs.map(requireFixtureWitnessInputs)),
-    readPublicContentRoutingWitnesses(publicContentRoutingDirectory),
-    Promise.all(persistenceTargetGroups.map(async ([name, paths]) => [
-      name, await requireSectionWitness(join(persistenceTargetDirectory, name), paths),
-    ])),
-  ]);
-  const originalWitnesses = await readWitnesses();
-  const [sharedSections, before, publicContentRouting, persistenceTargetWitnessEntries] = originalWitnesses;
-  const persistenceTargetWitnesses = Object.fromEntries(persistenceTargetWitnessEntries);
-  const owner = await createGeneratedFixtureOwner();
+  return Promise.all(contracts.map(contract => sourceForRoot(
+    resolve(root, contract.relativeRoot), contract, currentFixtureDigests[contract.identifier],
+  )));
+}
+
+async function requireUnchangedSources(sources) {
   try {
-    const ownedRoot = await realpath(owner.path);
-    const sources = [];
-    for (const [index, input] of inputs.entries()) {
-      const identifier = input.retained.identifier;
-      const reconstruction = join(ownedRoot, identifier);
-      try {
-        if (!(await pathIdentityMatches(owner)) || await realpath(owner.path) !== ownedRoot) fail("FIXTURE_WITNESS_INVALID");
-        await cp(input.retainedRoot, reconstruction, { recursive: true, force: false, errorOnExist: true, dereference: false });
-        const copied = await snapshotTree(reconstruction);
-        if (fingerprint(JSON.stringify(copied)) !== retainedFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
-        const { publicBuild, jobAttempt, projectSections } = before[index];
-        await applyFixtureWitness(reconstruction, owner, input.witnessRoot, publicBuild, copied);
-        if (jobAttempt !== undefined) {
-          const publicBuildSnapshot = await snapshotTree(reconstruction);
-          if (fingerprint(JSON.stringify(publicBuildSnapshot)) !== publicBuildFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
-          await applyFixtureWitness(reconstruction, owner, input.jobAttemptRoot, jobAttempt, publicBuildSnapshot);
-        }
-        const predecessor = await snapshotTree(reconstruction);
-        const predecessorDigest = jobAttemptWitnesses[identifier]?.digest ?? publicBuildFixtureDigests[identifier];
-        if (fingerprint(JSON.stringify(predecessor)) !== predecessorDigest) fail("FIXTURE_WITNESS_INVALID");
-        await applyFixtureWitness(reconstruction, owner, sharedSectionRoot, sharedSections, predecessor);
-        await applyFixtureWitness(reconstruction, owner, input.sectionRoot, projectSections, predecessor);
-        const sectionSnapshot = await snapshotTree(reconstruction);
-        if (fingerprint(JSON.stringify(sectionSnapshot)) !== sectionFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
-        for (const group of publicContentRoutingGroups(input.retained)) {
-          const members = group === "booking-selected" && !input.retained.expectedMultilingualVersion
-            ? publicContentRouting[group].filter(({ path }) => path === "apps/web/content/fr-CA/booking-calendly.yaml")
-            : publicContentRouting[group];
-          await applyFixtureWitness(reconstruction, owner, join(publicContentRoutingDirectory, group), members, sectionSnapshot);
-        }
-        if (Object.hasOwn(persistenceTargetFixtureDigests, identifier)) {
-          const routingSnapshot = await snapshotTree(reconstruction);
-          if (fingerprint(JSON.stringify(routingSnapshot)) !== publicContentRoutingFixtureDigests[identifier]) fail("FIXTURE_WITNESS_INVALID");
-          for (const group of ["shared", identifier]) {
-            await applyFixtureWitness(reconstruction, owner, join(persistenceTargetDirectory, group), persistenceTargetWitnesses[group], routingSnapshot);
-          }
-        }
-      } catch {
-        fail("FIXTURE_WITNESS_INVALID");
-      }
-      const source = await sourceForRoot(reconstruction, currentFixtureContract(identifier));
-      const expectedDigest = persistenceTargetFixtureDigests[identifier] ?? publicContentRoutingFixtureDigests[identifier] ?? sectionFixtureDigests[identifier];
-      if (fingerprint(JSON.stringify(source.snapshot)) !== expectedDigest) fail("FIXTURE_WITNESS_INVALID");
-      sources.push(source);
+    await Promise.all(sources.map(async source => {
+      if (source.identity !== undefined && !await matchesFixtureRoot(source.identity)) fail("FIXTURE_SOURCE_CHANGED");
+      const snapshot = await inspectFixture(source.root, source.contract, source.identity !== undefined);
+      if (!jsonMatches(snapshot, source.snapshot)) fail("FIXTURE_SOURCE_CHANGED");
+    }));
+  } catch {
+    fail("FIXTURE_SOURCE_CHANGED");
+  }
+}
+
+async function requireVerificationOwner(createOwner) {
+  let owner;
+  try {
+    owner = await createOwner();
+  } catch {
+    fail("VERIFICATION_SETUP_FAILED");
+  }
+  if (!await pathIdentityMatches(owner)) fail("VERIFICATION_SETUP_FAILED");
+  return owner;
+}
+
+async function copyCheckedFixture(source, owner, directoryName) {
+  try {
+    if (!await pathIdentityMatches(owner)) fail("VERIFICATION_SETUP_FAILED");
+    const root = join(owner.path, directoryName);
+    const physicalRoot = join(await realpath(owner.path), directoryName);
+    await cp(source.root, root, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    });
+    const identity = await readPathIdentity(physicalRoot);
+    const files = source.identity === undefined ? undefined : source.contract.expectedFiles;
+    if (!await pathIdentityMatches(owner) || await realpath(root) !== physicalRoot ||
+        !await matchesFixtureRoot(identity) ||
+        !jsonMatches(await snapshotTree(root, files), source.snapshot)) fail("VERIFICATION_SETUP_FAILED");
+    return { root, identity };
+  } catch {
+    fail("VERIFICATION_SETUP_FAILED");
+  }
+}
+
+export async function withCurrentGeneratedFixture(identifier, operation) {
+  const [source] = await fixedFixtureSources(repositoryRoot, [contractForIdentifier(identifier)]);
+  let owner;
+  try {
+    owner = await requireVerificationOwner(createGeneratedFixtureOwner);
+    const copy = await copyCheckedFixture(source, owner, identifier);
+    try {
+      return await operation(copy.root, source.contract);
+    } finally {
+      await requireUnchangedSources([{ ...source, ...copy }]);
     }
-    return await operation(sources);
   } finally {
     try {
-      await requireWitnessDirectories();
-      const after = await readWitnesses();
-      if (!jsonMatches(originalWitnesses, after)) fail("FIXTURE_SOURCE_CHANGED");
-    } catch {
-      fail("FIXTURE_SOURCE_CHANGED");
+      await requireUnchangedSources([source]);
     } finally {
-      if (!(await cleanupOwnedDirectory(owner))) fail("VERIFICATION_CLEANUP_FAILED");
+      if (owner !== undefined && !await cleanupOwnedDirectory(owner)) fail("VERIFICATION_CLEANUP_FAILED");
     }
   }
-}
-
-export function withCurrentGeneratedFixture(identifier, operation) {
-  return withCurrentFixtureSources(repositoryRoot, [identifier], async ([source]) => {
-    const result = await operation(source.root, source.contract);
-    if (!jsonMatches(await inspectFixture(source.root, source.contract), source.snapshot)) fail("FIXTURE_SOURCE_CHANGED");
-    return result;
-  });
-}
-
-async function sourceForRoot(root, contract) {
-  const fixedRoot = resolve(root);
-  return {
-    contract,
-    root: fixedRoot,
-    snapshot: await inspectFixture(fixedRoot, contract),
-  };
 }
 
 export async function verifyGeneratedSkeletonsForTesting(
@@ -2716,11 +2468,8 @@ export async function verifyGeneratedSkeletonsForTesting(
   const firstFixture = Object.hasOwn(options, "fromFixture")
     ? fixedFixtureIndex(fromFixture, "VERIFICATION_OPTION_INVALID")
     : 0;
-  return withCurrentFixtureSources(
-    fixtureRepositoryRoot,
-    generatedFixtureContracts.map(({ identifier }) => identifier),
-    (sources) => verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture),
-  );
+  const sources = await fixedFixtureSources(fixtureRepositoryRoot, generatedFixtureContracts);
+  return verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture);
 }
 
 export function verifyGeneratedProject(
@@ -2748,13 +2497,10 @@ export async function verifyGeneratedProjectForTesting(
   adapters,
   expectedProjectName,
   options = defaultVerificationOptions,
-  retained = false,
 ) {
   requireAdapters(adapters);
   requireVerificationOptions(options);
-  const contract = retained
-    ? { ...contractForIdentifier(identifier), ...(expectedProjectName === undefined ? {} : { projectName: expectedProjectName }) }
-    : contractForGeneratedProject(identifier, expectedProjectName);
+  const contract = contractForGeneratedProject(identifier, expectedProjectName);
   const source = await sourceForRoot(root, contract);
   return verifySourcesWithAdapters(adapters, [source], options);
 }

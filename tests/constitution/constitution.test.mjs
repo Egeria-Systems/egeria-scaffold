@@ -17,7 +17,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 
 import { listRepositoryPaths } from "../../scripts/check-semantic-naming.mjs";
-import { withCurrentGeneratedFixture } from "../../scripts/verify-generated-skeletons.mjs";
+import { generatedFixtureContracts } from "../../scripts/verify-generated-skeletons.mjs";
 
 import { isPinnedGitHubActionReference } from "../helpers/github-actions.mjs";
 import { exactSemanticVersionPattern } from "../helpers/semantic-version.mjs";
@@ -2876,7 +2876,11 @@ test("repository documentation has no broken local Markdown links", async () => 
   const brokenLinks = [];
   const persistenceGuide = "docs/application-persistence.md";
   const persistenceGuideTemplate = `packages/builder-core/templates/application-persistence/application-environments/target-validation/${persistenceGuide}`;
-  const persistenceGuideWitness = `tests/generated-fixtures/fixtures/persistence-target-validation/shared/${persistenceGuide}`;
+  const archivedSparseGuides = new Set([
+    `tests/generated-fixtures/fixtures/persistence-target-validation/shared/${persistenceGuide}`,
+    ...generatedFixtureContracts.map(({ identifier }) =>
+      `tests/generated-fixtures/fixtures/section-contracts/${identifier}/apps/web/AGENTS.md`),
+  ]);
 
   async function checkLinks(markdownFile, root, sourcePaths, repositoryMarkdownPath) {
     const document = await readFile(markdownFile, "utf8");
@@ -2942,19 +2946,10 @@ test("repository documentation has no broken local Markdown links", async () => 
     const repositoryMarkdownPath = relative(repositoryRoot, markdownFile)
       .split(sep)
       .join("/");
-    const sparseGuide = /^tests\/generated-fixtures\/fixtures\/section-contracts\/([a-z0-9-]+)\/apps\/web\/AGENTS\.md$/u.exec(
-      repositoryMarkdownPath,
-    );
-    if (repositoryMarkdownPath === persistenceGuideWitness) {
-      for (const identifier of ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"]) {
-        await withCurrentGeneratedFixture(identifier, (root, contract) =>
-          checkLinks(resolve(root, persistenceGuide), root, contract.expectedFiles, repositoryMarkdownPath),
-        );
-      }
-    } else if (sparseGuide) {
-      await withCurrentGeneratedFixture(sparseGuide[1], (root, contract) =>
-        checkLinks(resolve(root, "apps/web/AGENTS.md"), root, contract.expectedFiles, repositoryMarkdownPath),
-      );
+    if (archivedSparseGuides.has(repositoryMarkdownPath)) continue;
+    const fixture = generatedFixtureContracts.find(({ relativeRoot }) => repositoryMarkdownPath.startsWith(relativeRoot + "/"));
+    if (fixture) {
+      await checkLinks(markdownFile, resolve(repositoryRoot, fixture.relativeRoot), fixture.expectedFiles, repositoryMarkdownPath);
     } else {
       await checkLinks(markdownFile, repositoryRoot, repositoryPaths, repositoryMarkdownPath);
     }

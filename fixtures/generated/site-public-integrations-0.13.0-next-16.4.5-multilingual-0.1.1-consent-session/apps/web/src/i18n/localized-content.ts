@@ -20,15 +20,6 @@ export type LocalizedPageContent = Readonly<{
   sections: readonly PageSection[];
 }>;
 
-export type LocalizedBookingContent = Readonly<{
-  heading: string;
-  summary: string;
-  linkLabel: string;
-  frameTitle: string;
-  popupHeading: string;
-  closeLabel: string;
-}>;
-
 export type LocalizedErrorContent = Readonly<{
   heading: string;
   summary: string;
@@ -45,7 +36,6 @@ export type LocalizedCatalog = Readonly<{
   localeSwitch: Readonly<{ label: string }>;
   pages: Readonly<Record<string, LocalizedPageContent>>;
   notFound: LocalizedPageContent;
-  booking: LocalizedBookingContent;
   error: LocalizedErrorContent;
 }>;
 
@@ -53,15 +43,6 @@ export type LocalizedRoute =
   | Readonly<{ kind: "page"; identifier: string; path: string }>
   | Readonly<{ kind: "redirect"; path: string }>
   | Readonly<{ kind: "not-found" }>;
-
-const bookingKeys = [
-  "heading",
-  "summary",
-  "linkLabel",
-  "frameTitle",
-  "popupHeading",
-  "closeLabel",
-] as const;
 
 const errorKeys = ["heading", "summary", "retryLabel"] as const;
 
@@ -133,20 +114,6 @@ function parseLocaleSwitch(value: unknown): LocalizedCatalog["localeSwitch"] {
     return contentInvalid();
   }
   return { label: value.label };
-}
-
-function parseBooking(value: unknown): LocalizedBookingContent {
-  if (!isUnknownRecord(value) || !hasExactKeys(value, bookingKeys)) {
-    return contentInvalid();
-  }
-  for (const key of bookingKeys) {
-    if (!isNonEmptyString(value[key])) {
-      return contentInvalid();
-    }
-  }
-  return Object.fromEntries(
-    bookingKeys.map((key) => [key, value[key]]),
-  ) as LocalizedBookingContent;
 }
 
 function parseError(value: unknown): LocalizedErrorContent {
@@ -237,7 +204,6 @@ export function parseLocalizedCatalog(
       "localeSwitch",
       "pages",
       "notFound",
-      "booking",
       "error",
     ]) ||
     !isUnknownRecord(value.accessibility) ||
@@ -269,7 +235,6 @@ export function parseLocalizedCatalog(
       ]),
     ),
     notFound: parseLocalizedPage(value.notFound),
-    booking: parseBooking(value.booking),
     error: parseError(value.error),
   };
 }

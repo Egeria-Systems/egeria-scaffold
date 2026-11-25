@@ -25,6 +25,7 @@ const currentTransitionContexts = { current: createGenerationRenderingContext() 
 const currentSiteAppMigration = `transition-site-${currentTransitionCohorts[0].site.replaceAll(".", "-")}-to-app-${currentTransitionCohorts[0].app.replaceAll(".", "-")}`;
 
 import { parseDocument } from "yaml";
+import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
 import {
   appTransitionVisualProject,
@@ -607,7 +608,9 @@ test("app transitions execute in real linked worktrees through production Git an
 
 test("installed incoming app transitions ignore changed generation defaults", async () => {
   for (const [next, fixtureSuffix] of [["16.4.1", ""], ["16.4.5", "-next-16.4.5"]]) {
-    const source = await loadEntries(resolve(repositoryRoot, `fixtures/generated/site-0.13.0${fixtureSuffix}`));
+    const source = next === "16.4.5"
+      ? await readArchivedGeneratedFixture("site")
+      : await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
     const repository = createRepository(source);
     const recipes = core.profileRecipes.splice(0);
     try {
@@ -778,7 +781,7 @@ test("site-to-app preserves its installed deployment, consent bytes and Next gra
 
 test("portfolio execution refuses unadmitted retained and fresh visual inputs before writes", async () => {
   const sources = [
-    await loadEntries(resolve(repositoryRoot, "fixtures/generated/portfolio-0.12.0-next-16.4.5")),
+    await readArchivedGeneratedFixture("portfolio"),
     await appTransitionSource("portfolio"),
   ];
   for (const source of sources) {

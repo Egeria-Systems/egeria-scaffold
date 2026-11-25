@@ -1,6 +1,6 @@
 # Background job delivery
 
-The [common environment guide](environments.md) owns build origins, source identity, prepared artifacts and the protected release sequence.
+The common environment guide at `docs/environments.md` owns build origins, source identity, prepared artifacts and the protected release sequence.
 
 This optional capability generates one shared primary OpenNext Worker. Its ordinary HTTP handler remains intact; a separate Queue module handles jobs. It adds no application workflow, database, email/contact integration, scheduler or public endpoint. Current portfolio/site/app profiles can select it without changing profile or selecting persistence.
 
@@ -18,7 +18,7 @@ The consumer has a ten-second attempt deadline. Expected retry failures and unce
 
 Structural validity is not proof of previous producer admission: newly injected business-invalid envelopes receive the same retention treatment as previously accepted jobs rejected by a replacement validator. This deliberate recovery/privacy tradeoff preserves bounded data without authorizing execution or claiming provenance. Keep the dead-letter Queue unconsumed until an authorized operator handles it. Native exhaustion can retain an original malformed body if terminal quarantine itself repeatedly fails; apply the same restricted access and privacy policy to all queued work. Custom diagnostics contain only fixed outcome/error codes, never payloads, raw errors, identities or bodies. Source/configuration changes neither inspect nor delete remote data.
 
-`parseJobEnvelope` checks only bounded structure and target; it never authorizes execution. Producers still use strict `validateJob` before sending. `inspectTerminalJob` identifies a locally recoverable original envelope; `prepareJobRecovery` revalidates its exact schema, restored current declaration and environment and preserves the original operation identity and payload. Retention alone never makes a job recoverable or authorizes replay. They perform no provider I/O, authorization, dispatch, acknowledgement or drain. Before any later operator replay, reconcile whether the side effect already happened and obtain the required authorization. Repair the actual consumer cause first; replaying a poison job without a repair repeats failure. Restore compatible handler versions, payload validators or registration before recovering retained work. Invalid data requires human disposition and is never fabricated into another job.
+`runJobAttempt` checks the envelope, takes one bounded, frozen snapshot, validates it with the selected declaration, and runs that declaration's handler at most once. The result distinguishes malformed envelopes, declaration rejection and executed attempts. Producers still use strict `validateJob` before sending. `inspectTerminalJob` identifies a locally recoverable original envelope. `prepareJobRecovery` revalidates its exact schema, restored current declaration and environment and preserves the original operation identity and payload. Both recovery functions are pure. Retention alone never authorizes execution or replay. Before any later operator replay, reconcile whether the side effect already happened and obtain the required authorization. Restore compatible handler versions, payload validators or registration before recovering retained work.
 
 ## Configuration and authority
 
@@ -26,7 +26,7 @@ Structural validity is not proof of previous producer admission: newly injected 
 
 A provider Queue is bounded retention, not indefinite archival storage. Workers Free fixes retention at 24 hours; messages that expire are deleted by the provider. Do not assume that a DLQ transfer gives an additional 24-hour recovery window: inspect the provider's actual message age/expiry and act within the remaining time. No code here extends retention, archives expired messages or adds paid capacity. Source rollback does not recover expired work or reverse side effects. Never lower retention or discard queued data as part of source recovery.
 
-Jobs 0.3.0 supports fresh generation and verification. Existing-repository jobs lifecycle, upgrades, profile transitions and unrelated operations on jobs-bearing repositories refuse. The credentialed operator command belonged to jobs 0.2.0. Preserve the worktree and queued resources during recovery. Remote replay, drain, purge and deletion require separate operator decisions and tooling.
+Jobs 0.4.0 supports fresh generation and verification. Existing-repository jobs lifecycle, upgrades, profile transitions and unrelated operations on jobs-bearing repositories refuse. The credentialed operator command belonged to jobs 0.2.0. Preserve the worktree and queued resources during recovery. Remote replay, drain, purge and deletion require separate operator decisions and tooling.
 
 ## Local evidence and limits
 
@@ -47,6 +47,8 @@ Provider documentation describes production contracts; the local acknowledgement
 ## Common target and prepared queue identity
 
 `APPLICATION_ENVIRONMENT` and the compiled build target must agree before dispatch or consumption. Development maps only to `JOB_ENVIRONMENT=local`; staging and production retain their names. The queue wrapper reads the copied build identity through its Text module and passes that target explicitly. A target mismatch fails before send, acknowledgement or handler effects. Correct the target and rebuild in a new local checkout; never relabel an existing artifact.
+
+Set `BUILD_SOURCE_REVISION` to exactly 40 lowercase hexadecimal characters before a jobs production build. Next loads `apps/web/.env.local` in its usual order and gives an explicit process value precedence. For local preparation, set the revision there or in the build process, run `pnpm run build` at the project root, then run `pnpm --dir apps/web exec opennextjs-cloudflare build --skipNextBuild`. The copy at `apps/web/.open-next/assets/BUILD_ID` binds the target and revision. The same revision requirement applies when `build:cloudflare`, `preview`, or root `verify` starts the production build. Ordinary Next development keeps its optional revision.
 
 Generate each target's native Wrangler dry-run bundle and metadata before recording its artifact, as shown in the common guide. The receipt covers bundler inputs and every emitted module. Actual local Wrangler verification is required; static source checks do not establish the pinned Text import or output layout. Jobs selection is independent of persistence and email. Existing-repository jobs lifecycle remains closed for these targets.
 

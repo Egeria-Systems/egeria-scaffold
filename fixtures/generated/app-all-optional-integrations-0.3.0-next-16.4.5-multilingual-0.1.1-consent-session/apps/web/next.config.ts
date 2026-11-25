@@ -2,57 +2,26 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 import type { NextConfig } from "next";
 import { fileURLToPath } from "node:url";
 
-import { resolveBookingDestination } from "./src/integrations/booking-calendly/booking-settings.ts";
+import { readPublicBuildEnvironment, resolvePublicBuild } from "./src/configuration/public-build.ts";
 
-import { resolveApplicationBuild } from "./src/configuration/application-build.ts";
+const configurationErrorCodes = {
+  base: "APPLICATION_BUILD_INVALID",
+  contact: "CONTACT_CONFIGURATION_INVALID",
+  booking: "BOOKING_CONFIGURATION_INVALID",
+  analytics: "ANALYTICS_CONFIGURATION_INVALID",
+};
 
-
-import { resolveAnalyticsConfiguration } from "./src/integrations/analytics/analytics-configuration.ts";
-import { analyticsSettings } from "./src/integrations/analytics/analytics-settings.ts";
-
-const build = resolveApplicationBuild({
-  applicationEnvironment: process.env.APPLICATION_ENVIRONMENT,
-  publicApplicationEnvironment: process.env.NEXT_PUBLIC_APPLICATION_ENVIRONMENT,
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
-  sourceRevision: process.env.BUILD_SOURCE_REVISION,
-  deploymentId: process.env.NEXT_DEPLOYMENT_ID,
-}, "local");
-if (!build.ok) {
-  throw new Error(`APPLICATION_BUILD_INVALID:${build.issue.field}:${build.issue.reason}`);
+const result = resolvePublicBuild(readPublicBuildEnvironment(), "local");
+if (!result.ok) {
+  throw new Error(`${configurationErrorCodes[result.source]}:${result.field}:${result.reason}`);
 }
-const target = build.value.target;
-const buildId = build.value.buildId;
-
-const booking = resolveBookingDestination(process.env.NEXT_PUBLIC_CALENDLY_URL, target);
-if (!booking.ok) {
-  throw new Error(`BOOKING_CONFIGURATION_INVALID:${booking.issue.field}:${booking.issue.reason}`);
-}
-
-const analytics = resolveAnalyticsConfiguration(analyticsSettings, {
-  enabled: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED,
-  cloudflareToken: process.env.NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN,
-  googleMeasurementId: process.env.NEXT_PUBLIC_GA4_MEASUREMENT_ID,
-  clarityProjectId: process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID,
-  googleSiteVerification: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION,
-  siteUrl: process.env.NEXT_PUBLIC_SITE_URL,
-}, target);
-if (!analytics.ok) {
-  throw new Error(`ANALYTICS_CONFIGURATION_INVALID:${analytics.issue.field}:${analytics.issue.reason}`);
-}
+const { build: { buildId }, publicValues } = result.value;
 
 initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
   ...(buildId === undefined ? {} : { generateBuildId: async () => buildId }),
-  env: {
-    NEXT_PUBLIC_APPLICATION_ENVIRONMENT: target,
-    NEXT_PUBLIC_ANALYTICS_ENABLED: process.env.NEXT_PUBLIC_ANALYTICS_ENABLED ?? "",
-    NEXT_PUBLIC_CLOUDFLARE_WEB_ANALYTICS_TOKEN: analytics.configuration.cloudflareToken ?? "",
-    NEXT_PUBLIC_GA4_MEASUREMENT_ID: analytics.configuration.googleMeasurementId ?? "",
-    NEXT_PUBLIC_CLARITY_PROJECT_ID: analytics.configuration.clarityProjectId ?? "",
-    NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION: analytics.configuration.googleSiteVerification ?? "",
-    NEXT_PUBLIC_CALENDLY_URL: booking.destination ?? "",
-  },
+  env: publicValues,
   output: "standalone",
   outputFileTracingRoot: fileURLToPath(new URL("../../", import.meta.url)),
   reactStrictMode: true,

@@ -1,6 +1,6 @@
 import { Effect } from "effect";
 import { expect, it, vi } from "vitest";
-import { JobDispatcher, JobHandlerFailure, inspectTerminalJob, prepareJobRecovery, validateJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
+import { JobDispatcher, JobHandlerFailure, inspectTerminalJob, prepareJobRecovery, runJobAttempt, validateJob, type JobDefinition, type JobEnvelope } from "@/src/application/job-delivery";
 import { serverJobDispatcherLayer, consumeServerJobs } from "@/src/composition/server-jobs";
 import { createMemoryJobDelivery } from "@/src/infrastructure/memory/job-delivery";
 import { createCloudflareJobDispatcherLayer, consumeCloudflareJobs } from "@/src/infrastructure/cloudflare/job-delivery";
@@ -16,6 +16,107 @@ const definition = (handle: JobDefinition["handle"]): JobDefinition => ({
     Object.keys(payload).length === 1 && typeof payload.sequence === "number" && Number.isSafeInteger(payload.sequence), handle,
 });
 const dispatch = (job: JobEnvelope) => Effect.flatMap(JobDispatcher, (dispatcher) => dispatcher.dispatch(job));
+
+it("a checked attempt validates and executes the same isolated snapshot once", async () => {
+  const input = envelope({ payload: { entries: [{ sequence: 1 }] } });
+  let validated: JobEnvelope["payload"] | undefined;
+  const validate = vi.fn((payload: JobEnvelope["payload"]) => {
+    validated = payload;
+    return true;
+  });
+  const handle = vi.fn((job: JobEnvelope, { attempt }: { attempt: number }) => Effect.sync(() => {
+    expect(job.payload).toBe(validated);
+    expect(attempt).toBe(3);
+    expect(Object.isFrozen(job)).toBe(true);
+    expect(Object.isFrozen(job.payload)).toBe(true);
+    expect(Object.isFrozen(job.payload.entries)).toBe(true);
+    expect(job.payload).toEqual({ entries: [{ sequence: 1 }] });
+  }));
+  const pending = runJobAttempt(input, "local", [{ ...definition(handle), validate }], 3);
+  Reflect.set(input.payload, "entries", []);
+  const result = await pending;
+  expect(result).toMatchObject({ kind: "executed", decision: { outcome: "completed" } });
+  expect(validate).toHaveBeenCalledOnce();
+  expect(handle).toHaveBeenCalledOnce();
+  expect(Object.isFrozen(Reflect.get(Object(validated?.entries), "0"))).toBe(true);
+});
+
+it("a checked attempt reads a bounded JSON snapshot before declaration validation", async () => {
+  const sequence = vi.fn().mockReturnValueOnce(1).mockReturnValue(Infinity);
+  const handle = vi.fn(() => Effect.void);
+  const input = envelope({ payload: { get sequence() { return sequence(); } } });
+  const result = await runJobAttempt(input, "local", [definition(handle)], 1);
+  expect(result).toMatchObject({ kind: "executed", job: { payload: { sequence: 1 } }, decision: { outcome: "completed" } });
+  expect(sequence).toHaveBeenCalledOnce();
+  expect(handle).toHaveBeenCalledOnce();
+});
+
+it("stops expanding oversized shared strings before visiting the rest of the payload", async () => {
+  const chunk = "a".repeat(2_048);
+  const read = vi.fn(() => chunk);
+  const shared = { get chunk() { return read(); } };
+  const entries = Array.from({ length: 12 }, () => shared);
+  const validate = vi.fn(() => true);
+  const handle = vi.fn(() => Effect.void);
+  const result = await runJobAttempt(envelope({ payload: { entries } }), "local", [{ ...definition(handle), validate }], 1);
+  expect(result).toEqual({ kind: "malformed-envelope", code: "job-validation", operationId });
+  expect(read.mock.calls.length).toBeLessThan(entries.length);
+  expect(validate).not.toHaveBeenCalled();
+  expect(handle).not.toHaveBeenCalled();
+});
+
+it("stops expanding oversized shared containers with short values", () => {
+  const read = vi.fn(() => null);
+  const shared = { get value() { return read(); } };
+  const row = Array.from({ length: 48 }, () => shared);
+  const rows = Array.from({ length: 32 }, () => row);
+  const handlers = [{ ...definition(() => Effect.void), validate: () => true }];
+  expect(() => validateJob(envelope({ payload: { rows } }), "local", handlers))
+    .toThrow(expect.objectContaining({ code: "job-validation" }));
+  expect(read.mock.calls.length).toBeLessThan(rows.length * row.length);
+});
+
+it("preserves the exact UTF-8 envelope boundary with shared values and JSON escaping", () => {
+  const shared = { chunk: "é".repeat(2_048) };
+  const entries = [shared, shared, shared, "a".repeat(2_048), '"\\\n'];
+  const encodedBytes = (job: JobEnvelope) => new TextEncoder().encode(JSON.stringify(job)).byteLength;
+  const atLimit = (padding: string) => envelope({ payload: { entries, padding } });
+  const padding = "x".repeat(16_384 - encodedBytes(atLimit("")));
+  const handlers = [{ ...definition(() => Effect.void), validate: () => true }];
+  expect(encodedBytes(atLimit(padding))).toBe(16_384);
+  expect(validateJob(atLimit(padding), "local", handlers)).toEqual(atLimit(padding));
+  expect(() => validateJob(atLimit(padding + "x"), "local", handlers))
+    .toThrow(expect.objectContaining({ code: "job-validation" }));
+});
+
+it("a checked attempt separates structural and declaration failures without executing either", async () => {
+  const handle = vi.fn(() => Effect.void);
+  const validate = vi.fn(() => true);
+  const handler = { ...definition(handle), validate };
+  const malformed = await runJobAttempt({ ...envelope(), secret: "synthetic-unvalidated" }, "local", [], 1);
+  expect(malformed).toEqual({ kind: "malformed-envelope", code: "job-validation", operationId });
+  expect(await runJobAttempt(envelope({ environment: "production" }), "local", [handler], 1))
+    .toMatchObject({ kind: "malformed-envelope", code: "job-environment" });
+  expect(await runJobAttempt(envelope({ jobVersion: 2 }), "local", [handler], 1))
+    .toEqual({ kind: "declaration-rejection", code: "job-unsupported" });
+  expect(await runJobAttempt(envelope(), "local", [handler, handler], 1))
+    .toEqual({ kind: "declaration-rejection", code: "job-configuration" });
+  expect(validate).not.toHaveBeenCalled();
+  expect(await runJobAttempt(envelope(), "local", [{ ...handler, validate: () => false }], 1))
+    .toEqual({ kind: "declaration-rejection", code: "job-validation" });
+  expect(await runJobAttempt(envelope(), "local", [{ ...handler, validate: () => { throw new Error("synthetic-private"); } }], 1))
+    .toEqual({ kind: "declaration-rejection", code: "job-configuration" });
+  expect(handle).not.toHaveBeenCalled();
+});
+
+it("a checked attempt preserves abort and unknown execution decisions", async () => {
+  const handle = vi.fn(() => Effect.void);
+  expect(await runJobAttempt(envelope(), "local", [definition(handle)], 1, AbortSignal.abort()))
+    .toMatchObject({ kind: "executed", decision: { outcome: "retry", code: "job-handler-cancelled" } });
+  expect(handle).not.toHaveBeenCalled();
+  expect(await runJobAttempt(envelope(), "local", [definition(() => Effect.die("synthetic-private"))], 1))
+    .toMatchObject({ kind: "executed", decision: { outcome: "retry", code: "job-execution-unknown" } });
+});
 
 it("memory dispatch reports acceptance before execution and repeat-safe handlers converge out of order", async () => {
   let sequence = 0;

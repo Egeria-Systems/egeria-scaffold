@@ -1,5 +1,7 @@
+import type { ReactElement } from "react";
+
 import {
-  sectionContentSchemas,
+  sectionDefinitions,
   type CallToActionSection,
   type HeroSection,
   type PageSection,
@@ -125,17 +127,24 @@ function CallToActionSection({
   );
 }
 
-const defaultVariants = Object.freeze(["default"]);
-const supportedProfiles = Object.freeze(["portfolio", "site"]);
+const supportedProfiles = Object.freeze(["portfolio", "site", "app"] as const);
 const noAnalyticsDeclarations = Object.freeze([]);
 const noMigrationHooks = Object.freeze([]);
+
+type SectionComponents = {
+  readonly [Type in PageSection["type"]]: {
+    readonly type: Type;
+    readonly Component: (
+      properties: SectionProperties<Extract<PageSection, { type: Type }>>,
+    ) => ReactElement;
+  };
+};
 
 export const sectionRegistry = Object.freeze({
   hero: Object.freeze({
     type: "hero",
     contentSchemaVersion: "1.0.0",
-    contentSchema: sectionContentSchemas.hero,
-    approvedVariants: defaultVariants,
+    ...sectionDefinitions.hero,
     Component: HeroSection,
     supportedProfiles,
     accessibilityRequirements: Object.freeze(["page-heading-level-one"]),
@@ -145,8 +154,7 @@ export const sectionRegistry = Object.freeze({
   text: Object.freeze({
     type: "text",
     contentSchemaVersion: "1.0.0",
-    contentSchema: sectionContentSchemas.text,
-    approvedVariants: defaultVariants,
+    ...sectionDefinitions.text,
     Component: TextSection,
     supportedProfiles,
     accessibilityRequirements: Object.freeze(["section-heading-level-two"]),
@@ -156,8 +164,7 @@ export const sectionRegistry = Object.freeze({
   "project-list": Object.freeze({
     type: "project-list",
     contentSchemaVersion: "1.0.0",
-    contentSchema: sectionContentSchemas["project-list"],
-    approvedVariants: defaultVariants,
+    ...sectionDefinitions["project-list"],
     Component: ProjectListSection,
     supportedProfiles,
     accessibilityRequirements: Object.freeze([
@@ -171,8 +178,7 @@ export const sectionRegistry = Object.freeze({
   "call-to-action": Object.freeze({
     type: "call-to-action",
     contentSchemaVersion: "1.0.0",
-    contentSchema: sectionContentSchemas["call-to-action"],
-    approvedVariants: defaultVariants,
+    ...sectionDefinitions["call-to-action"],
     Component: CallToActionSection,
     supportedProfiles,
     accessibilityRequirements: Object.freeze([
@@ -182,7 +188,7 @@ export const sectionRegistry = Object.freeze({
     analyticsDeclarations: noAnalyticsDeclarations,
     migrationHooks: noMigrationHooks,
   }),
-});
+} satisfies SectionComponents);
 
 const ProjectListComponent = sectionRegistry["project-list"].Component;
 const CallToActionComponent = sectionRegistry["call-to-action"].Component;

@@ -5,12 +5,15 @@ export type NavigationItem = Readonly<{
   label: string;
 }>;
 
-type SectionBase<Type extends string, Content> = Readonly<{
+type SectionDefinitions = typeof sectionDefinitions;
+type SectionKind = keyof SectionDefinitions;
+
+type SectionBase<Type extends SectionKind> = Readonly<{
   id: string;
   type: Type;
-  variant: "default";
+  variant: SectionDefinitions[Type]["approvedVariants"][number];
   enabled: boolean;
-  content: Content;
+  content: ReturnType<SectionDefinitions[Type]["contentSchema"]>;
 }>;
 
 export type HeroSectionContent = Readonly<{
@@ -39,22 +42,14 @@ export type CallToActionSectionContent = Readonly<{
   href: string;
 }>;
 
-export type HeroSection = SectionBase<"hero", HeroSectionContent>;
-export type TextSection = SectionBase<"text", TextSectionContent>;
-export type ProjectListSection = SectionBase<
-  "project-list",
-  ProjectListSectionContent
->;
-export type CallToActionSection = SectionBase<
-  "call-to-action",
-  CallToActionSectionContent
->;
+export type HeroSection = SectionBase<"hero">;
+export type TextSection = SectionBase<"text">;
+export type ProjectListSection = SectionBase<"project-list">;
+export type CallToActionSection = SectionBase<"call-to-action">;
 
-export type PageSection =
-  | HeroSection
-  | TextSection
-  | ProjectListSection
-  | CallToActionSection;
+export type PageSection = {
+  [Type in SectionKind]: SectionBase<Type>;
+}[SectionKind];
 
 export type ContentConfiguration = Readonly<{
   schemaVersion: "1.0.0";
@@ -339,19 +334,48 @@ function parseCallToActionSectionContent(
   };
 }
 
-export const sectionContentSchemas = Object.freeze({
-  hero: parseHeroSectionContent,
-  text: parseTextSectionContent,
-  "project-list": parseProjectListSectionContent,
-  "call-to-action": parseCallToActionSectionContent,
+export const sectionDefinitions = Object.freeze({
+  hero: Object.freeze({
+    approvedVariants: Object.freeze(["default"] as const),
+    contentSchema: parseHeroSectionContent,
+  }),
+  text: Object.freeze({
+    approvedVariants: Object.freeze(["default"] as const),
+    contentSchema: parseTextSectionContent,
+  }),
+  "project-list": Object.freeze({
+    approvedVariants: Object.freeze(["default"] as const),
+    contentSchema: parseProjectListSectionContent,
+  }),
+  "call-to-action": Object.freeze({
+    approvedVariants: Object.freeze(["default"] as const),
+    contentSchema: parseCallToActionSectionContent,
+  }),
 });
+
+export const sectionContentSchemas = Object.freeze({
+  hero: sectionDefinitions.hero.contentSchema,
+  text: sectionDefinitions.text.contentSchema,
+  "project-list": sectionDefinitions["project-list"].contentSchema,
+  "call-to-action": sectionDefinitions["call-to-action"].contentSchema,
+});
+
+function parseSectionVariant<Variant extends string>(
+  value: unknown,
+  approvedVariants: readonly Variant[],
+): Variant {
+  const variant = approvedVariants.find((approved) => approved === value);
+  if (variant === undefined) {
+    throw new TypeError("CONTENT_INVALID");
+  }
+  return variant;
+}
 
 function parsePageSection(value: unknown): PageSection {
   if (
     !isUnknownRecord(value) ||
     !hasExactKeys(value, ["id", "type", "variant", "enabled", "content"]) ||
     !isSectionIdentifier(value.id) ||
-    value.variant !== "default" ||
     typeof value.enabled !== "boolean"
   ) {
     throw new TypeError("CONTENT_INVALID");
@@ -362,7 +386,7 @@ function parsePageSection(value: unknown): PageSection {
       return {
         id: value.id,
         type: value.type,
-        variant: value.variant,
+        variant: parseSectionVariant(value.variant, sectionDefinitions.hero.approvedVariants),
         enabled: value.enabled,
         content: sectionContentSchemas.hero(value.content),
       };
@@ -370,7 +394,7 @@ function parsePageSection(value: unknown): PageSection {
       return {
         id: value.id,
         type: value.type,
-        variant: value.variant,
+        variant: parseSectionVariant(value.variant, sectionDefinitions.text.approvedVariants),
         enabled: value.enabled,
         content: sectionContentSchemas.text(value.content),
       };
@@ -378,7 +402,7 @@ function parsePageSection(value: unknown): PageSection {
       return {
         id: value.id,
         type: value.type,
-        variant: value.variant,
+        variant: parseSectionVariant(value.variant, sectionDefinitions["project-list"].approvedVariants),
         enabled: value.enabled,
         content: sectionContentSchemas["project-list"](value.content),
       };
@@ -386,7 +410,7 @@ function parsePageSection(value: unknown): PageSection {
       return {
         id: value.id,
         type: value.type,
-        variant: value.variant,
+        variant: parseSectionVariant(value.variant, sectionDefinitions["call-to-action"].approvedVariants),
         enabled: value.enabled,
         content: sectionContentSchemas["call-to-action"](value.content),
       };

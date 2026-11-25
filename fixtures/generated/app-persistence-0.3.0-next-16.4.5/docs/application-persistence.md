@@ -48,20 +48,20 @@ The binding specifications use synthetic test-only schema, SQL, and isolated wor
 
 Run the three local commands above on the generated app. `db:check` verifies the managed configuration; `cf-typegen` generates binding types; `test:integration:bindings` executes the existing fixtures under `apps/web/tests/bindings/` against local workerd. Their two SQL files create only a test table and unique index. The suite checks ordered migration replay without duplicate ledger entries, parameterized read/write of SQL-shaped strings, a real unique-constraint failure that rolls back its prepared batch, and a storage reset followed by replay. These files stay separate from application migrations.
 
-The target test also compiles the test Worker once using Wrangler's local `--dry-run` output. It supplies missing, invalid and contradictory serving targets and missing/wrong bindings, checks that both distinctive local databases remain unchanged, and restores matching runtime input without changing the compiled fixture. This is a synthetic consumer; the separate foundation integration lane exercises the real built Next/OpenNext Worker.
+The target test also compiles the test Worker once using Wrangler's local `--dry-run` output. It supplies missing, invalid and contradictory serving targets and missing/wrong bindings, checks that both distinctive local databases remain unchanged, and restores matching runtime input without changing the compiled fixture. A separate Node test checks refused targets without acquiring the binding. This is a synthetic consumer; the separate foundation integration lane exercises the real built Next/OpenNext Worker.
 
 ### Guard the consuming boundary before SQL
 
-Use `apps/web/docs/application-boundaries.md` in the generated project for a real consumer. The generated pure mapping helper does not acquire bindings or install a production database service. The test-only Worker demonstrates this order inside its consuming function:
+Use `apps/web/docs/application-boundaries.md` in the generated project for a real consumer. The pure target check validates the runtime application target and database label against the compiled target. The consuming adapter acquires and validates its binding after that check. The test-only Worker demonstrates this order inside its consuming function:
 
 ```ts
 const compiled = readCompiledApplicationEnvironment();
 if (!compiled.ok) return new Response(null, { status: 503 });
-const runtime = validateRuntimeApplicationEnvironment(
-  environment.APPLICATION_ENVIRONMENT, compiled.value,
-);
-if (!runtime.ok || environment.APPLICATION_DATABASE_ENVIRONMENT !==
-  resolveApplicationDatabaseEnvironment(runtime.value)) {
+if (!matchesApplicationDatabaseTarget(
+  compiled.value,
+  environment.APPLICATION_ENVIRONMENT,
+  environment.APPLICATION_DATABASE_ENVIRONMENT,
+)) {
   return new Response(null, { status: 503 });
 }
 const binding = environment.APP_DB;

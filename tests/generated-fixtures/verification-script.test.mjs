@@ -32,7 +32,7 @@ import {
   inspectGeneratedFixture,
   parseVerificationArguments,
   verifyApplicationEnvironmentProjectForTesting,
-  verifyGeneratedProjectForTesting as verifyGeneratedProject,
+  verifyGeneratedProjectForTesting,
   withCurrentGeneratedFixture,
   verifyGeneratedSkeletonsForTesting as verifySkeletons,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -43,18 +43,6 @@ const repositoryRoot = resolve(
 );
 const execFileAsync = promisify(execFile);
 const fixtureRoot = identifier => generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot;
-const sectionWitnessTree = "tests/generated-fixtures/fixtures/section-contracts";
-const publicContentRoutingWitnessTree = "tests/generated-fixtures/fixtures/public-content-and-routing";
-const persistenceTargetWitnessTree = "tests/generated-fixtures/fixtures/persistence-target-validation";
-const predecessorFixtureTrees = [
-  "fixtures/generated",
-  "tests/generated-fixtures/fixtures/public-build",
-  "tests/generated-fixtures/fixtures/job-attempts",
-];
-
-function verifyGeneratedProjectForTesting(root, identifier, adapters, expectedProjectName, options) {
-  return verifyGeneratedProject(root, identifier, adapters, expectedProjectName, options, identifier !== "app-calendly");
-}
 const retainedFixtureIdentifier = identifier => ({
   "site-public-integrations": "site-multilingual-analytics",
   "app-jobs": "app",
@@ -84,23 +72,51 @@ test("every generated fixture selection uses the public create argument contract
   }
 });
 
-test("current public content witnesses retain the booked French catalog and locale boundary", async () => {
-  await withCurrentGeneratedFixture("site-public-integrations", async root => {
-    const boundary = await readFile(join(root, "apps/web/app/global-error.tsx"), "utf8");
-    const retained = await readFile(join(repositoryRoot, fixtureRoot("site-public-integrations"), "apps/web/app/global-error.tsx"), "utf8");
-    assert.notEqual(boundary, retained);
+async function copyFixedFixtureRepository(root) {
+  for (const { relativeRoot } of generatedFixtureContracts) {
+    await cp(resolve(repositoryRoot, relativeRoot), join(root, relativeRoot), {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    });
+  }
+}
+
+test("fixed verification reads complete fixture roots without reconstruction inputs", async context => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixed-fixture-roots-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const inputs = join(parent, "inputs");
+  await copyFixedFixtureRepository(inputs);
+  const identifier = generatedFixtureContracts.at(-1).identifier;
+  const result = await verifySkeletons({
+    createOwner: () => createKnownOwner(parent),
+    runCommand: successfulCommand,
+    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+  }, { includeVisual: false, fromFixture: identifier }, inputs);
+  assert.deepEqual(result.fixtures, [identifier]);
+  assert.deepEqual(result.workerIntegration, { executed: [identifier], skipped: [] });
+  assert.deepEqual(result.bindingIntegration, { executed: [identifier], skipped: [] });
+  assert.deepEqual((await readdir(parent)).sort(), ["inputs"]);
+});
+
+test("current public content fixtures retain the booked French catalog and locale boundary", async () => {
+  const identifier = "site-public-integrations";
+  const boundaryPath = "apps/web/app/global-error.tsx";
+  await withCurrentGeneratedFixture(identifier, async root => {
+    assert.deepEqual(await readFile(join(root, boundaryPath)),
+      await readFile(join(repositoryRoot, fixtureRoot(identifier), boundaryPath)));
     const french = await readFile(join(root, "apps/web/content/fr-CA/booking-calendly.yaml"), "utf8");
     assert.match(french, /^heading: Réserver une conversation$/mu);
   });
 });
 
-test("current persistence fixtures reconstruct the target contract and omit it from jobs-only", async () => {
+test("current persistence fixtures contain the target contract and omit it from jobs-only", async () => {
   const path = "apps/web/src/configuration/application-database.ts";
   for (const identifier of ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"]) {
     await withCurrentGeneratedFixture(identifier, async root => {
       const mapping = await readFile(join(root, path));
-      assert.notDeepEqual(mapping, await readFile(resolve(repositoryRoot, fixtureRoot(identifier), path)));
-      assert.deepEqual(mapping, await readFile(resolve(repositoryRoot, persistenceTargetWitnessTree, "shared", path)));
+      assert.deepEqual(mapping, await readFile(resolve(repositoryRoot, fixtureRoot(identifier), path)));
       const state = JSON.parse(await readFile(join(root, ".egeria/state.json"), "utf8"));
       const surface = state.managedSurfaces.find(entry => entry.path === path);
       assert.equal(surface.fingerprint, "sha256:" + createHash("sha256").update(mapping).digest("hex"));
@@ -113,161 +129,83 @@ test("current persistence fixtures reconstruct the target contract and omit it f
   });
 });
 
-test("fixed verification refuses missing current fixture witnesses before any command", async (context) => {
-  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-current-fixtures-"));
-  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const { relativeRoot } of generatedFixtureContracts) {
-    const destination = resolve(fixtureRepository, relativeRoot);
-    await mkdir(dirname(destination), { recursive: true });
-    await cp(resolve(repositoryRoot, relativeRoot), destination, { recursive: true, errorOnExist: true, force: false });
-  }
-  for (const tree of ["tests/generated-fixtures/fixtures/job-attempts", sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
-  }
-  await expectFixtureError(() => verifySkeletons({
-    createOwner: () => createKnownOwner(fixtureRepository),
-    runCommand: () => assert.fail("missing current fixture bytes cannot reach the production command vector"),
-    runAudit: () => assert.fail("missing current fixture bytes cannot reach the dependency audit"),
-  }, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-});
-
-test("fixed verification refuses missing checked job attempt witnesses before any command", async (context) => {
-  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-job-attempt-witnesses-"));
-  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const tree of ["fixtures/generated", "tests/generated-fixtures/fixtures/public-build", sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    const destination = resolve(fixtureRepository, tree);
-    await mkdir(dirname(destination), { recursive: true });
-    await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
-  }
-  await expectFixtureError(() => verifySkeletons({
-    createOwner: () => createKnownOwner(fixtureRepository),
-    runCommand: () => assert.fail("missing jobs witness bytes cannot reach the verification command vector"),
-    runAudit: () => assert.fail("missing jobs witness bytes cannot reach the dependency audit"),
-  }, { includeVisual: false, fromFixture: "app-jobs" }, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-});
-
-test("fixed verification refuses missing section witnesses before any command", async (context) => {
-  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-missing-section-witnesses-"));
-  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  for (const tree of [...predecessorFixtureTrees, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    await cp(resolve(repositoryRoot, tree), resolve(fixtureRepository, tree), { recursive: true });
-  }
-  let commands = 0;
-  let audits = 0;
-  await expectFixtureError(() => verifySkeletons({
-    createOwner: () => createKnownOwner(fixtureRepository),
-    runCommand: input => { commands++; return successfulCommand(input); },
-    runAudit: async () => {
-      audits++;
-      return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
-    },
-  }, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  assert.equal(commands, 0);
-  assert.equal(audits, 0);
-});
-
-test("fixed verification refuses changed witness bytes and different fixture ancestors before commands", async (context) => {
-  const fixtureRepository = await mkdtemp(join(tmpdir(), "egeria-current-fixture-witnesses-"));
-  context.after(() => rm(fixtureRepository, { recursive: true, force: true }));
-  const jobAttemptTree = "tests/generated-fixtures/fixtures/job-attempts";
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    const destination = resolve(fixtureRepository, tree);
-    await mkdir(dirname(destination), { recursive: true });
-    await cp(resolve(repositoryRoot, tree), destination, { recursive: true, errorOnExist: true, force: false });
-  }
-  let commands = 0;
-  const adapters = {
-    createOwner: () => createKnownOwner(fixtureRepository),
-    runCommand: input => { commands++; return successfulCommand(input); },
-    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
-  };
-  const witnessFile = resolve(fixtureRepository, "tests/generated-fixtures/fixtures/public-build/portfolio/apps/web/src/configuration/public-build.ts");
-  const retainedFile = resolve(fixtureRepository, fixtureRoot("portfolio"), "README.md");
-  const priorJobsWrapper = resolve(fixtureRepository, "tests/generated-fixtures/fixtures/public-build/app-jobs/apps/web/next.config.ts");
-  const jobAttemptFile = resolve(fixtureRepository, jobAttemptTree, "app-jobs/apps/web/next.config.ts");
-  const sharedSectionFile = resolve(fixtureRepository, sectionWitnessTree, "shared/apps/web/src/content/content-schema.ts");
-  const sectionState = resolve(fixtureRepository, sectionWitnessTree, "portfolio/.egeria/state.json");
-  const frenchBooking = resolve(fixtureRepository, publicContentRoutingWitnessTree, "booking-selected/apps/web/content/fr-CA/booking-calendly.yaml");
-  const persistenceMapping = resolve(fixtureRepository, persistenceTargetWitnessTree, "shared/apps/web/src/configuration/application-database.ts");
-  for (const path of [witnessFile, retainedFile, priorJobsWrapper, jobAttemptFile, sharedSectionFile, sectionState, frenchBooking, persistenceMapping]) {
-    const original = await readFile(path);
-    await writeFile(path, Buffer.concat([original, Buffer.from("\nsynthetic-drift\n")]));
-    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-    await writeFile(path, original);
-  }
-  const extraPath = resolve(fixtureRepository, jobAttemptTree, "app-jobs/unexpected.txt");
-  await writeFile(extraPath, "Unexpected fixture member.\n");
-  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  await rm(extraPath);
-  const extraSectionFile = resolve(fixtureRepository, sectionWitnessTree, "shared/extra.txt");
-  await writeFile(extraSectionFile, "Unexpected section witness.\n");
-  await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-  await rm(extraSectionFile);
-  for (const path of [
-    resolve(fixtureRepository, publicContentRoutingWitnessTree, "routed/extra.txt"),
-    resolve(fixtureRepository, persistenceTargetWitnessTree, "shared/extra.txt"),
-  ]) {
-    await writeFile(path, "Unexpected witness member.\n");
-    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-    await rm(path);
-  }
-  for (const path of [frenchBooking, persistenceMapping]) {
-    const original = await readFile(path);
-    await rm(path);
-    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-    await symlink(retainedFile, path);
-    await expectFixtureError(() => verifySkeletons(adapters, undefined, fixtureRepository), "FIXTURE_WITNESS_INVALID");
-    await rm(path);
-    await writeFile(path, original);
-  }
-  assert.equal(commands, 0);
-
-  for (const path of [jobAttemptFile, sharedSectionFile, persistenceMapping]) {
-    commands = 0;
-    const original = await readFile(path);
-    await expectFixtureError(() => verifySkeletons({
-      ...adapters,
-      async runCommand(input) {
-        if (commands === 0) await writeFile(path, Buffer.concat([original, Buffer.from("\nchanged-during-verification\n")]));
-        return adapters.runCommand(input);
-      },
-    }, undefined, fixtureRepository), "FIXTURE_SOURCE_CHANGED");
-    assert.ok(commands > 0);
-    await writeFile(path, original);
+test("fixed verification rejects invalid complete sources before starting any commands", async context => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixed-source-refusal-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const sentinel = join(parent, "separate-file");
+  await writeFile(sentinel, "separate bytes\n");
+  const cases = [
+    ["changed-bytes", "FIXTURE_CONTENT_INVALID", (root, path) => writeFile(path, "changed\n")],
+    ["executable-file", "FIXTURE_CONTENT_INVALID", (root, path) => chmod(path, 0o755)],
+    ["missing-file", "FIXTURE_INVENTORY_INVALID", (root, path) => rm(path)],
+    ["extra-file", "GENERATED_FIXTURE_FORBIDDEN_ARTIFACT", root => writeFile(join(root, "extra.txt"), "extra\n")],
+    ["extra-directory", "GENERATED_FIXTURE_FORBIDDEN_ARTIFACT", root => mkdir(join(root, "empty"))],
+    ["linked-file", "FIXTURE_PATH_INVALID", async (root, path) => {
+      await rm(path);
+      await symlink(sentinel, path);
+    }],
+    ["redirected-root", "FIXTURE_PATH_INVALID", async root => {
+      const moved = root + "-moved";
+      await rename(root, moved);
+      await symlink(moved, root, "dir");
+    }],
+  ];
+  for (const [name, code, corrupt] of cases) {
+    await context.test(name, async () => {
+      const inputs = join(parent, name);
+      await copyFixedFixtureRepository(inputs);
+      const root = join(inputs, fixtureRoot("portfolio"));
+      await corrupt(root, join(root, "README.md"));
+      const noEffect = () => assert.fail("invalid source must refuse before owner creation, commands or audit");
+      await expectFixtureError(() => verifySkeletons({
+        createOwner: noEffect,
+        runCommand: noEffect,
+        runAudit: noEffect,
+      }, { includeVisual: false, fromFixture: generatedFixtureContracts.at(-1).identifier }, inputs), code);
+      assert.equal(await readFile(sentinel, "utf8"), "separate bytes\n");
+    });
   }
 });
 
-test("current reconstruction refuses changed and nonregular copied files before overlay writes", async (context) => {
+test("fixed verification refuses changed or linked validation copies before setup or commands", async context => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-copy-race-"));
   context.after(() => rm(parent, { recursive: true, force: true }));
-  const path = "apps/web/next.config.ts";
-  const retainedRoot = resolve(repositoryRoot, fixtureRoot("portfolio"));
-  const protectedPath = join(parent, "separate-file");
-  const originalCopy = cp;
-  const unchanged = "separate file bytes\n";
-  await writeFile(protectedPath, unchanged);
-
-  for (const change of ["regular", "symlink"]) {
+  const source = await realpath(resolve(repositoryRoot, fixtureRoot("portfolio")));
+  const sentinel = join(parent, "separate-file");
+  await writeFile(sentinel, "separate bytes\n");
+  for (const change of ["regular", "executable", "symlink"]) {
     await context.test(change, async t => {
-      let reconstructed;
-      const copy = t.mock.method(filesystem, "cp", async (source, destination, options) => {
-        await originalCopy(source, destination, options);
-        if (source !== retainedRoot) return;
-        reconstructed = join(destination, path);
-        if (change === "regular") await writeFile(reconstructed, "changed while copying\n");
-        else {
-          await rm(reconstructed);
-          await symlink(protectedPath, reconstructed);
+      const originalCopy = cp;
+      let copiedRoot;
+      let owner;
+      const copy = t.mock.method(filesystem, "cp", async (from, to, options) => {
+        await originalCopy(from, to, options);
+        if (from !== source) return;
+        copiedRoot = to;
+        const path = join(to, "apps/web/next.config.ts");
+        if (change === "regular") {
+          await writeFile(path, "changed while copying\n");
+        } else if (change === "executable") {
+          await chmod(path, 0o755);
+        } else {
+          await rm(path);
+          await symlink(sentinel, path);
         }
       });
       syncBuiltinESMExports();
       try {
-        let reachedOperation = false;
-        const result = await withCurrentGeneratedFixture("portfolio", async () => { reachedOperation = true; }).catch(error => error);
-        assert.equal(await readFile(protectedPath, "utf8"), unchanged);
-        assert.equal(reachedOperation, false);
-        assert.ok(result instanceof GeneratedFixtureVerificationError);
-        assert.ok(reconstructed);
+        const noCommand = () => assert.fail("bad copies must refuse before commands");
+        await expectFixtureError(() => verifySkeletons({
+          async createOwner() {
+            owner = await createKnownOwner(parent);
+            return owner;
+          },
+          runCommand: noCommand,
+          runAudit: noCommand,
+        }), "VERIFICATION_SETUP_FAILED");
+        assert.ok(copiedRoot);
+        assert.equal(await pathExists(owner.path), false);
+        assert.equal(await readFile(sentinel, "utf8"), "separate bytes\n");
       } finally {
         copy.mock.restore();
         syncBuiltinESMExports();
@@ -276,22 +214,21 @@ test("current reconstruction refuses changed and nonregular copied files before 
   }
 });
 
-test("fixed verification detects a changed top-level witness inventory on exit", async t => {
-  const parent = await mkdtemp(join(tmpdir(), "egeria-witness-inventory-"));
-  t.after(() => rm(parent, { recursive: true, force: true }));
-  const isolatedRoot = join(parent, "inputs");
-  const witnessTree = "tests/generated-fixtures/fixtures/public-build";
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
-  }
-  await expectFixtureError(() => verifySkeletons({
-    async createOwner() {
-      await mkdir(join(isolatedRoot, witnessTree, "unexpected-fixture"));
-      return createKnownOwner(parent);
-    },
-    runCommand: successfulCommand,
-    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
-  }, { includeVisual: false, fromFixture: generatedFixtureContracts.at(-1).identifier }, isolatedRoot), "FIXTURE_SOURCE_CHANGED");
+test("the fixed fixture callback cannot change its copy even when it throws", async () => {
+  const root = resolve(repositoryRoot, fixtureRoot("portfolio"));
+  const original = await readFile(join(root, "README.md"));
+  await expectFixtureError(() => withCurrentGeneratedFixture("portfolio", async copy => {
+    assert.notEqual(copy, await realpath(root));
+    await writeFile(join(copy, "README.md"), "changed in callback\n");
+    throw new Error("callback failed");
+  }), "FIXTURE_SOURCE_CHANGED");
+  assert.deepEqual(await readFile(join(root, "README.md")), original);
+});
+
+test("the fixed fixture callback cannot make its copy executable", async () => {
+  await expectFixtureError(() => withCurrentGeneratedFixture("portfolio", async copy => {
+    await chmod(join(copy, "README.md"), 0o755);
+  }), "FIXTURE_SOURCE_CHANGED");
 });
 
 test("fixed and single-project verification reject a blocking dependency audit", async t => {
@@ -311,7 +248,7 @@ test("fixed and single-project verification reject a blocking dependency audit",
   "DEPENDENCY_AUDIT_FAILED");
   assert.equal(admittedAudits, 1);
   const commands = [];
-  await withCurrentGeneratedFixture("portfolio", root => expectFixtureError(() => verifyGeneratedProject(root, "portfolio", {
+  await withCurrentGeneratedFixture("portfolio", root => expectFixtureError(() => verifyGeneratedProjectForTesting(root, "portfolio", {
     ...adapters,
     runAudit: async () => assert.fail("certification must not use the exception route"),
     runCommand: async input => {
@@ -737,7 +674,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
     assert.equal(contract.expectedStandardsVersion, ["app-persistence", "app-persistence-email", "app-persistence-jobs-email"].includes(contract.identifier) ? "0.10.0" : "0.9.0");
     assert.equal(contract.expectedObservabilityVersion, "0.4.0");
     assert.equal(contract.expectedContentFilesVersion, "0.4.0");
-    assert.equal(contract.expectedDeploymentCloudflareVersion, contract.identifier === "app-persistence-jobs-email" ? "0.12.0" : contract.identifier === "app-jobs" ? "0.11.0" : ["app-persistence", "app-persistence-email"].includes(contract.identifier) ? "0.10.0" : "0.9.0");
+    const deploymentVersions = {
+      "app-persistence-jobs-email": "0.18.0",
+      "app-jobs": "0.17.0",
+      "app-persistence": "0.14.0",
+      "app-persistence-email": "0.14.0",
+    };
+    assert.equal(contract.expectedDeploymentCloudflareVersion, deploymentVersions[contract.identifier] ?? "0.13.0");
     assert.equal(
       contract.expectedSiteRoutingVersion,
       contract.profile === "portfolio" ? null : "0.5.0",
@@ -759,10 +702,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
       ["site-public-integrations", "app-all-optional-integrations"].includes(contract.identifier) ? "0.2.0" : null,
     );
     const surfaces = {
-      portfolio: 134, "portfolio-calendly": 143, site: 150, "site-multilingual": 167,
-      "site-public-integrations": 209, app: 170, "app-all-optional-integrations": 213,
-      "app-persistence": 191, "portfolio-email": 163, "app-persistence-email": 200,
-      "site-contact-form": 166, "app-jobs": 183, "app-persistence-jobs-email": 213,
+      portfolio: 136, "portfolio-calendly": 145, site: 152, "site-multilingual": 169,
+      "site-public-integrations": 211, app: 172, "app-all-optional-integrations": 215,
+      "app-persistence": 193, "portfolio-email": 165, "app-persistence-email": 202,
+      "site-contact-form": 168, "app-jobs": 185, "app-persistence-jobs-email": 215,
     };
     assert.equal(contract.expectedSurfaces, surfaces[contract.identifier]);
     assert.equal(contract.visualRegression, ["portfolio", "portfolio-calendly", "site", "app"].includes(contract.identifier));
@@ -792,10 +735,10 @@ test("fixture inspection accepts only the exact portable generated trees", async
   const analyticsSite = generatedFixtureContracts.find(
     ({ identifier }) => identifier === "site-public-integrations",
   );
-  assert.equal(basePortfolio.expectedFiles.length, 80);
-  assert.equal(site.expectedFiles.length, 96);
-  assert.equal(multilingualSite.expectedFiles.length, 113);
-  assert.equal(analyticsSite.expectedFiles.length, 155);
+  assert.equal(basePortfolio.expectedFiles.length, 82);
+  assert.equal(site.expectedFiles.length, 98);
+  assert.equal(multilingualSite.expectedFiles.length, 115);
+  assert.equal(analyticsSite.expectedFiles.length, 157);
   assert.equal(
     calendlyPortfolio.expectedFiles.length,
     basePortfolio.expectedFiles.length - 1 + 10,
@@ -954,9 +897,13 @@ test("fixture inspection accepts only the exact portable generated trees", async
 });
 
 test("generated fixture text and visual baseline attributes are explicit", async () => {
-  const fixturePaths = generatedFixtureContracts.map(
-    ({ relativeRoot }) => `${relativeRoot}/package.json`,
-  );
+  const controlDirectory = "tests/generated-fixtures/fixtures/installed-ancestor-controls";
+  const controls = (await readdir(resolve(repositoryRoot, controlDirectory))).sort();
+  assert.equal(controls.length, 16);
+  const fixturePaths = [
+    ...generatedFixtureContracts.map(({ relativeRoot }) => `${relativeRoot}/package.json`),
+    ...controls.map(name => controlDirectory + "/" + name),
+  ];
   const { stdout: textAttributes } = await execFileAsync(
     "git",
     [
@@ -1345,7 +1292,7 @@ test("current multilingual preview prepares the real root-layout fault only in i
     const spec = "apps/web/tests/e2e/multilingual-global-error.spec.ts";
     const before = await Promise.all([layout, boundary].map(path => readFile(join(root, path))));
     let inspected = false;
-    const result = await verifyGeneratedProject(root, "site-multilingual", {
+    const result = await verifyGeneratedProjectForTesting(root, "site-multilingual", {
       createOwner: () => createKnownOwner(parent),
       async runCommand(input) {
         if (!inspected) {
@@ -1427,28 +1374,35 @@ test("fixed verification audits and reports only the selected fixture suffix", a
   }
 });
 
-test("fixed verification detects a change to a skipped prefix fixture", async t => {
+test("fixed verification detects changed skipped-prefix sources on every exit", async context => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-prefix-"));
-  t.after(() => rm(parent, { recursive: true, force: true }));
-  const isolatedRoot = join(parent, "inputs");
-  for (const tree of [...predecessorFixtureTrees, sectionWitnessTree, publicContentRoutingWitnessTree, persistenceTargetWitnessTree]) {
-    await cp(resolve(repositoryRoot, tree), join(isolatedRoot, tree), { recursive: true });
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const identifier = generatedFixtureContracts.at(-1).identifier;
+  for (const ending of ["success", "command-error", "setup-error"]) {
+    await context.test(ending, async () => {
+      const inputs = join(parent, ending);
+      await copyFixedFixtureRepository(inputs);
+      const prefixReadme = join(inputs, fixtureRoot("portfolio"), "README.md");
+      const executed = new Set();
+      let owner;
+      await expectFixtureError(() => verifySkeletons({
+        async createOwner() {
+          await writeFile(prefixReadme, "Changed after initial inspection.\n");
+          if (ending === "setup-error") throw new Error("setup failed");
+          owner = await createKnownOwner(parent);
+          return owner;
+        },
+        async runCommand(input) {
+          executed.add(basename(input.cwd));
+          if (ending === "command-error") throw new Error("command failed");
+          return successfulCommand(input);
+        },
+        runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+      }, { includeVisual: false, fromFixture: identifier }, inputs), "FIXTURE_SOURCE_CHANGED");
+      assert.deepEqual([...executed], ending === "setup-error" ? [] : [identifier + "-project"]);
+      if (owner) assert.equal(await pathExists(owner.path), false);
+    });
   }
-  const prefixReadme = join(isolatedRoot, fixtureRoot("portfolio"), "README.md");
-  const last = generatedFixtureContracts.at(-1).identifier;
-  const executed = new Set();
-  await expectFixtureError(() => verifySkeletons({
-    createOwner: async () => {
-      await writeFile(prefixReadme, "Changed after initial inspection.\n");
-      return createKnownOwner(parent);
-    },
-    runCommand: async input => {
-      executed.add(basename(input.cwd));
-      return successfulCommand(input);
-    },
-    runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
-  }, { includeVisual: true, fromFixture: last }, isolatedRoot), "FIXTURE_SOURCE_CHANGED");
-  assert.deepEqual([...executed], [`${last}-project`]);
 });
 
 test("visual verification runs after prepared preview behavior", async () => {
@@ -2358,7 +2312,7 @@ test("live verification uses fixed copies, a minimal environment, and exact comm
     ),
   );
   for (const [fixtureIndex, arguments_] of fixtureCommands.entries()) {
-    const hasJobs = generatedFixtureContracts[fixtureIndex].expectedBackgroundJobVersion === "0.3.0";
+    const hasJobs = generatedFixtureContracts[fixtureIndex].expectedBackgroundJobVersion === "0.4.0";
     const jobCommands = arguments_.map(({ arguments: current }) => current)
       .filter(current => current.includes("scripts/check-job-delivery.mjs") || current.includes("--dry-run"));
     assert.deepEqual(jobCommands, hasJobs ? [
