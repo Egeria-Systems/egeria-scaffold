@@ -2876,11 +2876,6 @@ test("repository documentation has no broken local Markdown links", async () => 
   const brokenLinks = [];
   const persistenceGuide = "docs/application-persistence.md";
   const persistenceGuideTemplate = `packages/builder-core/templates/application-persistence/application-environments/target-validation/${persistenceGuide}`;
-  const archivedSparseGuides = new Set([
-    `tests/generated-fixtures/fixtures/persistence-target-validation/shared/${persistenceGuide}`,
-    ...generatedFixtureContracts.map(({ identifier }) =>
-      `tests/generated-fixtures/fixtures/section-contracts/${identifier}/apps/web/AGENTS.md`),
-  ]);
 
   async function checkLinks(markdownFile, root, sourcePaths, repositoryMarkdownPath) {
     const document = await readFile(markdownFile, "utf8");
@@ -2946,7 +2941,6 @@ test("repository documentation has no broken local Markdown links", async () => 
     const repositoryMarkdownPath = relative(repositoryRoot, markdownFile)
       .split(sep)
       .join("/");
-    if (archivedSparseGuides.has(repositoryMarkdownPath)) continue;
     const fixture = generatedFixtureContracts.find(({ relativeRoot }) => repositoryMarkdownPath.startsWith(relativeRoot + "/"));
     if (fixture) {
       await checkLinks(markdownFile, resolve(repositoryRoot, fixture.relativeRoot), fixture.expectedFiles, repositoryMarkdownPath);
