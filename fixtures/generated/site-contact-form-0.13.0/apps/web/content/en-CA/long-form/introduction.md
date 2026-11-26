@@ -1,5 +1,0 @@
----
-title: "Acme Site Contact Form"
-summary: A website introduction.
----
-An introduction to this website and the work it presents.
