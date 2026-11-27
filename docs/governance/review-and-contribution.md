@@ -165,10 +165,10 @@ Run verification in an owned temporary workspace outside the packet tree. Keep d
 
 Use one directory per new packet. Put the review record in `packet.md` and list it and each retained attachment in `packet-files.txt`, using one exact packet-relative file path per line with forward slashes. Use regular files and real directories. When an exact archive is needed, preserve it in its approved private location and record its revision, digest, retention reason, and reference in the packet.
 
-Run the check from the checkout root.
+Run the check from the checkout root and replace the example path with your packet's directory.
 
 ```sh
-node scripts/check-review-packet.mjs docs/review-packets/<packet>
+node scripts/check-review-packet.mjs "docs/review-packets/example-packet"
 ```
 
 Private workflow artifacts must not be force-added. A separately approved content-safe final receipt cited by the tracked registry may be tracked only through an explicit exact path exception; preparation, raw inspection, and review artifacts remain ignored. Keep secrets, personal information, exact home-directory paths, machine-specific tool paths, private URLs, and raw provider output out of tracked documentation. Preserve any private artifacts through a separately managed local backup when their loss would matter; Git no longer supplies recovery for them.

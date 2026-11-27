@@ -131,6 +131,7 @@ test("refuses declared dependency, cache, browser and build payloads", async (co
   const rejectedPaths = [
     "evidence/Node_Modules/library/index.js",
     "evidence/.pnpm/library/index.js",
+    "evidence/.npm/_cacache/content-v2/sha512/ab/blob",
     "evidence/.pnpm-store/v11/files/package",
     "evidence/pnpm-store/v11/files/package",
     "evidence/cache/pnpm/v11/files/package",
@@ -160,12 +161,17 @@ test("refuses declared dependency, cache, browser and build payloads", async (co
 });
 
 test("refuses declared workspace archives", async (context) => {
-  const { root } = await createPacket(context, {
-    "packet.md": "# Review\n",
-    "attachments/copied-workspace.TAR.gz": "opaque archive",
-  });
-
-  assertRefusal(checkPacket(root), "attachments/copied-workspace.TAR.gz");
+  for (const path of [
+    "attachments/copied-workspace.TAR.gz",
+    "attachments/copied-workspace.txz",
+    "attachments/copied-workspace.tbz2",
+  ]) {
+    const { root } = await createPacket(context, {
+      "packet.md": "# Review\n",
+      [path]: "opaque archive",
+    });
+    assertRefusal(checkPacket(root), path);
+  }
 });
 
 test("refuses ambiguous manifest entries at their source line", async (context) => {

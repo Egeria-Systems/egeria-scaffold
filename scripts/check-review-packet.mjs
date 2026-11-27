@@ -7,6 +7,7 @@ const recordName = "packet.md";
 const scratchNames = new Set([
   ".git",
   "node_modules",
+  "_cacache",
   ".pnpm",
   ".pnpm-store",
   "pnpm-store",
@@ -19,7 +20,7 @@ const scratchNames = new Set([
   "ms-playwright",
 ]);
 const storeEntries = new Set(["files", "index", "index.db", "projects"]);
-const archiveSuffix = /\.(?:zip|tar|gz|tgz|xz|bz2|zst|7z|rar|dmg|pkg)$/iu;
+const archiveSuffix = /\.(?:zip|tar|gz|tgz|xz|txz|bz2|tbz2|zst|7z|rar|dmg|pkg)$/iu;
 
 class PacketRefusal extends Error {}
 
