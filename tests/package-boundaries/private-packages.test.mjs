@@ -481,7 +481,6 @@ process.exitCode = await runCli(process.argv.slice(2), {
       "booking-calendly/apps/web/src/integrations/booking-calendly/booking-settings.ts.template",
       "booking-calendly/apps/web/src/integrations/booking-calendly/calendly-booking.tsx",
       "booking-calendly/apps/web/tests/e2e/calendly-booking.spec.ts",
-      "booking-calendly/docs/booking-calendly.md",
       "common/.github/workflows/deploy.yml.template",
       "common/.github/workflows/quality.yml.template",
       "common/.gitignore.template",
