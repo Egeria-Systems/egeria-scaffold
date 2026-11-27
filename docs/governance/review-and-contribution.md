@@ -8,7 +8,7 @@ The [lean application environments exception](#lean-application-environments-del
 
 Treat requests such as “implement the next logical increment,” “start the next increment,” and clear equivalents as instructions to enter this complete lifecycle, not as implementation-only shortcuts. Resolve the next eligible increment from the approved source plan, current program roadmap, accepted evidence, and repository state; then complete Gate 1 preparation, Gate 2 exact-file plan approval, test-driven implementation, the plan-authorized `@ponytail-review`, independent review, final verification and the review packet, and the Gate 3 stop.
 
-A generic start request is not approval of an unseen Gate 2 plan or any later authority gate. Stop for every required approval even when the request also names implementation, commit, push, pull-request, merge, deployment, or another later action.
+A generic start request is not approval of an unseen Gate 2 plan or any later authority gate. Stop for every required approval at the point specified by that gate, even when the request also names implementation, commit, push, pull-request, merge, deployment, or another later action.
 
 ## Gate 1: preparation evidence
 
@@ -85,7 +85,11 @@ Admission must pass for a builder candidate. The clean-checkout command validate
 
 Development of this repository may proceed directly on `main` only when the approved work is one clean, sequential implementation stream, no user-owned work is at risk, repository protections permit it, and isolation has no material safety or coordination benefit.
 
-A dedicated branch and isolated worktree are required when implementation becomes parallel or when isolation is materially useful for risk containment, experimentation, conflicting changes, or preservation of another active tree. Before either mode, verify the branch, status, comparison, and approval scope. Development workflow permission never authorizes push, pull-request creation, merge, deployment, publication, or another external action.
+A dedicated branch and isolated worktree are required when implementation becomes parallel or when isolation is materially useful for risk containment, experimentation, conflicting changes, or preservation of another active tree. Before either mode, verify the branch, status, comparison, and approval scope.
+
+### Commit and push authorization
+
+For work on this builder repository, the user or another agent acting under the user's delegated authority may preapprove in-scope commits and pushes to the task branch. The user's request for automatic delivery, to create a pull request, or to address pull-request review comments preapproves the commits and pushes needed to fulfill that request. Proceed on that authority within its scope and follow the applicable review and verification requirements.
 
 ## Accepted-baseline reconciliation
 
@@ -164,9 +168,9 @@ Private workflow artifacts must not be force-added. A separately approved conten
 
 ## Gate 3: verified-final-diff approval
 
-Present the final packet and stop. Gate 3 approval accepts only the verified increment diff. It does not itself authorize push, pull-request creation, merge, publication, deployment, persistent-data migration, provider cleanup, permission change, or production action.
+Present the final packet and obtain explicit user approval of the verified increment diff before accepting the increment or integrating it into `main`, including by direct push. In this builder repository, [authorized commits and task-branch pushes](#commit-and-push-authorization) may precede that approval, including when opening or updating a pull request for review. [Generated-client transformations](#generated-client-transformation-boundary) require verified-final-diff approval before commit.
 
-Pull-request creation requires a separate explicit request. Responding to GitHub review comments also requires an explicit request. Production deployment and persistent-data/provider changes always require their specified human gate and recovery plan; an agent or reviewer cannot self-approve them.
+Pull-request creation and posting replies to review comments each require an explicit request. Obtain separate authority for merge, publication, deployment, persistent-data migration, provider cleanup, permission changes, and production actions. Production deployment and persistent-data/provider changes always require their specified human gate and recovery plan.
 
 ## Lean application environments delivery exception
 
