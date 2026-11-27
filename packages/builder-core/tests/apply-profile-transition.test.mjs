@@ -35,7 +35,6 @@ import {
 } from "../dist/lifecycle/app-profile-transition.js";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const encoder = new TextEncoder();
 const decoder = new TextDecoder("utf-8", { fatal: true });
@@ -631,17 +630,17 @@ for (const [label, installed, declared] of [
   ["current state with retired declaration", "16.4.5", "16.4.1"],
 ]) {
   test(`site-to-app planning and application refuse ${label} before effects`, async () => {
-    const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
+    const source = await readArchivedGeneratedFixture("site");
     const state = JSON.parse(decode(source.get(".egeria/state.json")));
     const nextSurface = state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next");
     const manifest = JSON.parse(decode(source.get("apps/web/package.json")));
-    assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.1"));
-    assert.equal(manifest.dependencies.next, "16.4.1");
-    if (installed !== "16.4.1") {
+    assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.5"));
+    assert.equal(manifest.dependencies.next, "16.4.5");
+    if (installed !== "16.4.5") {
       nextSurface.fingerprint = fingerprintJsonValue(installed);
       source.set(".egeria/state.json", bytes(core.serializeStateJson(state)));
     }
-    if (declared !== "16.4.1") {
+    if (declared !== "16.4.5") {
       manifest.dependencies.next = declared;
       source.set("apps/web/package.json", bytes(`${JSON.stringify(manifest)}\n`));
     }
@@ -654,7 +653,7 @@ for (const [label, installed, declared] of [
     const dependencyCalls = [];
     const execution = await invokeApply(repository, {
       toProfile: "app",
-      // Before retirement, the untouched fixture can still supply a valid approval.
+      // Exercise apply with an approval if planning unexpectedly succeeds.
       approvedPlanFingerprint: plan.ok ? plan.value.planFingerprint : undefined,
       verifier: {
         prepareLockfile() {

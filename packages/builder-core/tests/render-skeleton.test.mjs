@@ -6506,7 +6506,7 @@ test("fresh security declarations match their locked Next across supported depen
 test("historical installed controls refuse instead of selecting fresh generation", async () => {
   const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   for (const fixture of ["portfolio-0.11.7", "portfolio-email-0.11.7", "site-0.12.7", "app-0.2.7", "app-persistence-0.2.7"]) {
-    const source = new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url);
+    const source = new URL(`./fixtures/retired-recipes/raw/${fixture}/`, import.meta.url);
     const project = parseDocument(await readFile(new URL(".egeria/project.yaml", source), "utf8")).toJS();
     const state = JSON.parse(await readFile(new URL(".egeria/state.json", source), "utf8"));
     assert.equal(createVerifiedProjectSnapshot(project, state).ok, false);

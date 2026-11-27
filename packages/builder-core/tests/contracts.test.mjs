@@ -14,7 +14,7 @@ const snapshots = await import(pathToFileURL(resolve(packageRoot, "dist/catalog/
 
 test("retired recipe controls refuse raw project and state admission", async t => {
   const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
-  for (const name of (await readdir(root)).filter(name => name !== "supported-rendering.json" && name !== "public-generations.json")) {
+  for (const name of (await readdir(root)).filter(name => name.endsWith(".json") && name !== "supported-rendering.json" && name !== "public-generations.json")) {
     const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
     await t.test(name + " project", () => {
       assert.equal(contracts.parseProjectYaml(control.projectYaml).ok, false);

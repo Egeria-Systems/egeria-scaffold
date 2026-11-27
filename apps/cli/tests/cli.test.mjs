@@ -2677,19 +2677,21 @@ for (const [label, installed, declared] of [
     const owner = await mkdtemp(join(tmpdir(), "egeria-retired-next-cli-"));
     const directory = join(owner, "project");
     try {
-      await cp(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"), directory, { recursive: true });
+      const fixture = generatedFixtureContracts.find(({ identifier }) => identifier === "site");
+      assert.ok(fixture);
+      await cp(resolve(repositoryRoot, fixture.relativeRoot), directory, { recursive: true });
       const statePath = join(directory, ".egeria/state.json");
       const manifestPath = join(directory, "apps/web/package.json");
       const state = JSON.parse(await readFile(statePath, "utf8"));
       const nextSurface = state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next");
       const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-      assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.1"));
-      assert.equal(manifest.dependencies.next, "16.4.1");
-      if (installed !== "16.4.1") {
+      assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.5"));
+      assert.equal(manifest.dependencies.next, "16.4.5");
+      if (installed !== "16.4.5") {
         nextSurface.fingerprint = fingerprintJsonValue(installed);
         await writeFile(statePath, core.serializeStateJson(state));
       }
-      if (declared !== "16.4.1") {
+      if (declared !== "16.4.5") {
         manifest.dependencies.next = declared;
         await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
       }

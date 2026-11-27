@@ -888,38 +888,39 @@ test("application-owned and ejected surfaces are reported without reading their 
 test("installed deployment verification files must match the selected recipe even when their recorded fingerprints agree", async (t) => {
   const workflow = ".github/workflows/deploy.yml";
   const helper = "apps/web/scripts/prepare-ci-git.sh";
-  for (const fixture of [
-    "site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
-    "app-persistence-retained-deployment",
-    "app-jobs-recovery-composition-0.3.0-next-16.4.5",
-    "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5",
-  ]) {
-    await t.test(fixture, async () => {
-      const source = fixture === "app-persistence-retained-deployment"
-        ? core.createInMemoryRepositoryReader(Object.fromEntries(
-          [...await readArchivedGeneratedFixture("app-persistence")].map(([path, content]) => [path, Buffer.from(content).toString("utf8")]),
-        ))
-        : core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated", fixture));
-      const state = JSON.parse((await source.readText(".egeria/state.json")).content);
-      const deploy = (await source.readText(workflow)).content;
-      const unwrapped = deploy.replace("sh " + helper + " pnpm", "pnpm");
-      assert.notEqual(unwrapped, deploy);
-      for (const [path, replacement] of [[workflow, unwrapped], [helper, 'exec "$@"\n']]) {
-        const mixed = structuredClone(state);
-        mixed.managedSurfaces.find(surface => surface.path === path).fingerprint = core.fingerprintFileContent(encoder.encode(replacement));
-        const reader = { readText: async (requested) => {
-          if (requested === path) return { kind: "file", content: replacement };
-          if (requested === ".egeria/state.json") return { kind: "file", content: core.serializeStateJson(mixed) };
-          return source.readText(requested);
-        } };
-        const snapshot = await core.readVerifiedProjectSnapshot(reader);
-        assert.equal(snapshot.ok, true);
-        const inference = await core.inferRepository(snapshot.value);
-        assert.equal(inference.surfaces.find(surface => surface.path === path)?.status, "drifted", path);
-        assert.equal(inference.surfaces.find(surface => surface.path === (path === workflow ? helper : workflow))?.status, "confirmed");
-      }
-    });
+  async function assertDeploymentDrift(source) {
+    const state = JSON.parse((await source.readText(".egeria/state.json")).content);
+    const deploy = (await source.readText(workflow)).content;
+    const unwrapped = deploy.replace("sh " + helper + " pnpm", "pnpm");
+    assert.notEqual(unwrapped, deploy);
+    for (const [path, replacement] of [[workflow, unwrapped], [helper, 'exec "$@"\n']]) {
+      const mixed = structuredClone(state);
+      mixed.managedSurfaces.find(surface => surface.path === path).fingerprint = core.fingerprintFileContent(encoder.encode(replacement));
+      const reader = { readText: async (requested) => {
+        if (requested === path) return { kind: "file", content: replacement };
+        if (requested === ".egeria/state.json") return { kind: "file", content: core.serializeStateJson(mixed) };
+        return source.readText(requested);
+      } };
+      const snapshot = await core.readVerifiedProjectSnapshot(reader);
+      assert.equal(snapshot.ok, true);
+      const inference = await core.inferRepository(snapshot.value);
+      assert.equal(inference.surfaces.find(surface => surface.path === path)?.status, "drifted", path);
+      assert.equal(inference.surfaces.find(surface => surface.path === (path === workflow ? helper : workflow))?.status, "confirmed");
+    }
   }
+
+  for (const fixture of ["site-public-integrations", "app-persistence", "app-jobs", "app-persistence-jobs-email"]) {
+    await t.test(fixture, () => withCurrentGeneratedFixture(fixture, root =>
+      assertDeploymentDrift(core.createFileSystemRepositoryReader(root)),
+    ));
+  }
+  await t.test("app-persistence-retained-deployment", async () => {
+    const files = await readArchivedGeneratedFixture("app-persistence");
+    const source = core.createInMemoryRepositoryReader(Object.fromEntries(
+      [...files].map(([path, content]) => [path, Buffer.from(content).toString("utf8")]),
+    ));
+    await assertDeploymentDrift(source);
+  });
 });
 
 test("successor managed build inputs refuse missing declarations and consistent but noncanonical bytes", async () => {

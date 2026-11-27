@@ -11,7 +11,7 @@ const core = await import(pathToFileURL(builtEntry));
 test("retired structured controls cannot fall back to current generation", async () => {
   const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   const root = resolve(packageRoot, "tests/fixtures/retired-recipes");
-  for (const name of (await readdir(root)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
+  for (const name of (await readdir(root)).filter(name => name.endsWith(".json") && !["supported-rendering.json", "public-generations.json"].includes(name))) {
     const control = JSON.parse(await readFile(resolve(root, name), "utf8"));
     for (const [variant, { state }] of Object.entries(control.variants)) {
       for (const [projectInput, stateInput] of [[control.project, state], [control.project, undefined], [undefined, state]]) {
@@ -27,7 +27,7 @@ test("retired controls refuse lifecycle planning and execution before effects", 
   const controls = resolve(packageRoot, "tests/fixtures/retired-recipes");
   const root = "/generated/project";
   const git = { ok: true, identity: { root, revision: "a".repeat(40), attachedRef: "refs/heads/retired-control-test", gitDirectory: "/generated/common/.git/worktrees/retired-control-test", commonDirectory: "/generated/common/.git" } };
-  for (const name of (await readdir(controls)).filter(name => !["supported-rendering.json", "public-generations.json"].includes(name))) {
+  for (const name of (await readdir(controls)).filter(name => name.endsWith(".json") && !["supported-rendering.json", "public-generations.json"].includes(name))) {
     const control = JSON.parse(await readFile(resolve(controls, name), "utf8"));
     for (const [variant, { state }] of Object.entries(control.variants)) {
       const files = new Map([[".egeria/project.yaml", control.projectYaml], [".egeria/state.json", JSON.stringify(state)]]);
