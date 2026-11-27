@@ -669,6 +669,11 @@ test("synthetic source entry ignores compiled output before the environment boun
 
 test("synthetic comparison executes all subsets with canonical baseline bytes and leaves source PNGs unchanged", async t => {
   const h = await comparisonHarness(t);
+  for (const graph of ["portfolio-0.12.0", "site-0.13.0", "app-0.3.0", "portfolio-0.11.7-foundation", "app-0.2.7", "app-0.2.7-persistence"]) {
+    const path = `packages/builder-core/lockfiles/web-recipe-${graph}-next-16.4.5/pnpm-lock.yaml`;
+    const original = await readFile(join(sourceRoot, path));
+    assert.deepEqual(h.admissionObservations.sourceFiles.find(entry => entry.path === path), { path, sha256: sha256(original) });
+  }
   const before = await Promise.all(h.paths.map(path => readFile(join(h.root, path))));
   const result = await assertSyntheticComparison(h);
   assert.equal(h.calls.every(call => call.mode === "compare" && Object.keys(call.baselines).length === 2), true);

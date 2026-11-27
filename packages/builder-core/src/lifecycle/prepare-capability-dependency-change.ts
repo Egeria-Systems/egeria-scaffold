@@ -1,9 +1,8 @@
 import { readFile } from "node:fs/promises";
-import { parseDocument } from "yaml";
 
 import type { ProjectConfiguration} from "../contracts/project.js";
 import type { ValidationResult } from "../contracts/result.js";
-import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
+import { createRecipeLockfileUrl, parsePackageManifest, resolveRecipeLockfileVersion } from "../generation/recipe-lockfiles.js";
 import type { RenderedSkeleton } from "../generation/render-skeleton.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
 import { jsonValuesEqual } from "../serialization/canonical-json.js";
@@ -15,16 +14,6 @@ const decoder = new TextDecoder("utf-8", { fatal: true });
 
 function record(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
-}
-
-function parseManifest(source: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(source);
-  // JSON.parse accepts duplicate keys; YAML's existing parser supplies uniqueness checks.
-  const document = parseDocument(source, { schema: "json", uniqueKeys: true, strict: true });
-  if (!record(value) || document.errors.length !== 0 || document.warnings.length !== 0) {
-    throw new Error("MANIFEST_INVALID");
-  }
-  return value;
 }
 
 function equal(left: unknown, right: unknown): boolean {
@@ -70,17 +59,17 @@ export async function prepareCapabilityDependencyChange<P extends ProjectConfigu
     if (sourceFile === undefined || targetFile === undefined || actualFile.kind !== "file" || actualLock.kind !== "file") {
       throw new Error("INPUT_UNAVAILABLE");
     }
-    const source = parseManifest(decoder.decode(sourceFile.content));
-    const target = parseManifest(decoder.decode(targetFile.content));
-    const actual = parseManifest(actualFile.content);
+    const source = parsePackageManifest(decoder.decode(sourceFile.content));
+    const target = parsePackageManifest(decoder.decode(targetFile.content));
+    const actual = parsePackageManifest(actualFile.content);
     for (const key of dependencyGraphMembers) {
       if (!equal(actual[key], source[key])) throw new Error("DEPENDENCY_GRAPH_UNSUPPORTED");
     }
     const rootSourceFile = input.current.files.find(({ path }) => path === "package.json");
     const rootActualFile = await input.reader.readText("package.json");
     if (rootSourceFile === undefined || rootActualFile.kind !== "file") throw new Error("ROOT_MANIFEST_UNAVAILABLE");
-    const rootSource = parseManifest(decoder.decode(rootSourceFile.content));
-    const rootActual = parseManifest(rootActualFile.content);
+    const rootSource = parsePackageManifest(decoder.decode(rootSourceFile.content));
+    const rootActual = parsePackageManifest(rootActualFile.content);
     for (const key of dependencyGraphMembers) {
       if (!equal(rootActual[key], rootSource[key])) throw new Error("DEPENDENCY_GRAPH_UNSUPPORTED");
     }

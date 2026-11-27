@@ -139,6 +139,10 @@ The same revision archives the twenty superseded fixture roots retired from the 
 
 The fresh jobs deployment views require a source revision at the Next production build phase, after Next loads the normal environment files. This binds the prepared OpenNext asset identity before the Queue entry consumes it. The existing [installed tuple boundary](../architecture/capability-model.md#current-environment-generation) selects both retained jobs deployment families exactly. The [jobs guide](../../packages/builder-core/templates/background-job-delivery/application-environments/checked-attempt/docs/background-job-delivery.md#common-target-and-prepared-queue-identity) owns the local preparation steps.
 
+### Installed Next.js retirement
+
+No generated project requires Next.js `16.4.1` compatibility. This decision supersedes [ADR-0015's installed Next.js retention](0015-vitest-five-generation.md#nextjs-1645-security-successor). The six installed seeds and two historical aliases are recoverable at [the original archive revision](https://github.com/Egeria-Systems/egeria-scaffold/tree/5c484d376c22421845daed9b2651483d09c55565/packages/builder-core/lockfiles). Historical measurements and certifications retain their original source identities. The [current capability model](../architecture/capability-model.md#current-environment-generation) owns selection and refusal for the surviving graphs.
+
 ## Consequences
 
 - Local work can omit optional public destinations without accidental provider calls; deployments require deliberate target configuration.

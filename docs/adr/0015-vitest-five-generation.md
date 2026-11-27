@@ -36,7 +36,7 @@ The prior public `portfolio@0.11.5`, `site@0.12.5` and `app@0.2.5` identities re
 
 Fresh schema-2 generation and the compatibility proof select Next.js `16.4.5` for [GHSA-mfr8-8qww-v76h](https://github.com/advisories/GHSA-mfr8-8qww-v76h). The current generator selects six matching successor lockfiles, and the root lock renews the proof graph. Each graph changes only the Next.js release, its environment and compiler packages, and the affected peer and snapshot records. The proof's separate `eslint-config-next@16.4.1` patch and the existing OpenNext and toolchain selections stay exact.
 
-A supported installed schema-2 project whose managed Next.js fingerprint records `16.4.1` retains that exact rendering and lock view. Capability changes and profile transitions preserve the installed dependency view, with the existing actual-manifest and lock checks at their applicable boundaries. The new lock paths preserve the earlier graphs and fixtures as exact evidence. Client upgrades and existing-project security remediation require their own supported operation and approval. [Current generation and fixtures](../architecture/capability-model.md#current-environment-generation)
+The successor originally retained installed schema-2 projects on Next.js `16.4.1`. The [installed Next.js retirement](0020-application-environments.md#installed-nextjs-retirement) supersedes that retention. The proof's separate ESLint patch remains active. [Current generation and fixtures](../architecture/capability-model.md#current-environment-generation)
 
 ### Temporary picomatch CI exception
 

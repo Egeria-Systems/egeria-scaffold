@@ -236,7 +236,7 @@ test("persistence removal requires evidence review and restores the default app 
 
 test("persistence lifecycle preserves current declarations and custom metadata", async () => {
   for (const retainDeployment of [false, true]) for (const transactionalEmailResend of [false, true]) {
-    const context = createGenerationRenderingContext(true, transactionalEmailResend, false, undefined, undefined, retainDeployment);
+    const context = createGenerationRenderingContext(true, transactionalEmailResend, false, undefined, retainDeployment);
     const repo = await repository({ transactionalEmailResend, context });
     const manifest = JSON.parse(decoder.decode(repo.files.get("apps/web/package.json")));
     manifest.description = "Custom persistence project";
@@ -571,7 +571,7 @@ test(`${applicationEnvironments ? "environment " : ""}changed user migration byt
 
 test("environment persistence neighbors preserve database ownership and enforce the binding lane", async () => {
   const renderingContext = core.createApplicationEnvironmentRenderingContext();
-  const retainedPersistence = createGenerationRenderingContext(true, false, false, undefined, undefined, false, undefined, undefined, true);
+  const retainedPersistence = createGenerationRenderingContext(true, false, false, undefined, false, undefined, undefined, true);
   const analytics = { consent: { policy: "explicit-opt-in" }, providers: { googleAnalytics4: true }, operationalIntegrations: {} };
   for (const [capability, settings, context] of [
     ["contact-form-web3forms", undefined],

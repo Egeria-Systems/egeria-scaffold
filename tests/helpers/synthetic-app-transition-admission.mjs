@@ -16,13 +16,15 @@ const compiledPaths = [
   "packages/builder-core/dist/ownership/fingerprint.js",
   "packages/builder-core/dist/serialization/canonical-json.js",
 ];
+const lockPath = key => `packages/builder-core/lockfiles/web-recipe-${key}/pnpm-lock.yaml`;
 const currentLockPaths = new Map([
-  ["packages/builder-core/lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml"],
-  ["packages/builder-core/lockfiles/web-recipe-app-0.2.6-persistence/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"],
-  ["packages/builder-core/lockfiles/web-recipe-app-0.2.6/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-app-0.2.7/pnpm-lock.yaml"],
-  ["packages/builder-core/lockfiles/web-recipe-portfolio-0.11.6-foundation/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.7-foundation/pnpm-lock.yaml"],
-  ["packages/builder-core/lockfiles/web-recipe-portfolio-0.11.6/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-portfolio-0.11.7/pnpm-lock.yaml"],
-  ["packages/builder-core/lockfiles/web-recipe-site-0.12.6/pnpm-lock.yaml", "packages/builder-core/lockfiles/web-recipe-site-0.12.7/pnpm-lock.yaml"],
+  "portfolio-0.12.0", "site-0.13.0", "app-0.3.0",
+  "portfolio-0.11.7-foundation", "app-0.2.7", "app-0.2.7-persistence",
+].map(key => [lockPath(key), lockPath(`${key}-next-16.4.5`)]));
+// These two historical inventory slots exist only in the disposable copy.
+const syntheticAliasSources = new Map([
+  [lockPath("portfolio-0.11.7"), lockPath("portfolio-0.12.0-next-16.4.5")],
+  [lockPath("site-0.12.7"), lockPath("site-0.13.0-next-16.4.5")],
 ]);
 const sha256 = bytes => createHash("sha256").update(bytes).digest("hex");
 const subsetKey = subset => [...subset].sort().join("+") || "none";
@@ -63,8 +65,9 @@ export async function createSyntheticAppTransitionAdmission(context) {
   const copiedPaths = [...sourcePaths, ...pngPaths, ...compiledPaths];
   for (const path of copiedPaths) {
     await mkdir(dirname(join(root, path)), { recursive: true });
-    await copyFile(join(sourceRoot, path), join(root, path));
-    assert.deepEqual(await readFile(join(root, path)), await readFile(join(sourceRoot, path)), path);
+    const source = join(sourceRoot, syntheticAliasSources.get(path) ?? path);
+    await copyFile(source, join(root, path));
+    assert.deepEqual(await readFile(join(root, path)), await readFile(source), path);
   }
   const originalSourceFiles = await Promise.all(sourcePaths.map(async path => ({ path, sha256: sha256(await readFile(join(root, path))) })));
   const targetLockfileFingerprint = `sha256:${sha256(await readFile(join(root, "packages/builder-core/lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml")))}`;

@@ -319,41 +319,39 @@ for (const [profile, expectedLock] of [
   });
 }
 
-test("application environment lock selection uses its own matching dependency graphs", () => {
-  for (const [profile, version, lock, next, eslint] of [
-    ["portfolio", "0.12.0", "portfolio-0.12.0", "16.4.1", "16.3.0"],
-    ["site", "0.13.0", "site-0.13.0", "16.4.1", "16.3.3"],
-    ["app", "0.3.0", "app-0.3.0", "16.4.1", "16.3.3"],
+test("retired Next lock graphs refuse exact installed manifests and keys", () => {
+  for (const [originProfile, recipeVersion, key, eslint, foundation, persistence] of [
+    ["portfolio", "0.12.0", "portfolio-0.12.0", "16.3.0", false, false],
+    ["portfolio", "0.12.0", "portfolio-0.11.7-foundation", "16.3.0", true, false],
+    ["site", "0.13.0", "site-0.13.0", "16.3.3", false, false],
+    ["site", "0.13.0", "app-0.2.7", "16.3.3", true, false],
+    ["app", "0.3.0", "app-0.3.0", "16.3.3", true, false],
+    ["app", "0.3.0", "app-0.2.7-persistence", "16.3.3", true, true],
   ]) {
-    const identity = { originProfile: profile, recipeVersion: version };
-    const manifest = { dependencies: { next, ...(profile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.3" } };
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
-    if (profile !== "app") {
-      const foundation = { ...manifest, dependencies: { ...manifest.dependencies, effect: "4.0.0-rc.112" } };
-      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, foundation), profile === "portfolio" ? "portfolio-0.11.7-foundation" : "app-0.2.7");
-    } else {
-      const persistence = {
-        ...manifest,
-        dependencies: { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
-        devDependencies: { ...manifest.devDependencies, "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20261006.1" },
-      };
-      assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, persistence), "app-0.2.7-persistence");
-    }
-    for (const dependencies of [
-      { ...manifest.dependencies, next: "16.3.2" },
-      { ...manifest.dependencies, effect: "4.0.0-rc.111" },
-      { ...manifest.dependencies, "drizzle-orm": "0.45.2" },
-    ]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, dependencies }), undefined);
+    const manifest = {
+      dependencies: {
+        next: "16.4.1",
+        ...(foundation ? { effect: "4.0.0-rc.112" } : {}),
+        ...(persistence ? { "drizzle-orm": "0.45.2" } : {}),
+      },
+      devDependencies: {
+        "eslint-config-next": eslint,
+        vitest: "5.0.3",
+        ...(persistence ? { "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20261006.1" } : {}),
+      },
+    };
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ originProfile, recipeVersion }, manifest), undefined, key);
+    assert.throws(() => recipeLockfiles.createRecipeLockfileUrl(key), /recipe-lockfile-version-unsupported/u);
   }
 });
 
 test("app lockfile selection requires exact profile, recipe, Next, ESLint, and Effect", async () => {
   const identity = { originProfile: "app", recipeVersion: "0.3.0" };
   const manifest = {
-    dependencies: { next: "16.4.1", effect: "4.0.0-rc.112" },
+    dependencies: { next: "16.4.5", effect: "4.0.0-rc.112" },
     devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.3" },
   };
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.3.0");
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.3.0-next-16.4.5");
   for (const changed of [
     { ...identity, originProfile: "site" },
     { ...identity, recipeVersion: "0.2.0" },
@@ -369,8 +367,8 @@ test("app lockfile selection requires exact profile, recipe, Next, ESLint, and E
       ...manifest, [section]: { ...manifest[section], [key]: "16.3.0" },
     }), undefined);
   }
-  assert.equal(new URL(recipeLockfiles.createRecipeLockfileUrl("app-0.3.0")).pathname,
-    resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml"));
+  assert.equal(new URL(recipeLockfiles.createRecipeLockfileUrl("app-0.3.0-next-16.4.5")).pathname,
+    resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml"));
 });
 
 test("Worker integration verifier records execution only for the exact owned script", async () => {
@@ -542,8 +540,8 @@ test("persistence binding verification refuses missing or substituted commands a
 
 test("persistence lock selection requires the exact compatible optional packages", () => {
   const identity = { originProfile: "app", recipeVersion: "0.3.0" };
-  const manifest = { dependencies: { next: "16.4.1", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.3", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20261006.1" } };
-  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.2.7-persistence");
+  const manifest = { dependencies: { next: "16.4.5", effect: "4.0.0-rc.112", "drizzle-orm": "0.45.2" }, devDependencies: { "eslint-config-next": "16.3.3", vitest: "5.0.3", "drizzle-kit": "0.31.10", "@cloudflare/workers-types": "5.20261006.1" } };
+  assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), "app-0.2.7-persistence-next-16.4.5");
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.2.0" }, manifest), undefined);
   for (const [section, key] of [["dependencies", "drizzle-orm"], ["devDependencies", "drizzle-kit"], ["devDependencies", "@cloudflare/workers-types"]]) {
     for (const version of [undefined, "latest", "0.1.0", "5.20260730.1"]) {
@@ -551,7 +549,7 @@ test("persistence lock selection requires the exact compatible optional packages
     }
   }
   assert.equal(recipeLockfiles.resolveRecipeLockfileVersion({ ...identity, recipeVersion: "0.1.0" }, manifest), undefined);
-  assert.equal(recipeLockfiles.createRecipeLockfileUrl("app-0.2.7-persistence").pathname, resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence/pnpm-lock.yaml"));
+  assert.equal(recipeLockfiles.createRecipeLockfileUrl("app-0.2.7-persistence-next-16.4.5").pathname, resolve(packageRoot, "lockfiles/web-recipe-app-0.2.7-persistence-next-16.4.5/pnpm-lock.yaml"));
 });
 
 test("environment persistence uses current dependency locks and refuses retired cohorts", async () => {
@@ -789,7 +787,7 @@ test("lockfile preparation rejects a byte-identical replacement root", async (co
   await writeFile(
     join(source, "apps/web/package.json"),
     `${JSON.stringify({
-      dependencies: { next: "16.4.1" },
+      dependencies: { next: "16.4.5" },
       devDependencies: { "eslint-config-next": "16.3.0", vitest: "5.0.3" },
     })}\n`,
   );
@@ -1229,6 +1227,52 @@ test("lockfile preparation reports a failed exclusive-write source mutation", as
       ],
     });
   });
+});
+
+test("retired Next inputs refuse lockfile writes and isolated dependency verification", async (context) => {
+  for (const [name, retiredSection] of [
+    ["direct dependency", "dependencies"],
+    ["mixed development dependency", "devDependencies"],
+    ["mixed optional dependency", "optionalDependencies"],
+    ["mixed peer dependency", "peerDependencies"],
+    ["retired installed fingerprint"],
+  ]) {
+    await context.test(name, async () => {
+      await withTestRoot(async owner => {
+        const fakePnpm = await createFakePnpmExecutable(owner);
+        const verifier = core.createPnpmGeneratedProjectVerifier({ pnpmExecutable: fakePnpm.executable });
+        const source = await createVerifierSource(owner);
+        const manifestPath = join(source, "apps/web/package.json");
+        const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+        manifest.description = "synthetic-private-next-marker";
+        if (retiredSection === undefined) {
+          const state = JSON.parse(await readFile(new URL("../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/.egeria/state.json", import.meta.url), "utf8"));
+          state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next").fingerprint = core.fingerprintJsonValue("16.4.1");
+          await writeFile(join(source, ".egeria/state.json"), core.serializeStateJson(state));
+        } else {
+          manifest[retiredSection] = { ...manifest[retiredSection], next: "16.4.1" };
+        }
+        await writeFile(manifestPath, JSON.stringify(manifest));
+        const before = await snapshotFileBytes(source);
+
+        let writerCalls = 0;
+        const prepared = await verifierModule.prepareLockfile(source, portfolioRecipeIdentity, async () => {
+          writerCalls += 1;
+          return { ok: false, sourceChanged: false };
+        });
+        const verified = await verifier.verifyInIsolatedCopy(source);
+
+        assert.deepEqual({ writerCalls, childCalls: (await fakePnpm.readCalls()).length }, { writerCalls: 0, childCalls: 0 });
+        assertFailure(prepared, "LOCKFILE_PREPARATION_FAILED");
+        assert.equal(verified.ok, false);
+        if (retiredSection !== undefined) {
+          assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(portfolioRecipeIdentity, manifest), undefined);
+        }
+        assert.doesNotMatch(JSON.stringify([prepared, verified]), /synthetic-private-next-marker/u);
+        assert.deepEqual(await snapshotFileBytes(source), before);
+      });
+    });
+  }
 });
 
 test("the fake pnpm records empty and explicitly supplied Linux entry environments", {
@@ -2380,11 +2424,9 @@ test("the generation core has no shell, Git, provider, or overwrite surface", as
 test("current dependency locks reject Vitest declaration drift", () => {
   for (const [originProfile, recipeVersion, eslint, lock] of [["portfolio", "0.12.0", "16.3.0", "portfolio-0.12.0"], ["site", "0.13.0", "16.3.3", "site-0.13.0"], ["app", "0.3.0", "16.3.3", "app-0.3.0"]]) {
     const identity = { originProfile, recipeVersion };
-    const manifest = { dependencies: { next: "16.4.1", ...(originProfile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.3" } };
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock);
-    const patched = { ...manifest, dependencies: { ...manifest.dependencies, next: "16.4.5" } };
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, patched), lock + "-next-16.4.5");
-    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...patched, dependencies: { ...patched.dependencies, next: "^16.4.5" } }), undefined);
+    const manifest = { dependencies: { next: "16.4.5", ...(originProfile === "app" ? { effect: "4.0.0-rc.112" } : {}) }, devDependencies: { "eslint-config-next": eslint, vitest: "5.0.3" } };
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, manifest), lock + "-next-16.4.5");
+    assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, dependencies: { ...manifest.dependencies, next: "^16.4.5" } }), undefined);
     for (const vitest of [undefined, "4.1.10", "4.1.11", "5.0.0", "5.0.1", "5.0.2", "^5.0.3"]) assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(identity, { ...manifest, devDependencies: { ...manifest.devDependencies, vitest } }), undefined);
     for (const section of ["dependencies", "devDependencies"]) {
       const key = section === "dependencies" ? "next" : "eslint-config-next";
@@ -2440,7 +2482,9 @@ test("security lock selection requires complete exact recipe manifests", async (
     assert.equal(manifest.devDependencies.vitest, "5.0.3");
     assert.equal(manifest.dependencies.effect, profile === "app" || options.transactionalEmailResend ? "4.0.0-rc.112" : undefined);
     assert.equal(recipeLockfiles.resolveRecipeLockfileVersion(rendered.project, manifest), expected);
-    const bytes = await readFile(recipeLockfiles.createRecipeLockfileUrl(expected));
+    const expectedPath = resolve(packageRoot, "lockfiles/web-recipe-" + expected + "/pnpm-lock.yaml");
+    assert.equal(fileURLToPath(recipeLockfiles.createRecipeLockfileUrl(expected)), expectedPath);
+    const bytes = await readFile(expectedPath);
     const lock = parseYaml(bytes.toString("utf8"));
     const workspace = parseYaml(new TextDecoder().decode(rendered.files.find(({ path }) => path === "pnpm-workspace.yaml").content));
     assert.deepEqual(lock.overrides, workspace.overrides);

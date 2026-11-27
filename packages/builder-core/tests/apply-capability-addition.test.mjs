@@ -1126,7 +1126,7 @@ test("persistence addition refuses a mixed Next.js patch before writing or verif
       manifest.dependencies.next = "16.4.1";
       repository.files.set("apps/web/package.json", `${JSON.stringify(manifest)}\n`);
     } else {
-      repository.files.set("pnpm-lock.yaml", await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0/pnpm-lock.yaml"), "utf8"));
+      repository.files.set("pnpm-lock.yaml", await readFile(resolve(repositoryRoot, "fixtures/generated/app-0.2.7/pnpm-lock.yaml"), "utf8"));
     }
     const before = [...repository.files];
     const result = await core.applyCapabilityAddition({
@@ -1208,12 +1208,11 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const checks = profile === "app" ? core.appGenerationVerificationChecks : core.ordinaryGenerationVerificationChecks;
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
-      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
+      destination, renderingContext: core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainConsent, options.retainDeployment),
       verifier: {
         async prepareLockfile(root) {
-          const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}${nextSuffix}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}-next-16.4.5/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
@@ -1441,11 +1440,11 @@ const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtim
 
 test("adding a neighbor preserves installed consent and adding consent selects current bytes", async () => {
   const archive = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath), "utf8");
-  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) {
     for (const initial of ["retained", "current", "absent"]) {
       const addingAnalytics = initial === "absent";
       const entries = await environmentContactEntries("site", {
-        retainedNext, retainDeployment, retainConsent: initial === "retained" ? true : undefined,
+        retainDeployment, retainConsent: initial === "retained" ? true : undefined,
         ...(addingAnalytics ? {} : { analytics: environmentAnalyticsSelection }),
       });
       const repository = createRepository(entries);

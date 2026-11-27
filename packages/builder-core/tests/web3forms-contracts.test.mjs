@@ -51,6 +51,7 @@ test("absent contact selection preserves the retained portfolio and excludes con
   const installed = await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
     ".egeria/project.yaml": Buffer.from(archive.get(".egeria/project.yaml")).toString("utf8"),
     ".egeria/state.json": Buffer.from(archive.get(".egeria/state.json")).toString("utf8"),
+    "apps/web/package.json": Buffer.from(archive.get("apps/web/package.json")).toString("utf8"),
   }));
   assert.equal(installed.ok, true);
   const portfolio = { ...request("portfolio"), projectName: "acme-portfolio", displayName: "Acme Portfolio" };

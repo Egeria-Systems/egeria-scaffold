@@ -24,7 +24,7 @@ test("application environment catalog admits exactly the retained, public-build,
     [false, true, "0.9.0", "0.11.0", "0.17.0", "0.15.0"],
     [true, true, "0.10.0", "0.12.0", "0.18.0", "0.16.0"],
   ]) for (const [retained, deployment] of [[true, predecessor], [false, successor], ...(publicBuild ? [["public-build", publicBuild]] : [])]) {
-    const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs, undefined, undefined, retained);
+    const context = createApplicationEnvironmentRenderingContext(persistence, false, jobs, undefined, retained);
     const jobsVersion = jobs ? (retained === false ? "0.4.0" : "0.3.0") : undefined;
     assert.equal(isApplicationEnvironmentRenderingContext(context), true);
     assert.equal(context.catalogSnapshot.standards, standards);

@@ -62,38 +62,30 @@ test("persistence refuses a changed root dependency graph before replacing its l
 
 
 test("current persistence dependency replacement refuses swapped source locks", async () => {
-  const cases = [
-    { next: "16.4.5", ordinary: "web-recipe-app-0.3.0-next-16.4.5", persistent: "web-recipe-app-0.2.7-persistence-next-16.4.5" },
-    { next: "16.4.1", ordinary: "web-recipe-app-0.3.0", persistent: "web-recipe-app-0.2.7-persistence" },
-  ];
-  for (const cohort of cases) {
-    const context = persistence => createGenerationRenderingContext(persistence, false, false, cohort.next === "16.4.1" ? cohort.next : undefined);
-    const currentOrdinary = await renderSkeleton(request, context(false));
-    const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, context(true));
-    assert.equal(currentOrdinary.ok, true);
-    assert.equal(currentPersistent.ok, true);
-    const expectedNext = cohort.next;
-    assert.equal(currentOrdinary.value.project.recipeVersion, "0.3.0");
-    assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
-    assert.equal(manifest(currentOrdinary.value).dependencies.next, expectedNext);
-    assert.equal(manifest(currentPersistent.value).dependencies.next, expectedNext);
-    for (const [sourceKind, targetKind, current, desired] of [
-      ["ordinary", "persistent", currentOrdinary.value, currentPersistent.value],
-      ["persistent", "ordinary", currentPersistent.value, currentOrdinary.value],
-    ]) {
-      const expectedSource = await readFile(new URL(`../lockfiles/${cohort[sourceKind]}/pnpm-lock.yaml`, import.meta.url), "utf8");
-      const expectedTarget = await readFile(new URL(`../lockfiles/${cohort[targetKind]}/pnpm-lock.yaml`, import.meta.url), "utf8");
-      const actual = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, expectedSource) });
-      assert.equal(actual.ok, true, JSON.stringify(actual));
-      assert.equal(decoder.decode(actual.value.desired.files.find(file => file.path === "pnpm-lock.yaml").content), expectedTarget);
-      assert.equal(actual.value.desired.project.recipeVersion, current.project.recipeVersion);
-      assert.equal(manifest(actual.value.desired).dependencies.next, expectedNext);
-      const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: expectedNext === "16.4.5" ? "16.4.1" : "16.4.5" } }), expectedSource) });
-      assert.equal(mismatched.ok, false);
-      for (const source of [expectedTarget, expectedSource + "\n"]) {
-        const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
-        assert.equal(refused.ok, false);
-      }
+  const currentOrdinary = await renderSkeleton(request, createGenerationRenderingContext());
+  const currentPersistent = await renderSkeleton({ ...request, applicationPersistence: true }, createGenerationRenderingContext(true));
+  assert.equal(currentOrdinary.ok, true);
+  assert.equal(currentPersistent.ok, true);
+  assert.equal(currentOrdinary.value.project.recipeVersion, "0.3.0");
+  assert.equal(currentPersistent.value.project.recipeVersion, currentOrdinary.value.project.recipeVersion);
+  assert.equal(manifest(currentOrdinary.value).dependencies.next, "16.4.5");
+  assert.equal(manifest(currentPersistent.value).dependencies.next, "16.4.5");
+  for (const [current, desired, removing] of [
+    [currentOrdinary.value, currentPersistent.value, false],
+    [currentPersistent.value, currentOrdinary.value, true],
+  ]) {
+    const expectedSource = await lock(removing);
+    const expectedTarget = await lock(!removing);
+    const actual = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, expectedSource) });
+    assert.equal(actual.ok, true, JSON.stringify(actual));
+    assert.equal(decoder.decode(actual.value.desired.files.find(file => file.path === "pnpm-lock.yaml").content), expectedTarget);
+    assert.equal(actual.value.desired.project.recipeVersion, current.project.recipeVersion);
+    assert.equal(manifest(actual.value.desired).dependencies.next, "16.4.5");
+    const mismatched = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, value => ({ ...value, dependencies: { ...value.dependencies, next: "16.4.1" } }), expectedSource) });
+    assert.equal(mismatched.ok, false);
+    for (const source of [expectedTarget, expectedSource + "\n"]) {
+      const refused = await prepareCapabilityDependencyChange({ current, desired, reader: await reader(current, undefined, source) });
+      assert.equal(refused.ok, false);
     }
   }
 });

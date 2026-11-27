@@ -4,9 +4,8 @@ import { projectConfigurationSchema, type ProjectConfiguration } from "../contra
 import type { ValidationResult } from "../contracts/result.js";
 import { installedStateSchema, type InstalledState } from "../contracts/state.js";
 import type { ApplicationEnvironmentRenderingContext } from "../generation/render-skeleton.js";
-import { currentNextVersion, retainedNextVersion } from "../generation/recipe-lockfiles.js";
+import { declaresCurrentNext, hasCurrentNextFingerprint, parsePackageManifest } from "../generation/recipe-lockfiles.js";
 import { retainedAnalyticsConsentTemplates, retainedSectionTemplates } from "../generation/template-catalog.js";
-import { fingerprintJsonValue } from "../ownership/fingerprint.js";
 import { createApplicationEnvironmentProfileRecipes } from "../profiles/profile-recipes.js";
 import { createCachingRepositoryReader } from "../repository/cache-reader.js";
 import type { RepositoryReader } from "../repository/repository-reader.js";
@@ -33,14 +32,13 @@ export function createGenerationRenderingContext(
   applicationPersistence = false,
   retainAppFoundation = false,
   backgroundJobs = false,
-  retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
   retainPublicContentRouting?: true,
   retainPersistenceTarget?: true,
 ): ApplicationEnvironmentRenderingContext {
-  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget);
+  return createApplicationEnvironmentRenderingContext(applicationPersistence, retainAppFoundation, backgroundJobs, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget);
 }
 
 type VerifiedProjectSnapshot = Readonly<{
@@ -122,13 +120,7 @@ export function createVerifiedProjectSnapshot(
   const projectValue = projectResult.data;
   const stateValue = stateResult.data;
   if (projectValue.originProfile !== stateValue.origin.profile || projectValue.recipeVersion !== stateValue.origin.recipeVersion) return invalidProjectSnapshot();
-  const nextSurface = stateValue.managedSurfaces.find(surface =>
-    surface.identifier === "builder-web-package-next" && surface.owner.kind === "builder-kernel" &&
-    surface.path === "apps/web/package.json" && surface.ownership === "merge-managed" &&
-    surface.fingerprintTarget.kind === "json-value" && surface.fingerprintTarget.pointer === "/dependencies/next");
-  if (nextSurface === undefined || stateValue.ejections.includes(nextSurface.path)) return invalidProjectSnapshot();
-  const retainsNext = nextSurface.fingerprint === fingerprintJsonValue(retainedNextVersion);
-  if (!retainsNext && nextSurface.fingerprint !== fingerprintJsonValue(currentNextVersion)) return invalidProjectSnapshot();
+  if (!hasCurrentNextFingerprint(stateValue)) return invalidProjectSnapshot();
   const analyticsSelected = projectValue.selectedCapabilities.includes("analytics");
   const retainedConsentCount = analyticsSelected ? retainedAnalyticsConsentTemplates.filter(([identifier, path, fingerprint]) =>
     stateValue.managedSurfaces.some(surface => surface.identifier === identifier && surface.path === path &&
@@ -167,7 +159,6 @@ export function createVerifiedProjectSnapshot(
     persistence,
     projectValue.selectedCapabilities.includes("app-foundation"),
     jobs,
-    retainsNext ? retainedNextVersion : undefined,
     retainedConsentCount === retainedAnalyticsConsentTemplates.length ? true : undefined,
     deploymentView,
     retainsSectionTemplates ? true : undefined,
@@ -199,23 +190,32 @@ export async function readVerifiedProjectSnapshot(
   const state = parseStateJson(stateSource.content);
   if (!project.ok || !state.ok) return invalidProjectSnapshot();
   const snapshot = createVerifiedProjectSnapshot(project.value, state.value);
-  return snapshot.ok ? { ok: true, value: { ...snapshot.value, reader } } : snapshot;
+  if (!snapshot.ok) return snapshot;
+  const manifest = await reader.readText("apps/web/package.json");
+  if (manifest.kind !== "file") return invalidProjectSnapshot();
+  try {
+    if (!declaresCurrentNext(parsePackageManifest(manifest.content))) return invalidProjectSnapshot();
+  } catch {
+    return invalidProjectSnapshot();
+  }
+  return { ok: true, value: { ...snapshot.value, reader } };
 }
 
 export function createApplicationEnvironmentRenderingContext(
   applicationPersistence = false,
   retainAppFoundation = false,
   backgroundJobs = false,
-  retainedNext?: typeof retainedNextVersion,
   retainAnalyticsConsent?: true,
   retainDeployment: RetainedDeploymentView = false,
   retainSections?: true,
   retainPublicContentRouting?: true,
   retainPersistenceTarget?: true,
 ): ApplicationEnvironmentRenderingContext {
+  if (retainAnalyticsConsent !== undefined && (retainAnalyticsConsent as unknown) !== true) {
+    throw new TypeError("APPLICATION_ENVIRONMENT_CONTEXT_INVALID");
+  }
   return {
     projectSchemaVersion: "2.0.0",
-    ...(retainedNext === undefined ? {} : { retainedNextVersion: retainedNext }),
     ...(retainAppFoundation ? { retainAppFoundation: true } : {}),
     ...(retainAnalyticsConsent ? { retainAnalyticsConsent: true } : {}),
     ...(retainSections ? { retainSections: true } : {}),
@@ -228,8 +228,6 @@ export function createApplicationEnvironmentRenderingContext(
 
 export function isApplicationEnvironmentRenderingContext(value: unknown): value is ApplicationEnvironmentRenderingContext {
   try {
-    const retainedNext = typeof value === "object" && value !== null && "retainedNextVersion" in value &&
-      value.retainedNextVersion === retainedNextVersion ? retainedNextVersion : undefined;
     const retainAnalyticsConsent = typeof value === "object" && value !== null &&
       "retainAnalyticsConsent" in value && value.retainAnalyticsConsent === true ? true : undefined;
     const retainSections = typeof value === "object" && value !== null &&
@@ -242,7 +240,7 @@ export function isApplicationEnvironmentRenderingContext(value: unknown): value 
     return [false, true].some((persistence) =>
       [false, true].some((retainFoundation) =>
         [false, true].some((jobs) => supportedDeploymentViews(jobs).some(retainDeployment =>
-          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainedNext, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget))))),
+          serialized === stringifyCanonicalJson(createApplicationEnvironmentRenderingContext(persistence, retainFoundation, jobs, retainAnalyticsConsent, retainDeployment, retainSections, retainPublicContentRouting, retainPersistenceTarget))))),
     );
   } catch {
     return false;

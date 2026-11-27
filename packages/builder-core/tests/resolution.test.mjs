@@ -2129,7 +2129,7 @@ test("the current catalog exposes exact capability contracts and keeps observabi
       ]
     }
   ];
-  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, true);
   const retainedCatalog = assertOk(core.createCapabilityCatalogSnapshot(packageVersions, retainedContext.catalogSnapshot));
   assert.deepEqual(retainedCatalog.slice(1, 7), expectedRetainedContracts);
   const publicBuildFiles = [
@@ -2770,7 +2770,7 @@ test("current recipes resolve to deterministic dependency-first manifests", () =
       removalPolicy: "reviewed",
     },
   ];
-  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, undefined, true);
+  const retainedContext = core.createGenerationRenderingContext(false, false, false, undefined, true);
   const retainedCatalog = assertOk(core.createCapabilityCatalogSnapshot(packageVersions, retainedContext.catalogSnapshot));
   const retainedSite = assertOk(resolveRequest({ profile: "site" }, retainedCatalog));
   assert.deepEqual(core.createInstalledManifest(retainedSite), expectedRetainedManifest);

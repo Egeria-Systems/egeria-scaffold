@@ -456,7 +456,7 @@ test("deployment subjects bind exact retained and fresh descriptor families", ()
     [false, true, false, "0.17.0", "sha256:f40fda98d448395ba53f2fcbd4111998bdcbf7f70c7004f43ff2358d06b50296"],
     [true, true, false, "0.18.0", "sha256:2a1928592d7db02e10d8a75750f92f822fea4838d3b87837fe43d99f20a30ab9"],
   ]) {
-    const { catalogSnapshot } = core.createGenerationRenderingContext(persistence, false, jobs, undefined, undefined, retained);
+    const { catalogSnapshot } = core.createGenerationRenderingContext(persistence, false, jobs, undefined, retained);
     const descriptors = assertSuccess(core.createCapabilityCatalogSnapshot(core.verifiedCapabilityPackageVersions, catalogSnapshot));
     const deployment = descriptors.find(({ identifier }) => identifier === "deployment-cloudflare");
     assert.deepEqual(core.createCertificationSubject(deployment, requiredEvidence["deployment-cloudflare"]), { descriptorVersion, behaviorContractDigest });

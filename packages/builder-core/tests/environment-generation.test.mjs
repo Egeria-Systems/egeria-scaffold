@@ -3,7 +3,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import * as core from "../dist/index.js";
-import { createGenerationRenderingContext } from "../dist/catalog/verified-package-versions.js";
+import { createGenerationRenderingContext, createVerifiedProjectSnapshot } from "../dist/catalog/verified-package-versions.js";
 import { ordinaryGenerationVerificationChecks } from "../dist/contracts/generation-verification.js";
 
 const request = {
@@ -25,12 +25,15 @@ test("fresh generation and installed inspection select exact deployment versions
     ["app-persistence-jobs-email", "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5", true, true, "0.12.0", "0.18.0", "0.16.0"],
   ]) {
     const root = new URL(`../../../fixtures/generated/${fixture}/`, import.meta.url);
-    const project = await readFile(new URL(".egeria/project.yaml", root), "utf8");
+    const [project, webManifest] = await Promise.all([
+      readFile(new URL(".egeria/project.yaml", root), "utf8"),
+      readFile(new URL("apps/web/package.json", root), "utf8"),
+    ]);
     const archivedStateRoot = new URL("../../../tests/generated-fixtures/fixtures/installed-ancestor-controls/", import.meta.url);
     const readArchivedCatalog = async name => {
       const state = await readFile(new URL(name + "-state.json", archivedStateRoot), "utf8");
       const snapshot = success(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
-        ".egeria/project.yaml": project, ".egeria/state.json": state,
+        ".egeria/project.yaml": project, ".egeria/state.json": state, "apps/web/package.json": webManifest,
       })));
       return snapshot.catalog;
     };
@@ -110,8 +113,9 @@ test("default codecs and installed inspection accept only the exact current tupl
   };
   const projectSource = core.serializeProjectYaml(rendered.project);
   assert.equal(success(core.parseStateJson(JSON.stringify(state))).schemaVersion, "2.0.0");
+  const manifestSource = Buffer.from(rendered.files.find(({ path }) => path === "apps/web/package.json").content).toString("utf8");
   const read = (project, installed) => core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
-    ".egeria/project.yaml": project, ".egeria/state.json": JSON.stringify(installed),
+    ".egeria/project.yaml": project, ".egeria/state.json": JSON.stringify(installed), "apps/web/package.json": manifestSource,
   }));
   const valid = success(await read(projectSource, state));
   assert.equal(valid.renderingContext.projectSchemaVersion, "2.0.0");
@@ -125,6 +129,45 @@ test("default codecs and installed inspection accept only the exact current tupl
     lastSuccessfulVerification: { kind: "capability-upgrade", checks: ["contracts", "plan-approval", "pre-state-inference", ...ordinaryGenerationVerificationChecks, "post-change-inference"] },
   })).ok, false);
 
+});
+
+
+test("installed inspection refuses retired and mixed Next declarations and fingerprints", async (context) => {
+  const root = new URL("../../../fixtures/generated/portfolio-0.12.0-next-16.4.5/", import.meta.url);
+  const [project, stateSource, manifestSource] = await Promise.all(
+    [".egeria/project.yaml", ".egeria/state.json", "apps/web/package.json"]
+      .map(path => readFile(new URL(path, root), "utf8")),
+  );
+  const current = JSON.parse(stateSource);
+  const manifest = JSON.parse(manifestSource);
+  manifest.description = "synthetic-private-next-marker";
+  const retiredState = structuredClone(current);
+  retiredState.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next").fingerprint = core.fingerprintJsonValue("16.4.1");
+  const retiredManifest = { ...manifest, dependencies: { ...manifest.dependencies, next: "16.4.1" } };
+  const inspect = (state, webManifest) => core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
+    ".egeria/project.yaml": project, ".egeria/state.json": JSON.stringify(state),
+    ...(webManifest === undefined ? {} : { "apps/web/package.json": JSON.stringify(webManifest) }),
+  }));
+
+  success(await inspect(current, manifest));
+  for (const [name, state, webManifest] of [
+    ["retired pair", retiredState, retiredManifest],
+    ["retired manifest with current fingerprint", current, retiredManifest],
+    ["current manifest with retired fingerprint", retiredState, manifest],
+    ["missing manifest", current, undefined],
+    ...["devDependencies", "optionalDependencies", "peerDependencies"].map(section =>
+      [section, current, { ...manifest, [section]: { ...manifest[section], next: "16.4.1" } }]),
+  ]) {
+    await context.test(name, async () => {
+      const result = await inspect(state, webManifest);
+      assert.equal(result.ok, false);
+      assert.equal(result.issues[0].code, "PROJECT_INSPECTION_INVALID");
+      assert.doesNotMatch(JSON.stringify(result.issues), /synthetic-private-next-marker/u);
+    });
+  }
+  const snapshot = createVerifiedProjectSnapshot(success(core.parseProjectYaml(project)), retiredState);
+  assert.equal(snapshot.ok, false);
+  assert.equal(snapshot.issues[0].code, "PROJECT_INSPECTION_INVALID");
 });
 
 
