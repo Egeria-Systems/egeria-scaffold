@@ -163,6 +163,17 @@ After all relevant inputs settle:
 3. Confirm no unrelated or premature surface was created.
 4. Record exact commands, versions, results, known limitations, and unproven properties.
 5. Create a review packet under the Git-ignored private local `docs/review-packets/` directory with scope, comparison, changed files, reviewer dispositions, verification, risks, deferred work, and rollback/recovery.
+6. Check the assembled packet before Gate 3. Rerun the check after adding evidence to that packet.
+
+Run verification in an owned temporary workspace outside the packet tree. Keep dependencies, package stores, downloaded browsers, and build output in that workspace. Export the individual receipts, reports, logs, screenshots, and other files needed to support the review. Clean up the workspace when the run closes. Record the owner and cleanup condition for any paused run that needs its workspace.
+
+Use one directory per new packet. Put the review record in `packet.md` and list it and each retained attachment in `packet-files.txt`, using one exact packet-relative file path per line with forward slashes. Use regular files and real directories. When an exact archive is needed, preserve it in its approved private location and record its revision, digest, retention reason, and reference in the packet.
+
+Run the check from the checkout root and replace the example path with your packet's directory.
+
+```sh
+node scripts/check-review-packet.mjs "docs/review-packets/example-packet"
+```
 
 Private workflow artifacts must not be force-added. A separately approved content-safe final receipt cited by the tracked registry may be tracked only through an explicit exact path exception; preparation, raw inspection, and review artifacts remain ignored. Keep secrets, personal information, exact home-directory paths, machine-specific tool paths, private URLs, and raw provider output out of tracked documentation. Preserve any private artifacts through a separately managed local backup when their loss would matter; Git no longer supplies recovery for them.
 
