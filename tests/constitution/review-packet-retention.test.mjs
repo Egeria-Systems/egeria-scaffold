@@ -18,11 +18,11 @@ const checkScript = resolve(import.meta.dirname, "../../scripts/check-review-pac
 const packetArgument = "docs/review-packets/current packet";
 const manifestName = "packet-files.txt";
 
-async function createPacket(context, files = { "packet.md": "# Review\n" }) {
+async function createPacket(context, files = { "packet.md": "# Review\n" }, argument = packetArgument) {
   const root = await mkdtemp(join(tmpdir(), "review-packet-retention-"));
   context.after(() => rm(root, { recursive: true, force: true }));
 
-  const packet = join(root, packetArgument);
+  const packet = join(root, argument);
   await mkdir(packet, { recursive: true });
   for (const [relativePath, content] of Object.entries(files)) {
     const destination = join(packet, relativePath);
@@ -57,7 +57,9 @@ test("accepts a packet of selected records and diagnostics without changing it",
     "packet.md": "# Review and verification\n",
     "receipt.json": '{"exit":0}\n',
     "logs/check.stdout": "ok\n",
+    "logs/build.stdout": "built\n",
     "notes/store/v11/summary.json": "{}\n",
+    "attachments/workspace.tar.sha256": "checksum\n",
     "visual/expected.png": "expected",
     "visual/actual.png": "actual",
     "visual/diff.png": "diff",
@@ -72,7 +74,7 @@ test("accepts a packet of selected records and diagnostics without changing it",
 
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.stderr, "");
-  assert.match(result.stdout, /\b8 files\b/u);
+  assert.match(result.stdout, /\b10 files\b/u);
   assert.ok(result.stdout.includes(String(expectedBytes)), result.stdout);
   assert.deepEqual((await readdir(packet, { recursive: true })).sort(), structure);
   assert.equal(await readFile(manifest, "utf8"), manifestContent);
@@ -147,6 +149,7 @@ test("refuses declared dependency, cache, browser and build payloads", async (co
     "evidence/.next/BUILD_ID",
     "evidence/.open-next/worker.js",
     "evidence/.wrangler/output.js",
+    "evidence/build/bundle.js",
     "evidence/dist/bundle.js",
     "evidence/.git",
   ];
@@ -165,6 +168,16 @@ test("refuses declared workspace archives", async (context) => {
     "attachments/copied-workspace.TAR.gz",
     "attachments/copied-workspace.txz",
     "attachments/copied-workspace.tbz2",
+    "attachments/copied-workspace.tar.lz4",
+    "attachments/copied-workspace.tar.lz",
+    "attachments/copied-workspace.tar.lzma",
+    "attachments/copied-workspace.tar.lzo",
+    "attachments/copied-workspace.tar.Z",
+    "attachments/copied-workspace.taz",
+    "attachments/copied-workspace.tbz",
+    "attachments/copied-workspace.tz2",
+    "attachments/copied-workspace.tlz",
+    "attachments/copied-workspace.tzst",
   ]) {
     const { root } = await createPacket(context, {
       "packet.md": "# Review\n",
@@ -172,6 +185,32 @@ test("refuses declared workspace archives", async (context) => {
     });
     assertRefusal(checkPacket(root), path);
   }
+});
+
+test("refuses a packet rooted in a disposable directory", async (context) => {
+  for (const argument of [
+    "docs/review-packets/run/Node_Modules/library",
+    "docs/review-packets/run/build",
+    "docs/review-packets/run/Library/Caches/pnpm/reports",
+  ]) {
+    const { root } = await createPacket(context, { "packet.md": "# Review\n" }, argument);
+
+    const result = checkPacket(root, [argument]);
+
+    assertRefusal(result, ".");
+    assert.match(result.stderr, /disposable/u);
+  }
+});
+
+test("refuses a disposable layout spanning the packet root and a declared path", async (context) => {
+  const argument = "docs/review-packets/run/store/v11";
+  const path = "files/ab/package";
+  const { root } = await createPacket(context, {
+    "packet.md": "# Review\n",
+    [path]: "payload",
+  }, argument);
+
+  assertRefusal(checkPacket(root, [argument]), path);
 });
 
 test("refuses ambiguous manifest entries at their source line", async (context) => {

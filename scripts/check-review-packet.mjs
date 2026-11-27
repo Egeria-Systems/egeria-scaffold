@@ -14,13 +14,15 @@ const scratchNames = new Set([
   ".next",
   ".open-next",
   ".wrangler",
+  "build",
   "dist",
   "playwright-browsers",
   "native-browsers",
   "ms-playwright",
 ]);
 const storeEntries = new Set(["files", "index", "index.db", "projects"]);
-const archiveSuffix = /\.(?:zip|tar|gz|tgz|xz|txz|bz2|tbz2|zst|7z|rar|dmg|pkg)$/iu;
+const archiveSuffix =
+  /\.(?:zip|tar|gz|tgz|taz|z|bz2|tbz|tbz2|tz2|xz|txz|lz|lzma|tlz|lzo|lz4|zst|tzst|7z|rar|dmg|pkg)$/iu;
 
 class PacketRefusal extends Error {}
 
@@ -39,6 +41,23 @@ function relativeComponents(path) {
   return components.some((part) => part === "" || part === "." || part === "..")
     ? null
     : components;
+}
+
+function rejectDisposablePath(components, relativePath) {
+  const names = components.map((component) => component.toLowerCase());
+  const disposablePath = names.some((name, offset) => {
+    const child = names[offset + 1];
+    const isPnpmCache = child === "pnpm" && (
+      name === "cache" || name === ".cache" ||
+      (name === "caches" && names[offset - 1] === "library")
+    );
+    return scratchNames.has(name) ||
+      isPnpmCache ||
+      (name === "store" && /^v\d+$/u.test(child ?? "") && storeEntries.has(names[offset + 2]));
+  });
+  if (disposablePath) {
+    refuse(relativePath, "is part of a disposable installation, cache, build or checkout.");
+  }
 }
 
 async function inspect(relativePath, operation) {
@@ -61,7 +80,7 @@ async function resolvePacketDirectory(components) {
   return target;
 }
 
-async function readInventory(packetDirectory) {
+async function readInventory(packetDirectory, packetComponents) {
   const manifest = join(packetDirectory, manifestName);
   const entry = await inspect(manifestName, () => lstat(manifest));
   if (!entry.isFile()) {
@@ -83,20 +102,7 @@ async function readInventory(packetDirectory) {
       refuse(manifestName, "has an invalid or duplicate file path on line " + (index + 1) + ".");
     }
 
-    const names = components.map((component) => component.toLowerCase());
-    const disposablePath = names.some((name, offset) => {
-      const child = names[offset + 1];
-      const isPnpmCache = child === "pnpm" && (
-        name === "cache" || name === ".cache" ||
-        (name === "caches" && names[offset - 1] === "library")
-      );
-      return scratchNames.has(name) ||
-        isPnpmCache ||
-        (name === "store" && /^v\d+$/u.test(child ?? "") && storeEntries.has(names[offset + 2]));
-    });
-    if (disposablePath) {
-      refuse(relativePath, "is part of a disposable installation, cache, build or checkout.");
-    }
+    rejectDisposablePath([...packetComponents, ...components], relativePath);
     if (archiveSuffix.test(relativePath)) {
       refuse(relativePath, "is an archive. Preserve exact archives in their approved private location.");
     }
@@ -158,8 +164,9 @@ async function main(args) {
   }
 
   try {
+    rejectDisposablePath(components, ".");
     const packetDirectory = await resolvePacketDirectory(components);
-    const inventory = await readInventory(packetDirectory);
+    const inventory = await readInventory(packetDirectory, components);
     const { fileCount, logicalBytes } = await checkContents(packetDirectory, inventory);
     process.stdout.write("Review packet accepted (" + fileCount + " files, " + logicalBytes + " logical bytes).\n");
   } catch (error) {
