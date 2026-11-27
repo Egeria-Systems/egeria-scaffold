@@ -548,10 +548,14 @@ export function createTemplateCatalog(
     }
   }
   if ((includeBookingCalendly)) {
-    for (const path of ["apps/web/content/fr-CA/booking-calendly.yaml", "apps/web/tests/unit/booking-configuration.test.ts", "apps/web/tests/component/booking-availability.test.tsx"]) {
+    for (const path of [
+      "apps/web/content/fr-CA/booking-calendly.yaml",
+      "apps/web/tests/unit/booking-configuration.test.ts",
+      "apps/web/tests/component/booking-availability.test.tsx",
+      "docs/booking-calendly.md",
+    ]) {
       sources.push({ source: `booking-calendly/application-environments/${path}`, destinationSource: `booking-calendly/${path}`, contentKind: "text" });
     }
-    sources.push({ source: "booking-calendly/docs/booking-calendly.md", contentKind: "text" });
   }
   if ((includeAnalytics)) {
     for (const path of ["apps/web/src/integrations/analytics/analytics-configuration.ts", "apps/web/tests/unit/analytics-configuration.test.ts"]) {
@@ -562,7 +566,6 @@ export function createTemplateCatalog(
 
     if ([
       "common/README.md.template", "common/apps/web/app/layout.tsx", "multilingual/apps/web/app/layout.tsx",
-      "booking-calendly/docs/booking-calendly.md",
       "contact-form-web3forms/apps/web/app/layout.tsx", "contact-form-web3forms/apps/web/app/layout.multilingual.tsx",
       "site/apps/web/src/routing/read-routing-content.ts", "site/apps/web/src/routing/routing-content-schema.ts",
       "site/apps/web/tests/unit/routing-content.test.ts", "site/apps/web/app/robots.ts",
