@@ -43,15 +43,17 @@ export async function readArchivedGeneratedFixture(identifier) {
   const fixture = generatedFixtureContracts.find(candidate => candidate.identifier === identifier);
   assert.ok(fixture, identifier);
   const root = new URL(fixture.relativeRoot + "/", repositoryRoot);
-  const [project, state, migrations, lock] = await Promise.all([
+  const [project, state, migrations, lock, webManifest] = await Promise.all([
     readFile(new URL(".egeria/project.yaml", root)),
     readFile(new URL("tests/generated-fixtures/fixtures/installed-ancestor-controls/" + identifier + "-state.json", repositoryRoot)),
     readFile(new URL(".egeria/migrations.jsonl", root)),
     readFile(new URL("pnpm-lock.yaml", root)),
+    readFile(new URL("apps/web/package.json", root), "utf8"),
   ]);
   const installed = await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
     ".egeria/project.yaml": project.toString("utf8"),
     ".egeria/state.json": state.toString("utf8"),
+    "apps/web/package.json": webManifest,
   }));
   assert.equal(installed.ok, true, JSON.stringify(installed.issues));
   const rendered = await core.renderSkeleton(requestForFixture(fixture), installed.value.renderingContext);

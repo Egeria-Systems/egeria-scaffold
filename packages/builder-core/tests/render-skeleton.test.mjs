@@ -69,13 +69,13 @@ test("current recipes own the lint patch and select exact optional dependency fa
   }
 });
 
-test("installed Next.js patch preserves its exact generated dependency view", async () => {
+test("current installed projects preserve their exact generated dependency bytes", async () => {
   const core = await import("../dist/index.js");
   const { readVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   const { resolveRecipeLockfileVersion } = await import("../dist/generation/recipe-lockfiles.js");
   for (const [root, profile, projectName, displayName, persistent, lock] of [
-    ["portfolio-0.12.0", "portfolio", "acme-portfolio", "Acme Portfolio", false, "portfolio-0.12.0"],
-    ["app-persistence-0.3.0", "app", "acme-app-persistence", "Acme App Persistence", true, "app-0.2.7-persistence"],
+    ["portfolio-0.12.0-next-16.4.5", "portfolio", "acme-portfolio", "Acme Portfolio", false, "portfolio-0.12.0-next-16.4.5"],
+    ["app-persistence-0.3.0-next-16.4.5", "app", "acme-app-persistence", "Acme App Persistence", true, "app-0.2.7-persistence-next-16.4.5"],
   ]) {
     const fixture = new URL("../../../fixtures/generated/" + root + "/", import.meta.url);
     const reader = core.createFileSystemRepositoryReader(fileURLToPath(fixture));
@@ -118,6 +118,7 @@ test("persistence target views preserve installed bytes independently of public 
   const snapshot = assertSuccess(await core.readVerifiedProjectSnapshot(core.createInMemoryRepositoryReader({
     ".egeria/project.yaml": project,
     ".egeria/state.json": state,
+    "apps/web/package.json": Buffer.from(archivedFiles.get("apps/web/package.json")).toString("utf8"),
   })));
   const request = {
     profile: "app", projectName: "acme-app-persistence", displayName: "Acme App Persistence",
@@ -6078,7 +6079,7 @@ test("fresh jobs require a source revision when Next generates a build ID", asyn
   const core = await import("../dist/index.js");
   const revision = "a".repeat(40);
   for (const [withJobs, retained] of [[true, false], [true, "public-build"], [true, true], [false, false]]) {
-    const context = core.createGenerationRenderingContext(false, false, withJobs, undefined, undefined, retained);
+    const context = core.createGenerationRenderingContext(false, false, withJobs, undefined, retained);
     const rendered = assertSuccess(await core.renderSkeleton({ profile: "app", projectName: "jobs-build",
       displayName: "Jobs build", packageVersions: core.verifiedCapabilityPackageVersions,
       ...(withJobs ? { backgroundJobDelivery: true } : {}) }, context));
@@ -6403,7 +6404,16 @@ const environmentAnalyticsSettings = {
   operationalIntegrations: { googleSearchConsole: true, lookerStudio: { connector: "google-analytics-4" } },
 };
 
-test("fresh consent rendering and exact installed consent bytes select independently of the Next graph", async () => {
+test("rendering context factories refuse the retired positional Next selector", async () => {
+  const core = await import("../dist/index.js");
+  for (const factory of [core.createGenerationRenderingContext, core.createApplicationEnvironmentRenderingContext]) {
+    assert.throws(() => factory(false, false, false, "16.4.1"), {
+      name: "TypeError", message: "APPLICATION_ENVIRONMENT_CONTEXT_INVALID",
+    });
+  }
+});
+
+test("current Next projects preserve exact installed and fresh consent bytes", async () => {
   const core = await import("../dist/index.js");
   const { createVerifiedProjectSnapshot } = await import("../dist/catalog/verified-package-versions.js");
   const paths = [
@@ -6417,33 +6427,31 @@ test("fresh consent rendering and exact installed consent bytes select independe
   const baseline = await Promise.all(paths.map(path => readFile(new URL(path, templateRoot))));
   for (const profile of ["portfolio", "site", "app"]) {
     for (const multilingual of [false, true]) {
-      for (const retainedNext of [undefined, "16.4.1"]) {
-        const request = { profile, projectName: "consent-rendering", displayName: "Consent rendering",
-          packageVersions: core.verifiedCapabilityPackageVersions, analytics: analyticsSettings, ...(multilingual ? { multilingual: true } : {}) };
-        const currentContext = core.createApplicationEnvironmentRenderingContext(false, false, false, retainedNext);
-        const priorContext = core.createApplicationEnvironmentRenderingContext(false, false, false, retainedNext, true);
-        const current = assertSuccess(await core.renderSkeleton(request, currentContext));
-        const prior = assertSuccess(await core.renderSkeleton(request, priorContext));
-        assert.deepEqual(prior.files.map(({ path }) => path), current.files.map(({ path }) => path));
-        assert.deepEqual(prior.surfaces, current.surfaces);
-        const next = parseGeneratedJson(current.files, "apps/web/package.json").dependencies.next;
-        assert.equal(next, retainedNext ?? "16.4.5");
-        const currentFiles = new Map(current.files.map(({ path, content }) => [path, Buffer.from(content)]));
-        const priorFiles = new Map(prior.files.map(({ path, content }) => [path, Buffer.from(content)]));
-        assert.deepEqual([...currentFiles.keys()].filter(path => !currentFiles.get(path).equals(priorFiles.get(path))).sort(), [...paths].sort());
-        for (const [index, path] of paths.entries()) assert.deepEqual(priorFiles.get(path), baseline[index]);
-        const priorState = renderingState(core, prior);
-        const currentState = renderingState(core, current);
-        assert.equal(assertSuccess(createVerifiedProjectSnapshot(prior.project, priorState)).renderingContext.retainAnalyticsConsent, true);
-        assert.equal(assertSuccess(createVerifiedProjectSnapshot(current.project, currentState)).renderingContext.retainAnalyticsConsent, undefined);
-        const updated = currentState.managedSurfaces.find(({ path }) => path === paths[0]);
-        const mixed = { ...priorState, managedSurfaces: priorState.managedSurfaces.map(surface => surface.path === paths[0] ? updated : surface) };
-        assert.equal(createVerifiedProjectSnapshot(prior.project, mixed).ok, false);
-        const { analytics, ...omittedRequest } = request;
-        const omitted = assertSuccess(await core.renderSkeleton(omittedRequest, currentContext));
-        assert.deepEqual(assertSuccess(await core.renderSkeleton(omittedRequest, priorContext)).files, omitted.files);
-        assert.ok(paths.every(path => !omitted.files.some(file => file.path === path)));
-      }
+      const request = { profile, projectName: "consent-rendering", displayName: "Consent rendering",
+        packageVersions: core.verifiedCapabilityPackageVersions, analytics: analyticsSettings, ...(multilingual ? { multilingual: true } : {}) };
+      const currentContext = core.createApplicationEnvironmentRenderingContext();
+      const priorContext = core.createApplicationEnvironmentRenderingContext(false, false, false, true);
+      const current = assertSuccess(await core.renderSkeleton(request, currentContext));
+      const prior = assertSuccess(await core.renderSkeleton(request, priorContext));
+      assert.deepEqual(prior.files.map(({ path }) => path), current.files.map(({ path }) => path));
+      assert.deepEqual(prior.surfaces, current.surfaces);
+      const next = parseGeneratedJson(current.files, "apps/web/package.json").dependencies.next;
+      assert.equal(next, "16.4.5");
+      const currentFiles = new Map(current.files.map(({ path, content }) => [path, Buffer.from(content)]));
+      const priorFiles = new Map(prior.files.map(({ path, content }) => [path, Buffer.from(content)]));
+      assert.deepEqual([...currentFiles.keys()].filter(path => !currentFiles.get(path).equals(priorFiles.get(path))).sort(), [...paths].sort());
+      for (const [index, path] of paths.entries()) assert.deepEqual(priorFiles.get(path), baseline[index]);
+      const priorState = renderingState(core, prior);
+      const currentState = renderingState(core, current);
+      assert.equal(assertSuccess(createVerifiedProjectSnapshot(prior.project, priorState)).renderingContext.retainAnalyticsConsent, true);
+      assert.equal(assertSuccess(createVerifiedProjectSnapshot(current.project, currentState)).renderingContext.retainAnalyticsConsent, undefined);
+      const updated = currentState.managedSurfaces.find(({ path }) => path === paths[0]);
+      const mixed = { ...priorState, managedSurfaces: priorState.managedSurfaces.map(surface => surface.path === paths[0] ? updated : surface) };
+      assert.equal(createVerifiedProjectSnapshot(prior.project, mixed).ok, false);
+      const { analytics, ...omittedRequest } = request;
+      const omitted = assertSuccess(await core.renderSkeleton(omittedRequest, currentContext));
+      assert.deepEqual(assertSuccess(await core.renderSkeleton(omittedRequest, priorContext)).files, omitted.files);
+      assert.ok(paths.every(path => !omitted.files.some(file => file.path === path)));
     }
   }
 });

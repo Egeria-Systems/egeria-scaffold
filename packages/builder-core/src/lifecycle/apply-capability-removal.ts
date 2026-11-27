@@ -713,7 +713,6 @@ export async function applyCapabilityRemoval(input: Readonly<{
     retainsPersistence,
     controls.project.value.selectedCapabilities.includes("app-foundation"),
     false,
-    environmentContext.retainedNextVersion,
     input.capability === "analytics" ? undefined : environmentContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,

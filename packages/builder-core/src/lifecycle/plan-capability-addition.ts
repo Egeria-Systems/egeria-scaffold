@@ -578,7 +578,6 @@ async function planCapabilityAdditionUnchecked(input: Readonly<{
     capabilityValue === "application-persistence" || project.selectedCapabilities.includes("application-persistence"),
     project.selectedCapabilities.includes("app-foundation"),
     false,
-    environmentContext.retainedNextVersion,
     environmentContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,

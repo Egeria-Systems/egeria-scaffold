@@ -18,7 +18,7 @@ import {
 } from "node:path";
 import { promisify } from "node:util";
 import { applicationEnvironmentVerificationScripts } from "../catalog/capability-catalog.js";
-import { parseProjectYaml } from "../state/codecs.js";
+import { parseProjectYaml, parseStateJson } from "../state/codecs.js";
 
 import {
   appGenerationVerificationChecks,
@@ -28,6 +28,9 @@ import {
 import type { ValidationResult } from "../contracts/result.js";
 import {
   createRecipeLockfileUrl,
+  declaresCurrentNext,
+  hasCurrentNextFingerprint,
+  parsePackageManifest,
   resolveRecipeLockfileVersion,
   type RecipeLockfileIdentity,
 } from "./recipe-lockfiles.js";
@@ -403,6 +406,15 @@ async function requirePnpmVersion(input: Readonly<{
     : issue("PNPM_VERSION_INVALID", "version-mismatch");
 }
 
+// Generation verifies before state is persisted. Installed lifecycle verifies while
+// the previous state is still present, before recording the new capability tuple.
+async function supportsNextState(root: string, source: ReadonlyMap<string, unknown>): Promise<boolean> {
+  const path = ".egeria/state.json";
+  if (!source.has(path)) return true;
+  const state = parseStateJson(await readFile(join(root, path), "utf8"));
+  return state.ok && hasCurrentNextFingerprint(state.value);
+}
+
 export async function prepareLockfile(
   root: string,
   recipeIdentity: RecipeLockfileIdentity,
@@ -430,9 +442,9 @@ export async function prepareLockfile(
     );
     const lockfileVersion = resolveRecipeLockfileVersion(
       recipeIdentity,
-      JSON.parse(manifestSource) as unknown,
+      parsePackageManifest(manifestSource),
     );
-    if (lockfileVersion === undefined) {
+    if (lockfileVersion === undefined || !(await supportsNextState(fixedRoot, before))) {
       return issue(
         "LOCKFILE_PREPARATION_FAILED",
         "recipe-lockfile-unavailable",
@@ -481,9 +493,11 @@ async function verifyInIsolatedCopy(
   let bindingIntegrationPresent: boolean;
   let backgroundJobs: boolean;
   try {
-    const manifest = JSON.parse(
-      await readFile(join(fixedRoot, "apps/web/package.json"), "utf8"),
-    ) as { scripts?: Record<string, unknown>; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
+    const packageManifest = parsePackageManifest(await readFile(join(fixedRoot, "apps/web/package.json"), "utf8"));
+    if (!declaresCurrentNext(packageManifest) || !(await supportsNextState(fixedRoot, sourceBefore))) {
+      return issue("LOCKFILE_PREPARATION_FAILED", "recipe-lockfile-unavailable");
+    }
+    const manifest = packageManifest as { scripts?: Record<string, unknown>; dependencies?: Record<string, unknown>; devDependencies?: Record<string, unknown> };
     const project = parseProjectYaml(await readFile(join(fixedRoot, ".egeria/project.yaml"), "utf8"));
     if (!project.ok || !Object.entries(applicationEnvironmentVerificationScripts).every(([name, value]) => manifest.scripts?.[name] === value)) {
       return issue("WORKER_INTEGRATION_INVALID", "environment-contract-mismatch");

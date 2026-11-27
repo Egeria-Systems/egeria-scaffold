@@ -20,6 +20,7 @@ import test from "node:test";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
+import { fingerprintJsonValue } from "../../../packages/builder-core/dist/ownership/fingerprint.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
 const lifecycleCohorts = [
   {
@@ -2666,6 +2667,53 @@ test("CLI diagnostics refuse retired installed controls without changing reposit
     }, profile);
   }
 });
+
+for (const [label, installed, declared] of [
+  ["retired state and declaration", "16.4.1", "16.4.1"],
+  ["retired state with current declaration", "16.4.1", "16.4.5"],
+  ["current state with retired declaration", "16.4.5", "16.4.1"],
+]) {
+  test(`CLI diagnostics refuse ${label} before effects`, async () => {
+    const owner = await mkdtemp(join(tmpdir(), "egeria-retired-next-cli-"));
+    const directory = join(owner, "project");
+    try {
+      await cp(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"), directory, { recursive: true });
+      const statePath = join(directory, ".egeria/state.json");
+      const manifestPath = join(directory, "apps/web/package.json");
+      const state = JSON.parse(await readFile(statePath, "utf8"));
+      const nextSurface = state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next");
+      const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+      assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.1"));
+      assert.equal(manifest.dependencies.next, "16.4.1");
+      if (installed !== "16.4.1") {
+        nextSurface.fingerprint = fingerprintJsonValue(installed);
+        await writeFile(statePath, core.serializeStateJson(state));
+      }
+      if (declared !== "16.4.1") {
+        manifest.dependencies.next = declared;
+        await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
+      }
+      const before = await listTree(directory);
+      const effects = [];
+      const run = cli.createCliRunner({
+        createVerifier() {
+          effects.push("create-verifier");
+          throw new Error("private verifier sentinel");
+        },
+      });
+      for (const kind of ["infer", "doctor", "diff"]) {
+        const captured = captureOutput();
+        assert.equal(await run([kind, "--directory", directory], captured.output), 1, kind);
+        assert.deepEqual(captured.standard, [], kind);
+        assert.deepEqual(captured.error, [JSON.stringify({ ok: false, code: "PROJECT_INSPECTION_INVALID" })], kind);
+      }
+      assert.deepEqual(effects, []);
+      assert.deepEqual(await listTree(directory), before);
+    } finally {
+      await rm(owner, { recursive: true, force: true });
+    }
+  });
+}
 
 test("doctor and diff return exit one for diagnosed repository drift", async () => {
   await withGeneratedFixture(async (directory) => {

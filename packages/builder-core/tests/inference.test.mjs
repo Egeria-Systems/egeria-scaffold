@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { promisify } from "node:util";
 import test from "node:test";
 import { withCurrentGeneratedFixture } from "../../../scripts/verify-generated-skeletons.mjs";
+import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 
 const execFileAsync = promisify(execFile);
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -889,12 +890,16 @@ test("installed deployment verification files must match the selected recipe eve
   const helper = "apps/web/scripts/prepare-ci-git.sh";
   for (const fixture of [
     "site-public-integrations-0.13.0-next-16.4.5-multilingual-0.1.1",
-    "app-persistence-0.3.0",
+    "app-persistence-retained-deployment",
     "app-jobs-recovery-composition-0.3.0-next-16.4.5",
     "app-persistence-jobs-email-recovery-composition-0.3.0-next-16.4.5",
   ]) {
     await t.test(fixture, async () => {
-      const source = core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated", fixture));
+      const source = fixture === "app-persistence-retained-deployment"
+        ? core.createInMemoryRepositoryReader(Object.fromEntries(
+          [...await readArchivedGeneratedFixture("app-persistence")].map(([path, content]) => [path, Buffer.from(content).toString("utf8")]),
+        ))
+        : core.createFileSystemRepositoryReader(resolve(packageRoot, "../../fixtures/generated", fixture));
       const state = JSON.parse((await source.readText(".egeria/state.json")).content);
       const deploy = (await source.readText(workflow)).content;
       const unwrapped = deploy.replace("sh " + helper + " pnpm", "pnpm");

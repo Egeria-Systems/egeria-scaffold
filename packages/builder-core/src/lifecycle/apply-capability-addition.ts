@@ -511,7 +511,6 @@ export async function applyCapabilityAddition(input: Readonly<{
     input.capability === "application-persistence" || controls.project.value.selectedCapabilities.includes("application-persistence"),
     controls.project.value.selectedCapabilities.includes("app-foundation"),
     false,
-    environmentContext.retainedNextVersion,
     environmentContext.retainAnalyticsConsent,
     retainsDeploymentConfiguration(environmentContext.catalogSnapshot),
     environmentContext.retainSections,

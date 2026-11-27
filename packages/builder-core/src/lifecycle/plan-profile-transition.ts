@@ -4,7 +4,7 @@ import { loadAppTransitionContentValidators, type AppTransitionContentValidators
 import { appTransitionBaselinePaths, appTransitionVisualProject, appTransitionVisualBookingSettings, appTransitionVisualAnalyticsSettings, verifyAppTransitionVisualInputRecord, prepareAppProfileTransition, selectAppTransitionVisuals, type AppTransitionDisposition, type AppTransitionVisualEvidence, type AppTransitionPreparation, type AppTransitionFailureCode } from "./app-profile-transition.js";
 
 import { createCapabilityCatalogSnapshot } from "../catalog/capability-catalog.js";
-import { createVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
+import { readVerifiedProjectSnapshot, verifiedCapabilityPackageVersions } from "../catalog/verified-package-versions.js";
 import type { ManagedSurfaceDescriptor } from "../contracts/capability.js";
 import type { ContractIssue } from "../contracts/result.js";
 import type { InstalledSurface } from "../contracts/state.js";
@@ -430,7 +430,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   if (project.ejectedAreas.length > 0 || controls.state.value.ejections.length > 0) {
     return planningFailure("PROJECT_EJECTION_UNSUPPORTED");
   }
-  const snapshot = createVerifiedProjectSnapshot(project, controls.state.value);
+  const snapshot = await readVerifiedProjectSnapshot(reader);
   if (!snapshot.ok) {
     return planningFailure("PROJECT_STATE_INCOMPATIBLE");
   }
@@ -530,9 +530,7 @@ export async function prepareAppProfileTransitionExecution(input: Readonly<{
   }
   const fromLock = resolveRecipeLockfileVersion({ originProfile: project.originProfile, recipeVersion: project.recipeVersion }, JSON.parse(new TextDecoder().decode(sourceManifest.content)));
   const toLock = resolveRecipeLockfileVersion({ originProfile: "app", recipeVersion: targetRecipeVersion }, JSON.parse(new TextDecoder().decode(targetManifest.content)));
-  const expectedTargetLock = renderingContext.retainedNextVersion === undefined
-    ? `app-${targetRecipeVersion}-next-${currentNextVersion}`
-    : `app-${targetRecipeVersion}`;
+  const expectedTargetLock = `app-${targetRecipeVersion}-next-${currentNextVersion}`;
   if (fromLock === undefined || toLock !== expectedTargetLock) {
     return planningFailure("PROJECT_INSPECTION_INVALID");
   }

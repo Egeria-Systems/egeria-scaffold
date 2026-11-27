@@ -701,8 +701,8 @@ test("current preparation fingerprints and canonical admission protect exact bas
   const { createApplicationEnvironmentProfileRecipes } = await import("../dist/profiles/profile-recipes.js");
   const context = { ...createGenerationRenderingContext(), profiles: createApplicationEnvironmentProfileRecipes() };
   const sectionContext = { ...context, retainPublicContentRouting: true };
-  const preSectionContext = createGenerationRenderingContext(false, false, false, undefined, undefined, false, true, true);
-  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, undefined, true, true, true);
+  const preSectionContext = createGenerationRenderingContext(false, false, false, undefined, false, true, true);
+  const predecessorContext = createGenerationRenderingContext(false, false, false, undefined, true, true, true);
   const retainedContext = { ...predecessorContext, retainAnalyticsConsent: true };
   const subsets = {};
   const consentFiles = [

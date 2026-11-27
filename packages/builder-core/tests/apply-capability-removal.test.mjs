@@ -2401,14 +2401,13 @@ async function environmentContactEntries(profile = "portfolio", options = {}) {
     const generated = await core.generateProject({
       request: { profile, projectName: "contact-lifecycle", displayName: "Contact Lifecycle", ...(options.analytics ? { analytics: options.analytics } : {}), ...(options.booking ? { bookingCalendly: { mode: options.booking } } : {}), ...(options.contact ? { contactFormWeb3Forms: true } : {}), ...(options.multilingual ? { multilingual: true } : {}) },
       destination, renderingContext: {
-        ...core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainedNext, options.retainConsent, options.retainDeployment),
+        ...core.createApplicationEnvironmentRenderingContext(false, false, false, options.retainConsent, options.retainDeployment),
         ...(options.retainPublicContentRouting ? { retainPublicContentRouting: true } : {}),
       },
       verifier: {
         async prepareLockfile(root) {
-          const nextSuffix = options.retainedNext ? "" : "-next-16.4.5";
           const version = profile === "portfolio" ? "portfolio-0.12.0" : profile === "site" ? "site-0.13.0" : "app-0.3.0";
-          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}${nextSuffix}/pnpm-lock.yaml`)));
+          await writeFile(join(root, "pnpm-lock.yaml"), await readFile(resolve(packageRoot, `lockfiles/web-recipe-${version}-next-16.4.5/pnpm-lock.yaml`)));
           return { ok: true, value: undefined };
         },
         async verifyInIsolatedCopy() { return { ok: true, value: { checks } }; },
@@ -2694,9 +2693,9 @@ const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtim
 
 test("removing a neighbor preserves installed consent and re-add chooses the successor", async () => {
   const retainedFile = await readFile(resolve(packageRoot, "templates/analytics/application-environments", consentRuntimePath), "utf8");
-  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) {
     for (const retainConsent of [undefined, true]) {
-      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", retainedNext, retainConsent, retainDeployment });
+      const entries = await environmentContactEntries("site", { analytics: environmentAnalyticsSelection, booking: "popup", retainConsent, retainDeployment });
       const repository = createRepository(entries);
       const priorSource = repository.files.get(consentRuntimePath);
       assert.equal(priorSource === retainedFile, retainConsent === true);

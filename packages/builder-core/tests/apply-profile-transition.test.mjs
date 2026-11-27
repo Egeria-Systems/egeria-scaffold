@@ -27,6 +27,7 @@ const currentSiteAppMigration = `transition-site-${currentTransitionCohorts[0].s
 import { parseDocument } from "yaml";
 import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import { createBuilderStateSurfaces } from "../dist/generation/builder-state-surfaces.js";
+import { fingerprintJsonValue } from "../dist/ownership/fingerprint.js";
 import {
   appTransitionVisualProject,
   appTransitionVisualBookingSettings,
@@ -316,9 +317,9 @@ async function appTransitionSource(profile, subset = 0, generation = "current", 
   }, renderingContext);
   assert.equal(rendered.ok, true, JSON.stringify(rendered));
   const files = new Map(rendered.value.files.map(({ path, content }) => [path, bytes(content)]));
-  const nextSuffix = renderingContext.retainedNextVersion === undefined ? "-next-16.4.5" : "";
+  const recipe = currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile];
   files.set("pnpm-lock.yaml", bytes(await readFile(resolve(packageRoot,
-    `lockfiles/web-recipe-${`${profile}-${currentTransitionCohorts.find(cohort => cohort.generation === generation)[profile]}`}${nextSuffix}/pnpm-lock.yaml`))));
+    `lockfiles/web-recipe-${profile}-${recipe}-next-16.4.5/pnpm-lock.yaml`))));
   files.set(".egeria/project.yaml", bytes(core.serializeProjectYaml(rendered.value.project)));
   files.set(".egeria/migrations.jsonl", bytes(""));
   const surfaces = core.materializeInstalledSurfaces({
@@ -607,32 +608,76 @@ test("app transitions execute in real linked worktrees through production Git an
 });
 
 test("installed incoming app transitions ignore changed generation defaults", async () => {
-  for (const [next, fixtureSuffix] of [["16.4.1", ""], ["16.4.5", "-next-16.4.5"]]) {
-    const source = next === "16.4.5"
-      ? await readArchivedGeneratedFixture("site")
-      : await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
-    const repository = createRepository(source);
-    const recipes = core.profileRecipes.splice(0);
-    try {
-      const execution = await runAppTransition(repository, {
-        verifier: {
-          prepareLockfile() { throw new Error("must not resolve a new graph"); },
-          async verifyInIsolatedCopy() { return { ok: true, value: { checks: core.appGenerationVerificationChecks } }; },
-        },
-      });
-      assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
-      const manifest = JSON.parse(decode(repository.files.get("apps/web/package.json")));
-      assert.equal(manifest.devDependencies.vitest, "5.0.3");
-      assert.equal(manifest.dependencies.next, next);
-      const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
-      assert.equal(state.ok, true);
-      assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.3.0" });
-      assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, `lockfiles/web-recipe-app-0.3.0${fixtureSuffix}/pnpm-lock.yaml`))));
-    } finally {
-      core.profileRecipes.push(...recipes);
-    }
+  const repository = createRepository(await readArchivedGeneratedFixture("site"));
+  const recipes = core.profileRecipes.splice(0);
+  try {
+    const execution = await runAppTransition(repository);
+    assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
+    const manifest = JSON.parse(decode(repository.files.get("apps/web/package.json")));
+    assert.equal(manifest.devDependencies.vitest, "5.0.3");
+    assert.equal(manifest.dependencies.next, "16.4.5");
+    const state = core.parseStateJson(decode(repository.files.get(".egeria/state.json")));
+    assert.equal(state.ok, true);
+    assert.deepEqual(state.value.origin, { profile: "app", recipeVersion: "0.3.0" });
+    assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot, "lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml"))));
+  } finally {
+    core.profileRecipes.push(...recipes);
   }
 });
+
+for (const [label, installed, declared] of [
+  ["retired state and declaration", "16.4.1", "16.4.1"],
+  ["retired state with current declaration", "16.4.1", "16.4.5"],
+  ["current state with retired declaration", "16.4.5", "16.4.1"],
+]) {
+  test(`site-to-app planning and application refuse ${label} before effects`, async () => {
+    const source = await loadEntries(resolve(repositoryRoot, "fixtures/generated/site-0.13.0"));
+    const state = JSON.parse(decode(source.get(".egeria/state.json")));
+    const nextSurface = state.managedSurfaces.find(({ identifier }) => identifier === "builder-web-package-next");
+    const manifest = JSON.parse(decode(source.get("apps/web/package.json")));
+    assert.equal(nextSurface.fingerprint, fingerprintJsonValue("16.4.1"));
+    assert.equal(manifest.dependencies.next, "16.4.1");
+    if (installed !== "16.4.1") {
+      nextSurface.fingerprint = fingerprintJsonValue(installed);
+      source.set(".egeria/state.json", bytes(core.serializeStateJson(state)));
+    }
+    if (declared !== "16.4.1") {
+      manifest.dependencies.next = declared;
+      source.set("apps/web/package.json", bytes(`${JSON.stringify(manifest)}\n`));
+    }
+    const repository = createRepository(source);
+    const plan = await core.planProfileTransition({
+      reader: repository.reader, git, toProfile: "app",
+      inspectCreateTargets: async () => ({ ok: true }),
+      inspectWorktree: async () => git,
+    });
+    const dependencyCalls = [];
+    const execution = await invokeApply(repository, {
+      toProfile: "app",
+      // Before retirement, the untouched fixture can still supply a valid approval.
+      approvedPlanFingerprint: plan.ok ? plan.value.planFingerprint : undefined,
+      verifier: {
+        prepareLockfile() {
+          dependencyCalls.push("prepare-lockfile");
+          throw new Error("refused transition must not resolve dependencies");
+        },
+        async verifyInIsolatedCopy() {
+          dependencyCalls.push("verify");
+          return { ok: true, value: { checks: core.appGenerationVerificationChecks } };
+        },
+      },
+    });
+    assert.equal(plan.ok, false, JSON.stringify({
+      planned: plan.ok, applied: execution.result.ok, dependencies: dependencyCalls,
+      writeBatches: repository.writes.length,
+    }));
+    assert.equal(plan.issues[0]?.code, "PROJECT_STATE_INCOMPATIBLE");
+    assertFailure(execution.result, { code: "PROJECT_STATE_INCOMPATIBLE", phase: "precondition", recovery: "not-required" });
+    assert.deepEqual(dependencyCalls, []);
+    assert.deepEqual(repository.writes, []);
+    assertUnchanged(repository, snapshotFiles(source));
+  });
+}
 
 for (const profile of ["portfolio", "site"]) {
   for (let subset = 0; subset < 8; subset += 1) {
@@ -752,9 +797,9 @@ for (const cohort of currentTransitionCohorts) test(`${cohort.label} incoming ap
 const consentRuntimePath = "apps/web/src/integrations/analytics/analytics-runtime.ts";
 
 test("site-to-app preserves its installed deployment, consent bytes and Next graph", async () => {
-  for (const retainDeployment of [false, true]) for (const retainedNext of [undefined, "16.4.1"]) {
+  for (const retainDeployment of [false, true]) {
     for (const retainConsent of [undefined, true]) {
-      const context = createGenerationRenderingContext(false, false, false, retainedNext, retainConsent, retainDeployment);
+      const context = createGenerationRenderingContext(false, false, false, retainConsent, retainDeployment);
       const source = await appTransitionSource("site", 4, "current", context);
       const oldState = JSON.parse(decode(source.get(".egeria/state.json")));
       const repository = createRepository(source);
@@ -764,10 +809,9 @@ test("site-to-app preserves its installed deployment, consent bytes and Next gra
       assert.equal(execution.result.ok, true, JSON.stringify(execution.result));
       assert.deepEqual(repository.files.get(consentRuntimePath), source.get(consentRuntimePath));
       const next = JSON.parse(decode(repository.files.get("apps/web/package.json"))).dependencies.next;
-      assert.equal(next, retainedNext ?? "16.4.5");
-      const lockSuffix = retainedNext ? "" : "-next-16.4.5";
+      assert.equal(next, "16.4.5");
       assert.deepEqual(repository.files.get("pnpm-lock.yaml"), bytes(await readFile(resolve(packageRoot,
-        `lockfiles/web-recipe-app-0.3.0${lockSuffix}/pnpm-lock.yaml`))));
+        "lockfiles/web-recipe-app-0.3.0-next-16.4.5/pnpm-lock.yaml"))));
       const state = JSON.parse(decode(repository.files.get(".egeria/state.json")));
       for (const surfacePath of ["apps/web/next.config.ts", "apps/web/scripts/check-application-environment.mjs", "apps/web/src/configuration/public-build.ts", "apps/web/src/configuration/document-metadata.ts"]) {
         assert.deepEqual(repository.files.get(surfacePath), source.get(surfacePath), surfacePath);
