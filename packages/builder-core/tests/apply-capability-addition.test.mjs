@@ -14,7 +14,6 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const repositoryRoot = resolve(packageRoot, "../..");
 const core = await import(pathToFileURL(resolve(packageRoot, "dist/index.js")));
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const encoder = new TextEncoder();
@@ -1118,7 +1117,10 @@ test("application persistence addition preserves custom scripts and installs the
 });
 
 test("persistence addition refuses a mixed Next.js patch before writing or verifying", async () => {
-  for (const drift of ["manifest", "lockfile"]) {
+  for (const [drift, code] of [
+    ["manifest", "PROJECT_INSPECTION_INVALID"],
+    ["lockfile", "PROJECT_DRIFT_DETECTED"],
+  ]) {
     const repository = createRepository(await fixtureEntries("app"));
     const plan = await approvedPlan(repository.reader, "application-persistence");
     if (drift === "manifest") {
@@ -1126,7 +1128,10 @@ test("persistence addition refuses a mixed Next.js patch before writing or verif
       manifest.dependencies.next = "16.4.1";
       repository.files.set("apps/web/package.json", `${JSON.stringify(manifest)}\n`);
     } else {
-      repository.files.set("pnpm-lock.yaml", await readFile(resolve(repositoryRoot, "fixtures/generated/app-0.2.7/pnpm-lock.yaml"), "utf8"));
+      const currentLock = repository.files.get("pnpm-lock.yaml");
+      const mixedLock = currentLock.replaceAll("16.4.5", "16.4.1");
+      assert.notEqual(mixedLock, currentLock);
+      repository.files.set("pnpm-lock.yaml", mixedLock);
     }
     const before = [...repository.files];
     const result = await core.applyCapabilityAddition({
@@ -1136,6 +1141,7 @@ test("persistence addition refuses a mixed Next.js patch before writing or verif
       verifier: { verifyInIsolatedCopy: async () => { throw new Error("mixed inputs must not verify"); } },
     });
     assert.equal(result.ok, false, drift);
+    assert.equal(result.code, code, drift);
     assert.equal(result.phase, "precondition", drift);
     assert.deepEqual(repository.writes, [], drift);
     assert.deepEqual([...repository.files], before, drift);

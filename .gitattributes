@@ -1,4 +1,5 @@
 fixtures/generated/** text eol=lf
 tests/generated-fixtures/fixtures/installed-ancestor-controls/*.json text eol=lf
+packages/builder-core/tests/fixtures/retired-recipes/raw/** text eol=lf
 packages/builder-core/templates/**/*.png binary
 fixtures/generated/**/*.png binary
