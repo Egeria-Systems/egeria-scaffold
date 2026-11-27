@@ -12,7 +12,7 @@ Do not rely on conversation memory. Verify decisions against repository sources 
 - Before Git work, verify the branch, status, and exact comparison scope. Fetch only when remote freshness materially affects the approved work.
 - Development of this builder repository may proceed directly on clean `main` for one approved sequential implementation stream when repository protections permit it and isolation has no material safety or coordination benefit. Use a dedicated branch and isolated worktree when implementation becomes parallel or isolation is otherwise materially useful. Repository-changing builder commands that target generated client repositories always require clean state, a dedicated branch, and one isolated-worktree execution.
 - Plan approval is not final-diff approval. Stop at every roadmap gate and obtain the specified approval.
-- Never create a pull request unless explicitly asked. A request to implement does not authorize push, pull-request creation, merge, deployment, publication, permission changes, production actions, external messages, or responses to review comments.
+- Follow this repository’s [commit and push authorization rule](docs/governance/review-and-contribution.md#commit-and-push-authorization). Obtain explicit authority for pull-request creation, merge, deployment, publication, permission changes, production actions, external messages, and replies to review comments.
 - Use small focused commits named for their actual change. Do not use branch names, commit prefixes, file names, or user-facing Git labels prefixed with `codex`.
 
 ## Stage discipline
@@ -80,7 +80,7 @@ Operational observability and selectable analytics are separate. Cloudflare Web 
 - Do not claim that Node, Vitest/jsdom, static, or build checks prove real-browser, workerd, deployment, visual, translation, accessibility-conformance, production-safety, or security properties they do not exercise.
 - Before an increment is complete, dispatch independent read-only requirements, architecture and anti-overengineering, and test-evidence reviewers. Add a specialist only when the changed scope materially requires it.
 - Validate every finding against the current tree. Repair only evidence-backed material defects, rerun affected verification, and record all dispositions.
-- Produce a review packet listing the comparison, changed files, commands and results, reviewer dispositions, risks, deferred work, and rollback/recovery. Then stop for explicit user approval.
+- Produce a review packet listing the comparison, changed files, commands and results, reviewer dispositions, risks, deferred work, and rollback/recovery. Follow the [verified-final-diff approval gate](docs/governance/review-and-contribution.md#gate-3-verified-final-diff-approval) for its approval timing.
 
 ## Canonical owners and cohesion
 
