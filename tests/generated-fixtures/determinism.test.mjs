@@ -11,6 +11,7 @@ import test from "node:test";
 import {
   contractForGeneratedProject,
   generatedFixtureContracts,
+  generatedFixtureShardIdentifiers,
   inspectGeneratedFixture,
   withCurrentGeneratedFixture,
 } from "../../scripts/verify-generated-skeletons.mjs";
@@ -246,6 +247,7 @@ test("representative current app fixtures retain exact descriptor ownership, pro
 });
 
 test("compiled project generation matches every committed fixture identifier", async (context) => {
+  const selectedIdentifiers = generatedFixtureShardIdentifiers(process.env.EGERIA_GENERATED_FIXTURE_SHARD);
   for (const identifier of ["app", "app-all-optional-integrations", "app-persistence"]) {
     assert.equal(
       await pathExists(resolve(repositoryRoot, generatedFixtureContracts.find(contract => contract.identifier === identifier).relativeRoot)),
@@ -264,7 +266,7 @@ test("compiled project generation matches every committed fixture identifier", a
   const owner = await mkdtemp(join(tmpdir(), "egeria-fixture-determinism-"));
 
   try {
-    for (const { identifier } of generatedFixtureContracts) {
+    for (const identifier of selectedIdentifiers) {
       const fixtureCase = contractForGeneratedProject(identifier);
       let fixtureFailure;
       await context.test(fixtureCase.identifier, async () => {

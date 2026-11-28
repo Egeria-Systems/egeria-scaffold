@@ -480,7 +480,9 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "builder-and-packages",
     "cli-lifecycle-cases",
     "cli-lifecycle",
+    "generated-project-fixtures",
     "generated-projects",
+    "generated-determinism-fixtures",
     "generated-fixtures",
     "generated-jobs-profiles",
     "generated-jobs",
@@ -540,8 +542,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "builder-and-packages": { condition: summaryCondition, needs: ["scope"] },
     "cli-lifecycle-cases": { condition: generatedQualityEvent, needs: ["scope"] },
     "cli-lifecycle": { condition: summaryCondition, needs: ["scope", "cli-lifecycle-cases"] },
-    "generated-projects": { condition: generatedQualityEvent, needs: ["scope"] },
-    "generated-fixtures": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-project-fixtures": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-projects": { condition: summaryCondition, needs: ["scope", "generated-project-fixtures"] },
+    "generated-determinism-fixtures": { condition: generatedQualityEvent, needs: ["scope"] },
+    "generated-fixtures": { condition: summaryCondition, needs: ["scope", "generated-determinism-fixtures"] },
     "generated-jobs-profiles": { condition: generatedQualityEvent, needs: ["scope"] },
     "generated-jobs": {
       condition: "${{ always() && (" + ordinaryQualityEvent + ") }}",
@@ -650,13 +654,13 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
   }
 
-  assert.deepEqual(workflow.jobs["generated-projects"].container, {
+  assert.deepEqual(workflow.jobs["generated-project-fixtures"].container, {
     image:
       "mcr.microsoft.com/playwright:v1.62.1-noble@sha256:dcc5531e97840b9b5e794f2814476b21571c5124a3fca2267d73041f56e7580e",
     options: "--shm-size=1g",
   });
   assert.deepEqual(workflow.jobs["app-transition-visuals"].container,
-    workflow.jobs["generated-projects"].container);
+    workflow.jobs["generated-project-fixtures"].container);
   assert.equal(workflow.jobs["app-transition-visuals"].env.EGERIA_VISUAL_IMAGE,
     workflow.jobs["app-transition-visuals"].container.image);
   assert.equal(workflow.jobs["app-transition-visuals"].steps.filter(
@@ -679,13 +683,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       workflowCommands(job),
     ]),
   );
-  const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/cli.test.mjs';
-  const cliRuntimeCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/cli.test.mjs';
+  const cliTestCommand = "node --test apps/cli/tests/cli.test.mjs";
   const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
     ({ name }) => name === "Test CLI contracts",
   );
-  assert.equal(mainCliStep?.run, nonJobsCommand);
-  assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: "^generated runtime " });
+  assert.equal(mainCliStep?.run, cliTestCommand);
+  assert.deepEqual(mainCliStep.env, { EGERIA_CLI_TEST_SCOPE: "contracts" });
   const lifecycle = workflow.jobs["cli-lifecycle-cases"];
   assert.equal(lifecycle.name, "CLI lifecycle (${{ matrix.group }})");
   assert.deepEqual(lifecycle.strategy, {
@@ -696,10 +699,10 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.deepEqual(lifecycle.steps.filter(({ run }) => run).map(({ run }) => run), [
     "pnpm install --frozen-lockfile",
     "pnpm run build:builder",
-    cliRuntimeCommand,
+    cliTestCommand,
   ]);
-  assert.deepEqual(lifecycle.steps.find(({ run }) => run === cliRuntimeCommand).env, {
-    CLI_TEST_PATTERN: "^generated runtime ${{ matrix.group }} / ",
+  assert.deepEqual(lifecycle.steps.find(({ run }) => run === cliTestCommand).env, {
+    EGERIA_CLI_TEST_SCOPE: "${{ matrix.group }}",
   });
   assertQualityMatrixSummary(workflow.jobs["cli-lifecycle"], "cli-lifecycle", "cli-lifecycle-cases");
   assert.deepEqual(workflow.jobs["builder-and-packages"].steps.filter(({ run }) => run).map(({ run }) => run), [
@@ -709,7 +712,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "pnpm run test:package-boundaries",
     "pnpm run build:builder",
     "node --test packages/builder-core/tests/*.test.mjs",
-    nonJobsCommand,
+    cliTestCommand,
     "pnpm run test:packages",
     "node --test tests/capability-certification/*.test.mjs",
     "node scripts/check-capability-certification.mjs",
@@ -781,22 +784,33 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     GENERATED_REQUIRED: "${{ needs.scope.outputs.generated-projects }}",
     PROFILE_RESULT: "${{ needs.generated-jobs-profiles.result }}",
   });
+  const retainedFixtureCommand = withVerificationGit('node scripts/verify-generated-skeletons.mjs --visual --shard="$EGERIA_GENERATED_FIXTURE_SHARD"');
+  const completeFixtureCommand = withVerificationGit("pnpm run test:generated-fixtures");
+  const determinismCommand = withVerificationGit('node --test --test-name-pattern="^compiled project generation matches every committed fixture identifier$" tests/generated-fixtures/determinism.test.mjs');
   const generatedCommands = {
-    "generated-projects": ["pnpm run build:builder", withVerificationGit("pnpm run verify:generated-visuals")],
-    "generated-fixtures": ["pnpm run build:builder", withVerificationGit("pnpm run test:generated-fixtures")],
+    "generated-project-fixtures": ["pnpm run build:builder", retainedFixtureCommand],
+    "generated-determinism-fixtures": ["pnpm run build:builder", completeFixtureCommand, determinismCommand],
     "generated-jobs-profiles": ["pnpm --filter @egeria-systems/builder-core run build", generatedJobsCommand],
   };
   for (const [identifier, commands] of Object.entries(generatedCommands)) {
     const job = workflow.jobs[identifier];
-    assert.deepEqual(job.container, workflow.jobs["generated-projects"].container, identifier);
-    assert.equal(job["timeout-minutes"], identifier === "generated-projects" ? 90 : identifier === "generated-fixtures" ? 75 : 45);
-    for (const property of ["continue-on-error", "concurrency", ...(identifier === "generated-jobs-profiles" ? [] : ["strategy"])]) {
+    assert.deepEqual(job.container, workflow.jobs["generated-project-fixtures"].container, identifier);
+    assert.equal(job["timeout-minutes"], identifier === "generated-project-fixtures" ? 90 : identifier === "generated-determinism-fixtures" ? 75 : 45);
+    for (const property of ["continue-on-error", "concurrency"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
+    }
+    if (identifier !== "generated-jobs-profiles") {
+      assert.deepEqual(job.strategy, {
+        "fail-fast": false,
+        "max-parallel": 4,
+        matrix: { shard: [1, 2, 3, 4] },
+      }, identifier);
+      assert.deepEqual(job.env, { EGERIA_GENERATED_FIXTURE_SHARD: "${{ matrix.shard }}/4" }, identifier);
     }
     const checkout = job.steps.find(({ uses }) => uses?.startsWith("actions/checkout@"));
     assert.deepEqual(checkout.with, { "persist-credentials": false }, identifier);
     const runSteps = job.steps.filter(({ run }) => run);
-    if (identifier === "generated-fixtures") {
+    if (identifier === "generated-determinism-fixtures") {
       const diagnosticStep = runSteps[0];
       assert.ok(diagnosticStep);
       assert.equal(job.steps.filter(({ id }) => id === "git_prerequisite").length, 1);
@@ -815,16 +829,18 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       const setupIndex = job.steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@"));
       assert.ok(setupIndex >= 0 && setupIndex < job.steps.indexOf(diagnosticStep));
     }
-    const verificationSteps = identifier === "generated-fixtures" ? runSteps.slice(1) : runSteps;
+    const verificationSteps = identifier === "generated-determinism-fixtures" ? runSteps.slice(1) : runSteps;
     assert.deepEqual(verificationSteps.map(({ run }) => run), [
       "pnpm install --frozen-lockfile", ...commands,
     ], identifier);
     for (const step of verificationSteps) {
-      assert.equal(Object.hasOwn(step, "if"), false, identifier);
+      const condition = step.run === completeFixtureCommand ? "matrix.shard == 1"
+        : step.run === determinismCommand ? "matrix.shard != 1" : undefined;
+      assert.equal(step.if, condition, step.name);
       assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
     }
     const artifactUploads = job.steps.filter(({ uses }) => uses?.startsWith("actions/upload-artifact@"));
-    if (identifier === "generated-fixtures") {
+    if (identifier === "generated-determinism-fixtures") {
       assert.equal(artifactUploads.length, 1);
       assert.deepEqual(artifactUploads[0], {
         name: "Retain native Git prerequisite evidence",
@@ -832,7 +848,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
         "continue-on-error": true,
         uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
         with: {
-          name: "generated-fixtures-git-prerequisite",
+          name: "generated-fixtures-git-prerequisite-${{ matrix.shard }}-attempt-${{ github.run_attempt }}",
           path: [
             "${{ steps.git_prerequisite.outputs.directory }}/context.json",
             "${{ steps.git_prerequisite.outputs.directory }}/inherited.stdout",
@@ -851,14 +867,17 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       });
       assert.ok(job.steps.indexOf(artifactUploads[0]) > job.steps.indexOf(verificationSteps.at(-1)));
     }
-    const command = commands.at(-1);
-    const owners = Object.entries(workflow.jobs).flatMap(([owner, candidate]) =>
-      candidate.steps.filter(({ run }) => run === command).map(() => owner));
-    assert.deepEqual(owners, [identifier]);
+    for (const command of commands.slice(1)) {
+      const owners = Object.entries(workflow.jobs).flatMap(([owner, candidate]) =>
+        candidate.steps.filter(({ run }) => run === command).map(() => owner));
+      assert.deepEqual(owners, [identifier]);
+    }
   }
-  const generatedProjectSteps = workflow.jobs["generated-projects"].steps;
+  assertQualityMatrixSummary(workflow.jobs["generated-projects"], "generated-projects", "generated-project-fixtures");
+  assertQualityMatrixSummary(workflow.jobs["generated-fixtures"], "generated-fixtures", "generated-determinism-fixtures");
+  const generatedProjectSteps = workflow.jobs["generated-project-fixtures"].steps;
   const visualVerificationIndex = generatedProjectSteps.findIndex(
-    ({ run }) => run === withVerificationGit("pnpm run verify:generated-visuals"),
+    ({ run }) => run === retainedFixtureCommand,
   );
   const visualArtifactUploadIndex = generatedProjectSteps.findIndex(
     ({ name }) => name === "Upload generated visual failure artifacts",
@@ -869,7 +888,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     if: "failure()",
     uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     with: {
-      name: "generated-visual-failure-artifacts",
+      name: "generated-visual-failure-artifacts-${{ matrix.shard }}-attempt-${{ github.run_attempt }}",
       path: "generated-visual-artifacts/",
       "if-no-files-found": "ignore",
       "include-hidden-files": false,
@@ -885,7 +904,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     if: "always()",
     uses: "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a",
     with: {
-      name: "generated-dependency-audits",
+      name: "generated-dependency-audits-${{ matrix.shard }}-attempt-${{ github.run_attempt }}",
       path: "generated-visual-artifacts/dependency-audit/",
       "if-no-files-found": "ignore",
       "include-hidden-files": false,
@@ -918,8 +937,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scope",
     "builder-and-packages",
     "cli-lifecycle-cases",
-    "generated-projects",
-    "generated-fixtures",
+    "generated-project-fixtures",
+    "generated-determinism-fixtures",
     "generated-jobs-profiles",
     "app-transition-visuals",
     "compatibility-proof",
@@ -927,8 +946,8 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const jobsWithToolchain = [
     "builder-and-packages",
     "cli-lifecycle-cases",
-    "generated-projects",
-    "generated-fixtures",
+    "generated-project-fixtures",
+    "generated-determinism-fixtures",
     "generated-jobs-profiles",
     "app-transition-visuals",
     "compatibility-proof",
@@ -936,7 +955,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   for (const [identifier, job] of Object.entries(workflow.jobs)) {
     assert.equal(job["runs-on"], "ubuntu-24.04", identifier);
     assert.equal(typeof job["timeout-minutes"], "number", identifier);
-    const maximumMinutes = identifier === "builder-and-packages" ? 180 : identifier === "generated-projects" ? 90 : identifier === "generated-fixtures" ? 75 : 45;
+    const maximumMinutes = identifier === "builder-and-packages" ? 180 : identifier === "generated-project-fixtures" ? 90 : identifier === "generated-determinism-fixtures" ? 75 : 45;
     assert.ok(job["timeout-minutes"] > 0 && job["timeout-minutes"] <= maximumMinutes);
   }
   for (const identifier of jobsWithCheckout) {
@@ -1088,7 +1107,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     {
       name: "dependent builder policy lane",
       mutateWorkflow(candidate) {
-        candidate.jobs["builder-and-packages"].needs = ["generated-fixtures"];
+        candidate.jobs["builder-and-packages"].needs = ["generated-determinism-fixtures"];
       },
     },
     {
@@ -1128,10 +1147,10 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     {
       name: "removed generated verification",
       mutateWorkflow(candidate) {
-        candidate.jobs["generated-projects"].steps = candidate.jobs[
-          "generated-projects"
+        candidate.jobs["generated-project-fixtures"].steps = candidate.jobs[
+          "generated-project-fixtures"
         ].steps.filter(
-          ({ run }) => run !== withVerificationGit("pnpm run verify:generated-visuals"),
+          ({ run }) => !run?.includes("node scripts/verify-generated-skeletons.mjs"),
         );
       },
     },
@@ -1148,16 +1167,16 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         groups[1] = groups[0];
       },
     },
-    ...[".*", "^compiled current app optional lifecycle completes production verification$"].map((pattern) => ({
-      name: `incorrect main complement ${pattern}`,
+    ...["unknown", "analytics"].map((scope) => ({
+      name: `incorrect CLI contract scope ${scope}`,
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].steps.find(
           ({ name }) => name === "Test CLI contracts",
-        ).env.CLI_TEST_SKIP_PATTERN = pattern;
+        ).env.EGERIA_CLI_TEST_SCOPE = scope;
       },
     })),
   );
-  for (const identifier of ["cli-lifecycle-cases", "generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
+  for (const identifier of ["cli-lifecycle-cases", "generated-project-fixtures", "generated-determinism-fixtures", "generated-jobs-profiles"]) {
     for (const [property, value] of [["needs", ["builder-and-packages"]], ["if", "false"],
       ["continue-on-error", true], ["concurrency", "shared-verification"]]) {
       negativeCases.push({
@@ -1176,7 +1195,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       });
       const forbiddenProperties = [
         ["if", "false"],
-        ["continue-on-error", identifier === "generated-fixtures" && step.id === "git_prerequisite" ? false : true],
+        ["continue-on-error", identifier === "generated-determinism-fixtures" && step.id === "git_prerequisite" ? false : true],
       ];
       for (const [property, value] of forbiddenProperties) {
         negativeCases.push({
@@ -1209,7 +1228,19 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
+  for (const identifier of ["generated-project-fixtures", "generated-determinism-fixtures"]) {
+    negativeCases.push(
+      {
+        name: `${identifier} duplicate shard`,
+        mutateWorkflow(candidate) { candidate.jobs[identifier].strategy.matrix.shard[3] = 1; },
+      },
+      {
+        name: `${identifier} incorrect shard count`,
+        mutateWorkflow(candidate) { candidate.jobs[identifier].env.EGERIA_GENERATED_FIXTURE_SHARD = "${{ matrix.shard }}/3"; },
+      },
+    );
+  }
+  for (const identifier of ["generated-project-fixtures", "generated-determinism-fixtures", "generated-jobs-profiles"]) {
     negativeCases.push({
       name: `${identifier} duplicate verification`,
       mutateWorkflow(candidate) {
@@ -1218,7 +1249,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["generated-fixtures", "generated-jobs-profiles"]) {
+  for (const identifier of ["generated-determinism-fixtures", "generated-jobs-profiles"]) {
     for (const [property, value] of [["image", "untrusted:latest"], ["options", "--shm-size=64m"]]) {
       negativeCases.push({
         name: `${identifier} wrong ${property}`,
@@ -1231,7 +1262,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
         const steps = candidate.jobs[identifier].steps;
         const command = steps.filter(({ run }) => run).at(-1);
         steps.splice(steps.indexOf(command), 1);
-        candidate.jobs["generated-projects"].steps.push(command);
+        candidate.jobs["generated-project-fixtures"].steps.push(command);
       },
     });
   }
@@ -1239,26 +1270,26 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     {
       name: "duplicate native Git diagnostic command",
       mutateWorkflow(candidate) {
-        const steps = candidate.jobs["generated-fixtures"].steps;
+        const steps = candidate.jobs["generated-determinism-fixtures"].steps;
         steps.push(structuredClone(steps.find(({ id }) => id === "git_prerequisite")));
       },
     },
     {
       name: "native Git diagnostic replaced by a shell command",
       mutateWorkflow(candidate) {
-        candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run = "echo diagnostic";
+        candidate.jobs["generated-determinism-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run = "echo diagnostic";
       },
     },
     {
       name: "shell command after the native Git diagnostic",
       mutateWorkflow(candidate) {
-        candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run += "echo unexpected\n";
+        candidate.jobs["generated-determinism-fixtures"].steps.find(({ id }) => id === "git_prerequisite").run += "echo unexpected\n";
       },
     },
     {
       name: "native Git diagnostic before pinned setup",
       mutateWorkflow(candidate) {
-        const steps = candidate.jobs["generated-fixtures"].steps;
+        const steps = candidate.jobs["generated-determinism-fixtures"].steps;
         const diagnosticIndex = steps.findIndex(({ id }) => id === "git_prerequisite");
         const setupIndex = steps.findIndex(({ uses }) => uses?.startsWith("pnpm/setup@"));
         [steps[diagnosticIndex], steps[setupIndex]] = [steps[setupIndex], steps[diagnosticIndex]];
@@ -1268,22 +1299,22 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       name: "native Git diagnostic exception on another verification job",
       mutateWorkflow(candidate) {
         candidate.jobs["generated-jobs"].steps.push(structuredClone(
-          candidate.jobs["generated-fixtures"].steps.find(({ id }) => id === "git_prerequisite"),
+          candidate.jobs["generated-determinism-fixtures"].steps.find(({ id }) => id === "git_prerequisite"),
         ));
       },
     },
     {
       name: "duplicate native Git diagnostic uploader",
       mutateWorkflow(candidate) {
-        const steps = candidate.jobs["generated-fixtures"].steps;
-        steps.push(structuredClone(steps.find(({ with: settings }) => settings?.name === "generated-fixtures-git-prerequisite")));
+        const steps = candidate.jobs["generated-determinism-fixtures"].steps;
+        steps.push(structuredClone(steps.find(({ with: settings }) => settings?.name === "generated-fixtures-git-prerequisite-${{ matrix.shard }}-attempt-${{ github.run_attempt }}")));
       },
     },
   );
   for (const [identifier, artifactName] of [
-    ["generated-projects", "generated-dependency-audits"],
-    ["generated-projects", "generated-visual-failure-artifacts"],
-    ["generated-fixtures", "generated-fixtures-git-prerequisite"],
+    ["generated-project-fixtures", "generated-dependency-audits-${{ matrix.shard }}-attempt-${{ github.run_attempt }}"],
+    ["generated-project-fixtures", "generated-visual-failure-artifacts-${{ matrix.shard }}-attempt-${{ github.run_attempt }}"],
+    ["generated-determinism-fixtures", "generated-fixtures-git-prerequisite-${{ matrix.shard }}-attempt-${{ github.run_attempt }}"],
   ]) {
     const findArtifact = (candidate) => candidate.jobs[identifier].steps.find(
       ({ with: settings }) => settings?.name === artifactName,
@@ -1292,7 +1323,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       name: `${artifactName} moved to another runner`,
       mutateWorkflow(candidate) {
         const artifact = findArtifact(candidate);
-        const destination = identifier === "generated-fixtures" ? "generated-jobs" : "generated-fixtures";
+        const destination = identifier === "generated-determinism-fixtures" ? "generated-jobs" : "generated-determinism-fixtures";
         candidate.jobs[destination].steps.push(artifact);
         candidate.jobs[identifier].steps = candidate.jobs[identifier].steps.filter(
           (step) => step !== artifact,
@@ -1418,7 +1449,7 @@ test("generated jobs aggregate rejects incomplete selected verification", async 
 
 test("quality summaries refuse incomplete selected matrices", async () => {
   const workflow = parse(await readRepositoryFile(".github/workflows/repository-quality.yml"));
-  for (const identifier of ["cli-lifecycle"]) {
+  for (const identifier of ["cli-lifecycle", "generated-projects", "generated-fixtures"]) {
     const job = workflow.jobs[identifier];
     assert.equal(job.steps.length, 1, identifier);
     const { run } = job.steps[0];
