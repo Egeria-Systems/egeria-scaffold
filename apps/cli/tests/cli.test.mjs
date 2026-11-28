@@ -22,6 +22,10 @@ import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-f
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
 import { fingerprintJsonValue } from "../../../packages/builder-core/dist/ownership/fingerprint.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
+function generatedRuntimeTest(group, name, ...testArguments) {
+  return test(`generated runtime ${group} / ${name}`, ...testArguments);
+}
+
 const lifecycleCohorts = [
   {
     label: "current", generation: "current", profiles: createGenerationRenderingContext().profiles,
@@ -1194,7 +1198,7 @@ test("app transition application parses and forwards only the exact approved fin
   })]);
 });
 
-test("compiled app profile creation contains verification failure and invalid options", async () => {
+generatedRuntimeTest("foundation-optionals", "compiled app profile creation contains verification failure and invalid options", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-app-create-process-"));
   try {
     for (const allOptionals of [false, true]) {
@@ -4163,7 +4167,7 @@ async function withAppTransitionFixture(profile, allOptionals, run, generation =
 
 for (const profile of ["site"]) {
   for (const allOptionals of [false, true]) {
-    test(`compiled app transition from ${profile} with ${allOptionals ? "all optionals" : "no optionals"} preserves content through production verification`, async () => {
+    generatedRuntimeTest("app-transitions", `compiled app transition from ${profile} with ${allOptionals ? "all optionals" : "no optionals"} preserves content through production verification`, async () => {
       await withAppTransitionFixture(profile, allOptionals, async ({ linked, primary }) => {
         const before = await gitRepositorySnapshot(linked);
         const primaryBefore = await gitRepositorySnapshot(primary);
@@ -4310,7 +4314,7 @@ test("compiled app profile transition preserves source admission refusals", asyn
   }
 });
 
-test("compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
+generatedRuntimeTest("app-transitions", "compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
   await withAppTransitionFixture("site", false, async ({ linked, primary }) => {
     const planning = planProfileTransitionArguments(linked, "app");
     const first = await executeBuilt(planning);
@@ -4434,7 +4438,7 @@ test("the compiled plan-remove command reports exact absence without writes", as
   });
 });
 
-test("the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
+generatedRuntimeTest("booking-and-multilingual", "the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
   const cases = ["portfolio", "site"].flatMap((profile) => [
     {
       profile,
@@ -4604,7 +4608,7 @@ test("the compiled CLI preserves multilingual through both capability install or
   }
 });
 
-test("the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition", async () => {
+generatedRuntimeTest("analytics", "the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition", async () => {
   const cases = ["portfolio", "site"].flatMap((profile) => [
     { profile, installationOrder: ["analytics", "multilingual"] },
     { profile, installationOrder: ["multilingual", "analytics"] },
@@ -4863,7 +4867,7 @@ test("the compiled CLI reports path-only multilingual and analytics removal refe
   }
 });
 
-test("the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
+generatedRuntimeTest("booking-and-multilingual", "the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
@@ -5192,7 +5196,7 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
   }
 });
 
-test("compiled removal preserves modified and already-ejected application surfaces", async () => {
+generatedRuntimeTest("booking-and-multilingual", "compiled removal preserves modified and already-ejected application surfaces", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -5339,7 +5343,7 @@ test("compiled removal preserves modified and already-ejected application surfac
   );
 });
 
-test("compiled removal verification failure retains a representative transformation and old receipts", async () => {
+generatedRuntimeTest("booking-and-multilingual", "compiled removal verification failure retains a representative transformation and old receipts", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -5457,7 +5461,7 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
-  test(profile === "portfolio" ? `compiled ${cohort.label} portfolio app transition refuses without admitted visuals` : `compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
+  generatedRuntimeTest("app-transitions", profile === "portfolio" ? `compiled ${cohort.label} portfolio app transition refuses without admitted visuals` : `compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
       const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
@@ -5492,7 +5496,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
 for (const generation of [
   { name: "current", generation: "current", recipe: "0.3.0", vitest: "5.0.3", catalogSnapshot: createGenerationRenderingContext().catalogSnapshot },
 ]) {
-  test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
+  generatedRuntimeTest("foundation-optionals", `compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const foundationPaths = assertSuccess(core.createVerifiedCapabilityCatalog())
@@ -5580,7 +5584,7 @@ for (const generation of [
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 1_200_000 }, async () => {
+  generatedRuntimeTest("foundation-optionals", `compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
@@ -5677,7 +5681,7 @@ test("Web3Forms options strictly select contact and keep settings out of errors"
 });
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "app"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 1_200_000 }, async () => {
+  generatedRuntimeTest("contact", `compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile === "app" ? "app-persistence-email" : profile, async ({ linked, primary }) => {
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
       const initialState = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
@@ -5971,7 +5975,7 @@ async function executeEnvironmentBuilt(arguments_) {
 }
 
 for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["app", false]]) {
-  test(`compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
+  generatedRuntimeTest("contact", `compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
@@ -6080,7 +6084,7 @@ test("retired upgrade commands refuse before repository or verifier access", asy
 });
 
 for (const [profile, mode, multilingual] of [["portfolio", "link", false], ["site", "popup", true], ["app", "inline", false]]) {
-  test(`compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 3_600_000 }, async () => {
+  generatedRuntimeTest("analytics", `compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 3_600_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));

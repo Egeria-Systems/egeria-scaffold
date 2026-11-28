@@ -98,7 +98,7 @@ async function runRepositoryQualityScopeClassifier(input) {
       });
     assert.deepEqual(
       entries.map(([name]) => name).toSorted(),
-      ["compatibility-proof", "generated-projects"],
+      ["compatibility-proof", "documentation-only", "generated-projects"],
     );
     return Object.fromEntries(entries);
   } finally {
@@ -458,10 +458,27 @@ function workflowCommands(job) {
     .join("\n");
 }
 
+function assertQualityMatrixSummary(job, identifier, matrixJob) {
+  assert.equal(job.name, identifier);
+  assert.equal(job["timeout-minutes"], 2);
+  assert.equal(Object.hasOwn(job, "continue-on-error"), false, identifier);
+  assert.equal(Object.hasOwn(job, "strategy"), false, identifier);
+  assert.equal(job.steps.length, 1);
+  const [step] = job.steps;
+  assert.deepEqual(Object.keys(step).sort(), ["env", "name", "run", "shell"]);
+  assert.equal(step.shell, "bash");
+  assert.deepEqual(step.env, {
+    SCOPE_RESULT: "${{ needs.scope.result }}",
+    GENERATED_REQUIRED: "${{ needs.scope.outputs.generated-projects }}",
+    MATRIX_RESULT: "${{ needs." + matrixJob + ".result }}",
+  });
+}
+
 function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const expectedJobIdentifiers = [
     "scope",
     "builder-and-packages",
+    "cli-lifecycle-cases",
     "cli-lifecycle",
     "generated-projects",
     "generated-fixtures",
@@ -488,6 +505,9 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     "scripts/lib/isolated-process.mjs",
     "scripts/lib/dependency-audit.mjs",
     "tests/generated-fixtures/**",
+    "tests/helpers/installed-fixture-ancestor.mjs",
+    "tests/helpers/synthetic-app-transition-admission.mjs",
+    ":(exclude,top,glob)packages/builder-core/tests/*.test.mjs",
   ];
   const compatibilityPaths = [
     ".github/workflows/repository-quality.yml",
@@ -514,10 +534,12 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const ordinaryQualityEvent = "github.event_name == 'push' || (" + readyPullRequest + ")";
   const generatedScope = "needs.scope.outputs.generated-projects == 'true'";
   const generatedQualityEvent = "(" + ordinaryQualityEvent + ") && " + generatedScope;
+  const summaryCondition = "${{ always() && (" + ordinaryQualityEvent + ") }}";
   const expectedScheduling = {
     scope: {},
-    "builder-and-packages": { condition: ordinaryQualityEvent },
-    "cli-lifecycle": { condition: ordinaryQualityEvent },
+    "builder-and-packages": { condition: summaryCondition, needs: ["scope"] },
+    "cli-lifecycle-cases": { condition: generatedQualityEvent, needs: ["scope"] },
+    "cli-lifecycle": { condition: summaryCondition, needs: ["scope", "cli-lifecycle-cases"] },
     "generated-projects": { condition: generatedQualityEvent, needs: ["scope"] },
     "generated-fixtures": { condition: generatedQualityEvent, needs: ["scope"] },
     "generated-jobs-profiles": { condition: generatedQualityEvent, needs: ["scope"] },
@@ -536,14 +558,19 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     assert.equal(workflow.jobs[identifier].if, condition, identifier);
     assert.deepEqual(workflow.jobs[identifier].needs, needs, identifier);
   }
-  for (const identifier of ["builder-and-packages", "cli-lifecycle"]) {
+  for (const identifier of ["builder-and-packages", "cli-lifecycle-cases"]) {
     const job = workflow.jobs[identifier];
-    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : identifier === "cli-lifecycle" ? 45 : 90);
+    assert.equal(job["timeout-minutes"], identifier === "builder-and-packages" ? 180 : 45);
     for (const property of ["continue-on-error", "concurrency"]) {
       assert.equal(Object.hasOwn(job, property), false, identifier);
     }
-    for (const step of job.steps) {
-      assert.equal(Object.hasOwn(step, "if"), false, identifier);
+    const buildIndex = job.steps.findIndex(({ name }) => name === "Build builder and packages");
+    assert.ok(buildIndex >= 0, identifier);
+    for (const [index, step] of job.steps.entries()) {
+      const condition = identifier === "builder-and-packages" && index >= buildIndex
+        ? "needs.scope.outputs.documentation-only != 'true'"
+        : undefined;
+      assert.equal(step.if, condition, step.name);
       assert.equal(Object.hasOwn(step, "continue-on-error"), false, identifier);
     }
   }
@@ -558,6 +585,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.deepEqual(scopeJob.outputs, {
     "generated-projects": "${{ steps.classify.outputs.generated-projects }}",
     "compatibility-proof": "${{ steps.classify.outputs.compatibility-proof }}",
+    "documentation-only": "${{ steps.classify.outputs.documentation-only }}",
   });
   assert.deepEqual(scopeStep?.env, {
     EVENT_NAME: "${{ github.event_name }}",
@@ -573,11 +601,11 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   assert.match(scopeRun, /git cat-file -e "\$\{HEAD_SHA\}\^\{commit\}"/u);
   assert.match(
     scopeRun,
-    /git diff --quiet "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{generated_paths\[@\]\}"/u,
+    /git diff --quiet --no-renames "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{generated_paths\[@\]\}"/u,
   );
   assert.match(
     scopeRun,
-    /git diff --quiet "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{compatibility_paths\[@\]\}"/u,
+    /git diff --quiet --no-renames "\$BASE_SHA" "\$HEAD_SHA" -- "\$\{compatibility_paths\[@\]\}"/u,
   );
   assert.match(
     scopeRun,
@@ -651,79 +679,29 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
       workflowCommands(job),
     ]),
   );
-  const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs';
-  const jobsCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs';
-  assert.equal(
-    workflow.jobs["builder-and-packages"].steps.find(({ name }) => name === "Test CLI excluding dedicated lifecycle jobs")?.run,
-    nonJobsCommand,
+  const nonJobsCommand = 'node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/cli.test.mjs';
+  const cliRuntimeCommand = 'node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/cli.test.mjs';
+  const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
+    ({ name }) => name === "Test CLI contracts",
   );
-  const lifecycle = workflow.jobs["cli-lifecycle"];
+  assert.equal(mainCliStep?.run, nonJobsCommand);
+  assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: "^generated runtime " });
+  const lifecycle = workflow.jobs["cli-lifecycle-cases"];
   assert.equal(lifecycle.name, "CLI lifecycle (${{ matrix.group }})");
   assert.deepEqual(lifecycle.strategy, {
     "fail-fast": false,
-    matrix: {
-      include: [
-        { group: "app-optionals", "test-pattern": "^compiled current app optional lifecycle completes production verification$" },
-        { group: "email-portfolio", "test-pattern": "^compiled current email lifecycle on portfolio verifies and retains its foundation$" },
-        { group: "email-site", "test-pattern": "^compiled current email lifecycle on site verifies and retains its foundation$" },
-        { group: "hosted-contact-portfolio", "test-pattern": "^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$" },
-        { group: "hosted-contact-app", "test-pattern": "^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$" },
-      ],
-    },
+    "max-parallel": 4,
+    matrix: { group: ["analytics", "contact", "booking-and-multilingual", "app-transitions", "foundation-optionals"] },
   });
   assert.deepEqual(lifecycle.steps.filter(({ run }) => run).map(({ run }) => run), [
     "pnpm install --frozen-lockfile",
     "pnpm run build:builder",
-    jobsCommand,
+    cliRuntimeCommand,
   ]);
-  assert.deepEqual(lifecycle.steps.find(({ run }) => run === jobsCommand).env, {
-    CLI_TEST_PATTERN: "${{ matrix.test-pattern }}",
+  assert.deepEqual(lifecycle.steps.find(({ run }) => run === cliRuntimeCommand).env, {
+    CLI_TEST_PATTERN: "^generated runtime ${{ matrix.group }} / ",
   });
-  const mainCliStep = workflow.jobs["builder-and-packages"].steps.find(
-    ({ run }) => run === nonJobsCommand,
-  );
-  const skipPattern = lifecycle.strategy.matrix.include
-    .map((group) => `(?:${group["test-pattern"]})`).join("|");
-  assert.deepEqual(mainCliStep.env, { CLI_TEST_SKIP_PATTERN: skipPattern });
-  const selectors = lifecycle.strategy.matrix.include.map((group) => new RegExp(group["test-pattern"], "u"));
-  const skipSelector = new RegExp(mainCliStep.env.CLI_TEST_SKIP_PATTERN, "u");
-  const dedicatedNames = [
-    "compiled current app optional lifecycle completes production verification",
-    ...["portfolio", "site"].map(
-      (profile) => `compiled current email lifecycle on ${profile} verifies and retains its foundation`,
-    ),
-    ...["portfolio", "app"].map(
-      (profile) => `compiled current Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`,
-    ),
-  ];
-  assert.equal(new Set(dedicatedNames).size, 5);
-  assert.deepEqual(selectors.map((selector) => dedicatedNames.filter(
-    (name) => selector.test(name),
-  ).length), [1, 1, 1, 1, 1]);
-  for (const name of dedicatedNames) {
-    assert.equal(selectors.filter((selector) => selector.test(name)).length, 1, name);
-    assert.equal(skipSelector.test(name), true, name);
-  }
-  const remainderNames = [
-    "parses a project configuration",
-    "compiled current app transition from site completes production verification",
-    // Routing sentinel; the current transition loop emits only the site case.
-    "compiled current app transition from portfolio completes production verification",
-    "compiled app transition from site with all optionals preserves content through production verification",
-    "compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery",
-    "application environment compiled CLI refuses inputs before dependencies and preserves existing content",
-    "retired upgrade commands refuse before repository or verifier access",
-    "compiled jobs lifecycle refuses both desired and installed jobs without effects",
-    ...dedicatedNames.map((name) => `${name} with extra coverage`),
-    ...dedicatedNames.map((name) => name.replace(/^compiled [\s\S]+? (jobs|app optional|email|Web3Forms) lifecycle/u, "compiled future $1 lifecycle")),
-    ...dedicatedNames.filter((name) => name.includes(" on ")).map(
-      (name) => name.replace(/ on [\w-]+ /u, " on future-profile "),
-    ),
-  ];
-  for (const name of remainderNames) {
-    assert.equal(selectors.some((selector) => selector.test(name)), false, name);
-    assert.equal(skipSelector.test(name), false, name);
-  }
+  assertQualityMatrixSummary(workflow.jobs["cli-lifecycle"], "cli-lifecycle", "cli-lifecycle-cases");
   assert.deepEqual(workflow.jobs["builder-and-packages"].steps.filter(({ run }) => run).map(({ run }) => run), [
     "pnpm install --frozen-lockfile",
     "pnpm run test:constitution",
@@ -939,7 +917,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   const jobsWithCheckout = [
     "scope",
     "builder-and-packages",
-    "cli-lifecycle",
+    "cli-lifecycle-cases",
     "generated-projects",
     "generated-fixtures",
     "generated-jobs-profiles",
@@ -948,7 +926,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
   ];
   const jobsWithToolchain = [
     "builder-and-packages",
-    "cli-lifecycle",
+    "cli-lifecycle-cases",
     "generated-projects",
     "generated-fixtures",
     "generated-jobs-profiles",
@@ -972,7 +950,7 @@ function assertConsolidatedRepositoryQualityWorkflow(source, workflow) {
     );
     assert.equal(checkout?.with?.["persist-credentials"], false, identifier);
   }
-  for (const identifier of ["scope", "builder-and-packages", "cli-lifecycle"]) {
+  for (const identifier of ["scope", "builder-and-packages", "cli-lifecycle-cases"]) {
     const checkout = workflow.jobs[identifier].steps.find(({ uses }) =>
       uses?.startsWith("actions/checkout@"),
     );
@@ -1110,15 +1088,23 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
     {
       name: "dependent builder policy lane",
       mutateWorkflow(candidate) {
-        candidate.jobs["builder-and-packages"].needs = ["scope"];
+        candidate.jobs["builder-and-packages"].needs = ["generated-fixtures"];
       },
     },
     {
       name: "incomplete non-jobs selector",
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].steps.find(
-          ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
+          ({ name }) => name === "Test CLI contracts",
         ).run = "node --test --test-name-pattern='^parser' apps/cli/tests/*.test.mjs";
+      },
+    },
+    {
+      name: "scope skip omits a repository policy check",
+      mutateWorkflow(candidate) {
+        candidate.jobs["builder-and-packages"].steps.find(
+          ({ name }) => name === "Test repository constitution",
+        ).if = "needs.scope.outputs.documentation-only != 'true'";
       },
     },
     {
@@ -1153,25 +1139,25 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   negativeCases.push(
     {
       name: "omitted lifecycle group",
-      mutateWorkflow(candidate) { candidate.jobs["cli-lifecycle"].strategy.matrix.include.pop(); },
+      mutateWorkflow(candidate) { candidate.jobs["cli-lifecycle-cases"].strategy.matrix.group.pop(); },
     },
     {
       name: "overlapping lifecycle selectors",
       mutateWorkflow(candidate) {
-        const groups = candidate.jobs["cli-lifecycle"].strategy.matrix.include;
-        groups[1]["test-pattern"] = groups[0]["test-pattern"];
+        const groups = candidate.jobs["cli-lifecycle-cases"].strategy.matrix.group;
+        groups[1] = groups[0];
       },
     },
     ...[".*", "^compiled current app optional lifecycle completes production verification$"].map((pattern) => ({
       name: `incorrect main complement ${pattern}`,
       mutateWorkflow(candidate) {
         candidate.jobs["builder-and-packages"].steps.find(
-          ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
+          ({ name }) => name === "Test CLI contracts",
         ).env.CLI_TEST_SKIP_PATTERN = pattern;
       },
     })),
   );
-  for (const identifier of ["cli-lifecycle", "generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
+  for (const identifier of ["cli-lifecycle-cases", "generated-projects", "generated-fixtures", "generated-jobs-profiles"]) {
     for (const [property, value] of [["needs", ["builder-and-packages"]], ["if", "false"],
       ["continue-on-error", true], ["concurrency", "shared-verification"]]) {
       negativeCases.push({
@@ -1210,7 +1196,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
       },
     });
   }
-  for (const identifier of ["cli-lifecycle"]) {
+  for (const identifier of ["cli-lifecycle-cases"]) {
     negativeCases.push({
       name: `${identifier} cancels sibling verification`,
       mutateWorkflow(candidate) { candidate.jobs[identifier].strategy["fail-fast"] = true; },
@@ -1364,7 +1350,7 @@ test("ordinary repository CI exposes stable fail-safe quality jobs", async () =>
   );
   assert.ok(buildIndex >= 0 && buildIndex < packageTestIndex);
   const cliTestIndex = builderSteps.findIndex(
-    ({ name }) => name === "Test CLI excluding dedicated lifecycle jobs",
+    ({ name }) => name === "Test CLI contracts",
   );
   assert.ok(buildIndex < cliTestIndex && cliTestIndex < packageTestIndex);
   assert.deepEqual(builderSteps.slice(cliTestIndex + 1).map(({ name }) => name), [
@@ -1425,6 +1411,44 @@ test("generated jobs aggregate rejects incomplete selected verification", async 
         }
         assert.equal(exitCode === 0, expectedSuccess, input);
       }
+    }
+  }
+});
+
+
+test("quality summaries refuse incomplete selected matrices", async () => {
+  const workflow = parse(await readRepositoryFile(".github/workflows/repository-quality.yml"));
+  for (const identifier of ["cli-lifecycle"]) {
+    const job = workflow.jobs[identifier];
+    assert.equal(job.steps.length, 1, identifier);
+    const { run } = job.steps[0];
+    for (const [scope, required, matrix, expected] of [
+      ["success", "true", "success", 0],
+      ["success", "false", "skipped", 0],
+      ["success", "true", "skipped", 1],
+      ["success", "true", "failure", 1],
+      ["success", "true", "cancelled", 1],
+      ["success", "true", "", 1],
+      ["success", "false", "success", 1],
+      ["success", "", "skipped", 1],
+      ["failure", "false", "skipped", 1],
+      ["cancelled", "true", "success", 1],
+    ]) {
+      const input = [identifier, scope, required, matrix].join(" / ");
+      let status = 0;
+      try {
+        await execFileAsync("bash", ["-c", run], {
+          cwd: repositoryRoot,
+          timeout: 3000,
+          maxBuffer: 16 * 1024,
+          env: { PATH: process.env.PATH, SCOPE_RESULT: scope, GENERATED_REQUIRED: required, MATRIX_RESULT: matrix },
+        });
+      } catch (error) {
+        assert.equal(error.killed, false, input);
+        assert.equal(typeof error.code, "number", input);
+        status = error.code;
+      }
+      assert.equal(status, expected, input);
     }
   }
 });
@@ -1592,6 +1616,65 @@ test("repository quality scope classification executes fail-safe Git behavior", 
     },
   ];
 
+
+  const fileScenarios = [
+    ["UNRELATED.md", "true", "false", "false"],
+    ["docs/architecture/enforcement-map.md", "false", "false", "false"],
+    ["docs/governance/shared-test-deployment.md", "false", "false", "false"],
+    ["docs/implementation-evidence/receipt.md", "false", "false", "false"],
+    ["packages/builder-core/tests/verification.test.mjs", "false", "false", "false"],
+    ["packages/builder-core/tests/verification.integration.mjs", "false", "true", "false"],
+    ["packages/builder-core/tests/fixtures/runtime.test.mjs", "false", "true", "false"],
+    ["apps/cli/tests/cli.test.mjs", "false", "true", "false"],
+    ["tests/helpers/installed-fixture-ancestor.mjs", "false", "true", "false"],
+    ["tests/helpers/synthetic-app-transition-admission.mjs", "false", "true", "false"],
+    ["fixtures/generated/portfolio/README.md", "false", "true", "false"],
+    ["pnpm-lock.yaml", "false", "true", "true"],
+  ];
+  let previousRevision = repositoryQualityWorkflowRevision;
+  for (const [path, documentationOnly, generatedProjects, compatibilityProof] of fileScenarios) {
+    const revision = await commitFile(path, "fixture\n", path);
+    scenarios.push({
+      name: path,
+      pushBaseSha: previousRevision,
+      pushHeadSha: revision,
+      expected: {
+        "documentation-only": documentationOnly,
+        "generated-projects": generatedProjects,
+        "compatibility-proof": compatibilityProof,
+      },
+    });
+    previousRevision = revision;
+  }
+  scenarios.push({
+    name: "documentation mixed with a lockfile change",
+    pushBaseSha: repositoryQualityWorkflowRevision,
+    pushHeadSha: previousRevision,
+    expected: bothEnabled,
+  });
+  scenarios.push({
+    name: "resolved object is not a commit",
+    pushBaseSha: (await git("rev-parse", "HEAD:README.md")).stdout.trim(),
+    pushHeadSha: previousRevision,
+    expected: bothEnabled,
+  });
+
+  const testPath = "packages/builder-core/tests/verification.test.mjs";
+  const sourcePath = "packages/builder-core/src/verification.mjs";
+  await mkdir(dirname(resolve(fixtureRoot, sourcePath)), { recursive: true });
+  for (const [from, to] of [[testPath, sourcePath], [sourcePath, testPath]]) {
+    await git("mv", from, to);
+    await git("commit", "--quiet", "-m", "move verification file across the scope boundary");
+    const revision = (await git("rev-parse", "HEAD")).stdout.trim();
+    scenarios.push({
+      name: `rename ${from} to ${to}`,
+      pushBaseSha: previousRevision,
+      pushHeadSha: revision,
+      expected: { "generated-projects": "true", "compatibility-proof": "false" },
+    });
+    previousRevision = revision;
+  }
+
   for (const scenario of scenarios) {
     const actual = await runRepositoryQualityScopeClassifier({
       scopeRun,
@@ -1603,7 +1686,8 @@ test("repository quality scope classification executes fail-safe Git behavior", 
       pushHeadSha: scenario.pushHeadSha,
       forceDiffFailure: scenario.forceDiffFailure ?? false,
     });
-    assert.deepEqual(actual, scenario.expected, scenario.name);
+    const documentationOnly = ["unchanged revision", "unrelated documentation"].includes(scenario.name) ? "true" : "false";
+    assert.deepEqual(actual, { "documentation-only": documentationOnly, ...scenario.expected }, scenario.name);
   }
 
   assert.deepEqual(
@@ -1620,6 +1704,7 @@ test("repository quality scope classification executes fail-safe Git behavior", 
     {
       "generated-projects": "true",
       "compatibility-proof": "false",
+      "documentation-only": "false",
     },
     "pull-request revisions",
   );

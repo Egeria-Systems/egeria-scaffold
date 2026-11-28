@@ -21,6 +21,7 @@ jobs:
     outputs:
       generated-projects: ${{ steps.classify.outputs.generated-projects }}
       compatibility-proof: ${{ steps.classify.outputs.compatibility-proof }}
+      documentation-only: ${{ steps.classify.outputs.documentation-only }}
     steps:
       - name: Check out repository history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -42,6 +43,7 @@ jobs:
 
           generated_projects="true"
           compatibility_proof="true"
+          documentation_only="false"
           scope_error="false"
           zero_revision="0000000000000000000000000000000000000000"
           BASE_SHA=""
@@ -84,6 +86,9 @@ jobs:
             "scripts/lib/isolated-process.mjs"
             "scripts/lib/dependency-audit.mjs"
             "tests/generated-fixtures/**"
+            "tests/helpers/installed-fixture-ancestor.mjs"
+            "tests/helpers/synthetic-app-transition-admission.mjs"
+            ":(exclude,top,glob)packages/builder-core/tests/*.test.mjs"
           )
           compatibility_paths=(
             ".github/workflows/repository-quality.yml"
@@ -95,16 +100,30 @@ jobs:
             "proofs/nextjs-cloudflare/**"
           )
 
+          prose_exclusions=(
+            ":(exclude,top,glob)*.md"
+            ":(exclude,top,glob)docs/**/*.md"
+          )
+          certification_documentation=(
+            "docs/governance/shared-test-deployment.md"
+            "docs/architecture/enforcement-map.md"
+            "docs/implementation-evidence/**"
+          )
+
           if [[ "$scope_error" == "false" ]] &&
             revision_shape_is_valid "$BASE_SHA" &&
             revision_shape_is_valid "$HEAD_SHA" &&
             git cat-file -e "${BASE_SHA}^{commit}" 2>/dev/null &&
             git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
             set +e
-            git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${generated_paths[@]}"
+            git diff --quiet --no-renames "$BASE_SHA" "$HEAD_SHA" -- "${generated_paths[@]}"
             generated_status=$?
-            git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- "${compatibility_paths[@]}"
+            git diff --quiet --no-renames "$BASE_SHA" "$HEAD_SHA" -- "${compatibility_paths[@]}"
             compatibility_status=$?
+            git diff --quiet --no-renames "$BASE_SHA" "$HEAD_SHA" -- . "${prose_exclusions[@]}"
+            non_prose_status=$?
+            git diff --quiet --no-renames "$BASE_SHA" "$HEAD_SHA" -- "${certification_documentation[@]}"
+            certification_documentation_status=$?
             set -e
 
             case "$generated_status" in
@@ -130,6 +149,12 @@ jobs:
                 scope_error="true"
                 ;;
             esac
+
+            case "$non_prose_status:$certification_documentation_status" in
+              0:0) documentation_only="true" ;;
+              [01]:[01]) ;;
+              *) scope_error="true" ;;
+            esac
           else
             scope_error="true"
           fi
@@ -137,13 +162,18 @@ jobs:
           if [[ "$scope_error" == "true" ]]; then
             generated_projects="true"
             compatibility_proof="true"
+            documentation_only="false"
           fi
 
           printf 'generated-projects=%s\n' "$generated_projects" >> "$GITHUB_OUTPUT"
           printf 'compatibility-proof=%s\n' "$compatibility_proof" >> "$GITHUB_OUTPUT"
+          printf 'documentation-only=%s\n' "$documentation_only" >> "$GITHUB_OUTPUT"
 
   builder-and-packages:
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
+    needs: [scope]
+    if: >-
+      ${{ always()
+      && (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
@@ -174,53 +204,56 @@ jobs:
         run: pnpm run test:package-boundaries
 
       - name: Build builder and packages
+        if: needs.scope.outputs.documentation-only != 'true'
         run: pnpm run build:builder
 
       - name: Test builder core
+        if: needs.scope.outputs.documentation-only != 'true'
         run: node --test packages/builder-core/tests/*.test.mjs
 
-      - name: Test CLI excluding dedicated lifecycle jobs
+      - name: Test CLI contracts
+        if: needs.scope.outputs.documentation-only != 'true'
         env:
-          CLI_TEST_SKIP_PATTERN: (?:^compiled current app optional lifecycle completes production verification$)|(?:^compiled current email lifecycle on portfolio verifies and retains its foundation$)|(?:^compiled current email lifecycle on site verifies and retains its foundation$)|(?:^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$)|(?:^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$)
-        run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/*.test.mjs
+          CLI_TEST_SKIP_PATTERN: '^generated runtime '
+        run: node --test --test-skip-pattern="$CLI_TEST_SKIP_PATTERN" apps/cli/tests/cli.test.mjs
 
       - name: Test public packages
+        if: needs.scope.outputs.documentation-only != 'true'
         run: pnpm run test:packages
 
       - name: Test capability certification contracts
+        if: needs.scope.outputs.documentation-only != 'true'
         run: node --test tests/capability-certification/*.test.mjs
 
       - name: Check capability admission
+        if: needs.scope.outputs.documentation-only != 'true'
         run: node scripts/check-capability-certification.mjs
 
       - name: Lint builder and packages
+        if: needs.scope.outputs.documentation-only != 'true'
         run: pnpm run lint:builder
 
       - name: Typecheck builder and packages
+        if: needs.scope.outputs.documentation-only != 'true'
         run: pnpm run typecheck:builder
 
       - name: Check release intent
+        if: needs.scope.outputs.documentation-only != 'true'
         run: pnpm run check:package-release dependency-update origin/main || pnpm run check:package-release pull-request origin/main || pnpm exec changeset status --since origin/main
 
-  cli-lifecycle:
+  cli-lifecycle-cases:
     name: CLI lifecycle (${{ matrix.group }})
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)
+    needs: [scope]
+    if: >-
+      (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft))
+      && needs.scope.outputs.generated-projects == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
-        include:
-          - group: app-optionals
-            test-pattern: ^compiled current app optional lifecycle completes production verification$
-          - group: email-portfolio
-            test-pattern: ^compiled current email lifecycle on portfolio verifies and retains its foundation$
-          - group: email-site
-            test-pattern: ^compiled current email lifecycle on site verifies and retains its foundation$
-          - group: hosted-contact-portfolio
-            test-pattern: ^compiled current Web3Forms lifecycle on portfolio preserves composition and re-adds safely$
-          - group: hosted-contact-app
-            test-pattern: ^compiled current Web3Forms lifecycle on app preserves composition and re-adds safely$
+        group: [analytics, contact, booking-and-multilingual, app-transitions, foundation-optionals]
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -244,8 +277,29 @@ jobs:
 
       - name: Test CLI lifecycle
         env:
-          CLI_TEST_PATTERN: ${{ matrix.test-pattern }}
-        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/*.test.mjs
+          CLI_TEST_PATTERN: '^generated runtime ${{ matrix.group }} / '
+        run: node --test --test-name-pattern="$CLI_TEST_PATTERN" apps/cli/tests/cli.test.mjs
+
+  cli-lifecycle:
+    name: cli-lifecycle
+    needs: [scope, cli-lifecycle-cases]
+    if: >-
+      ${{ always()
+      && (github.event_name == 'push' || (github.event_name == 'pull_request' && !github.event.pull_request.draft)) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require complete selected verification
+        shell: bash
+        env:
+          SCOPE_RESULT: ${{ needs.scope.result }}
+          GENERATED_REQUIRED: ${{ needs.scope.outputs.generated-projects }}
+          MATRIX_RESULT: ${{ needs.cli-lifecycle-cases.result }}
+        run: |
+          case "$SCOPE_RESULT:$GENERATED_REQUIRED:$MATRIX_RESULT" in
+            success:true:success|success:false:skipped) exit 0 ;;
+            *) printf '%s\n' 'CLI lifecycle verification did not complete successfully.' >&2; exit 1 ;;
+          esac
 
   generated-projects:
     needs: [scope]
