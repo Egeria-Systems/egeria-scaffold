@@ -128,7 +128,7 @@ jobs:
         run: |
           pnpm install --frozen-lockfile
           pnpm run build:builder
-          pnpm run check:capability-certification
+          node scripts/check-capability-certification.mjs
 
       - name: Prepare private measurement context
         env:
