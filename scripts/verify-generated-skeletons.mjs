@@ -1181,24 +1181,49 @@ function fixedFixtureIndex(identifier, failureCode) {
   return index;
 }
 
+function fixtureShardCoordinates(shard) {
+  if (typeof shard !== "string") return undefined;
+  const match = /^([1-9][0-9]*)\/([1-9][0-9]*)$/u.exec(shard);
+  if (match?.[0] !== shard) return undefined;
+  const index = Number(match[1]);
+  const count = Number(match[2]);
+  if (index > count || count > generatedFixtureContracts.length) return undefined;
+  return { index, count };
+}
+
+export function generatedFixtureShardIdentifiers(shard) {
+  const identifiers = generatedFixtureContracts.map(({ identifier }) => identifier);
+  if (shard === undefined) return identifiers;
+  const coordinates = fixtureShardCoordinates(shard);
+  if (!coordinates) fail("VERIFICATION_OPTION_INVALID");
+  const { index, count } = coordinates;
+  return identifiers.filter((_, position) => position % count === index - 1);
+}
+
 export function parseVerificationArguments(arguments_) {
   if (!Array.isArray(arguments_)) {
     fail("VERIFICATION_ARGUMENT_INVALID");
   }
-  const prefix = "--from-fixture=";
+  const fromFixturePrefix = "--from-fixture=";
+  const shardPrefix = "--shard=";
   let includeVisual = false;
   let fromFixture;
+  let shard;
   for (const argument of arguments_) {
     if (argument === "--visual" && !includeVisual) {
       includeVisual = true;
-    } else if (typeof argument === "string" && argument.startsWith(prefix) && fromFixture === undefined) {
-      fromFixture = argument.slice(prefix.length);
+    } else if (typeof argument === "string" && argument.startsWith(fromFixturePrefix) && fromFixture === undefined && shard === undefined) {
+      fromFixture = argument.slice(fromFixturePrefix.length);
       fixedFixtureIndex(fromFixture, "VERIFICATION_ARGUMENT_INVALID");
+    } else if (typeof argument === "string" && argument.startsWith(shardPrefix) && shard === undefined && fromFixture === undefined) {
+      shard = argument.slice(shardPrefix.length);
+      if (!fixtureShardCoordinates(shard)) fail("VERIFICATION_ARGUMENT_INVALID");
     } else {
       fail("VERIFICATION_ARGUMENT_INVALID");
     }
   }
   if (fromFixture !== undefined) return Object.freeze({ includeVisual, fromFixture });
+  if (shard !== undefined) return Object.freeze({ includeVisual, shard });
   return includeVisual ? visualVerificationOptions : defaultVerificationOptions;
 }
 
@@ -2077,9 +2102,11 @@ async function verifySourcesWithAdapters(
   sourcesBefore,
   options = defaultVerificationOptions,
   admittedAudit,
-  firstFixture = 0,
+  fixtureIdentifiers,
 ) {
-  const selectedSources = sourcesBefore.slice(firstFixture);
+  const selectedSources = fixtureIdentifiers === undefined
+    ? sourcesBefore
+    : sourcesBefore.filter(({ contract }) => fixtureIdentifiers.includes(contract.identifier));
   let owner;
   let pendingError;
   const workerIntegration = { executed: [], skipped: [] };
@@ -2463,13 +2490,17 @@ export async function verifyGeneratedSkeletonsForTesting(
 ) {
   requireAdapters(adapters);
   if (typeof adapters.runAudit !== "function") fail("VERIFICATION_ADAPTER_INVALID");
-  const { fromFixture, ...commandOptions } = options ?? {};
+  const { fromFixture, shard, ...commandOptions } = options ?? {};
   requireVerificationOptions(commandOptions);
-  const firstFixture = Object.hasOwn(options, "fromFixture")
-    ? fixedFixtureIndex(fromFixture, "VERIFICATION_OPTION_INVALID")
-    : 0;
+  const hasFromFixture = Object.hasOwn(options, "fromFixture");
+  if (Object.hasOwn(options, "shard") && (hasFromFixture || shard === undefined)) {
+    fail("VERIFICATION_OPTION_INVALID");
+  }
+  const fixtureIdentifiers = hasFromFixture
+    ? generatedFixtureContracts.slice(fixedFixtureIndex(fromFixture, "VERIFICATION_OPTION_INVALID")).map(({ identifier }) => identifier)
+    : generatedFixtureShardIdentifiers(shard);
   const sources = await fixedFixtureSources(fixtureRepositoryRoot, generatedFixtureContracts);
-  return verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, firstFixture);
+  return verifySourcesWithAdapters(adapters, sources, commandOptions, adapters.runAudit, fixtureIdentifiers);
 }
 
 export function verifyGeneratedProject(

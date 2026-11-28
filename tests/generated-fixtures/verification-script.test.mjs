@@ -1346,6 +1346,91 @@ test("fixed verification accepts a known starting fixture with either visual mod
   }
 });
 
+
+test("fixed verification accepts only bounded disjoint fixture shards", async () => {
+  const options = parseVerificationArguments(["--visual", "--shard=2/4"]);
+  assert.deepEqual(options, { includeVisual: true, shard: "2/4" });
+  const { generatedFixtureShardIdentifiers } = await import("../../scripts/verify-generated-skeletons.mjs");
+  const shards = [1, 2, 3, 4].map(index => generatedFixtureShardIdentifiers(`${index}/4`));
+  assert.deepEqual(shards, [
+    ["portfolio", "site-public-integrations", "portfolio-email", "app-persistence-jobs-email"],
+    ["portfolio-calendly", "app", "app-persistence-email"],
+    ["site", "app-all-optional-integrations", "site-contact-form"],
+    ["site-multilingual", "app-persistence", "app-jobs"],
+  ]);
+  const identifiers = generatedFixtureContracts.map(({ identifier }) => identifier);
+  assert.deepEqual(generatedFixtureShardIdentifiers(), identifiers);
+  assert.deepEqual(shards.flat().toSorted(), identifiers.toSorted());
+  for (const flags of [
+    ["--shard=0/4"], ["--shard=1/0"], ["--shard=5/4"], ["--shard=1/14"],
+    ["--shard=01/4"], ["--shard=1/04"], ["--shard=1/4\n"], ["--shard=1/9007199254740993"],
+    ["--shard", "1/4"], ["--shard="], ["--shard=1/4", "--shard=2/4"],
+    ["--from-fixture=site", "--shard=2/4"], ["--shard=2/4", "--from-fixture=site"],
+  ]) {
+    assert.throws(() => parseVerificationArguments(flags), { code: "VERIFICATION_ARGUMENT_INVALID" });
+  }
+  assert.throws(() => generatedFixtureShardIdentifiers("0/4"), { code: "VERIFICATION_OPTION_INVALID" });
+});
+
+test("fixed verification runs and reports only its admitted shard", async context => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-shard-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  const audited = [];
+  const visual = [];
+  const installed = new Set();
+  const result = await verifySkeletons({
+    createOwner: () => createKnownOwner(parent),
+    runAudit: async ({ cwd }) => {
+      audited.push(basename(cwd));
+      return { status: "passed", rawExitCode: 0, thresholdExitCode: 0 };
+    },
+    runCommand: async input => {
+      const fixture = basename(input.cwd);
+      if (input.arguments.includes("--frozen-lockfile")) installed.add(fixture);
+      if (input.arguments.includes("test:visual")) visual.push(fixture);
+      return successfulCommand(input);
+    },
+  }, { includeVisual: true, shard: "2/4" });
+  const expected = ["portfolio-calendly", "app", "app-persistence-email"];
+  const roots = expected.map(identifier => `${identifier}-project`);
+  assert.deepEqual(result.fixtures, expected);
+  assert.deepEqual([...installed], roots);
+  assert.deepEqual(audited, roots);
+  assert.deepEqual(result.auditDispositions.map(({ fixture }) => fixture), expected);
+  assert.deepEqual(visual, ["portfolio-calendly-project", "app-project"]);
+});
+
+test("fixed verification checks nonselected roots before and after shard execution", async context => {
+  const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-shard-source-"));
+  context.after(() => rm(parent, { recursive: true, force: true }));
+  for (const when of ["before", "during"]) {
+    await context.test(when, async () => {
+      const inputs = join(parent, when);
+      await copyFixedFixtureRepository(inputs);
+      const excludedReadme = join(inputs, fixtureRoot("portfolio"), "README.md");
+      const changeExcludedSource = () => writeFile(excludedReadme, "Changed outside the selected shard.\n");
+      if (when === "before") await changeExcludedSource();
+      let owner;
+      let executed = false;
+      await expectFixtureError(() => verifySkeletons({
+        async createOwner() {
+          await changeExcludedSource();
+          owner = await createKnownOwner(parent);
+          return owner;
+        },
+        async runCommand(input) {
+          executed = true;
+          return successfulCommand(input);
+        },
+        runAudit: async () => ({ status: "passed", rawExitCode: 0, thresholdExitCode: 0 }),
+      }, { includeVisual: false, shard: "13/13" }, inputs),
+      when === "before" ? "FIXTURE_CONTENT_INVALID" : "FIXTURE_SOURCE_CHANGED");
+      assert.equal(executed, when === "during");
+      if (owner) assert.equal(await pathExists(owner.path), false);
+    });
+  }
+});
+
 test("fixed verification audits and reports only the selected fixture suffix", async t => {
   const parent = await mkdtemp(join(tmpdir(), "egeria-fixture-suffix-"));
   t.after(() => rm(parent, { recursive: true, force: true }));

@@ -16,12 +16,23 @@ import {
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import test from "node:test";
+import nodeTest from "node:test";
 import { generatedFixtureContracts } from "../../../scripts/verify-generated-skeletons.mjs";
 import { readArchivedGeneratedFixture } from "../../../tests/helpers/installed-fixture-ancestor.mjs";
 import { createGenerationRenderingContext } from "../../../packages/builder-core/dist/catalog/verified-package-versions.js";
 import { fingerprintJsonValue } from "../../../packages/builder-core/dist/ownership/fingerprint.js";
 import { createRecipeLockfileUrl, resolveRecipeLockfileVersion } from "../../../packages/builder-core/dist/generation/recipe-lockfiles.js";
+const selectedCliTestScope = process.env.EGERIA_CLI_TEST_SCOPE;
+let registeredCaseCount = 0;
+
+function testForScope(scope, name, ...testArguments) {
+  if (selectedCliTestScope !== undefined && selectedCliTestScope !== scope) return;
+  registeredCaseCount += 1;
+  return nodeTest(name, ...testArguments);
+}
+
+const test = testForScope.bind(undefined, "contracts");
+
 const lifecycleCohorts = [
   {
     label: "current", generation: "current", profiles: createGenerationRenderingContext().profiles,
@@ -42,6 +53,62 @@ const cli = await import(pathToFileURL(resolve(packageRoot, "dist/run-cli.js")))
 const core = await import(
   pathToFileURL(resolve(repositoryRoot, "packages/builder-core/dist/index.js"))
 );
+
+test("CLI test scopes partition the original certification test names", async () => {
+  const registrar = `
+    import { registerHooks } from "node:module";
+    const target = process.argv[1];
+    const registry = "data:text/javascript,export default name => globalThis.registeredNames.push(name)";
+    globalThis.registeredNames = [];
+    const hooks = registerHooks({
+      resolve(specifier, context, next) {
+        if (specifier === "node:test" && context.parentURL === target) {
+          return { url: registry, shortCircuit: true };
+        }
+        return next(specifier, context);
+      },
+    });
+    try {
+      await import(target);
+      console.log(JSON.stringify(globalThis.registeredNames));
+    } finally {
+      hooks.deregister();
+    }
+  `;
+  const registrationEnvironment = { ...process.env };
+  delete registrationEnvironment.EGERIA_CLI_TEST_SCOPE;
+
+  const namesFor = (scope) => new Promise((resolveNames, reject) => {
+    const env = scope === undefined ? registrationEnvironment
+      : { ...registrationEnvironment, EGERIA_CLI_TEST_SCOPE: scope };
+    execFile(
+      process.execPath,
+      ["--input-type=module", "--eval", registrar, import.meta.url],
+      { cwd: repositoryRoot, env, encoding: "utf8", timeout: 20000 },
+      (error, stdout) => {
+        if (error) return reject(error);
+        try {
+          resolveNames(JSON.parse(stdout));
+        } catch (parseError) {
+          reject(parseError);
+        }
+      },
+    );
+  });
+
+  const scopes = ["contracts", "analytics", "contact", "booking-and-multilingual", "app-transitions", "foundation-optionals"];
+  const [allNames, ...scopeNames] = await Promise.all([namesFor(), ...scopes.map(namesFor)]);
+  assert.ok(allNames.includes(
+    "the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition",
+  ));
+  assert.ok(allNames.includes(
+    "the compiled CLI preserves multilingual through both capability install orders and re-addition",
+  ));
+  assert.ok(scopeNames.every((names) => names.length > 0));
+  assert.deepEqual(scopeNames.flat().toSorted(), allNames.toSorted());
+  assert.equal(new Set(allNames).size, allNames.length);
+  await assert.rejects(namesFor("unknown"), /CLI test scope selected no tests/u);
+});
 
 test("default application environment CLI accepts selection-only configuration", () => {
   const result = cliArguments.parseCliArguments([
@@ -1194,7 +1261,7 @@ test("app transition application parses and forwards only the exact approved fin
   })]);
 });
 
-test("compiled app profile creation contains verification failure and invalid options", async () => {
+testForScope("foundation-optionals", "compiled app profile creation contains verification failure and invalid options", async () => {
   const owner = await mkdtemp(join(tmpdir(), "egeria-app-create-process-"));
   try {
     for (const allOptionals of [false, true]) {
@@ -4163,7 +4230,7 @@ async function withAppTransitionFixture(profile, allOptionals, run, generation =
 
 for (const profile of ["site"]) {
   for (const allOptionals of [false, true]) {
-    test(`compiled app transition from ${profile} with ${allOptionals ? "all optionals" : "no optionals"} preserves content through production verification`, async () => {
+    testForScope("app-transitions", `compiled app transition from ${profile} with ${allOptionals ? "all optionals" : "no optionals"} preserves content through production verification`, async () => {
       await withAppTransitionFixture(profile, allOptionals, async ({ linked, primary }) => {
         const before = await gitRepositorySnapshot(linked);
         const primaryBefore = await gitRepositorySnapshot(primary);
@@ -4310,7 +4377,7 @@ test("compiled app profile transition preserves source admission refusals", asyn
   }
 });
 
-test("compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
+testForScope("app-transitions", "compiled app transition refusals retain fingerprint gates and pre-write or retained-write recovery", async () => {
   await withAppTransitionFixture("site", false, async ({ linked, primary }) => {
     const planning = planProfileTransitionArguments(linked, "app");
     const first = await executeBuilt(planning);
@@ -4434,7 +4501,7 @@ test("the compiled plan-remove command reports exact absence without writes", as
   });
 });
 
-test("the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
+testForScope("booking-and-multilingual", "the compiled CLI preserves multilingual through both capability install orders and re-addition", async () => {
   const cases = ["portfolio", "site"].flatMap((profile) => [
     {
       profile,
@@ -4604,7 +4671,7 @@ test("the compiled CLI preserves multilingual through both capability install or
   }
 });
 
-test("the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition", async () => {
+testForScope("analytics", "the compiled CLI preserves analytics and multilingual across both install orders and analytics re-addition", async () => {
   const cases = ["portfolio", "site"].flatMap((profile) => [
     { profile, installationOrder: ["analytics", "multilingual"] },
     { profile, installationOrder: ["multilingual", "analytics"] },
@@ -4863,7 +4930,7 @@ test("the compiled CLI reports path-only multilingual and analytics removal refe
   }
 });
 
-test("the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
+testForScope("booking-and-multilingual", "the compiled CLI reports Calendly reference warnings and completes exact add-remove-re-add transactions", async () => {
   for (const profile of ["portfolio", "site"]) {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
@@ -5192,7 +5259,7 @@ test("the compiled CLI reports Calendly reference warnings and completes exact a
   }
 });
 
-test("compiled removal preserves modified and already-ejected application surfaces", async () => {
+testForScope("booking-and-multilingual", "compiled removal preserves modified and already-ejected application surfaces", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -5339,7 +5406,7 @@ test("compiled removal preserves modified and already-ejected application surfac
   );
 });
 
-test("compiled removal verification failure retains a representative transformation and old receipts", async () => {
+testForScope("booking-and-multilingual", "compiled removal verification failure retains a representative transformation and old receipts", async () => {
   await withGitFixture(
     "portfolio",
     async ({ linked, primary }) => {
@@ -5457,7 +5524,7 @@ test("the built entry emits one JSON line with exact process exits", async () =>
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"]) {
-  test(profile === "portfolio" ? `compiled ${cohort.label} portfolio app transition refuses without admitted visuals` : `compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
+  testForScope("app-transitions", profile === "portfolio" ? `compiled ${cohort.label} portfolio app transition refuses without admitted visuals` : `compiled ${cohort.label} app transition from ${profile} completes production verification`, async () => {
     await withAppTransitionFixture(profile, false, async ({ linked }) => {
       const before = await gitRepositorySnapshot(linked);
       const planning = await executeBuilt(planProfileTransitionArguments(linked, "app"));
@@ -5492,7 +5559,7 @@ for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site
 for (const generation of [
   { name: "current", generation: "current", recipe: "0.3.0", vitest: "5.0.3", catalogSnapshot: createGenerationRenderingContext().catalogSnapshot },
 ]) {
-  test(`compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
+  testForScope("foundation-optionals", `compiled ${generation.name} app optional lifecycle completes production verification`, { timeout: 1_800_000 }, async (context) => {
     await withGitFixture("app", async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const foundationPaths = assertSuccess(core.createVerifiedCapabilityCatalog())
@@ -5580,7 +5647,7 @@ for (const generation of [
 
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "site"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 1_200_000 }, async () => {
+  testForScope("foundation-optionals", `compiled ${cohort.label} email lifecycle on ${profile} verifies and retains its foundation`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = await gitRepositorySnapshot(primary);
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
@@ -5677,7 +5744,7 @@ test("Web3Forms options strictly select contact and keep settings out of errors"
 });
 
 for (const cohort of lifecycleCohorts) for (const profile of ["portfolio", "app"].filter(profile => Object.hasOwn(cohort, profile))) {
-  test(`compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 1_200_000 }, async () => {
+  testForScope("contact", `compiled ${cohort.label} Web3Forms lifecycle on ${profile} preserves composition and re-adds safely`, { timeout: 1_200_000 }, async () => {
     await withGitFixture(profile === "app" ? "app-persistence-email" : profile, async ({ linked, primary }) => {
       const initialProject = assertSuccess(core.parseProjectYaml(await readFile(join(linked, ".egeria/project.yaml"), "utf8")));
       const initialState = assertSuccess(core.parseStateJson(await readFile(join(linked, ".egeria/state.json"), "utf8")));
@@ -5971,7 +6038,7 @@ async function executeEnvironmentBuilt(arguments_) {
 }
 
 for (const [profile, multilingual] of [["portfolio", false], ["site", true], ["app", false]]) {
-  test(`compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
+  testForScope("contact", `compiled environment contact lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 1_800_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
@@ -6080,7 +6147,7 @@ test("retired upgrade commands refuse before repository or verifier access", asy
 });
 
 for (const [profile, mode, multilingual] of [["portfolio", "link", false], ["site", "popup", true], ["app", "inline", false]]) {
-  test(`compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 3_600_000 }, async () => {
+  testForScope("analytics", `compiled environment analytics and neighbor lifecycle on ${profile} preserves exact neighbors and re-adds`, { timeout: 3_600_000 }, async () => {
     const renderingContext = core.createApplicationEnvironmentRenderingContext();
     await withGitFixture(profile, async ({ linked, primary }) => {
       const primaryBefore = withoutSharedRefs(await gitRepositorySnapshot(primary));
@@ -6323,3 +6390,5 @@ test("compiled retired recipe lifecycle commands refuse without writes", async (
     }
   }
 });
+
+if (registeredCaseCount === 0) throw new Error("CLI test scope selected no tests.");
