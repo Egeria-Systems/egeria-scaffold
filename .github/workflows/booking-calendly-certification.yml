@@ -68,7 +68,7 @@ jobs:
         run: pnpm run build:builder
 
       - name: Test compiled lifecycle behavior
-        run: pnpm run test:cli
+        run: pnpm --filter @egeria-systems/cli run test
 
       - name: Create fresh-added deployment candidate
         env:

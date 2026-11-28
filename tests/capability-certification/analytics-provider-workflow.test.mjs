@@ -509,8 +509,14 @@ test("the manual workflow is main-only, revision-bound, pinned, and step-secret-
     EXPECTED_REVISION: "${{ inputs.expected_revision }}",
   });
   const admission = steps["Verify protected staging inputs"];
+  const trustedSource = steps["Install and build trusted source"];
   assert.equal(admission.if, "env.CERTIFICATION_MODE == 'exercise'");
-  assert.ok(job.steps.indexOf(admission) < job.steps.indexOf(steps["Install and build trusted source"]));
+  assert.ok(job.steps.indexOf(admission) < job.steps.indexOf(trustedSource));
+  assert.deepEqual(trustedSource.run.trim().split("\n"), [
+    "pnpm install --frozen-lockfile",
+    "pnpm run build:builder",
+    "node scripts/check-capability-certification.mjs",
+  ]);
   for (const name of ["Verify protected staging inputs", "Wait for dedicated Worker readiness", "Exercise deployed consent behavior"]) {
     assert.equal(steps[name].env.CF_ACCESS_CLIENT_ID, "${{ secrets.CF_ACCESS_CLIENT_ID }}");
     assert.equal(steps[name].env.CF_ACCESS_CLIENT_SECRET, "${{ secrets.CF_ACCESS_CLIENT_SECRET }}");

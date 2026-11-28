@@ -2720,7 +2720,7 @@ test("the historical Calendly deployment job retains manual revision and credent
   assert.equal(stepsByName["Build builder"].run, "pnpm run build:builder");
   assert.equal(
     stepsByName["Test compiled lifecycle behavior"].run,
-    "pnpm run test:cli",
+    "pnpm --filter @egeria-systems/cli run test",
   );
   assert.match(
     stepsByName["Create fresh-added deployment candidate"].run,
